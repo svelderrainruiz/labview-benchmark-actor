@@ -6,6 +6,7 @@ import { buildReleaseStage } from './record-release-stage.mjs';
 const candidate = { component: 'extension', version: '1.2.0', commit: 'a'.repeat(40), vsixSha256: 'b'.repeat(64) };
 const readback = {
   matched: true,
+  expected: { type: 'DONE', task: 'stage-1.2.0' },
   reply: { senderId: 'WIN', type: 'DONE', task: 'stage-1.2.0', payload: 'extension 1.2.0 staged and validated' },
 };
 
@@ -15,4 +16,6 @@ assert.deepEqual(staged.candidate, candidate);
 assert.equal(staged.frame.senderId, 'WIN');
 assert.throws(() => buildReleaseStage({ candidate, readback: { ...readback, reply: { ...readback.reply, payload: '' } } }));
 assert.throws(() => buildReleaseStage({ candidate, readback: { ...readback, matched: false } }));
-console.log('record-release-stage selftest: 3/3 passed');
+assert.throws(() => buildReleaseStage({ candidate, readback: { ...readback, reply: { ...readback.reply, type: 'PROGRESS' } } }));
+assert.throws(() => buildReleaseStage({ candidate, readback: { ...readback, reply: { ...readback.reply, task: 'different-task' } } }));
+console.log('record-release-stage selftest: 5/5 passed');

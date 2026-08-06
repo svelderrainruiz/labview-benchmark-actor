@@ -92,6 +92,14 @@ ok('rejects a tampered digest', () => {
   assert.ok(v.findings.some((f) => /digest/.test(f)), 'expected a digest finding');
 });
 
+// 8. FAIL-CLOSED: staging cannot be satisfied by an in-progress or non-terminal net frame.
+ok('rejects a non-DONE staging frame', () => {
+  const r = clone(committed); r.staged.frame.type = 'PROGRESS'; reseal(r);
+  const v = validateReceipt(r);
+  assert.equal(v.ok, false);
+  assert.ok(v.findings.some((f) => /staged over net/.test(f)), 'expected a terminal staging finding');
+});
+
 let n = 0;
 for (const c of cases) { c.fn(); n += 1; console.log(`ok ${n} - ${c.name}`); }
 console.log(`# release-with-review-drive selftest ${n}/${cases.length} passed`);

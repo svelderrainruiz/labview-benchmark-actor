@@ -2662,7 +2662,7 @@ check('closed-loop-readback', () => {
   const netSrc = readFileSync(join(here, '..', 'tools', 'collab-cli', 'Net.cs'), 'utf8');
   const typesLine = netSrc.split('\n').find((l) => l.includes('"CLAIM"') && l.includes('"HELLO"')) || '';
   for (const t of ['RESOLVED', 'REFINE', 'BLOCKED']) { assert(typesLine.includes(`"${t}"`), `net Types set includes ${t}`); }
-  return { selftest: 'await-agent-reply 7/7', loopback: r.loopbackProof.ok, liveDrives: r.liveDrives.length, netVerdictTypes: 'RESOLVED/REFINE/BLOCKED' };
+  return { selftest: 'await-agent-reply 9/9', loopback: r.loopbackProof.ok, liveDrives: r.liveDrives.length, netVerdictTypes: 'RESOLVED/REFINE/BLOCKED' };
 });
 
 // LBA-REQ-068 / ADR-0049: net-only live VM-agent drive -- the host drives the reviewer VM's agent to run the

@@ -798,7 +798,7 @@ const SELFTEST = [
   }],
   ['release-stage producer normalizes a correlated WIN readback into the composite staging shape', () => {
     const candidate = { component: 'extension', version: '1.2.0', commit: 'a'.repeat(40), vsixSha256: 'b'.repeat(64) };
-    const staged = buildReleaseStage({ candidate, readback: { matched: true, reply: { senderId: 'WIN', type: 'DONE', task: 'stage-1.2.0', payload: 'staged' } } });
+    const staged = buildReleaseStage({ candidate, readback: { matched: true, expected: { type: 'DONE', task: 'stage-1.2.0' }, reply: { senderId: 'WIN', type: 'DONE', task: 'stage-1.2.0', payload: 'staged' } } });
     return isStagedReleaseFrame(staged, '1.2.0') && staged.candidate.commit === candidate.commit;
   }],
   ['release status detects a merged release branch before the later ext-v tag exists', () => isReleaseMergedToMain('1.2.0', (ref, main) => ref === 'origin/release/1.2.0' && main === 'origin/main')],

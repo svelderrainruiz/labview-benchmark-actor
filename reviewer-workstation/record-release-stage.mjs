@@ -19,12 +19,18 @@ function parseArgs(argv) {
 }
 
 export function buildReleaseStage({ candidate, readback, drive = 'await-agent-reply', vm = 'reviewer-vm' } = {}) {
+  const expected = readback?.expected;
+  const reply = readback?.reply;
+  if (readback?.matched !== true || expected?.type !== 'DONE' || typeof expected.task !== 'string' || !expected.task
+    || reply?.type !== 'DONE' || reply.task !== expected.task) {
+    throw new Error('readback must contain a matched expected DONE with the same non-empty task as its reply');
+  }
   const staged = {
     drive,
     vm,
-    matched: readback?.matched === true,
+    matched: true,
     candidate,
-    frame: readback?.reply ?? null,
+    frame: reply,
   };
   if (!stagedOk(staged, candidate)) {
     throw new Error('readback is not a matched WIN net frame with task, payload, and the requested candidate component/version');

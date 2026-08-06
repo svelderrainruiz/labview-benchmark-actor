@@ -44,14 +44,14 @@ export function candidatesMatch(a, b) {
     && String(a.vsixSha256) === String(b.vsixSha256);
 }
 
-// The staging drive closed the loop over net iff it is a matched WIN frame of an allowed net type carrying a
-// task + payload, bound to the candidate's component + version (what the VM reported it staged).
+// The staging drive closed the loop over net iff it is a matched WIN DONE frame carrying a task + payload,
+// bound to the candidate's component + version (what the VM reported it staged).
 export function stagedOk(staged, candidate) {
   const s = staged ?? {};
   const c = candidate ?? {};
   return s.matched === true && !!s.frame
     && s.frame.senderId === 'WIN'
-    && NET_TYPES.includes(s.frame.type)
+    && s.frame.type === 'DONE'
     && typeof s.frame.task === 'string' && s.frame.task.length > 0
     && typeof s.frame.payload === 'string' && s.frame.payload.length > 0
     && s.candidate && String(s.candidate.component) === String(c.component) && String(s.candidate.version) === String(c.version);
