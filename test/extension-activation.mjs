@@ -809,6 +809,25 @@ try {
       if (savedLadWg === undefined) delete process.env.LOCALAPPDATA; else process.env.LOCALAPPDATA = savedLadWg;
       rmSync(wgRoot, { recursive: true, force: true });
     }
+    // Some WinGet package managers do not create the optional Links shim. Gyan.FFmpeg still lives under the
+    // package store, so detect its real bin\ffmpeg.exe without relying on a new terminal PATH.
+    const wgPackageRoot = join(tmpdir(), 'lba-test-winget-package-' + Date.now());
+    const wgPackageBin = join(wgPackageRoot, 'Microsoft', 'WinGet', 'Packages', 'Gyan.FFmpeg_Microsoft.Winget.Source_8wekyb3d8bbwe', 'ffmpeg-9.0-full_build', 'bin');
+    mkdirSync(wgPackageBin, { recursive: true });
+    const wgPackageFfmpeg = join(wgPackageBin, 'ffmpeg.exe');
+    copyFileSync(process.execPath, wgPackageFfmpeg);
+    try { chmodSync(wgPackageFfmpeg, 0o755); } catch { /* no-op on Windows */ }
+    const savedPathPackage = process.env.PATH;
+    const savedLadPackage = process.env.LOCALAPPDATA;
+    process.env.PATH = join(tmpdir(), 'lba-no-ffmpeg-here-xyz');
+    process.env.LOCALAPPDATA = wgPackageRoot;
+    try {
+      assert(ext.resolveFfmpegChecked() === wgPackageFfmpeg, 'resolveFfmpegChecked finds Gyan.FFmpeg in the WinGet package store when Links is absent');
+    } finally {
+      process.env.PATH = savedPathPackage;
+      if (savedLadPackage === undefined) delete process.env.LOCALAPPDATA; else process.env.LOCALAPPDATA = savedLadPackage;
+      rmSync(wgPackageRoot, { recursive: true, force: true });
+    }
     // absent everywhere: clear PATH *and* point %LOCALAPPDATA% at a staged-ffmpeg-free dir so the `ffmpeg` probe
     // ENOENTs even on a host that HAS ffmpeg on PATH or staged under %LOCALAPPDATA%\lba\ffmpeg.exe (the reviewer WIN VM).
     const savedPath = process.env.PATH;

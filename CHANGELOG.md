@@ -25,6 +25,8 @@ follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project
 - **Linux cleanroom witness reliability on Windows worktrees.** Nested Ubuntu shell scripts are enforced as
   LF, and the devcontainer captures the host commit before startup so its Linux witness receipt retains source
   provenance even when Docker Desktop cannot resolve linked-worktree Git metadata.
+- **WinGet FFmpeg discovery without a Links shim.** The Windows launch capture now finds Gyan.FFmpeg directly
+  in WinGet's package store when an installation does not create `%LOCALAPPDATA%\Microsoft\WinGet\Links\ffmpeg.exe`.
 
 ## [1.2.0] - 2026-08-05
 
