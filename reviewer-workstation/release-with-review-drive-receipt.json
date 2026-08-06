@@ -16,13 +16,15 @@
     "matched": true,
     "candidate": {
       "component": "extension",
-      "version": "0.5.0"
+      "version": "0.5.0",
+      "commit": "a646c989adfd3038abc72c42cf59f165e9167ebe",
+      "vsixSha256": "f3996947a53a2f9b1b4872d110845de79c37e21b67280949723320ac94395eb3"
     },
     "frame": {
       "type": "DONE",
       "task": "rev-1785753563",
       "senderId": "WIN",
-      "payload": "ext 0.5.0 launch-to-ready 2604 ms over 5 samples; review OK"
+      "payload": "{\"schema\":\"labview-benchmark-actor/release-stage@1\",\"candidate\":{\"component\":\"extension\",\"version\":\"0.5.0\",\"commit\":\"a646c989adfd3038abc72c42cf59f165e9167ebe\",\"vsixSha256\":\"f3996947a53a2f9b1b4872d110845de79c37e21b67280949723320ac94395eb3\"}}"
     }
   },
   "review": {
@@ -103,5 +105,5 @@
     "releaseWithReviewProven": true,
     "reason": "the net-staged candidate extension 0.5.0 was signed PASS by an enrolled reviewer + announced RESOLVED over net -- one bound release-with-review loop"
   },
-  "digest": "abf8886247f7e8e8e955f14d71c29a17fad9e19979d147cd7be8b00dc5aca58c"
+  "digest": "b9ade83ce52c2a4eb866cdf81e25d9264cd9f1855ab98c37079b5fb5c468c822"
 }

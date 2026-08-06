@@ -13,7 +13,7 @@
 //
 // Usage:
 //   node reviewer-workstation/await-agent-reply.mjs --task loop-123 [--tcp 7420] [--timeout 300] \
-//        [--type DONE] [--count 1] [--out receipt.json]
+//        [--type DONE] [--out receipt.json]
 // Env:
 //   LBABUS   path to the lbabus binary or a *.dll (default: `lbabus` on PATH). A *.dll is launched via `dotnet`
 //            with DOTNET_ROLL_FORWARD=Major so a net8.0 build runs on a newer-only runtime.
@@ -25,7 +25,7 @@ import { writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 
 function parseArgs(argv) {
-  const a = { tcp: 7420, timeout: 300, type: 'DONE', count: 1, task: '', out: '' };
+  const a = { tcp: 7420, timeout: 300, type: 'DONE', task: '', out: '' };
   for (let i = 0; i < argv.length; i += 1) {
     const k = argv[i];
     const v = argv[i + 1];
@@ -34,7 +34,7 @@ function parseArgs(argv) {
       case '--tcp': a.tcp = Number(v); i += 1; break;
       case '--timeout': a.timeout = Number(v); i += 1; break;
       case '--type': a.type = v; i += 1; break;
-      case '--count': a.count = Number(v); i += 1; break;
+      case '--count': throw new Error('--count is incompatible with correlation; the listener stops only after the matching frame arrives or timeout expires');
       case '--out': a.out = v; i += 1; break;
       case '-h': case '--help': a.help = true; break;
       default: throw new Error(`await-agent-reply: unknown argument '${k}'`);
@@ -57,6 +57,29 @@ export function parseLine(line) {
   };
 }
 
+export function matchesExpectedReply(frame, expected) {
+  return frame?.type === expected?.type && frame?.task === expected?.task;
+}
+
+export function buildListenArgs({ tcp, timeout } = {}) {
+  return ['net', 'listen', '--tcp', String(tcp), '--echo', '--timeout', String(timeout)];
+}
+
+export function listenerDeadlineMs(timeoutSec) {
+  const seconds = Number(timeoutSec);
+  if (!Number.isFinite(seconds) || seconds <= 0) throw new Error('await timeout must be a positive number of seconds');
+  return Math.ceil(seconds * 1000);
+}
+
+export function installListenerDeadline({ child, timeoutSec, isMatched, onTimeout = () => {} } = {}) {
+  return setTimeout(() => {
+    if (!isMatched()) {
+      onTimeout();
+      child.kill();
+    }
+  }, listenerDeadlineMs(timeoutSec));
+}
+
 function resolveLbabus() {
   const lbabus = process.env.LBABUS || 'lbabus';
   if (lbabus.endsWith('.dll')) {
@@ -71,13 +94,20 @@ async function main() {
   if (!a.task) { console.error('await-agent-reply: --task <id> is required'); return 2; }
 
   const { cmd, pre, env } = resolveLbabus();
-  const args = [...pre, 'net', 'listen', '--tcp', String(a.tcp), '--echo', '--count', String(a.count), '--timeout', String(a.timeout)];
+  const args = [...pre, ...buildListenArgs(a)];
   const startedAt = new Date().toISOString();
   console.error(`[await-agent-reply] listening tcp=${a.tcp} awaiting type=${a.type} task=${a.task} timeout=${a.timeout}s`);
 
   const child = spawn(cmd, args, { env });
   const frames = [];
   let matched = null;
+  let deadlineExpired = false;
+  const deadlineTimer = installListenerDeadline({
+    child,
+    timeoutSec: a.timeout,
+    isMatched: () => matched !== null,
+    onTimeout: () => { deadlineExpired = true; },
+  });
   let buf = '';
   child.stdout.on('data', (d) => {
     buf += d.toString();
@@ -87,11 +117,15 @@ async function main() {
       const f = parseLine(line);
       if (!f) continue;
       frames.push(f);
-      if (!matched && f.type === a.type && f.task === a.task) matched = f;
+      if (!matched && matchesExpectedReply(f, { type: a.type, task: a.task })) {
+        matched = f;
+        child.kill();
+      }
     }
   });
 
   const code = await new Promise((res) => child.on('close', res));
+  clearTimeout(deadlineTimer);
   const resolvedAt = new Date().toISOString();
 
   const receipt = {
@@ -107,7 +141,7 @@ async function main() {
     listenerExit: code,
     note: matched
       ? 'VM agent reply correlated by task id; loop closed over TCP (no GitHub Discussion).'
-      : 'no correlated reply before the listener stopped (timeout or task mismatch) -- fail-closed.',
+      : `no correlated reply before the listener stopped (${deadlineExpired ? 'wrapper deadline' : 'listener timeout or task mismatch'}) -- fail-closed.`,
   };
 
   if (a.out) { writeFileSync(a.out, JSON.stringify(receipt, null, 2)); console.error(`[await-agent-reply] receipt -> ${a.out}`); }
@@ -117,7 +151,7 @@ async function main() {
 }
 
 function readHelp() {
-  return 'await-agent-reply.mjs --task <id> [--tcp 7420] [--timeout 300] [--type DONE] [--count 1] [--out receipt.json]';
+  return 'await-agent-reply.mjs --task <id> [--tcp 7420] [--timeout 300] [--type DONE] [--out receipt.json]';
 }
 
 // Run as a CLI only when invoked directly; importing this module (e.g. the selftest) just gets the helpers.

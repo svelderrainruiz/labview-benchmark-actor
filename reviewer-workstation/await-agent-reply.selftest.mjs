@@ -4,10 +4,10 @@
 // lines and asserts the DONE/NOTE correlation the host<->VM-agent closed loop depends on. Run:
 //   node reviewer-workstation/await-agent-reply.selftest.mjs
 import assert from 'node:assert';
-import { parseLine } from './await-agent-reply.mjs';
+import { buildListenArgs, matchesExpectedReply, parseLine } from './await-agent-reply.mjs';
 
 let passed = 0;
-const total = 7;
+const total = 9;
 function ok(name, fn) {
   try { fn(); console.log(`  PASS  ${name}`); passed += 1; }
   catch (e) { console.log(`  FAIL  ${name}: ${e.message}`); process.exitCode = 1; }
@@ -51,6 +51,17 @@ ok('correlation matches only the expected type AND task (fail-closed)', () => {
 ok('a payload containing the em dash keeps the full tail', () => {
   const f = parseLine('TCP 127.0.0.1:1  [t] WIN #1 NOTE task:t \u2014 a \u2014 b');
   assert(f.payload === 'a \u2014 b', `payload was: ${f.payload}`);
+});
+
+ok('the native listener remains unbounded until correlation or timeout', () => {
+  const args = buildListenArgs({ tcp: 7420, timeout: 300 });
+  assert(!args.includes('--count'), `unexpected arbitrary frame limit: ${args.join(' ')}`);
+  assert(args.includes('--timeout'), 'the listener remains bounded by timeout');
+});
+ok('a matching reply is distinguished from unrelated shared-bus traffic', () => {
+  const expected = { type: 'DONE', task: 'stage-1.2.0' };
+  assert(matchesExpectedReply({ type: 'DONE', task: 'stage-1.2.0' }, expected));
+  assert(!matchesExpectedReply({ type: 'NOTE', task: 'other' }, expected));
 });
 
 console.log(`\nawait-agent-reply selftest: ${passed}/${total} checks passed`);

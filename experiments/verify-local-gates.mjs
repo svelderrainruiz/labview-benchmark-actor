@@ -2653,6 +2653,7 @@ check('handoff-verdict', () => {
 // RESOLVED/REFINE/BLOCKED net frame -- coordination rides TCP, not a GitHub Discussion.
 check('closed-loop-readback', () => {
   execFileSync(process.execPath, [join(here, '..', 'reviewer-workstation', 'await-agent-reply.selftest.mjs')], { stdio: 'pipe' });
+  execFileSync(process.execPath, [join(here, '..', 'reviewer-workstation', 'await-agent-reply.timeout.selftest.mjs')], { stdio: 'pipe' });
   const r = JSON.parse(readFileSync(join(here, '..', 'reviewer-workstation', 'closed-loop-readback-receipt.json'), 'utf8'));
   assert(r.schema === 'labview-benchmark-actor/closed-loop-readback-receipt@1' && r.requirement === 'LBA-REQ-059', 'committed closed-loop receipt shape');
   assert(r.loopbackProof.ok === true && r.loopbackProof.matchingTaskClosesLoop === true && r.loopbackProof.wrongTaskFailsClosed === true && r.loopbackProof.semanticVerdictTypeOverNet === true, 'loopback proof: loop closes, wrong task fails closed, semantic verdict type rides net');
@@ -2662,7 +2663,7 @@ check('closed-loop-readback', () => {
   const netSrc = readFileSync(join(here, '..', 'tools', 'collab-cli', 'Net.cs'), 'utf8');
   const typesLine = netSrc.split('\n').find((l) => l.includes('"CLAIM"') && l.includes('"HELLO"')) || '';
   for (const t of ['RESOLVED', 'REFINE', 'BLOCKED']) { assert(typesLine.includes(`"${t}"`), `net Types set includes ${t}`); }
-  return { selftest: 'await-agent-reply 7/7', loopback: r.loopbackProof.ok, liveDrives: r.liveDrives.length, netVerdictTypes: 'RESOLVED/REFINE/BLOCKED' };
+  return { selftest: 'await-agent-reply 9/9 + timeout 3/3', loopback: r.loopbackProof.ok, liveDrives: r.liveDrives.length, netVerdictTypes: 'RESOLVED/REFINE/BLOCKED' };
 });
 
 // LBA-REQ-068 / ADR-0049: net-only live VM-agent drive -- the host drives the reviewer VM's agent to run the

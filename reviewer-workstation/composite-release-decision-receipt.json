@@ -16,13 +16,15 @@
     "matched": true,
     "candidate": {
       "component": "extension",
-      "version": "1.2.0"
+      "version": "1.2.0",
+      "commit": "a807318c4d16e830e6349844541c9c57ba16de75",
+      "vsixSha256": "0d28f6b4926d153586a534d9c029e7b8a54f3af575563c56d19cdc3d811bcd50"
     },
     "frame": {
       "type": "DONE",
       "task": "rev-1.2.0-net",
       "senderId": "WIN",
-      "payload": "ext 1.2.0 staged + WIN-plane validated (winPlaneReady:true, commit a807318, node-24 vsix 0d28f6b4): npm ci + compile + 6 suites + masked activation 26 cmds + agent-last-gate 8/8; review PASS"
+      "payload": "{\"schema\":\"labview-benchmark-actor/release-stage@1\",\"candidate\":{\"component\":\"extension\",\"version\":\"1.2.0\",\"commit\":\"a807318c4d16e830e6349844541c9c57ba16de75\",\"vsixSha256\":\"0d28f6b4926d153586a534d9c029e7b8a54f3af575563c56d19cdc3d811bcd50\"}}"
     }
   },
   "machine": {
@@ -147,5 +149,5 @@
     "compositeReleaseProven": true,
     "reason": "both gates publish for extension 1.2.0: machine quorum + enrolled sign-off (ADR-0018) AND human visual PASS (LBA-REQ-057), bound to the same net-staged candidate"
   },
-  "digest": "6242bb49f32bc551d9a1d0f0e99eb0f226286efc30afc85ca099e2be46b09b06"
+  "digest": "60255ccee459e6508ee2ed259ffeab5d94622975070fd23153afded6b2fc170e"
 }

@@ -54,7 +54,7 @@ export function computeDecision(r) {
   if (!visualPublish) reasons.push('the human visual gate would not publish: ' + (decision.visual?.reasons ?? []).join('; '));
 
   const stagedOverNet = stagedOk(staged, candidate);
-  if (!stagedOverNet) reasons.push('the candidate was not staged over net by a matched WIN drive bound to the same component+version');
+  if (!stagedOverNet) reasons.push('the candidate was not staged over net by a matched WIN DONE release-stage@1 frame bound to the same component/version/commit/vsixSha256');
 
   const visualTargetBound = candidatesMatch(candidate, visual.verdict?.target);
   if (!visualTargetBound) reasons.push('the human visual verdict target does not name the staged candidate (component/version/commit/vsixSha256)');
