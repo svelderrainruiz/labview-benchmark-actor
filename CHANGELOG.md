@@ -6,6 +6,26 @@ follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project
 
 ## [Unreleased]
 
+## [1.3.0] - 2026-08-06
+
+### Added
+- **Production golden LabVIEW workflow.** The Vagrant-backed golden actor now follows an explicit
+  `Provision` -> `ConsoleReady` -> `Handoff` -> `Confirm` -> `Package` lifecycle. Public provisioning
+  reboots before it verifies LabVIEWCLI and a usable graphical console; the user completes NI/VIPM activation
+  only in the VM console; packaging is blocked until current evidence verifies.
+- **Snapshot-resistant activation evidence.** A successful functional LabVIEWCLI confirmation persists a fresh
+  host challenge that is digest-bound into the activation receipt. Enrollment and production packaging require
+  that current challenge, guest identity, and operator console acknowledgement, preventing a pre-activation
+  snapshot or stale receipt from being treated as activated.
+- **Receipt-driven typed mesh lifecycle.** Direct Vagrant startup rejects topologies that cannot exchange
+  traffic, and the lifecycle proof verifies each actor's listener and emitter peer sets against the declared
+  topology before accepting a mesh receipt.
+
+### Fixed
+- **Linux cleanroom witness reliability on Windows worktrees.** Nested Ubuntu shell scripts are enforced as
+  LF, and the devcontainer captures the host commit before startup so its Linux witness receipt retains source
+  provenance even when Docker Desktop cannot resolve linked-worktree Git metadata.
+
 ## [1.2.0] - 2026-08-05
 
 ### Fixed
