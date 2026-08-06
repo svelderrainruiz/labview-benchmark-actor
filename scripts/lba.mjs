@@ -101,6 +101,16 @@ export function hostCapabilities() {
   return caps.sort();
 }
 
+export function goldenActivationHandoffCommands({ vm = 'actor1', hostname = vm, ip = '192.168.56.11' } = {}) {
+  const cycle = 'cleanroom/ubuntu-labview/golden-activation-cycle.ps1';
+  const identity = `-ActorId golden -ActorHostname ${hostname} -ActorIp ${ip}`;
+  return [
+    `pwsh -File ${cycle} -Vm ${vm} -Mode Handoff ${identity}`,
+    `pwsh -File ${cycle} -Vm ${vm} -Mode Confirm ${identity}`,
+    `node experiments/activation/registerMeshActor.mjs --receipt cleanroom/ubuntu-labview/mesh/.vagrant/golden-${vm}-activation-receipt.json --registry cleanroom/ubuntu-labview/mesh-actors.csv`,
+  ];
+}
+
 // ---- governance completeness for one requirement id ----------------------------------------------
 export function governCheck(id) {
   const results = GOVERNANCE_SURFACES.map((s) => ({ label: s.label, file: s.file, present: !!s.has(id, read(s.file) || '') }));
@@ -634,10 +644,8 @@ export const COMMANDS = {
       if (!args.includes('--run')) { console.log('\n(plan only \u2014 re-run with `lba init --run` to provision; set ISO / VM_NAME / BASEFOLDER first)'); return; }
       console.log('\n\u25b6 provisioning the golden VM (cleanroom/ubuntu-labview/build-virtualbox.sh --run)\u2026');
       execFileSync('bash', [join(repoRoot, 'cleanroom/ubuntu-labview/build-virtualbox.sh'), '--run'], { stdio: 'inherit' });
-      console.log('\nNEXT (hybrid \u2014 the one human step): activate LabVIEW CE + VIPM in the VM, then confirm + register:');
-      console.log('  LBA_ACTOR_ID=golden LBA_ACTOR_HOSTNAME=actor LBA_ACTOR_IP=192.168.56.10 bash experiments/activation/probe-activation.sh 20 22 /tmp/lba-activation-capture.json');
-      console.log('  node experiments/activation/buildActivationReceipt.mjs /tmp/lba-activation-capture.json /tmp/lba-activation-receipt.json');
-      console.log('  node experiments/activation/registerMeshActor.mjs --receipt /tmp/lba-activation-receipt.json --registry cleanroom/ubuntu-labview/mesh-actors.csv');
+      console.log('\nNEXT (hybrid): package the golden image into the declared Vagrant actor, then activate and confirm inside that VM:');
+      goldenActivationHandoffCommands().forEach((command) => console.log(`  ${command}`));
     },
   },
   'mesh-run': {
@@ -675,6 +683,14 @@ const SELFTEST = [
     return Number(nextRequirementId().match(/(\d+)$/)[1]) === cur + 1;
   }],
   ['next ADR id is well-formed and unused', () => /^ADR-\d{4}$/.test(nextAdrId()) && !existsSync(join(repoRoot, 'docs/architecture/adr', `${nextAdrId()}.md`))],
+  ['lba init activation handoff stays inside the Vagrant guest and registers its receipt', () => {
+    const commands = goldenActivationHandoffCommands();
+    return commands.length === 3
+      && commands[0].includes('golden-activation-cycle.ps1 -Vm actor1 -Mode Handoff')
+      && commands[1].includes('-Mode Confirm -ActorId golden -ActorHostname actor1 -ActorIp 192.168.56.11')
+      && commands[2].includes('golden-actor1-activation-receipt.json')
+      && !commands.some((command) => command.includes('probe-activation.sh'));
+  }],
   ['govern-check confirms a modern fully-governed requirement across all surfaces', () => governCheck('LBA-REQ-034').ok],
   ['govern-check fails closed for a non-existent requirement', () => governCheck('LBA-REQ-999').ok === false],
   ['release-preflight static checks pass for a consistent node-24 / version / CHANGELOG set', () => {
