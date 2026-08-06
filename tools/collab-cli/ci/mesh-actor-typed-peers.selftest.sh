@@ -50,4 +50,6 @@ grep -q '^net send --hosts sink ' "$no_emitter_trace"
 
 grep -Fq 'Environment=MESH_LISTENERS=#{listeners}' "$vagrantfile"
 grep -Fq 'Environment=MESH_EMITTERS=#{emitters}' "$vagrantfile"
+grep -Fq 'def normalized_mesh_node_type(actor)' "$vagrantfile"
+grep -Fq 'normalized_mesh_node_type(x)' "$vagrantfile"
 echo 'mesh-actor typed-peer selftest: 3/3 passed'

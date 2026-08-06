@@ -168,7 +168,7 @@ function Get-ReceiptCanonicalView {
   } | Sort-Object actorId, hostname)
   return [ordered]@{
     schema = [string]$Receipt.schema; outcome = [string]$Receipt.outcome; provider = [string]$Receipt.provider
-    sourceRef = [string]$Receipt.sourceRef; action = [string]$Receipt.action
+    sourceRef = [string]$Receipt.sourceRef; action = [string]$Receipt.action; completedAt = [string]$Receipt.completedAt
     inputs = [ordered]@{
       topologyHash = [string]$Receipt.inputs.topologyHash; registryHash = [string]$Receipt.inputs.registryHash
       vagrantfileHash = [string]$Receipt.inputs.vagrantfileHash; provisionerHash = [string]$Receipt.inputs.provisionerHash
@@ -186,7 +186,12 @@ function Get-ReceiptDigest {
 function Read-ValidatedReceipt {
   param([Parameter(Mandatory = $true)][string]$Path)
   if (-not (Test-Path -LiteralPath $Path -PathType Leaf)) { return [pscustomobject]@{ valid = $false; receipt = $null; findings = @('receipt is missing') } }
-  try { $receipt = Get-Content -LiteralPath $Path -Raw | ConvertFrom-Json }
+  try {
+    $rawReceipt = Get-Content -LiteralPath $Path -Raw
+    $receipt = $rawReceipt | ConvertFrom-Json
+    $timestampMatch = [regex]::Match($rawReceipt, '"completedAt"\s*:\s*"(?<value>[^"]+)"')
+    if ($timestampMatch.Success) { $receipt.completedAt = $timestampMatch.Groups['value'].Value }
+  }
   catch { return [pscustomobject]@{ valid = $false; receipt = $null; findings = @('receipt JSON is unreadable') } }
   $findings = @()
   try {
@@ -199,6 +204,10 @@ function Read-ValidatedReceipt {
     if ([string]$receipt.outcome -ne 'success') { throw 'receipt outcome is not success' }
     if ([string]$receipt.action -notin @('replace', 'apply-refresh', 'apply-verify')) { throw 'receipt action is unsupported' }
     if ([string]$receipt.sourceRef -notmatch '^collab-cli-v\d+\.\d+\.\d+$') { throw 'receipt sourceRef is invalid' }
+    $completedAt = [datetime]::MinValue
+    if (-not [datetime]::TryParseExact([string]$receipt.completedAt, 'o', [System.Globalization.CultureInfo]::InvariantCulture, [System.Globalization.DateTimeStyles]::RoundtripKind, [ref]$completedAt) -or $completedAt.Kind -ne [DateTimeKind]::Utc) {
+      throw 'receipt completedAt must be a UTC ISO-8601 round-trip timestamp'
+    }
     if ([string]$receipt.digest -notmatch '^[a-f0-9]{64}$') { throw 'receipt digest is not a lowercase SHA-256' }
     $allowedInputs = @('topologyHash', 'registryHash', 'vagrantfileHash', 'provisionerHash', 'meshWorkerHash')
     $actualInputs = @($receipt.inputs.PSObject.Properties.Name)
@@ -247,14 +256,19 @@ function Get-GuestProofs {
     $marker = Get-MeshSuccessMarker -NodeType $nodeType
     $guestCheck = (@'
 set -e
-started="$(date +%s)"
+before_cursor="$(journalctl -u lba-mesh.service --no-pager --show-cursor -n 0 2>/dev/null | sed -n 's/^-- cursor: //p')"
+restart_since="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
 test ! -e /tmp/lba-{0}.credential
 test "$(/usr/local/bin/lbabus version)" = "{1}"
 test "$(systemctl show -p ActiveState --value lba-gate-suite.service)" = active
 grep -Fx 'NODE_TYPE={2}' /etc/lba-mesh-actor >/dev/null
 systemctl show -p Environment --value lba-mesh.service | tr ' ' '\n' | grep -Fx 'NODE_TYPE={2}' >/dev/null
 sudo systemctl restart --no-block lba-mesh.service
-timeout {3} sh -c 'until journalctl -u lba-mesh.service --no-pager --since "@$1" | grep -Fq "{4}"; do sleep 1; done' sh "$started"
+if [ -n "$before_cursor" ]; then
+  timeout {3} sh -c 'until journalctl -u lba-mesh.service --no-pager --after-cursor "$1" | grep -Fq "$2"; do sleep 1; done' sh "$before_cursor" "{4}"
+else
+  timeout {3} sh -c 'until journalctl -u lba-mesh.service --no-pager --since "$1" | grep -Fq "$2"; do sleep 1; done' sh "$restart_since" "{4}"
+fi
 printf 'lbabus=%s nodeType={2} meshProof=ok\n' "$(/usr/local/bin/lbabus version)"
 '@ -f $actor.hostname, $ExpectedVersion, $nodeType, $TimeoutSec, $marker).Replace("`r`n", "`n")
     $guestOutput = & vagrant ssh ([string]$actor.hostname) '-c' $guestCheck
@@ -316,6 +330,18 @@ if ($SelfTest) {
     $tampered.digest = $hashB
     [System.IO.File]::WriteAllText($tempReceipt, (ConvertTo-CompactJson -Value $tampered -Depth 10), (New-Object System.Text.UTF8Encoding($false)))
     if ((Read-ValidatedReceipt -Path $tempReceipt).valid) { throw 'self-test expected tampered receipt rejection' }
+    $timestampTampered = $receipt | Select-Object *
+    $timestampTampered.completedAt = '2026-08-06T00:00:00.0000000Z'
+    [System.IO.File]::WriteAllText($tempReceipt, (ConvertTo-CompactJson -Value $timestampTampered -Depth 10), (New-Object System.Text.UTF8Encoding($false)))
+    if ((Read-ValidatedReceipt -Path $tempReceipt).valid) { throw 'self-test expected completion timestamp tamper rejection' }
+    $malformedTimestamp = $receipt | Select-Object *
+    $malformedTimestamp.completedAt = 'not-a-timestamp'
+    $malformedTimestamp.digest = Get-ReceiptDigest -Receipt $malformedTimestamp
+    [System.IO.File]::WriteAllText($tempReceipt, (ConvertTo-CompactJson -Value $malformedTimestamp -Depth 10), (New-Object System.Text.UTF8Encoding($false)))
+    if ((Read-ValidatedReceipt -Path $tempReceipt).valid) { throw 'self-test expected malformed completion timestamp rejection' }
+    $scriptText = Get-Content -LiteralPath $PSCommandPath -Raw
+    if ($scriptText -notmatch 'before_cursor="\$\(journalctl' -or $scriptText -notmatch '--after-cursor') { throw 'self-test expected a cursor-bound post-restart mesh proof' }
+    if ($scriptText -match 'date -u \+%%') { throw 'self-test found an invalid escaped date format in the journal fallback' }
     Write-Output 'mesh provision cycle self-test passed: canonical receipt, tamper rejection, and drift classification'
   } finally { Remove-Item -LiteralPath $tempRoot -Recurse -Force -ErrorAction SilentlyContinue }
   return
