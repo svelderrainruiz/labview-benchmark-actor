@@ -6,13 +6,22 @@
 // (a dropped step), if the ready verdict is forged, or if the digest is tampered. Pure -- no VM, no ripgrep.
 
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { spawnSync } from 'node:child_process';
+import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
   buildReadinessReceipt, validateReadinessReceipt, digestReadinessReceipt,
   analyzeProvisioner, READINESS_SCHEMA,
 } from './provisionerReadiness.mjs';
+import {
+  buildGoldenActivationReadinessReceipt,
+  validateGoldenActivationReadinessReceipt,
+  digestGoldenActivationReadiness,
+  REQUIRED_RUNTIME_CHECKS,
+  GOLDEN_ACTIVATION_READINESS_SCHEMA,
+} from './goldenActivationReadiness.mjs';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const repoRoot = join(here, '..', '..');
@@ -93,6 +102,77 @@ const ok = (m) => { n++; console.log(`ok ${n} - ${m}`); };
   const v = validateReadinessReceipt(tampered, realScript);
   assert.ok(!v.ok && v.findings.some((f) => /digest/.test(f)), 'a tampered digest must be rejected');
   ok('fail-closed: a tampered digest is rejected');
+}
+
+// 8. A live golden actor handoff receipt is deterministic and requires every no-secret prerequisite.
+{
+  const checks = Object.fromEntries(REQUIRED_RUNTIME_CHECKS.map((name) => [name, true]));
+  const capture = {
+    schema: 'labview-benchmark-actor/golden-activation-readiness-capture@1',
+    mode: 'check',
+    repairPerformed: false,
+    rebootRequired: false,
+    checks,
+  };
+  const receipt = buildGoldenActivationReadinessReceipt(capture);
+  const v = validateGoldenActivationReadinessReceipt(receipt);
+  assert.equal(receipt.schema, GOLDEN_ACTIVATION_READINESS_SCHEMA, 'golden readiness schema is stable');
+  assert.ok(v.ok && v.ready, `all runtime prerequisites produce READY: ${v.findings.join('; ')}`);
+  assert.equal(receipt.digest, digestGoldenActivationReadiness(receipt), 'golden readiness digest is deterministic');
+  ok('golden activation readiness: all public prerequisites yield a deterministic READY handoff receipt');
+}
+
+// 9. Missing guest dependencies and tampered verdicts refuse the human activation handoff.
+{
+  const checks = Object.fromEntries(REQUIRED_RUNTIME_CHECKS.map((name) => [name, true]));
+  checks.xvfb = false;
+  const receipt = buildGoldenActivationReadinessReceipt({ checks });
+  let v = validateGoldenActivationReadinessReceipt(receipt);
+  assert.ok(v.ok && !v.ready && receipt.missing.includes('xvfb'), 'missing Xvfb yields an incomplete handoff receipt');
+  receipt.ready = true;
+  receipt.verdict.ready = true;
+  receipt.digest = digestGoldenActivationReadiness(receipt);
+  v = validateGoldenActivationReadinessReceipt(receipt);
+  assert.ok(!v.ok && !v.ready, 'a resealed forged readiness verdict is rejected');
+  ok('golden activation readiness: missing prerequisites and forged verdicts fail closed');
+}
+
+// 10. Confirmation cannot reuse a stale successful capture after the current probe fails.
+{
+  const activationCycle = readFileSync(join(repoRoot, 'cleanroom', 'ubuntu-labview', 'golden-activation-cycle.ps1'), 'utf8');
+  assert.match(activationCycle, /rm -f \/tmp\/lba-activation-capture\.json && chmod 700/, 'the guest capture is cleared before each probe');
+  assert.match(activationCycle, /\$result\.ProbeExit -eq 0 -and \$result\.Receipt\.verdict\.activated -eq \$true/, 'confirmation requires the current probe to succeed');
+  ok('golden activation confirmation: stale captures and failed current probes cannot confirm activation');
+}
+
+// 11. VI Server readiness accepts only active exact key/value settings, never comments or port prefixes.
+{
+  const activationReady = readFileSync(join(repoRoot, 'cleanroom', 'ubuntu-labview', 'activation-ready.sh'), 'utf8');
+  const helperStart = activationReady.indexOf('has_active_setting() {');
+  const helperEnd = activationReady.indexOf('\n}\n', helperStart);
+  assert.ok(helperStart >= 0 && helperEnd > helperStart, 'activation readiness script exposes the exact-setting helper');
+  const helper = activationReady.slice(helperStart, helperEnd + 3).replace(/\r\n/g, '\n');
+  const fixtureDirectory = mkdtempSync(join(tmpdir(), 'lba-activation-ready-'));
+  const inactiveFixture = join(fixtureDirectory, 'inactive.conf');
+  const activeFixture = join(fixtureDirectory, 'active.conf');
+  writeFileSync(inactiveFixture, '#server.tcp.enabled=TRUE\nserver.tcp.port=33630\n');
+  writeFileSync(activeFixture, 'server.tcp.enabled=TRUE\nserver.tcp.port=3363\n');
+  const gitBash = 'C:\\Program Files\\Git\\bin\\bash.exe';
+  const bash = process.platform === 'win32' && existsSync(gitBash) ? gitBash : 'bash';
+  const probe = [
+    'set -eu', helper,
+    '! has_active_setting "$1" server.tcp.enabled TRUE',
+    '! has_active_setting "$1" server.tcp.port 3363',
+    'has_active_setting "$2" server.tcp.enabled TRUE',
+    'has_active_setting "$2" server.tcp.port 3363',
+  ].join('\n');
+  try {
+    const result = spawnSync(bash, ['-c', probe, 'activation-ready-regression', inactiveFixture, activeFixture], { encoding: 'utf8' });
+    assert.equal(result.status, 0, `exact active VI Server settings must be required: ${result.stderr}`);
+  } finally {
+    rmSync(fixtureDirectory, { recursive: true, force: true });
+  }
+  ok('golden activation readiness: VI Server settings must be active and exact');
 }
 
 console.log(`\n# provisioner-headless-readiness self-test: ${n}/${n} passed`);
