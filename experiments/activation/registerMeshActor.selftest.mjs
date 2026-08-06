@@ -12,17 +12,26 @@ import { tmpdir } from 'node:os';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import { buildActivationReceipt } from './buildActivationReceipt.mjs';
-import { describeActivationEvidence, registerGoldenActor, REGISTRY_HEADER } from './registerMeshActor.mjs';
+import { describeActivationEvidence, enrollCurrentGoldenActor, parseCurrentGuestIdentity, readCurrentGuestIdentity, registerGoldenActor, REGISTRY_HEADER, verifyCurrentGuestIdentity } from './registerMeshActor.mjs';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const receipt = JSON.parse(readFileSync(join(here, 'fixtures', 'activation-receipt.json'), 'utf8'));
 const capture = JSON.parse(readFileSync(join(here, 'fixtures', 'activation-capture.json'), 'utf8'));
 const actorIdentity = { actorId: 'golden', hostname: 'actor', ip: '192.168.56.10' };
-const boundReceipt = buildActivationReceipt({ ...capture, actor: actorIdentity });
+const bootId = '11111111-2222-3333-4444-555555555555';
+const boundReceipt = buildActivationReceipt({ ...capture, host: { ...capture.host, bootId }, actor: actorIdentity });
 let passed = 0;
 const ok = (m) => { console.log(`  PASS  ${m}`); passed += 1; };
 
 const goldenRows = (csv) => csv.split(/\r?\n/).filter((l) => l.startsWith('golden,'));
+
+const currentGuestOutput = `bootId=${bootId}\nhostname=actor\nips=192.168.198.180 192.168.56.10\n`;
+const currentGuestRun = (command, args, options) => {
+  assert.equal(command, 'vagrant');
+  assert.deepEqual(args.slice(0, 3), ['ssh', 'actor1', '-c']);
+  assert.equal(options.cwd, '/test/mesh');
+  return currentGuestOutput;
+};
 
 // 1. an ACTIVATED receipt registers exactly one golden mesh-actor row
 {
@@ -81,10 +90,12 @@ const goldenRows = (csv) => csv.split(/\r?\n/).filter((l) => l.startsWith('golde
   const registryPath = join(temp, 'mesh-actors.csv');
   writeFileSync(receiptPath, `${JSON.stringify(boundReceipt)}\n`);
   try {
-    const run = spawnSync(process.execPath, [join(here, 'registerMeshActor.mjs'), '--receipt', receiptPath, '--registry', registryPath], { encoding: 'utf8' });
-    assert.equal(run.status, 0, run.stderr);
-    assert.match(readFileSync(registryPath, 'utf8'), /^golden,golden,actor,actor,192\.168\.56\.10,7420,7421,both,AGENT_GENERATED$/m);
-    const noPassword = spawnSync(process.execPath, [join(here, 'registerMeshActor.mjs'), '--receipt', receiptPath, '--registry', registryPath, '--password', 'NOT_A_SECRET'], { encoding: 'utf8' });
+    const result = enrollCurrentGoldenActor({ receipt: boundReceipt, registry: '', vm: 'actor1', vagrantRoot: '/test/mesh', run: currentGuestRun });
+    assert.equal(result.ok, true, result.findings.join('; '));
+    assert.match(result.csv, /^golden,golden,actor,actor,192\.168\.56\.10,7420,7421,both,AGENT_GENERATED$/m);
+    const noVm = spawnSync(process.execPath, [join(here, 'registerMeshActor.mjs'), '--receipt', receiptPath, '--registry', registryPath], { encoding: 'utf8' });
+    assert.equal(noVm.status, 2, 'the enrollment CLI requires a Vagrant VM challenge');
+    const noPassword = spawnSync(process.execPath, [join(here, 'registerMeshActor.mjs'), '--receipt', receiptPath, '--registry', registryPath, '--vm', 'actor1', '--password', 'NOT_A_SECRET'], { encoding: 'utf8' });
     assert.equal(noPassword.status, 2, 'the enrollment CLI rejects password arguments');
     ok('CLI registers only from a valid receipt and never accepts a password');
   } finally {
@@ -97,15 +108,15 @@ const goldenRows = (csv) => csv.split(/\r?\n/).filter((l) => l.startsWith('golde
   const temp = mkdtempSync(join(tmpdir(), 'lba-register-refuse-'));
   const receiptPath = join(temp, 'unconfirmed.json');
   const registryPath = join(temp, 'mesh-actors.csv');
-  const unconfirmed = buildActivationReceipt({ ...capture, actor: actorIdentity, exitCode: 1 });
+  const unconfirmed = buildActivationReceipt({ ...capture, host: { ...capture.host, bootId }, actor: actorIdentity, exitCode: 1 });
   const seed = `${REGISTRY_HEADER}\nmesh,1,actor1,actor,192.168.56.11,7420,7421,both,AGENT_GENERATED\n`;
   writeFileSync(receiptPath, `${JSON.stringify(unconfirmed)}\n`);
   writeFileSync(registryPath, seed);
   try {
-    const run = spawnSync(process.execPath, [join(here, 'registerMeshActor.mjs'), '--receipt', receiptPath, '--registry', registryPath], { encoding: 'utf8' });
-    assert.equal(run.status, 1, 'unconfirmed activation is refused by the CLI');
-    assert.equal(readFileSync(registryPath, 'utf8'), seed, 'refusal leaves the local registry untouched');
-    assert.match(run.stderr, /Complete the user-only LabVIEW\/VIPM activation/, 'refusal names the next safe step');
+    const result = enrollCurrentGoldenActor({ receipt: unconfirmed, registry: seed, vm: 'actor1', vagrantRoot: '/test/mesh', run: currentGuestRun });
+    assert.equal(result.ok, false, 'unconfirmed activation is refused before a current guest check can enroll it');
+    assert.equal(result.csv, seed, 'refusal leaves the local registry untouched');
+    assert.match(result.findings.join('; '), /Complete the user-only LabVIEW\/VIPM activation/, 'refusal names the next safe step');
     ok('CLI refusal preserves the registry and explains the human activation next step');
   } finally {
     rmSync(temp, { recursive: true, force: true });
@@ -126,13 +137,42 @@ const goldenRows = (csv) => csv.split(/\r?\n/).filter((l) => l.startsWith('golde
 // 9. A verified Vagrant target identity becomes the golden row endpoint without caller-controlled overrides.
 {
   const targetIdentity = { actorId: 'golden', hostname: 'actor1', ip: '192.168.56.11' };
-  const targetReceipt = buildActivationReceipt({ ...capture, actor: targetIdentity });
+  const targetReceipt = buildActivationReceipt({ ...capture, host: { ...capture.host, bootId }, actor: targetIdentity });
   const result = registerGoldenActor({ receipt: targetReceipt, registry: '' });
   assert.equal(result.ok, true, result.findings.join('; '));
   assert.equal(result.row.hostname, 'actor1');
   assert.equal(result.row.ip, '192.168.56.11');
   assert.match(result.csv, /^golden,golden,actor1,actor,192\.168\.56\.11,7420,7421,both,AGENT_GENERATED$/m);
   ok('verified target identity supplies the golden registry endpoint');
+}
+
+// 10. Registration challenges the current Vagrant guest boot, hostname, and host-only IP.
+{
+  const guest = parseCurrentGuestIdentity(`bootId=${bootId}\nhostname=actor\nips=192.168.198.180 192.168.56.10\n`);
+  assert.equal(verifyCurrentGuestIdentity({ receipt: boundReceipt, guest }).ok, true, 'matching current guest accepts the receipt');
+  const restarted = { ...guest, bootId: 'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee' };
+  const result = verifyCurrentGuestIdentity({ receipt: boundReceipt, guest: restarted });
+  assert.equal(result.ok, false, 'a reverted or recreated guest boot is rejected');
+  assert.match(result.findings.join('; '), /boot ID/, 'the refusal requires a fresh confirmation');
+  ok('current guest boot challenge rejects a replayed activation receipt');
+}
+
+// 11. CLI refuses an activation receipt when the selected current guest was recreated or reverted.
+{
+  const temp = mkdtempSync(join(tmpdir(), 'lba-register-stale-'));
+  const receiptPath = join(temp, 'activation-receipt.json');
+  const registryPath = join(temp, 'mesh-actors.csv');
+  writeFileSync(receiptPath, `${JSON.stringify(boundReceipt)}\n`);
+  try {
+    const staleRun = () => `bootId=aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee\nhostname=actor\nips=192.168.198.180 192.168.56.10\n`;
+    const result = enrollCurrentGoldenActor({ receipt: boundReceipt, registry: '', vm: 'actor1', vagrantRoot: '/test/mesh', run: staleRun });
+    assert.equal(result.ok, false, 'the boot-ID mismatch is refused before the registry is written');
+    assert.equal(result.csv, '', 'stale confirmation leaves no registry mutation');
+    assert.match(result.findings.join('; '), /boot ID does not match/, 'refusal requests a fresh confirmation');
+    ok('CLI refuses a replayed receipt after the selected guest boot changes');
+  } finally {
+    rmSync(temp, { recursive: true, force: true });
+  }
 }
 
 console.log(`\nregisterMeshActor.selftest: ${passed}/${passed} checks passed`);

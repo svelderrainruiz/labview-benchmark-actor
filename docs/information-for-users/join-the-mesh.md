@@ -35,10 +35,13 @@ After a successful functional confirmation, enroll it with the non-secret receip
 ```powershell
 node experiments/activation/registerMeshActor.mjs `
   --receipt <activation-receipt.json> `
-  --registry cleanroom/ubuntu-labview/mesh-actors.csv
+  --registry cleanroom/ubuntu-labview/mesh-actors.csv `
+  --vm <vagrant-vm> `
+  --vagrant-root cleanroom/ubuntu-labview/mesh
 ```
 
-The command refuses an unconfirmed, crashed, or tampered receipt and leaves the local registry unchanged.
+The command refuses an unconfirmed, crashed, tampered, or stale receipt and leaves the local registry unchanged.
+It challenges the current Vagrant guest boot ID, hostname, and IP before enrolling it.
 It does not accept credentials or passwords; those remain local to the VM provisioning flow.
 
 ## 2. Watch for a dispatched run

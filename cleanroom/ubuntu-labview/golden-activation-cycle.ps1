@@ -40,6 +40,7 @@ $keyring = Join-Path $PSScriptRoot 'ni-labview-2026-noble-community.asc'
 $readinessBuilder = Join-Path $repoRoot 'experiments\provisioner-readiness\goldenActivationReadiness.mjs'
 $activationProbe = Join-Path $repoRoot 'experiments\activation\probe-activation.sh'
 $activationBuilder = Join-Path $repoRoot 'experiments\activation\buildActivationReceipt.mjs'
+$registrationScript = Join-Path $repoRoot 'experiments\activation\registerMeshActor.mjs'
 $artifactDir = Join-Path $VagrantRoot '.vagrant'
 $readinessCapture = Join-Path $artifactDir "golden-$Vm-readiness-capture.json"
 $readinessReceipt = Join-Path $artifactDir "golden-$Vm-readiness-receipt.json"
@@ -203,6 +204,7 @@ try {
       $result = Confirm-Activation
       if ($result.ProbeExit -eq 0 -and $result.IdentityVerified -and $result.Receipt.verdict.activated -eq $true) {
         Write-Output "golden actor '$Vm' activation is CONFIRMED; activation receipt: $activationReceipt"
+        Write-Output "enroll the current guest: node $registrationScript --receipt $activationReceipt --registry $(Join-Path (Split-Path -Parent $VagrantRoot) 'mesh-actors.csv') --vm $Vm --vagrant-root $VagrantRoot"
         exit 0
       }
       if (-not $result.IdentityVerified) {

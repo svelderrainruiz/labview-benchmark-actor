@@ -41,10 +41,13 @@ After `Confirm` exits successfully, register the local golden actor with the rec
 ```powershell
 node experiments/activation/registerMeshActor.mjs `
 	--receipt cleanroom/ubuntu-labview/mesh/.vagrant/golden-actor1-activation-receipt.json `
-	--registry cleanroom/ubuntu-labview/mesh-actors.csv
+	--registry cleanroom/ubuntu-labview/mesh-actors.csv `
+	--vm actor1 `
+	--vagrant-root cleanroom/ubuntu-labview/mesh
 ```
 
-The command validates the receipt before changing the ignored local registry. It never accepts a password;
+The command validates the receipt and challenges the current Vagrant guest boot ID, hostname, and IP before
+changing the ignored local registry. It never accepts a password;
 the local provisioning flow generates credentials separately. If confirmation is unconfirmed, crashed, or
 tampered, enrollment leaves the registry unchanged and prints the next safe action.
 

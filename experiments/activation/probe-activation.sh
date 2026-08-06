@@ -39,6 +39,11 @@ try:
 except FileNotFoundError:
     output = ""
 
+try:
+  boot_id = open("/proc/sys/kernel/random/boot_id", encoding="utf-8").read().strip().lower()
+except OSError:
+  boot_id = ""
+
 record = {
     "schema": "labview-benchmark-actor/activation-capture@1",
     "probeVi": probe_vi,
@@ -48,7 +53,7 @@ record = {
     "exitCode": int(exit_code),
     "wallMs": int(wall_ms),
     "output": output,
-    "host": {"os": platform.system().lower(), "hostname": socket.gethostname()},
+    "host": {"os": platform.system().lower(), "hostname": socket.gethostname(), **({"bootId": boot_id} if boot_id else {})},
 }
 actor_fields = {
     "actorId": os.environ.get("LBA_ACTOR_ID", "").strip(),
