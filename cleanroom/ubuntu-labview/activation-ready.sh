@@ -60,7 +60,26 @@ labview_conf="${config_dir}/labview.conf"
 community_conf="${config_dir}/labviewcommunity.conf"
 
 has_command() { command -v "$1" >/dev/null 2>&1; }
-file_contains() { [ -f "$1" ] && grep -Fq "$2" "$1"; }
+has_active_setting() {
+  [ -f "$1" ] || return 1
+  awk -v expected_key="$2" -v expected_value="$3" '
+    {
+      line = $0
+      sub(/\r$/, "", line)
+      sub(/^[[:space:]]+/, "", line)
+      if (line == "" || line ~ /^#/ || line ~ /^;/) next
+      equals = index(line, "=")
+      if (equals == 0) next
+      key = substr(line, 1, equals - 1)
+      value = substr(line, equals + 1)
+      sub(/[[:space:]]+$/, "", key)
+      sub(/^[[:space:]]+/, "", value)
+      sub(/[[:space:]]+$/, "", value)
+      if (key == expected_key && value == expected_value) found = 1
+    }
+    END { exit found ? 0 : 1 }
+  ' "$1"
+}
 
 check_labview_cli=false; has_command LabVIEWCLI && check_labview_cli=true
 check_labview_binary=false; [ -x /usr/local/natinst/LabVIEW-2026-64/labview ] && check_labview_binary=true
@@ -74,12 +93,12 @@ check_labview_conf=false; [ -f "$labview_conf" ] && check_labview_conf=true
 check_community_conf=false; [ -f "$community_conf" ] && check_community_conf=true
 check_vi_server_tcp=false
 check_vi_server_access=false
-if file_contains "$labview_conf" 'server.tcp.enabled=TRUE' && file_contains "$labview_conf" 'server.tcp.port=3363' && \
-   file_contains "$community_conf" 'server.tcp.enabled=TRUE' && file_contains "$community_conf" 'server.tcp.port=3363'; then
+if has_active_setting "$labview_conf" 'server.tcp.enabled' 'TRUE' && has_active_setting "$labview_conf" 'server.tcp.port' '3363' && \
+  has_active_setting "$community_conf" 'server.tcp.enabled' 'TRUE' && has_active_setting "$community_conf" 'server.tcp.port' '3363'; then
   check_vi_server_tcp=true
 fi
-if file_contains "$labview_conf" 'server.tcp.access="' && file_contains "$labview_conf" 'server.vi.access="' && \
-   file_contains "$community_conf" 'server.tcp.access="' && file_contains "$community_conf" 'server.vi.access="'; then
+if has_active_setting "$labview_conf" 'server.tcp.access' '"+*"' && has_active_setting "$labview_conf" 'server.vi.access' '"+*"' && \
+  has_active_setting "$community_conf" 'server.tcp.access' '"+*"' && has_active_setting "$community_conf" 'server.vi.access' '"+*"'; then
   check_vi_server_access=true
 fi
 check_sudo=false; sudo -n true >/dev/null 2>&1 && check_sudo=true
