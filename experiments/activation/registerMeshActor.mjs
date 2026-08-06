@@ -34,6 +34,14 @@ export function describeActivationEvidence(receipt) {
     };
   }
   if (validation.activated) {
+    if (!receipt.actor) {
+      return {
+        eligible: false,
+        status: 'missing-actor-identity',
+        nextStep: 'Do not enroll. Run a new confirmation probe with the public LBA_ACTOR_ID, LBA_ACTOR_HOSTNAME, and LBA_ACTOR_IP identity values.',
+        findings: [],
+      };
+    }
     return {
       eligible: true,
       status: 'activated',
@@ -85,6 +93,19 @@ export function registerGoldenActor({ receipt, registry = '', actor = {} } = {})
     };
   }
   const row = { ...GOLDEN_DEFAULTS, ...actor };
+  if (row.role !== 'golden' || row.actor_id !== 'golden') {
+    return {
+      ok: false, refused: true, csv: registry, row: null,
+      findings: ['golden enrollment only permits role=golden and actor_id=golden'],
+    };
+  }
+  const identity = receipt.actor;
+  if (row.hostname !== identity.hostname || row.ip !== identity.ip || row.actor_id !== identity.actorId) {
+    return {
+      ok: false, refused: true, csv: registry, row: null,
+      findings: ['receipt actor identity does not match the requested local golden actor'],
+    };
+  }
   const cells = COLS.map((c) => String(row[c]));
 
   const lines = String(registry).split(/\r?\n/);
@@ -123,6 +144,7 @@ function main() {
   }
   if (args.help) {
     console.log('usage: node registerMeshActor.mjs --receipt <activation-receipt.json> [--registry <mesh-actors.csv>] [--role golden] [--actor-id golden] [--hostname actor] [--username actor] [--ip 192.168.56.10] [--tcp-port 7420] [--udp-port 7421] [--node-type both]');
+    console.log('The requested golden actor identity must exactly match the public actor identity bound into the receipt.');
     console.log('The command never accepts a password; the local provisioning flow generates it separately.');
     process.exit(0);
   }
