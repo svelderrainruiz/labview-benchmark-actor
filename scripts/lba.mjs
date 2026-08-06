@@ -47,7 +47,7 @@ import { assembleLiveN2 } from '../experiments/mesh-fulfillment/driveLiveN2.mjs'
 import { stagedOk } from '../reviewer-workstation/release-with-review-drive.mjs';
 import { buildReleaseStage } from '../reviewer-workstation/record-release-stage.mjs';
 
-export const ITERATION = 17; // bump when you refine this tool (see the banner above)
+export const ITERATION = 18; // bump when you refine this tool (see the banner above)
 
 const here = dirname(fileURLToPath(import.meta.url));
 export const repoRoot = resolve(here, '..');
@@ -250,7 +250,10 @@ export function renderReleaseStatus(status) {
 }
 
 export function isStagedReleaseFrame(staged, version) {
-  return stagedOk(staged, { component: 'extension', version: String(version) });
+  const candidate = staged?.candidate;
+  return candidate?.component === 'extension'
+    && candidate?.version === String(version)
+    && stagedOk(staged, candidate);
 }
 
 export function isReleaseMergedTo(version, targetRef, isAncestor) {
@@ -790,16 +793,20 @@ const SELFTEST = [
     return /NEXT/.test(out) && /phase 6/.test(out) && /OPERATOR/.test(out) && out.includes('\u2713') && out.includes('\u25cb');
   }],
   ['release status accepts only a version-bound WIN DONE staging frame for phase 7', () => {
-    const staged = { matched: true, candidate: { component: 'extension', version: '1.2.0' }, frame: { type: 'DONE', senderId: 'WIN', task: 'stage-1.2.0', payload: 'staged' } };
+    const candidate = { component: 'extension', version: '1.2.0', commit: 'a'.repeat(40), vsixSha256: 'b'.repeat(64) };
+    const staged = { matched: true, candidate, frame: { type: 'DONE', senderId: 'WIN', task: 'stage-1.2.0', payload: JSON.stringify({ schema: 'labview-benchmark-actor/release-stage@1', candidate }) } };
     const wrongPlane = { ...staged, frame: { ...staged.frame, senderId: 'LINUX' } };
     const wrongVersion = { ...staged, candidate: { ...staged.candidate, version: '1.2.1' } };
+    const wrongCommit = { ...staged, frame: { ...staged.frame, payload: JSON.stringify({ schema: 'labview-benchmark-actor/release-stage@1', candidate: { ...candidate, commit: 'c'.repeat(40) } }) } };
+    const wrongVsix = { ...staged, frame: { ...staged.frame, payload: JSON.stringify({ schema: 'labview-benchmark-actor/release-stage@1', candidate: { ...candidate, vsixSha256: 'd'.repeat(64) } }) } };
     const incomplete = { ...staged, matched: false };
-    return isStagedReleaseFrame(staged, '1.2.0') && !isStagedReleaseFrame(wrongPlane, '1.2.0') && !isStagedReleaseFrame(wrongVersion, '1.2.0') && !isStagedReleaseFrame(incomplete, '1.2.0');
+    return isStagedReleaseFrame(staged, '1.2.0') && !isStagedReleaseFrame(wrongPlane, '1.2.0') && !isStagedReleaseFrame(wrongVersion, '1.2.0') && !isStagedReleaseFrame(wrongCommit, '1.2.0') && !isStagedReleaseFrame(wrongVsix, '1.2.0') && !isStagedReleaseFrame(incomplete, '1.2.0');
   }],
   ['release-stage producer normalizes a correlated WIN readback into the composite staging shape', () => {
     const candidate = { component: 'extension', version: '1.2.0', commit: 'a'.repeat(40), vsixSha256: 'b'.repeat(64) };
-    const staged = buildReleaseStage({ candidate, readback: { matched: true, expected: { type: 'DONE', task: 'stage-1.2.0' }, reply: { senderId: 'WIN', type: 'DONE', task: 'stage-1.2.0', payload: 'staged' } } });
-    return isStagedReleaseFrame(staged, '1.2.0') && staged.candidate.commit === candidate.commit;
+    const payload = JSON.stringify({ schema: 'labview-benchmark-actor/release-stage@1', candidate });
+    const staged = buildReleaseStage({ candidate, readback: { matched: true, expected: { type: 'DONE', task: 'stage-1.2.0' }, reply: { senderId: 'WIN', type: 'DONE', task: 'stage-1.2.0', payload } } });
+    return isStagedReleaseFrame(staged, '1.2.0') && staged.candidate.commit === candidate.commit && staged.candidate.vsixSha256 === candidate.vsixSha256;
   }],
   ['release status detects a merged release branch before the later ext-v tag exists', () => isReleaseMergedToMain('1.2.0', (ref, main) => ref === 'origin/release/1.2.0' && main === 'origin/main')],
   ['release status requires the release ancestry in develop before phase 13 is complete', () => {

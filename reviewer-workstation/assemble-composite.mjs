@@ -54,9 +54,9 @@ export function computeBindingDiffs({ candidate, machine, visual, staged }) {
     diffs.push({ source: 'machine.quorumVerdict.consensus', field: 'sourceCommit', expected: c.commit ?? null, got: consensus.sourceCommit ?? null });
   }
 
-  // staged candidate -- component + version (what the WIN VM reported it staged over net).
+  // staged candidate -- all four fields from the structured WIN release-stage@1 frame.
   const stagedCandidate = staged?.candidate ?? {};
-  for (const f of ['component', 'version']) {
+  for (const f of CANDIDATE_FIELDS) {
     if (String(c[f]) !== String(stagedCandidate[f])) {
       diffs.push({ source: 'staged.candidate', field: f, expected: c[f] ?? null, got: stagedCandidate[f] ?? null });
     }

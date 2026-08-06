@@ -72,7 +72,15 @@ node reviewer-workstation/record-release-stage.mjs \
 ```
 
 The awaiter ignores unrelated traffic and stops only when the correlated `DONE` arrives or its wrapper-enforced
-timeout expires; `record-release-stage.mjs` rejects non-terminal, mismatched, or uncorrelated readbacks.
+timeout expires. The WIN `DONE` payload must be this structured identity, emitted by the stage operation rather
+than copied from the host command:
+
+```json
+{"schema":"labview-benchmark-actor/release-stage@1","candidate":{"component":"extension","version":"X.Y.Z","commit":"<candidate-commit>","vsixSha256":"<candidate-vsix-sha256>"}}
+```
+
+`record-release-stage.mjs` rejects prose-only, partial, non-terminal, mismatched, or uncorrelated readbacks. It
+derives the staged candidate from that WIN frame and verifies all four fields before writing the artifact.
 
 ## 4. Signing (the two human sign-offs, in the VM)
 

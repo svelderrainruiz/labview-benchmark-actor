@@ -44,17 +44,32 @@ export function candidatesMatch(a, b) {
     && String(a.vsixSha256) === String(b.vsixSha256);
 }
 
-// The staging drive closed the loop over net iff it is a matched WIN DONE frame carrying a task + payload,
-// bound to the candidate's component + version (what the VM reported it staged).
+// The staging drive closed the loop over net iff it is a matched WIN DONE frame carrying a task + structured
+// release-stage@1 payload that names all four candidate identity fields (what the VM reported it staged).
+export function parseStagedCandidatePayload(payload) {
+  try {
+    const parsed = JSON.parse(String(payload));
+    if (parsed?.schema !== 'labview-benchmark-actor/release-stage@1') return null;
+    const candidate = parsed.candidate;
+    if (!candidate || ['component', 'version', 'commit', 'vsixSha256'].some((field) => typeof candidate[field] !== 'string' || !candidate[field])) return null;
+    return candidate;
+  } catch {
+    return null;
+  }
+}
+
 export function stagedOk(staged, candidate) {
   const s = staged ?? {};
   const c = candidate ?? {};
+  const frameCandidate = parseStagedCandidatePayload(s.frame?.payload);
   return s.matched === true && !!s.frame
     && s.frame.senderId === 'WIN'
     && s.frame.type === 'DONE'
     && typeof s.frame.task === 'string' && s.frame.task.length > 0
     && typeof s.frame.payload === 'string' && s.frame.payload.length > 0
-    && s.candidate && String(s.candidate.component) === String(c.component) && String(s.candidate.version) === String(c.version);
+    && candidatesMatch(s.candidate, c)
+    && candidatesMatch(frameCandidate, c)
+    && candidatesMatch(s.candidate, frameCandidate);
 }
 
 // Compute the full binding over a receipt-shaped object, REUSING the existing verdict primitives. Returns the
@@ -70,7 +85,7 @@ export function computeBinding(r) {
   const minVisualReviewers = r?.minVisualReviewers ?? r?.gate?.minVisualReviewers ?? 1;
 
   const stagedOverNet = stagedOk(staged, candidate);
-  if (!stagedOverNet) reasons.push('the candidate was not staged over net by a matched WIN drive bound to the same component+version');
+  if (!stagedOverNet) reasons.push('the candidate was not staged over net by a matched WIN DONE release-stage@1 frame bound to the same component/version/commit/vsixSha256');
 
   const candidateMatchesVerdictTarget = candidatesMatch(candidate, verdict.target);
   if (!candidateMatchesVerdictTarget) reasons.push('the signed verdict target does not match the staged release candidate (component/version/commit/vsixSha256)');

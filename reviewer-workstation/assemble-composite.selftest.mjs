@@ -121,13 +121,24 @@ ok('rejects a staged candidate that names a different version, with a precise di
   assert.equal(d.got, '7.7.7');
 });
 
-// 7. computeBindingDiffs is empty for the matched committed set (the binding invariant holds as committed).
+// 7. FAIL-CLOSED (precise diff): the STAGED frame reports a different commit and VSIX hash than the candidate.
+ok('rejects staged commit and VSIX identity drift with precise diffs', () => {
+  const p = piecesFromCommitted();
+  p.staged.candidate.commit = 'f'.repeat(40);
+  p.staged.candidate.vsixSha256 = 'a'.repeat(64);
+  const res = assembleComposite(p);
+  assert.equal(res.ok, false);
+  assert.ok(res.diffs.some((x) => x.source === 'staged.candidate' && x.field === 'commit'), 'staged commit diff reported');
+  assert.ok(res.diffs.some((x) => x.source === 'staged.candidate' && x.field === 'vsixSha256'), 'staged VSIX diff reported');
+});
+
+// 8. computeBindingDiffs is empty for the matched committed set (the binding invariant holds as committed).
 ok('computeBindingDiffs is empty for the matched committed set', () => {
   const diffs = computeBindingDiffs(piecesFromCommitted());
   assert.equal(diffs.length, 0, `committed set should have no binding diffs, got: ${JSON.stringify(diffs)}`);
 });
 
-// 8. FAIL-CLOSED: even with a perfect candidate binding, a tampered visual sign-off fails the composite gate
+// 9. FAIL-CLOSED: even with a perfect candidate binding, a tampered visual sign-off fails the composite gate
 //    (the assembler defers the cryptographic gate to the composite verifier -- it does not paper over it).
 ok('a bound-but-forged visual sign-off still fails the composite gate', () => {
   const p = piecesFromCommitted();
@@ -138,7 +149,7 @@ ok('a bound-but-forged visual sign-off still fails the composite gate', () => {
   assert.ok(res.findings.some((f) => /human visual gate would not publish/.test(f)), 'expected the composite gate finding');
 });
 
-// 9. FAIL-CLOSED: multiple pieces drift at once -> every mismatch is reported (not just the first).
+// 10. FAIL-CLOSED: multiple pieces drift at once -> every mismatch is reported (not just the first).
 ok('reports every binding mismatch when multiple pieces drift', () => {
   const p = piecesFromCommitted();
   p.visual.verdict.target.vsixSha256 = 'a'.repeat(64);

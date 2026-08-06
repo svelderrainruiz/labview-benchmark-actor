@@ -3,7 +3,7 @@
 
 import { readFileSync, writeFileSync } from 'node:fs';
 import { pathToFileURL } from 'node:url';
-import { stagedOk } from './release-with-review-drive.mjs';
+import { parseStagedCandidatePayload, stagedOk } from './release-with-review-drive.mjs';
 
 function parseArgs(argv) {
   const args = {};
@@ -25,15 +25,19 @@ export function buildReleaseStage({ candidate, readback, drive = 'await-agent-re
     || reply?.type !== 'DONE' || reply.task !== expected.task) {
     throw new Error('readback must contain a matched expected DONE with the same non-empty task as its reply');
   }
+  const frameCandidate = parseStagedCandidatePayload(reply.payload);
+  if (!frameCandidate) {
+    throw new Error('readback DONE payload must be a release-stage@1 JSON object with component, version, commit, and vsixSha256');
+  }
   const staged = {
     drive,
     vm,
     matched: true,
-    candidate,
+    candidate: frameCandidate,
     frame: reply,
   };
   if (!stagedOk(staged, candidate)) {
-    throw new Error('readback is not a matched WIN net frame with task, payload, and the requested candidate component/version');
+    throw new Error('readback is not a matched WIN release-stage@1 frame bound to the requested component, version, commit, and vsix hash');
   }
   return staged;
 }
