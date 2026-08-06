@@ -111,4 +111,18 @@ const ok = (m) => { console.log(`  PASS  ${m}`); passed += 1; };
   ok('actor identity is digest-bound and malformed receipt structures fail closed');
 }
 
+// 8. A guest boot ID is normalized, digest-bound, and format-validated when the probe supplies it.
+{
+  const bootId = '11111111-2222-3333-4444-555555555555';
+  const bound = buildActivationReceipt({ ...capture, host: { ...capture.host, bootId } });
+  assert.equal(bound.host.bootId, bootId, 'preserves the guest boot ID');
+  assert.ok(validateActivationReceipt(bound).ok, 'a UUID boot ID validates');
+  const tampered = { ...bound, host: { ...bound.host, bootId: 'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee' } };
+  assert.equal(validateActivationReceipt(tampered).ok, false, 'boot ID changes break the digest');
+  const malformed = { ...bound, host: { ...bound.host, bootId: 'not-a-boot-id' } };
+  malformed.digest = digestReceipt(malformed);
+  assert.equal(validateActivationReceipt(malformed).ok, false, 'a malformed boot ID is rejected even if resealed');
+  ok('guest boot identity is digest-bound and format-validated');
+}
+
 console.log(`\nbuildActivationReceipt.selftest: ${passed}/${passed} checks passed`);

@@ -38,7 +38,7 @@ function canonical(receipt) {
     schema: receipt?.schema,
     probe: { viName: p?.viName, inputs: p?.inputs, expectedOutput: p?.expectedOutput, knownAnswer: p?.knownAnswer },
     result: { exitCode: r?.exitCode, operationSucceeded: r?.operationSucceeded, parsedOutput: r?.parsedOutput },
-    host: { os: h?.os, labviewVersion: h?.labviewVersion },
+    host: { os: h?.os, labviewVersion: h?.labviewVersion, ...(h?.bootId ? { bootId: h.bootId } : {}) },
     ...(receipt?.actor ? { actor: receipt.actor } : {}),
     verdict: { activated: receipt?.verdict?.activated },
   });
@@ -62,6 +62,7 @@ export function buildActivationReceipt(capture) {
   const viName = basename(capture.probeVi || 'AddTwoNumbers.vi');
   const os = capture.host?.os || 'linux';
   const labviewVersion = parsed.labviewVersion || capture.labviewVersion || null;
+  const bootId = typeof capture.host?.bootId === 'string' && capture.host.bootId.trim() ? capture.host.bootId.trim().toLowerCase() : null;
   const actor = capture.actor && ['actorId', 'hostname', 'ip'].every((field) => typeof capture.actor[field] === 'string' && capture.actor[field].trim());
   const result = {
     exitCode: capture.exitCode,
@@ -79,7 +80,7 @@ export function buildActivationReceipt(capture) {
       viName, inputs, expectedOutput, knownAnswer: true,
     },
     result,
-    host: { os, labviewVersion },
+    host: { os, labviewVersion, ...(bootId ? { bootId } : {}) },
     ...(actor ? { actor: { actorId: capture.actor.actorId.trim(), hostname: capture.actor.hostname.trim(), ip: capture.actor.ip.trim() } } : {}),
     verdict: {
       activated,
@@ -99,6 +100,9 @@ export function validateActivationReceipt(receipt) {
   const p = receipt?.probe, r = receipt?.result, h = receipt?.host;
   if (!p || !r || !h || !receipt?.verdict) return { ok: false, activated: false, findings: findings.concat('missing probe/result/host/verdict') };
   if (p.knownAnswer !== true) findings.push('probe.knownAnswer must be true (functional activation proof)');
+  if (h.bootId !== undefined && !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/.test(String(h.bootId))) {
+    findings.push('host.bootId must be a Linux boot UUID when present');
+  }
   if (receipt.actor !== undefined && (!receipt.actor || ['actorId', 'hostname', 'ip'].some((field) => typeof receipt.actor[field] !== 'string' || !receipt.actor[field].trim()))) {
     findings.push('actor identity must contain non-empty actorId, hostname, and ip strings');
   }

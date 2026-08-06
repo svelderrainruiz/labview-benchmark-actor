@@ -7,9 +7,12 @@
 // Registry schema (cleanroom/ubuntu-labview/mesh-actors.csv):
 //   role,actor_id,hostname,username,ip,tcp_port,udp_port,node_type,password
 // The real mesh-actors.csv is gitignored and its passwords are AGENT-generated locally; this module only
-// composes the row deterministically (password stays the AGENT_GENERATED placeholder).
+// composes the row deterministically (password stays the AGENT_GENERATED placeholder). The CLI additionally
+// challenges the current Vagrant guest boot/hostname/IP before it writes the registry, so an old receipt from
+// a reverted or recreated actor cannot be replayed.
 
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { execFileSync } from 'node:child_process';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { dirname, join, resolve } from 'node:path';
 import { validateActivationReceipt } from './buildActivationReceipt.mjs';
@@ -17,11 +20,56 @@ import { validateActivationReceipt } from './buildActivationReceipt.mjs';
 export const REGISTRY_HEADER = 'role,actor_id,hostname,username,ip,tcp_port,udp_port,node_type,password';
 const here = dirname(fileURLToPath(import.meta.url));
 export const DEFAULT_REGISTRY_PATH = join(here, '..', '..', 'cleanroom', 'ubuntu-labview', 'mesh-actors.csv');
+export const DEFAULT_VAGRANT_ROOT = join(here, '..', '..', 'cleanroom', 'ubuntu-labview', 'mesh');
 export const GOLDEN_DEFAULTS = {
   role: 'golden', actor_id: 'golden', hostname: 'actor', username: 'actor',
   ip: '192.168.56.10', tcp_port: '7420', udp_port: '7421', node_type: 'both', password: 'AGENT_GENERATED',
 };
 const COLS = ['role', 'actor_id', 'hostname', 'username', 'ip', 'tcp_port', 'udp_port', 'node_type', 'password'];
+
+export function parseCurrentGuestIdentity(output) {
+  const values = Object.fromEntries(String(output || '').split(/\r?\n/)
+    .map((line) => line.split(/=(.*)/s))
+    .filter(([key, value]) => key && value !== undefined)
+    .map(([key, value]) => [key.trim(), value.trim()]));
+  return {
+    bootId: String(values.bootId || '').toLowerCase(),
+    hostname: String(values.hostname || ''),
+    ips: String(values.ips || '').split(/\s+/).filter(Boolean),
+  };
+}
+
+export function verifyCurrentGuestIdentity({ receipt, guest } = {}) {
+  const expected = receipt?.actor;
+  const bootId = receipt?.host?.bootId;
+  const findings = [];
+  if (!expected || !bootId) findings.push('receipt lacks the guest identity and boot proof required for enrollment');
+  if (expected && guest?.hostname !== expected.hostname) findings.push('current guest hostname does not match the activation receipt');
+  if (expected && !guest?.ips?.includes(expected.ip)) findings.push('current guest IP does not match the activation receipt');
+  if (bootId && guest?.bootId !== bootId) findings.push('current guest boot ID does not match the activation receipt; run a fresh confirmation');
+  return { ok: findings.length === 0, findings };
+}
+
+export function readCurrentGuestIdentity({ vm, vagrantRoot = DEFAULT_VAGRANT_ROOT, run = execFileSync } = {}) {
+  if (!vm) throw new Error('a Vagrant VM name is required to verify the current guest');
+  const guestCommand = 'printf "bootId=%s\\nhostname=%s\\nips=%s\\n" "$(cat /proc/sys/kernel/random/boot_id)" "$(hostname)" "$(hostname -I)"';
+  const output = run('vagrant', ['ssh', vm, '-c', guestCommand], { cwd: vagrantRoot, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] });
+  return parseCurrentGuestIdentity(output);
+}
+
+export function enrollCurrentGoldenActor({ receipt, registry = '', actor = {}, vm, vagrantRoot = DEFAULT_VAGRANT_ROOT, run = execFileSync } = {}) {
+  const evidence = describeActivationEvidence(receipt);
+  if (!evidence.eligible) return registerGoldenActor({ receipt, registry, actor });
+  const guest = readCurrentGuestIdentity({ vm, vagrantRoot, run });
+  const current = verifyCurrentGuestIdentity({ receipt, guest });
+  if (!current.ok) {
+    return {
+      ok: false, refused: true, csv: registry, row: null,
+      findings: ['current guest does not satisfy the activation receipt', ...current.findings],
+    };
+  }
+  return registerGoldenActor({ receipt, registry, actor });
+}
 
 export function describeActivationEvidence(receipt) {
   const validation = validateActivationReceipt(receipt);
@@ -143,19 +191,19 @@ function main() {
     process.exit(2);
   }
   if (args.help) {
-    console.log('usage: node registerMeshActor.mjs --receipt <activation-receipt.json> [--registry <mesh-actors.csv>] [--role golden] [--actor-id golden] [--hostname actor] [--username actor] [--ip 192.168.56.10] [--tcp-port 7420] [--udp-port 7421] [--node-type both]');
+    console.log('usage: node registerMeshActor.mjs --receipt <activation-receipt.json> --vm <vagrant-vm> [--vagrant-root <mesh-dir>] [--registry <mesh-actors.csv>] [--role golden] [--actor-id golden] [--hostname actor] [--username actor] [--ip 192.168.56.10] [--tcp-port 7420] [--udp-port 7421] [--node-type both]');
     console.log('The requested golden actor identity must exactly match the public actor identity bound into the receipt.');
     console.log('The command never accepts a password; the local provisioning flow generates it separately.');
     process.exit(0);
   }
-  const allowed = new Set(['help', 'receipt', 'registry', 'role', 'actor-id', 'hostname', 'username', 'ip', 'tcp-port', 'udp-port', 'node-type']);
+  const allowed = new Set(['help', 'receipt', 'registry', 'vm', 'vagrant-root', 'role', 'actor-id', 'hostname', 'username', 'ip', 'tcp-port', 'udp-port', 'node-type']);
   const unknown = Object.keys(args).find((key) => !allowed.has(key));
   if (unknown) {
     console.error(`registration refused: unsupported --${unknown}; enrollment never accepts credentials or passwords`);
     process.exit(2);
   }
-  if (typeof args.receipt !== 'string' || !args.receipt) {
-    console.error('usage: node registerMeshActor.mjs --receipt <activation-receipt.json> [--registry <mesh-actors.csv>]');
+  if (typeof args.receipt !== 'string' || !args.receipt || typeof args.vm !== 'string' || !args.vm) {
+    console.error('usage: node registerMeshActor.mjs --receipt <activation-receipt.json> --vm <vagrant-vm> [--vagrant-root <mesh-dir>] [--registry <mesh-actors.csv>]');
     process.exit(2);
   }
 
@@ -181,7 +229,13 @@ function main() {
     ...(typeof args['udp-port'] === 'string' ? { udp_port: args['udp-port'] } : {}),
     ...(typeof args['node-type'] === 'string' ? { node_type: args['node-type'] } : {}),
   };
-  const result = registerGoldenActor({ receipt, registry, actor });
+  let result;
+  try {
+    result = enrollCurrentGoldenActor({ receipt, registry, actor, vm: args.vm, vagrantRoot: typeof args['vagrant-root'] === 'string' ? resolve(args['vagrant-root']) : DEFAULT_VAGRANT_ROOT });
+  } catch (error) {
+    console.error(`registration refused: cannot verify current guest ${args.vm}: ${error.message}`);
+    process.exit(1);
+  }
   if (!result.ok) {
     console.error(`registration refused: ${result.findings.join('; ')}`);
     process.exit(1);

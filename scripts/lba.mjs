@@ -107,7 +107,7 @@ export function goldenActivationHandoffCommands({ vm = 'actor1', hostname = vm, 
   return [
     `pwsh -File ${cycle} -Vm ${vm} -Mode Handoff ${identity}`,
     `pwsh -File ${cycle} -Vm ${vm} -Mode Confirm ${identity}`,
-    `node experiments/activation/registerMeshActor.mjs --receipt cleanroom/ubuntu-labview/mesh/.vagrant/golden-${vm}-activation-receipt.json --registry cleanroom/ubuntu-labview/mesh-actors.csv`,
+    `node experiments/activation/registerMeshActor.mjs --receipt cleanroom/ubuntu-labview/mesh/.vagrant/golden-${vm}-activation-receipt.json --registry cleanroom/ubuntu-labview/mesh-actors.csv --vm ${vm} --vagrant-root cleanroom/ubuntu-labview/mesh`,
   ];
 }
 
@@ -688,7 +688,7 @@ const SELFTEST = [
     return commands.length === 3
       && commands[0].includes('golden-activation-cycle.ps1 -Vm actor1 -Mode Handoff')
       && commands[1].includes('-Mode Confirm -ActorId golden -ActorHostname actor1 -ActorIp 192.168.56.11')
-      && commands[2].includes('golden-actor1-activation-receipt.json')
+      && commands[2].includes('golden-actor1-activation-receipt.json --registry cleanroom/ubuntu-labview/mesh-actors.csv --vm actor1')
       && !commands.some((command) => command.includes('probe-activation.sh'));
   }],
   ['govern-check confirms a modern fully-governed requirement across all surfaces', () => governCheck('LBA-REQ-034').ok],
