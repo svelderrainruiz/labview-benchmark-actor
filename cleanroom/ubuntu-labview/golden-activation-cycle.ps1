@@ -119,7 +119,7 @@ function Get-Readiness {
 
 function Confirm-Activation {
   Send-GuestFile -Source $activationProbe -Destination '/tmp/lba-probe-activation.sh'
-  $probeExit = Invoke-VagrantAllowFailure -Arguments @('ssh', $Vm, '-c', 'chmod 700 /tmp/lba-probe-activation.sh; bash /tmp/lba-probe-activation.sh 20 22 /tmp/lba-activation-capture.json')
+  $probeExit = Invoke-VagrantAllowFailure -Arguments @('ssh', $Vm, '-c', 'rm -f /tmp/lba-activation-capture.json && chmod 700 /tmp/lba-probe-activation.sh && bash /tmp/lba-probe-activation.sh 20 22 /tmp/lba-activation-capture.json')
   Receive-GuestFile -Source '/tmp/lba-activation-capture.json' -Destination $activationCapture
   & node $activationBuilder $activationCapture $activationReceipt | Out-Host
   $builderExit = $LASTEXITCODE
@@ -177,11 +177,11 @@ try {
         exit 1
       }
       $result = Confirm-Activation
-      if ($result.Receipt.verdict.activated -eq $true) {
+      if ($result.ProbeExit -eq 0 -and $result.Receipt.verdict.activated -eq $true) {
         Write-Output "golden actor '$Vm' activation is CONFIRMED; activation receipt: $activationReceipt"
         exit 0
       }
-      Write-Output "golden actor '$Vm' activation remains unconfirmed; complete the user-only handoff and retry Confirm"
+      Write-Output "golden actor '$Vm' activation remains unconfirmed (probe exit $($result.ProbeExit)); complete the user-only handoff and retry Confirm"
       exit 1
     }
   }

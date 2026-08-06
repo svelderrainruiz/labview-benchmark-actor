@@ -135,4 +135,12 @@ const ok = (m) => { n++; console.log(`ok ${n} - ${m}`); };
   ok('golden activation readiness: missing prerequisites and forged verdicts fail closed');
 }
 
+// 10. Confirmation cannot reuse a stale successful capture after the current probe fails.
+{
+  const activationCycle = readFileSync(join(repoRoot, 'cleanroom', 'ubuntu-labview', 'golden-activation-cycle.ps1'), 'utf8');
+  assert.match(activationCycle, /rm -f \/tmp\/lba-activation-capture\.json && chmod 700/, 'the guest capture is cleared before each probe');
+  assert.match(activationCycle, /\$result\.ProbeExit -eq 0 -and \$result\.Receipt\.verdict\.activated -eq \$true/, 'confirmation requires the current probe to succeed');
+  ok('golden activation confirmation: stale captures and failed current probes cannot confirm activation');
+}
+
 console.log(`\n# provisioner-headless-readiness self-test: ${n}/${n} passed`);
