@@ -2,7 +2,7 @@
   "name": "labview-benchmark-actor",
   "displayName": "LabVIEW Benchmark Actor",
   "description": "Standalone agentic benchmark-actor infrastructure with cross-plane coordination (lbabus) for LabVIEW benchmarking.",
-  "version": "1.2.0",
+  "version": "1.3.0",
   "publisher": "svelderrainruiz",
   "license": "0BSD",
   "author": "Sergio Velderrain",
@@ -252,7 +252,7 @@
         "labviewBenchmarkActor.ffmpegPath": {
           "type": "string",
           "default": "",
-          "markdownDescription": "Path to `ffmpeg.exe` used to capture the LabVIEW launch at 12 fps (Windows `gdigrab`). Leave empty to auto-resolve the copy the installer stages at `%LOCALAPPDATA%\\lba\\ffmpeg.exe`, else `ffmpeg` from `PATH`."
+          "markdownDescription": "Path to `ffmpeg.exe` used to capture the LabVIEW launch at 12 fps (Windows `gdigrab`). Leave empty to auto-resolve the installer copy, a WinGet Gyan.FFmpeg package, or `ffmpeg` from `PATH`."
         },
         "labviewBenchmarkActor.labviewPath": {
           "type": "string",
