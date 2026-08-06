@@ -654,6 +654,18 @@ check('cleanroom-provisioner-scripts-pure-ascii', () => {
   return { scripts: scanned };
 });
 
+// Typed mesh actors must send only to listener-capable peers and wait only for emitter-capable peers.
+// Bash is available in Linux CI and local WSL; Windows runners may not expose it as an executable.
+check('mesh-typed-peer-routing', () => {
+  try {
+    execFileSync('bash', ['tools/collab-cli/ci/mesh-actor-typed-peers.selftest.sh'], { cwd: pkgRoot, stdio: 'pipe' });
+  } catch (error) {
+    if (error.code === 'ENOENT') return { skipped: 'bash is unavailable on this host' };
+    throw error;
+  }
+  return { selftest: 'mesh-actor-typed-peers 3/3', proves: 'source targets listeners; listeners await emitters; empty typed lists remain empty' };
+});
+
 // 14. The clean-room bootstrap installs its toolchain winget-free. `winget` is an MSIX app-execution alias
 //     that is NOT resolvable on the non-interactive WinRM provisioner PATH, so `winget install ...` in the
 //     bootstrap fails over Vagrant. Enforce winget-free installs (dotnet-install + release archives) so the
@@ -701,13 +713,17 @@ check('cleanroom-gate-suite-shared-in-sync', () => {
 check('codespace-witness-bootstrap-valid', () => {
   const dc = JSON.parse(readFileSync(join(pkgRoot, '.devcontainer', 'cleanroom-witness', 'devcontainer.json'), 'utf8'));
   assert(String(dc.postCreateCommand || '').includes('bootstrap-validate.sh'), 'the witness devcontainer runs bootstrap-validate on postCreate');
+  assert(String(dc.initializeCommand || '').includes('capture-source-commit.mjs'), 'the witness captures host Git provenance before the container starts');
   assert(/ubuntu-24\.04/.test(String(dc.image || '')), 'the witness devcontainer is Ubuntu 24.04 (noble) to match the VBox golden VM');
   const bs = readFileSync(join(pkgRoot, 'cleanroom', 'ubuntu-labview', 'codespace', 'bootstrap-validate.sh'), 'utf8');
   assert(bs.startsWith('#!/usr/bin/env bash'), 'bootstrap-validate.sh has a bash shebang');
   assert(bs.includes('set -euo pipefail'), 'bootstrap-validate.sh runs in strict mode');
+  assert(bs.includes('LBA_SOURCE_COMMIT') && bs.includes('.source-commit'), 'the witness fails closed unless it can resolve source provenance from Git or the host handoff');
   assert(bs.includes('cleanroom/ubuntu-labview/lba/gate-suite.sh'), 'the witness runs the SHARED gate-suite (single source), not a copy');
   assert(bs.includes('dotnet publish') && bs.includes('LbaBus.csproj'), 'the witness builds lbabus from source');
-  return { devcontainer: 'noble', runsSharedGateSuite: true };
+  const attributes = readFileSync(join(pkgRoot, '.gitattributes'), 'utf8');
+  assert(attributes.includes('cleanroom/ubuntu-labview/**/*.sh text eol=lf'), 'nested Ubuntu cleanroom shell scripts are forced to LF for Linux containers');
+  return { devcontainer: 'noble', runsSharedGateSuite: true, hostGitProvenance: true };
 });
 
 // The ACG codespace-witness PREBUILD workflow (ADR-0014/ADR-0015): a REAL container build of the witness

@@ -19,7 +19,9 @@
 set -u
 
 LBABUS="${LBABUS:-/out/cli/lbabus.dll}"
-PEERS="${MESH_PEERS:-${1:-}}"          # comma-separated actor hostnames (self is filtered out)
+PEERS="${MESH_PEERS:-${1:-}}"          # legacy all-peer fallback for symmetric Docker meshes
+LISTENERS="${MESH_LISTENERS-$PEERS}"   # comma-separated peers that accept TCP + receive UDP (empty is meaningful)
+EMITTERS="${MESH_EMITTERS-$PEERS}"     # comma-separated peers expected to emit TCP + UDP (empty is meaningful)
 TCP_PORT="${TCP_PORT:-7420}"
 UDP_PORT="${UDP_PORT:-7421}"
 TIMEOUT_SEC="${TIMEOUT_SEC:-90}"
@@ -75,23 +77,32 @@ if [ -n "${LBA_AGENTS_ROLE:-}${LBA_AGENTS_REPO:-}" ]; then
   fi
 fi
 
-# split PEERS csv, trim, drop self.
-others=""
-IFS=',' read -ra _peers <<< "$PEERS"
-for p in "${_peers[@]}"; do
-  p="$(printf '%s' "$p" | tr -d '[:space:]')"
-  if [ -n "$p" ] && [ "$p" != "$actor" ]; then others="$others $p"; fi
-done
-expected="$(printf '%s' "$others" | wc -w | tr -d ' ')"
-peer_csv="$(echo $others | tr ' ' ',')"   # comma-joined peer list for the single --hosts fan-out (self already dropped)
+# Split a peer CSV, trim, and drop self. Typed Vagrant meshes use separate listener and emitter lists;
+# Docker's symmetric MESH_PEERS remains the default for both lists.
+peer_words() {
+  local csv="$1" out="" p
+  IFS=',' read -ra _peers <<< "$csv"
+  for p in "${_peers[@]}"; do
+    p="$(printf '%s' "$p" | tr -d '[:space:]')"
+    if [ -n "$p" ] && [ "$p" != "$actor" ]; then out="$out $p"; fi
+  done
+  printf '%s' "$out"
+}
+peer_csv() { printf '%s' "$1" | tr ' ' ',' | sed 's/^,*//; s/,*$//'; }
+
+listener_words="$(peer_words "$LISTENERS")"
+emitter_words="$(peer_words "$EMITTERS")"
+listener_count="$(printf '%s' "$listener_words" | wc -w | tr -d ' ')"
+expected="$(printf '%s' "$emitter_words" | wc -w | tr -d ' ')"
+listener_csv="$(peer_csv "$listener_words")"
 
 tcp_out="$(mktemp)"; udp_out="$(mktemp)"
-echo "[$actor] mesh start: expected=$expected tcp=$TCP_PORT udp=$UDP_PORT"
+echo "[$actor] mesh start: listeners=$listener_count emitters=$expected tcp=$TCP_PORT udp=$UDP_PORT"
 
 # 1. background listeners (sink|both only): TCP collects exactly $expected reliable frames (echoing an ACK to
 # each sender); UDP collects presence beacons, exiting as soon as it has heard EVERY distinct peer
 # (--count-distinct) or the timeout fires. A pure source starts NO listeners (node types are enforced).
-if [ "$is_listener" = 1 ]; then
+if [ "$is_listener" = 1 ] && [ "$expected" -gt 0 ]; then
   run_lbabus net listen --tcp "$TCP_PORT" --echo --count "$expected" --timeout "$TIMEOUT_SEC" > "$tcp_out" 2>/dev/null &
   tcp_pid=$!
   run_lbabus net listen --udp "$UDP_PORT" --count-distinct "$expected" --timeout "$UDP_TIMEOUT_SEC" > "$udp_out" 2>/dev/null &
@@ -104,9 +115,11 @@ sleep 2   # let our own listeners bind before the peers start hammering them
 # its listener accepts (startup race). One process per actor -- not one per peer -- keeps the mesh at O(N)
 # total dotnet launches instead of O(N^2), so the proof measures the lbabus net transport rather than dotnet
 # process-startup contention. A clean exit is also our barrier that every peer is alive.
-if [ "$is_emitter" = 1 ] && ! run_lbabus net send --hosts "$peer_csv" --tcp "$TCP_PORT" --type CLAIM --task mesh \
+tcp_send_ok=1
+if [ "$is_emitter" = 1 ] && [ "$listener_count" -gt 0 ] && ! run_lbabus net send --hosts "$listener_csv" --tcp "$TCP_PORT" --type CLAIM --task mesh \
     --message "hello from $actor" --await 2 --retries "$SEND_RETRIES" --retry-ms "$SEND_RETRY_MS" >/dev/null 2>&1; then
-  echo "[$actor] WARN one or more TCP peers unreachable after $SEND_RETRIES tries"
+  tcp_send_ok=0
+  echo "[$actor] WARN one or more listener peers unreachable after $SEND_RETRIES tries"
 fi
 
 # 3. UDP: ONE `lbabus net beacon` fans presence beacons out to EVERY peer via --hosts (the CLI resolves each
@@ -114,15 +127,17 @@ fi
 # identity, so a peer attributes each beacon regardless of datagram loss or address translation. On the Vagrant
 # mesh we also beacon to MESH_OBSERVERS (the host .1 monitor) so the read-only host viewer sees presence, and
 # --bind pins the host-only source NIC; observers are extra TARGETS, never required peers.
-beacon_hosts="$peer_csv"
+beacon_hosts="$listener_csv"
 [ -n "$MESH_OBSERVERS" ] && beacon_hosts="${beacon_hosts:+$beacon_hosts,}$MESH_OBSERVERS"
-[ "$is_emitter" = 1 ] && run_lbabus net beacon --hosts "$beacon_hosts" --udp "$UDP_PORT" $bind_arg --count "$UDP_BEACONS" --interval 1 --task mesh >/dev/null 2>&1 || true
+[ "$is_emitter" = 1 ] && [ -n "$beacon_hosts" ] && run_lbabus net beacon --hosts "$beacon_hosts" --udp "$UDP_PORT" $bind_arg --count "$UDP_BEACONS" --interval 1 --task mesh >/dev/null 2>&1 || true
 
 # 4. verdict. A sink|both waits for its listeners and counts DISTINCT peers heard over each transport; a pure
 # source has nothing to hear -- its success is that it fanned its stream out to every peer.
 if [ "$is_listener" = 1 ]; then
-  wait "$tcp_pid" 2>/dev/null
-  wait "$udp_pid" 2>/dev/null
+  if [ "$expected" -gt 0 ]; then
+    wait "$tcp_pid" 2>/dev/null
+    wait "$udp_pid" 2>/dev/null
+  fi
 
   tcp_received="$(grep -c '^TCP ' "$tcp_out" 2>/dev/null || true)"; [ -z "$tcp_received" ] && tcp_received=0
   # UDP line = "UDP <addr>  [<ts>] <senderId> #<seq> ..." -- pull <senderId>, count distinct non-self peers.
@@ -131,7 +146,7 @@ if [ "$is_listener" = 1 ]; then
     | grep -vx "$actor" | sort -u | grep -c . || true)"; [ -z "$udp_distinct" ] && udp_distinct=0
 
   echo "[$actor] TCP heard from $tcp_received / $expected ; UDP heard from $udp_distinct / $expected"
-  if [ "$tcp_received" -ge "$expected" ] && [ "$udp_distinct" -ge "$expected" ]; then
+  if [ "$tcp_send_ok" = 1 ] && [ "$tcp_received" -ge "$expected" ] && [ "$udp_distinct" -ge "$expected" ]; then
     echo "[$actor] MESH OK (TCP+UDP)"
     # boot-benchmark MESH-OK milestone (co-owned drop-in): emit ONLY when a serial sink is attached
     # ([ -w /dev/ttyS0 ]) so this is a silent no-op off-bench (Docker-CI + normal mesh write nothing). The
@@ -142,7 +157,10 @@ if [ "$is_listener" = 1 ]; then
   fi
   echo "[$actor] MESH INCOMPLETE"; exit 1
 else
-  echo "[$actor] SOURCE emitted to $expected peer(s)"
-  echo "[$actor] MESH OK (source)"
-  exit 0
+  echo "[$actor] SOURCE emitted to $listener_count listener peer(s)"
+  if [ "$tcp_send_ok" = 1 ]; then
+    echo "[$actor] MESH OK (source)"
+    exit 0
+  fi
+  echo "[$actor] MESH INCOMPLETE"; exit 1
 fi

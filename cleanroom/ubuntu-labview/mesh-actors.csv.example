@@ -16,7 +16,8 @@
 #   udp_port = lbabus net UDP       (presence beacon; lbabus `net beacon` uses 7421)
 #   node_type = source | sink | both  (bus behavior: source EMITS only, sink COLLECTS only, both is the
 #              symmetric peer; DEFAULT both. Orthogonal to `role`. docs/proposals/mesh-node-types.md)
-#   password = dev-only plaintext   (AGENT-generated; hashed locally at build/inject time)
+#   password = dev-only plaintext   (AGENT-generated; 16+ characters with upper/lower/digit/symbol,
+#              must NOT contain the username, comma, or newline; Vagrant rejects weak values before boot)
 #
 # The mesh Vagrantfile (mesh/Vagrantfile) reads the role=mesh rows: one VM per row, host-only IP, and a
 # per-actor chpasswd + /etc/lba-mesh-actor endpoint record. Extend the mesh by appending mesh rows.
