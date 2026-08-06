@@ -52,7 +52,10 @@ Run `reviewer-workstation/win-plane-validate.sh` for `release/X.Y.Z` (drives
 `reviewer-workstation/win-plane-validate.ps1` in the VM): `npm ci` + compile + the test
 suites + masked activation + the packaging gate, landing on `winPlaneReady:true`. The
 candidate `.vsix` is staged in the VM (sha verified) via
-`reviewer-workstation/stage-local-vsix.ps1`.
+`reviewer-workstation/stage-local-vsix.ps1`. Save the resulting WIN-plane net `DONE` frame
+as `~/lba-vm-share/staged-frame-WIN-X.Y.Z.json`; this is the independent, version-bound
+completion evidence for release phase 7 (neither a quorum sign-off nor a visual verdict
+can substitute for it).
 
 ## 4. Signing (the two human sign-offs, in the VM)
 
@@ -81,10 +84,21 @@ key material). Then:
 
 ## 5. Seal — receipt + agreement
 
-1. **Composite receipt.** Assemble the composite release-decision receipt with
-   `reviewer-workstation/composite-release-decision.mjs`, writing
-   `reviewer-workstation/composite-release-decision-receipt.json` with `candidate.version
-   == X.Y.Z`. That committed `candidate.version` is the **single source of truth** for the
+1. **Composite receipt.** Assemble the composite release-decision receipt with the actual
+   assembler, writing `reviewer-workstation/composite-release-decision-receipt.json`:
+
+   ```
+   node reviewer-workstation/assemble-composite.mjs \
+     --component extension --version X.Y.Z --commit <candidate-commit> \
+     --vsix256 <candidate-vsix-sha256> \
+     --attestation ~/lba-vm-share/attestation-X.Y.Z.json \
+     --quorum-signoff ~/lba-vm-share/quorum-signoff-X.Y.Z.json \
+     --visual-verdict ~/lba-vm-share/visual-verdict-X.Y.Z.json \
+     --staged-frame ~/lba-vm-share/staged-frame-WIN-X.Y.Z.json \
+     --out reviewer-workstation/composite-release-decision-receipt.json
+   ```
+
+   The committed `candidate.version == X.Y.Z` is the **single source of truth** for the
    enforced version (issue #416) — no gate file hardcodes a version, so the bump touches
    only this receipt (+ `package.json` + `CHANGELOG.md`).
 2. **Record the agreement.** Instead of hand-editing JSON, run the recorder (issue #419):
@@ -141,8 +155,11 @@ key material). Then:
    bump, receipt, and agreement return to integration.
 2. Assert `git merge-base --is-ancestor <release-tip> main` **and** `… develop` — the
    release tip is an ancestor of both, so the planes stay in sync.
-3. Re-check the Marketplace listing (the gallery API lags a few minutes) and record the
-   closeout in the regenerated `docs/testing/test-report.md` counts.
+3. Re-check the Marketplace listing (the gallery API lags a few minutes) with
+   `npm run lba -- release-verify-published X.Y.Z`. A successful query records
+   `~/lba-vm-share/marketplace-verification-X.Y.Z.json`, allowing the resumable driver to
+   recognize phase 13 without publishing twice. Record the closeout in the regenerated
+   `docs/testing/test-report.md` counts.
 
 ## Artifact + credential map
 
@@ -150,7 +167,9 @@ key material). Then:
 | --- | --- |
 | Node pin | `.nvmrc` (sourced by every release-path workflow) |
 | Cross-plane attestation | `~/lba-vm-share/attestation-X.Y.Z.json` (host) |
+| WIN staging net frame | `~/lba-vm-share/staged-frame-WIN-X.Y.Z.json` (host) |
 | Signed visual verdict | `~/lba-vm-share/visual-verdict-X.Y.Z.json` (host) |
+| Marketplace verification | `~/lba-vm-share/marketplace-verification-X.Y.Z.json` (host) |
 | Composite receipt (committed) | `reviewer-workstation/composite-release-decision-receipt.json` |
 | Release agreement (committed) | `tools/collab-cli/release-agreement.json` |
 | Marketplace publish credential | `VSCE_PAT` secret (CI) |

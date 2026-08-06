@@ -35,7 +35,7 @@
 //   signing-status               discover + report the enrolled reviewer key location + where each sign-off runs
 //   selftest                     self-check this tool (run by the `agent-tooling-selftest` gate)
 
-import { readFileSync, writeFileSync, existsSync, readdirSync } from 'node:fs';
+import { mkdirSync, readFileSync, writeFileSync, existsSync, readdirSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { dirname, join, resolve } from 'node:path';
@@ -45,7 +45,7 @@ import { ingestRun, readReturned } from '../experiments/mesh-fulfillment/meshIng
 import { corroborateRun } from '../experiments/mesh-fulfillment/meshCorroborate.mjs';
 import { assembleLiveN2 } from '../experiments/mesh-fulfillment/driveLiveN2.mjs';
 
-export const ITERATION = 16; // bump when you refine this tool (see the banner above)
+export const ITERATION = 17; // bump when you refine this tool (see the banner above)
 
 const here = dirname(fileURLToPath(import.meta.url));
 export const repoRoot = resolve(here, '..');
@@ -154,7 +154,7 @@ export function releasePlan(version) {
     { id: 4, key: 'dispatch-corroboration', kind: 'auto', exec: 'ci', dependsOn: [3], title: 'dispatch acg-cross-plane-corroboration.yml at the candidate commit', command: 'gh workflow run acg-cross-plane-corroboration.yml --ref <candidate-commit>' },
     { id: 5, key: 'build-attestation', kind: 'auto', exec: 'auto', dependsOn: [4], title: 'build the machine attestation from the run witnesses', command: 'node experiments/acg-quorum/cross-plane-attestation.mjs  (from the corroboration run artifacts)' },
     { id: 6, key: 'quorum-signoff', kind: 'operator', exec: 'operator', signing: true, dependsOn: [5], title: 'Ed25519 quorum sign-off over the attestation (enrolled key)', command: 'lba signing-status  ->  reviewer-workstation/render-quorum.sh all --version ' + v + ' (#415)' },
-    { id: 7, key: 'stage-benchmark', kind: 'operator', exec: 'operator', dependsOn: [3], title: 'stage + live-benchmark the candidate on the WIN VM (net DONE frame)', command: 'reviewer-workstation/render-verdict.sh set-target --version ' + v + ' … (#411)' },
+    { id: 7, key: 'stage-benchmark', kind: 'operator', exec: 'operator', dependsOn: [3], title: 'stage + live-benchmark the candidate on the WIN VM (net DONE frame)', command: 'reviewer-workstation/render-verdict.sh set-target --version ' + v + ' … (#411)  ->  save the WIN DONE frame as ~/lba-vm-share/staged-frame-WIN-' + v + '.json' },
     { id: 8, key: 'visual-verdict', kind: 'operator', exec: 'operator', signing: true, dependsOn: [7], title: 'signed reviewer visual verdict of the built candidate (Ed25519)', command: 'run "Render Reviewer Verdict" in the VM  ->  render-verdict.sh collect' },
     { id: 9, key: 'assemble-composite', kind: 'auto', exec: 'auto', dependsOn: [3, 5, 6, 7, 8], title: 'assemble the composite-release-decision receipt (binds all pieces to one candidate)', command: 'node reviewer-workstation/assemble-composite.mjs --component extension --version ' + v + ' … --out reviewer-workstation/composite-release-decision-receipt.json (#410)' },
     { id: 10, key: 'record-agreement', kind: 'auto', exec: 'auto', dependsOn: [9], title: 'record WIN+LINUX agreed + visualReview in release-agreement.json', command: 'node tools/collab-cli/record-release-agreement.mjs … (#419)' },
@@ -247,6 +247,44 @@ export function renderReleaseStatus(status) {
   return lines.join('\n');
 }
 
+export function isStagedReleaseFrame(staged, version) {
+  return staged?.candidate?.component === 'extension'
+    && staged?.candidate?.version === String(version)
+    && staged?.frame?.type === 'DONE'
+    && staged?.frame?.senderId === 'WIN';
+}
+
+export function isReleaseMergedToMain(version, isAncestor) {
+  const v = String(version);
+  return [`ext-v${v}`, `origin/release/${v}`, `release/${v}`].some((ref) => isAncestor(ref, 'origin/main'));
+}
+
+export const MARKETPLACE_VERIFICATION_SCHEMA = 'labview-benchmark-actor/marketplace-verification@1';
+
+export function marketplaceVerificationPath(share, version) {
+  return join(share, `marketplace-verification-${String(version)}.json`);
+}
+
+export function buildMarketplaceVerificationReceipt({ extension, version, result, verifiedAt = new Date().toISOString() } = {}) {
+  return {
+    schema: MARKETPLACE_VERIFICATION_SCHEMA,
+    extension: String(extension),
+    version: String(version),
+    verifiedAt,
+    observed: { latest: result?.latest ?? null, versions: Array.isArray(result?.versions) ? result.versions.map(String) : [] },
+    verdict: { published: result?.ok === true && result?.live === true },
+  };
+}
+
+export function isMarketplaceVerificationReceipt(receipt, { extension, version } = {}) {
+  return receipt?.schema === MARKETPLACE_VERIFICATION_SCHEMA
+    && receipt.extension === String(extension)
+    && receipt.version === String(version)
+    && receipt.verdict?.published === true
+    && Array.isArray(receipt.observed?.versions)
+    && receipt.observed.versions.map(String).includes(String(version));
+}
+
 // Impure live probes: best-effort, never throws. Reads git / package.json / CHANGELOG / the ~/lba-vm-share receipts /
 // the committed composite receipt + agreement / gh -- to detect which phases are already complete for `version`.
 export function liveReleaseProbes(version, { env = process.env } = {}) {
@@ -258,7 +296,13 @@ export function liveReleaseProbes(version, { env = process.env } = {}) {
   const agreement = (() => { try { return read('tools/collab-cli/release-agreement.json'); } catch { return null; } })();
   const shareHas = (name) => !!share && existsSync(join(share, name));
   const compositeSealed = !!composite && composite.candidate?.version === v && composite.verdict?.compositeReleaseProven === true;
-  const mergedToMain = tryGit(['merge-base', '--is-ancestor', `ext-v${v}`, 'origin/main']);
+  const stagedFrame = (() => { try { return JSON.parse(readFileSync(join(share, `staged-frame-WIN-${v}.json`), 'utf8')); } catch { return null; } })();
+  const extensionId = pkg.publisher && pkg.name ? `${pkg.publisher}.${pkg.name}` : '';
+  const marketplaceReceipt = (() => {
+    if (!share || !extensionId) return null;
+    try { return JSON.parse(readFileSync(marketplaceVerificationPath(share, v), 'utf8')); } catch { return null; }
+  })();
+  const mergedToMain = isReleaseMergedToMain(v, (ref, main) => tryGit(['merge-base', '--is-ancestor', ref, main]));
   // Once a release has a sealed composite or is merged to main, it got PAST the early scaffolding (branch cut,
   // version bumped, vsix built, attestation ready) even if the release branch was later deleted -- so those
   // transient probes read done. A sealed composite also implies the quorum + visual + staging were completed.
@@ -269,13 +313,13 @@ export function liveReleaseProbes(version, { env = process.env } = {}) {
     vsixBuilt: progressed || (existsSync(join(repoRoot, 'labview-benchmark-actor.vsix')) && pkg.version === v),
     attestationReady: progressed || shareHas(`attestation-${v}.json`),
     quorumSigned: compositeSealed || shareHas(`quorum-signoff-${v}.json`),
-    staged: compositeSealed || shareHas(`visual-verdict-${v}.json`) || shareHas(`quorum-signoff-${v}.json`),
+    staged: compositeSealed || isStagedReleaseFrame(stagedFrame, v),
     visualSigned: compositeSealed || shareHas(`visual-verdict-${v}.json`),
     compositeSealed,
     agreementRecorded: !!agreement && agreement.includes(v),
     mergedToMain,
     ghReleaseCut: (() => { try { execFileSync('gh', ['release', 'view', `ext-v${v}`], { stdio: 'pipe' }); return true; } catch { return false; } })(),
-    published: false, // confirmed separately by `lba release-verify-published` (live Marketplace query)
+    published: isMarketplaceVerificationReceipt(marketplaceReceipt, { extension: extensionId, version: v }),
   };
 }
 
@@ -542,7 +586,7 @@ export const COMMANDS = {
     },
   },
   'release-verify-published': {
-    desc: 'confirm the VS Code Marketplace listing shows X.Y.Z live after publish (#412)',
+    desc: 'confirm the VS Code Marketplace listing shows X.Y.Z live after publish and record resumable local evidence (#412)',
     run: async (args) => {
       const version = args.find((a) => !a.startsWith('--'));
       if (!/^\d+\.\d+\.\d+/.test(version || '')) { console.error('usage: lba release-verify-published X.Y.Z [--extension <publisher.name>]'); process.exit(2); }
@@ -554,7 +598,14 @@ export const COMMANDS = {
         const q = await queryMarketplaceExtension({ publisher, name });
         const r = assertPublished(q, { publisher, name, version });
         if (!r.ok) { console.error(`\u2717 ${extId} ${version} NOT confirmed live: ${r.reason}`); process.exit(1); }
+        const share = process.env.LBA_VM_SHARE || (process.env.HOME ? join(process.env.HOME, 'lba-vm-share') : '');
+        if (!share) { console.error('\u2717 Marketplace verification succeeded but no local share is configured; set HOME or LBA_VM_SHARE to persist resumable evidence'); process.exit(1); }
+        const receiptPath = marketplaceVerificationPath(share, version);
+        const receipt = buildMarketplaceVerificationReceipt({ extension: extId, version, result: r });
+        mkdirSync(share, { recursive: true });
+        writeFileSync(receiptPath, `${JSON.stringify(receipt, null, 2)}\n`);
         console.log(`\u2713 ${extId} ${version} is LIVE on the Marketplace (latest ${r.latest}; recent: ${r.versions.slice(0, 5).join(', ')})`);
+        console.log(`  recorded resumable Marketplace verification: ${receiptPath}`);
       } catch (e) { console.error(`\u2717 Marketplace query error: ${e.message}`); process.exit(1); }
     },
   },
@@ -728,10 +779,24 @@ const SELFTEST = [
     const out = renderReleaseStatus(st);
     return /NEXT/.test(out) && /phase 6/.test(out) && /OPERATOR/.test(out) && out.includes('\u2713') && out.includes('\u25cb');
   }],
+  ['release status accepts only a version-bound WIN DONE staging frame for phase 7', () => {
+    const staged = { candidate: { component: 'extension', version: '1.2.0' }, frame: { type: 'DONE', senderId: 'WIN' } };
+    const wrongPlane = { ...staged, frame: { ...staged.frame, senderId: 'LINUX' } };
+    const wrongVersion = { ...staged, candidate: { ...staged.candidate, version: '1.2.1' } };
+    return isStagedReleaseFrame(staged, '1.2.0') && !isStagedReleaseFrame(wrongPlane, '1.2.0') && !isStagedReleaseFrame(wrongVersion, '1.2.0');
+  }],
+  ['release status detects a merged release branch before the later ext-v tag exists', () => isReleaseMergedToMain('1.2.0', (ref, main) => ref === 'origin/release/1.2.0' && main === 'origin/main')],
   ['release-verify-published (#412) confirms a version present in the Marketplace query result', () => {
     const q = { results: [{ extensions: [{ publisher: { publisherName: 'pub' }, extensionName: 'ext', versions: [{ version: '1.2.0' }, { version: '1.1.1' }] }] }] };
     const r = assertPublished(q, { publisher: 'pub', name: 'ext', version: '1.2.0' });
     return r.ok === true && r.live === true && r.latest === '1.2.0';
+  }],
+  ['release-verify-published records only a matching successful Marketplace observation as resumable evidence', () => {
+    const result = { ok: true, live: true, latest: '1.2.0', versions: ['1.2.0', '1.1.1'] };
+    const receipt = buildMarketplaceVerificationReceipt({ extension: 'pub.ext', version: '1.2.0', result, verifiedAt: '2026-08-06T00:00:00.000Z' });
+    const wrongVersion = { ...receipt, version: '1.2.1' };
+    return isMarketplaceVerificationReceipt(receipt, { extension: 'pub.ext', version: '1.2.0' })
+      && !isMarketplaceVerificationReceipt(wrongVersion, { extension: 'pub.ext', version: '1.2.0' });
   }],
   ['release-verify-published (#412) fails closed on absent version / publisher mismatch / no extension', () => {
     const q = { results: [{ extensions: [{ publisher: { publisherName: 'pub' }, extensionName: 'ext', versions: [{ version: '1.1.1' }] }] }] };

@@ -25,6 +25,8 @@ import { dirname, join } from 'node:path';
 import { buildReceipt as buildComposite, validateReceipt as validateComposite } from './composite-release-decision.mjs';
 import { buildReceipt as buildAttestation } from '../experiments/acg-quorum/cross-plane-attestation.mjs';
 
+export const DEFAULT_REVIEWER_ALLOWLIST_PATH = join(dirname(fileURLToPath(import.meta.url)), '..', 'tools', 'collab-cli', 'reviewer-allowlist.json');
+
 // The four candidate-identity fields every piece must agree on.
 const CANDIDATE_FIELDS = ['component', 'version', 'commit', 'vsixSha256'];
 
@@ -132,8 +134,7 @@ function main() {
   const visualBundle = JSON.parse(readFileSync(args['visual-verdict'], 'utf8'));
   const visual = (visualBundle.verdict && visualBundle.signOff) ? visualBundle : { verdict: visualBundle, signOff: visualBundle.signOff };
   const staged = JSON.parse(readFileSync(args['staged-frame'], 'utf8'));
-  const here = dirname(fileURLToPath(import.meta.url));
-  const allowlistPath = args['reviewer-allowlist'] ?? join(here, '..', 'docs', 'release', 'reviewer-allowlist.json');
+  const allowlistPath = args['reviewer-allowlist'] ?? DEFAULT_REVIEWER_ALLOWLIST_PATH;
   let reviewerAllowlist = {};
   try { reviewerAllowlist = JSON.parse(readFileSync(allowlistPath, 'utf8')); } catch { /* an empty allowlist fails the gate closed, as intended */ }
 
