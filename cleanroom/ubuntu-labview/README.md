@@ -165,3 +165,9 @@ can use `-Apply`.
 Actor removal is deliberately not automatic. Before removing an actor from `mesh-actors.csv`, explicitly run
 `vagrant destroy -f <hostname>` in `cleanroom/ubuntu-labview/mesh`; then make the topology change and use
 `-Replace`. This prevents an agent from silently destroying a VM no longer declared in the local registry.
+
+For the Vagrant production-golden path, use the enforced sequence in [ACTIVATION.md](ACTIVATION.md):
+`Provision` (including a reboot and LabVIEWCLI/console check), `ConsoleReady -OperatorDesktopConfirmed`,
+`Handoff`, `Confirm`, then `Package`. Packaging is blocked unless a fresh identity-bound functional receipt and its
+post-confirmation challenge still match the current guest; this prevents a pre-activation snapshot from being
+packaged or enrolled as activated.

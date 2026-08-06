@@ -17,6 +17,7 @@ export PATH=/usr/local/bin:/usr/local/natinst/share/nilvcli:/usr/bin:/bin:/usr/s
 A="${1:-20}"
 B="${2:-22}"
 OUT="${3:-/tmp/lba-activation-capture.json}"
+ACTIVATION_CHALLENGE="${LBA_ACTIVATION_CHALLENGE:-}"
 EXPECTED=$((A + B))
 VIP=/usr/local/natinst/share/nilvcli/Examples/AddTwoNumbers/AddTwoNumbers.vi
 LVP=/usr/local/natinst/LabVIEW-2026-64/labview
@@ -24,7 +25,7 @@ LVCLI=/usr/local/bin/LabVIEWCLI
 PROBE_OUT=/tmp/lba-activation-probe.out
 
 emit_capture() {
-  python3 - "$A" "$B" "$EXPECTED" "$1" "$2" "$VIP" "$LVP" "$PROBE_OUT" "$OUT" <<'PY'
+  python3 - "$A" "$B" "$EXPECTED" "$1" "$2" "$VIP" "$LVP" "$PROBE_OUT" "$OUT" "$3" <<'PY'
 import json
 import os
 import platform
@@ -32,7 +33,7 @@ import socket
 import subprocess
 import sys
 
-a, b, expected, exit_code, wall_ms, probe_vi, labview_path, probe_out, destination = sys.argv[1:]
+a, b, expected, exit_code, wall_ms, probe_vi, labview_path, probe_out, destination, activation_challenge = sys.argv[1:]
 try:
     with open(probe_out, encoding="utf-8", errors="replace") as handle:
         output = handle.read()
@@ -74,6 +75,8 @@ if all(actor_fields.values()):
     record["actorIdentityError"] = "requested actor IP is not assigned to the probed guest"
   else:
     record["actor"] = {"actorId": "golden", "hostname": actual_hostname, "ip": actor_fields["ip"]}
+if activation_challenge:
+  record["freshness"] = {"challenge": activation_challenge}
 with open(destination, "w", encoding="utf-8") as handle:
     json.dump(record, handle, indent=2)
     handle.write("\n")
@@ -86,11 +89,16 @@ if ! command -v python3 >/dev/null 2>&1; then
   exit 127
 fi
 
+if [ -n "$ACTIVATION_CHALLENGE" ] && ! [[ "$ACTIVATION_CHALLENGE" =~ ^[a-f0-9]{32}$ ]]; then
+  echo "activation capture unavailable: LBA_ACTIVATION_CHALLENGE must be 32 lowercase hexadecimal characters" >&2
+  exit 2
+fi
+
 # Headless display :99 (isolated from any gdm :0 session); start only if not already up. LabVIEW SEGFAULTS
 # on a half-initialized display, so poll xdpyinfo (bounded ~30s) + a 1s settle before launching.
 if ! command -v xvfb-run >/dev/null 2>&1; then
   printf '%s\n' 'xvfb-run is required for the headless activation probe; run provision-guest.sh first.' > "$PROBE_OUT"
-  emit_capture 127 0
+  emit_capture 127 0 ''
   echo "activation capture -> $OUT (exit=127; missing headless display prerequisite)" >&2
   cat "$PROBE_OUT"
   exit 127
@@ -107,7 +115,19 @@ rc=$?
 t1=$(date +%s%N)
 wall=$(( (t1 - t0) / 1000000 ))
 
-emit_capture "$rc" "$wall"
+persisted_challenge=''
+if [ -n "$ACTIVATION_CHALLENGE" ] && [ "$rc" -eq 0 ]; then
+  if sudo -n install -d -m 700 /var/lib/lba-golden-activation && \
+     printf '%s\n' "$ACTIVATION_CHALLENGE" | sudo -n tee /var/lib/lba-golden-activation/challenge >/dev/null && \
+     sudo -n chmod 600 /var/lib/lba-golden-activation/challenge; then
+    persisted_challenge="$ACTIVATION_CHALLENGE"
+  else
+    printf '%s\n' 'could not persist the post-activation challenge; confirmation is intentionally unconfirmed' >> "$PROBE_OUT"
+    rc=1
+  fi
+fi
+
+emit_capture "$rc" "$wall" "$persisted_challenge"
 echo "activation capture -> $OUT (exit=$rc wall=${wall}ms expected=$EXPECTED)"
 cat "$PROBE_OUT"
 exit "$rc"

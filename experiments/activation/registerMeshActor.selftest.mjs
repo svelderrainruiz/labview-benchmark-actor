@@ -19,13 +19,14 @@ const receipt = JSON.parse(readFileSync(join(here, 'fixtures', 'activation-recei
 const capture = JSON.parse(readFileSync(join(here, 'fixtures', 'activation-capture.json'), 'utf8'));
 const actorIdentity = { actorId: 'golden', hostname: 'actor', ip: '192.168.56.10' };
 const bootId = '11111111-2222-3333-4444-555555555555';
-const boundReceipt = buildActivationReceipt({ ...capture, host: { ...capture.host, bootId }, actor: actorIdentity });
+const activationChallenge = '0123456789abcdef0123456789abcdef';
+const boundReceipt = buildActivationReceipt({ ...capture, host: { ...capture.host, bootId }, actor: actorIdentity, freshness: { challenge: activationChallenge } });
 let passed = 0;
 const ok = (m) => { console.log(`  PASS  ${m}`); passed += 1; };
 
 const goldenRows = (csv) => csv.split(/\r?\n/).filter((l) => l.startsWith('golden,'));
 
-const currentGuestOutput = `bootId=${bootId}\nhostname=actor\nips=192.168.198.180 192.168.56.10\n`;
+const currentGuestOutput = `bootId=${bootId}\nhostname=actor\nips=192.168.198.180 192.168.56.10\nactivationChallenge=${activationChallenge}\n`;
 const currentGuestRun = (command, args, options) => {
   assert.equal(command, 'vagrant');
   assert.deepEqual(args.slice(0, 3), ['ssh', 'actor1', '-c']);
@@ -146,15 +147,19 @@ const currentGuestRun = (command, args, options) => {
   ok('verified target identity supplies the golden registry endpoint');
 }
 
-// 10. Registration challenges the current Vagrant guest boot, hostname, and host-only IP.
+// 10. Registration challenges the current Vagrant guest boot, hostname, host-only IP, and activation challenge.
 {
-  const guest = parseCurrentGuestIdentity(`bootId=${bootId}\nhostname=actor\nips=192.168.198.180 192.168.56.10\n`);
+  const guest = parseCurrentGuestIdentity(currentGuestOutput);
   assert.equal(verifyCurrentGuestIdentity({ receipt: boundReceipt, guest }).ok, true, 'matching current guest accepts the receipt');
   const restarted = { ...guest, bootId: 'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee' };
   const result = verifyCurrentGuestIdentity({ receipt: boundReceipt, guest: restarted });
   assert.equal(result.ok, false, 'a reverted or recreated guest boot is rejected');
   assert.match(result.findings.join('; '), /boot ID/, 'the refusal requires a fresh confirmation');
-  ok('current guest boot challenge rejects a replayed activation receipt');
+  const restoredSnapshot = { ...guest, activationChallenge: '' };
+  const replay = verifyCurrentGuestIdentity({ receipt: boundReceipt, guest: restoredSnapshot });
+  assert.equal(replay.ok, false, 'a pre-confirmation snapshot without the persisted challenge is rejected');
+  assert.match(replay.findings.join('; '), /activation challenge/, 'the refusal requires a fresh confirmation');
+  ok('current guest challenge rejects replayed activation evidence after snapshot restore');
 }
 
 // 11. CLI refuses an activation receipt when the selected current guest was recreated or reverted.
@@ -164,7 +169,7 @@ const currentGuestRun = (command, args, options) => {
   const registryPath = join(temp, 'mesh-actors.csv');
   writeFileSync(receiptPath, `${JSON.stringify(boundReceipt)}\n`);
   try {
-    const staleRun = () => `bootId=aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee\nhostname=actor\nips=192.168.198.180 192.168.56.10\n`;
+    const staleRun = () => `bootId=aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee\nhostname=actor\nips=192.168.198.180 192.168.56.10\nactivationChallenge=${activationChallenge}\n`;
     const result = enrollCurrentGoldenActor({ receipt: boundReceipt, registry: '', vm: 'actor1', vagrantRoot: '/test/mesh', run: staleRun });
     assert.equal(result.ok, false, 'the boot-ID mismatch is refused before the registry is written');
     assert.equal(result.csv, '', 'stale confirmation leaves no registry mutation');
@@ -173,6 +178,22 @@ const currentGuestRun = (command, args, options) => {
   } finally {
     rmSync(temp, { recursive: true, force: true });
   }
+}
+
+// 12. CSV serializers reject delimiter injection and malformed local overrides before writing a registry.
+{
+  const seed = `${REGISTRY_HEADER}\nmesh,1,actor1,actor,192.168.56.11,7420,7421,both,AGENT_GENERATED\n`;
+  const comma = registerGoldenActor({ receipt: boundReceipt, registry: seed, actor: { username: 'actor,extra' } });
+  assert.equal(comma.ok, false, 'a comma in an override is refused');
+  assert.equal(comma.csv, seed, 'a comma override leaves the registry unchanged');
+  const newline = registerGoldenActor({ receipt: boundReceipt, registry: seed, actor: { username: 'actor\nmesh,2' } });
+  assert.equal(newline.ok, false, 'a newline in an override is refused');
+  assert.equal(newline.csv, seed, 'a newline override leaves the registry unchanged');
+  const missingFreshness = buildActivationReceipt({ ...capture, host: { ...capture.host, bootId }, actor: actorIdentity });
+  const stale = enrollCurrentGoldenActor({ receipt: missingFreshness, registry: seed, vm: 'actor1', vagrantRoot: '/test/mesh', run: currentGuestRun });
+  assert.equal(stale.ok, false, 'legacy evidence without a post-confirmation challenge cannot enroll');
+  assert.match(stale.findings.join('; '), /snapshot-resistant activation challenge/, 'missing freshness names the safe next step');
+  ok('CSV overrides and legacy evidence are fail-closed before registry mutation');
 }
 
 console.log(`\nregisterMeshActor.selftest: ${passed}/${passed} checks passed`);
