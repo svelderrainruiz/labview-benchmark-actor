@@ -40,6 +40,7 @@ cleanroom/ubuntu-labview/.actor-pw
 # Ubuntu clean-room local build artifacts + Vagrant mesh runtime state
 cleanroom/ubuntu-labview/.build/
 cleanroom/ubuntu-labview/mesh/.vagrant/
+.devcontainer/cleanroom-witness/.source-commit
 
 # Agent-last-gate per-run verdict receipt (regenerated each run)
 experiments/agent-last-gate/receipt.json

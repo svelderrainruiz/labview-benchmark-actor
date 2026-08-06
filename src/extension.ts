@@ -870,6 +870,41 @@ export function ffmpegRunnable(cmd: string): boolean {
   }
 }
 
+function findWingetPackageFfmpeg(localAppData: string): string | null {
+  const packagesRoot = path.join(localAppData, 'Microsoft', 'WinGet', 'Packages');
+  let packages;
+  try {
+    packages = readdirSync(packagesRoot, { withFileTypes: true });
+  } catch {
+    return null;
+  }
+  const findBelow = (directory: string, depth: number): string | null => {
+    if (depth > 3) return null;
+    let entries;
+    try {
+      entries = readdirSync(directory, { withFileTypes: true });
+    } catch {
+      return null;
+    }
+    for (const entry of entries) {
+      const candidate = path.join(directory, entry.name);
+      if (entry.isFile() && entry.name.toLowerCase() === 'ffmpeg.exe' && ffmpegRunnable(candidate)) return candidate;
+    }
+    for (const entry of entries) {
+      if (!entry.isDirectory()) continue;
+      const found = findBelow(path.join(directory, entry.name), depth + 1);
+      if (found) return found;
+    }
+    return null;
+  };
+  for (const packageDir of packages) {
+    if (!packageDir.isDirectory() || !/^Gyan\.FFmpeg_/i.test(packageDir.name)) continue;
+    const found = findBelow(path.join(packagesRoot, packageDir.name), 0);
+    if (found) return found;
+  }
+  return null;
+}
+
 export function resolveFfmpegChecked(): string | null {
   const configured = captureCfg<string>('ffmpegPath', '').trim();
   if (configured) return ffmpegRunnable(configured) ? configured : null;
@@ -877,14 +912,15 @@ export function resolveFfmpegChecked(): string | null {
   const staged = localAppData ? path.join(localAppData, 'lba', 'ffmpeg.exe') : '';
   if (staged && existsSync(staged)) return staged;
   if (ffmpegRunnable('ffmpeg')) return 'ffmpeg';
-  // A winget-installed ffmpeg (the "Install ffmpeg (winget)" button installs Gyan.FFmpeg) symlinks ffmpeg.exe into
-  // %LOCALAPPDATA%\Microsoft\WinGet\Links and adds that dir to the USER PATH -- but this extension-host process
-  // still holds the PRE-install PATH (VS Code's "Reload Window" does NOT refresh the process environment), so the
-  // `ffmpeg`-on-PATH probe above misses it right after installing (issue #405). Check the stable winget Links
-  // location directly so the capture works without a full VS Code restart.
+  // A winget-installed ffmpeg (the "Install ffmpeg (winget)" button installs Gyan.FFmpeg) often symlinks ffmpeg.exe
+  // into %LOCALAPPDATA%\Microsoft\WinGet\Links and adds that dir to the USER PATH. The extension-host process can
+  // retain its pre-install PATH, and some WinGet installations omit the Links shim entirely; check both the shim and
+  // the Gyan package store directly so the capture works without a VS Code or terminal restart.
   if (localAppData) {
     const wingetLink = path.join(localAppData, 'Microsoft', 'WinGet', 'Links', 'ffmpeg.exe');
     if (existsSync(wingetLink) && ffmpegRunnable(wingetLink)) return wingetLink;
+    const wingetPackageFfmpeg = findWingetPackageFfmpeg(localAppData);
+    if (wingetPackageFfmpeg) return wingetPackageFfmpeg;
   }
   return null;
 }

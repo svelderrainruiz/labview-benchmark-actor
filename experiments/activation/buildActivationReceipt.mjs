@@ -12,7 +12,9 @@
 // (wall time, temp-log path, TCP port), so a committed receipt replays offline byte-stably in CI.
 
 import { createHash } from 'node:crypto';
+import { readFileSync, writeFileSync } from 'node:fs';
 import { basename } from 'node:path';
+import { pathToFileURL } from 'node:url';
 
 export const RECEIPT_SCHEMA = 'labview-benchmark-actor/activation-receipt@1';
 
@@ -31,13 +33,15 @@ export function parseProbeOutput(text) {
 
 // Canonical, deterministic verdict-bearing view (the digest input) — no wall time / port / temp paths.
 function canonical(receipt) {
-  const p = receipt.probe, r = receipt.result, h = receipt.host;
+  const p = receipt?.probe, r = receipt?.result, h = receipt?.host;
   return JSON.stringify({
-    schema: receipt.schema,
-    probe: { viName: p.viName, inputs: p.inputs, expectedOutput: p.expectedOutput, knownAnswer: p.knownAnswer },
-    result: { exitCode: r.exitCode, operationSucceeded: r.operationSucceeded, parsedOutput: r.parsedOutput },
-    host: { os: h.os, labviewVersion: h.labviewVersion },
-    verdict: { activated: receipt.verdict.activated },
+    schema: receipt?.schema,
+    probe: { viName: p?.viName, inputs: p?.inputs, expectedOutput: p?.expectedOutput, knownAnswer: p?.knownAnswer },
+    result: { exitCode: r?.exitCode, operationSucceeded: r?.operationSucceeded, parsedOutput: r?.parsedOutput },
+    host: { os: h?.os, labviewVersion: h?.labviewVersion, ...(h?.bootId ? { bootId: h.bootId } : {}) },
+    ...(receipt?.actor ? { actor: receipt.actor } : {}),
+    ...(receipt?.freshness !== undefined ? { freshness: { challenge: receipt?.freshness?.challenge } } : {}),
+    verdict: { activated: receipt?.verdict?.activated },
   });
 }
 
@@ -59,6 +63,10 @@ export function buildActivationReceipt(capture) {
   const viName = basename(capture.probeVi || 'AddTwoNumbers.vi');
   const os = capture.host?.os || 'linux';
   const labviewVersion = parsed.labviewVersion || capture.labviewVersion || null;
+  const bootId = typeof capture.host?.bootId === 'string' && capture.host.bootId.trim() ? capture.host.bootId.trim().toLowerCase() : null;
+  const activationChallenge = capture.freshness?.challenge;
+  const freshness = activationChallenge === undefined ? undefined : { challenge: String(activationChallenge).trim().toLowerCase() };
+  const actor = capture.actor && ['actorId', 'hostname', 'ip'].every((field) => typeof capture.actor[field] === 'string' && capture.actor[field].trim());
   const result = {
     exitCode: capture.exitCode,
     operationSucceeded: parsed.operationSucceeded,
@@ -75,7 +83,9 @@ export function buildActivationReceipt(capture) {
       viName, inputs, expectedOutput, knownAnswer: true,
     },
     result,
-    host: { os, labviewVersion },
+    host: { os, labviewVersion, ...(bootId ? { bootId } : {}) },
+    ...(actor ? { actor: { actorId: capture.actor.actorId.trim(), hostname: capture.actor.hostname.trim(), ip: capture.actor.ip.trim() } } : {}),
+    ...(freshness ? { freshness } : {}),
     verdict: {
       activated,
       reason: activated
@@ -91,14 +101,72 @@ export function buildActivationReceipt(capture) {
 export function validateActivationReceipt(receipt) {
   const findings = [];
   if (!receipt || receipt.schema !== RECEIPT_SCHEMA) findings.push(`schema must be ${RECEIPT_SCHEMA}`);
-  const p = receipt?.probe, r = receipt?.result;
-  if (!p || !r || !receipt.verdict) return { ok: false, activated: false, findings: findings.concat('missing probe/result/verdict') };
+  const p = receipt?.probe, r = receipt?.result, h = receipt?.host;
+  if (!p || !r || !h || !receipt?.verdict) return { ok: false, activated: false, findings: findings.concat('missing probe/result/host/verdict') };
   if (p.knownAnswer !== true) findings.push('probe.knownAnswer must be true (functional activation proof)');
+  if (h.bootId !== undefined && !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/.test(String(h.bootId))) {
+    findings.push('host.bootId must be a Linux boot UUID when present');
+  }
+  if (receipt.actor !== undefined && (!receipt.actor || ['actorId', 'hostname', 'ip'].some((field) => typeof receipt.actor[field] !== 'string' || !receipt.actor[field].trim()))) {
+    findings.push('actor identity must contain non-empty actorId, hostname, and ip strings');
+  }
+  if (receipt.freshness !== undefined && (!receipt.freshness || !/^[a-f0-9]{32}$/.test(String(receipt.freshness.challenge)))) {
+    findings.push('freshness.challenge must be a 32-character lowercase hexadecimal host challenge when present');
+  }
   const expectedVerdict = decideActivated({
     exitCode: r.exitCode, operationSucceeded: r.operationSucceeded,
     parsedOutput: r.parsedOutput, expectedOutput: p.expectedOutput, knownAnswer: p.knownAnswer,
   });
   if (receipt.verdict.activated !== expectedVerdict) findings.push(`verdict.activated=${receipt.verdict.activated} contradicts the rule (${expectedVerdict})`);
-  if (receipt.digest !== digestReceipt(receipt)) findings.push('digest does not match the verdict-bearing fields (tampered)');
+  try {
+    if (receipt.digest !== digestReceipt(receipt)) findings.push('digest does not match the verdict-bearing fields (tampered)');
+  } catch {
+    findings.push('receipt digest-bearing fields are malformed');
+  }
   return { ok: findings.length === 0, activated: !!receipt.verdict.activated && findings.length === 0, findings };
 }
+
+function main() {
+  const [, , ...args] = process.argv;
+  if (args[0] === '--validate') {
+    if (args.length !== 2) {
+      console.error('usage: node buildActivationReceipt.mjs --validate <receipt.json>');
+      process.exit(2);
+    }
+    let receipt;
+    try {
+      receipt = JSON.parse(readFileSync(args[1], 'utf8'));
+    } catch (error) {
+      console.error(`activation receipt: cannot read ${args[1]}: ${error.message}`);
+      process.exit(1);
+    }
+    const result = validateActivationReceipt(receipt);
+    if (!result.ok) {
+      console.error(`activation receipt: INVALID: ${result.findings.join('; ')}`);
+      process.exit(1);
+    }
+    console.log(`activation receipt: ${result.activated ? 'ACTIVATED' : 'UNCONFIRMED'}`);
+    process.exit(result.activated ? 0 : 1);
+  }
+  const [capturePath, receiptPath] = args;
+  if (!capturePath || !receiptPath) {
+    console.error('usage: node buildActivationReceipt.mjs <capture.json> <receipt.json> | --validate <receipt.json>');
+    process.exit(2);
+  }
+  const capture = JSON.parse(readFileSync(capturePath, 'utf8'));
+  if (capture.schema !== 'labview-benchmark-actor/activation-capture@1') {
+    console.error('activation receipt: unsupported capture schema');
+    process.exit(1);
+  }
+  const receipt = buildActivationReceipt(capture);
+  const result = validateActivationReceipt(receipt);
+  if (!result.ok) {
+    console.error(`activation receipt: invalid generated receipt: ${result.findings.join('; ')}`);
+    process.exit(1);
+  }
+  writeFileSync(receiptPath, `${JSON.stringify(receipt, null, 2)}\n`);
+  console.log(`activation receipt: ${result.activated ? 'ACTIVATED' : 'UNCONFIRMED'}`);
+  process.exit(result.activated ? 0 : 1);
+}
+
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) main();

@@ -103,6 +103,30 @@ export function hostCapabilities() {
   return caps.sort();
 }
 
+export function goldenActivationHandoffCommands({ vm = 'actor1', hostname = vm, ip = '192.168.56.11' } = {}) {
+  const cycle = 'cleanroom/ubuntu-labview/golden-activation-cycle.ps1';
+  const identity = `-ActorId golden -ActorHostname ${hostname} -ActorIp ${ip}`;
+  return [
+    `pwsh -File ${cycle} -Vm ${vm} -Mode Provision`,
+    `pwsh -File ${cycle} -Vm ${vm} -Mode ConsoleReady -OperatorDesktopConfirmed ${identity}`,
+    `pwsh -File ${cycle} -Vm ${vm} -Mode Handoff ${identity}`,
+    `pwsh -File ${cycle} -Vm ${vm} -Mode Confirm ${identity}`,
+    `pwsh -File ${cycle} -Vm ${vm} -Mode Package ${identity}`,
+    `node experiments/activation/registerMeshActor.mjs --receipt cleanroom/ubuntu-labview/mesh/.vagrant/golden-${vm}-activation-receipt.json --registry cleanroom/ubuntu-labview/mesh-actors.csv --vm ${vm} --vagrant-root cleanroom/ubuntu-labview/mesh`,
+  ];
+}
+
+export function sourceGoldenCompletionCommands({ vm = process.env.VM_NAME || 'lba-ubuntu2404-labview2026-scratch' } = {}) {
+  return [
+    `VBoxManage startvm ${vm} --type gui`,
+    `# In ${vm}'s console, run provision-guest.sh and provision-lbabus-fromsource.sh before activation.`,
+    '# The operator activates LabVIEW and VIPM only in that VM console, then snapshots the activated state.',
+    `VBoxManage snapshot ${vm} take labview2026-activated-ready`,
+    `vagrant package --base ${vm} --output labview-ubuntu2404-production.box`,
+    'vagrant box add actor/ubuntu2404-labview labview-ubuntu2404-production.box --force',
+  ];
+}
+
 // ---- governance completeness for one requirement id ----------------------------------------------
 export function governCheck(id) {
   const results = GOVERNANCE_SURFACES.map((s) => ({ label: s.label, file: s.file, present: !!s.has(id, read(s.file) || '') }));
@@ -698,9 +722,9 @@ export const COMMANDS = {
       if (!args.includes('--run')) { console.log('\n(plan only \u2014 re-run with `lba init --run` to provision; set ISO / VM_NAME / BASEFOLDER first)'); return; }
       console.log('\n\u25b6 provisioning the golden VM (cleanroom/ubuntu-labview/build-virtualbox.sh --run)\u2026');
       execFileSync('bash', [join(repoRoot, 'cleanroom/ubuntu-labview/build-virtualbox.sh'), '--run'], { stdio: 'inherit' });
-      console.log('\nNEXT (hybrid \u2014 the one human step): activate LabVIEW CE + VIPM in the VM, then confirm + register:');
-      console.log('  bash experiments/activation/probe-activation.sh      # headless RunVI probe -> activation-receipt@1');
-      console.log('  node experiments/activation/registerMeshActor.mjs    # mint + register the VM as a mesh actor');
+      console.log('\nNEXT (hybrid): complete and package the original source golden before any Vagrant mesh clone exists:');
+      sourceGoldenCompletionCommands().forEach((command) => console.log(`  ${command}`));
+      console.log('\nOnly after the activated production box is installed and a Vagrant golden candidate exists, use the staged Provision -> ConsoleReady -> Handoff -> Confirm -> Package cycle from cleanroom/ubuntu-labview/ACTIVATION.md.');
     },
   },
   'mesh-run': {
@@ -738,6 +762,24 @@ const SELFTEST = [
     return Number(nextRequirementId().match(/(\d+)$/)[1]) === cur + 1;
   }],
   ['next ADR id is well-formed and unused', () => /^ADR-\d{4}$/.test(nextAdrId()) && !existsSync(join(repoRoot, 'docs/architecture/adr', `${nextAdrId()}.md`))],
+  ['the Vagrant production cycle is staged and only registers after package evidence exists', () => {
+    const commands = goldenActivationHandoffCommands();
+    return commands.length === 6
+      && commands[0].includes('golden-activation-cycle.ps1 -Vm actor1 -Mode Provision')
+      && commands[1].includes('-Mode ConsoleReady -OperatorDesktopConfirmed -ActorId golden -ActorHostname actor1 -ActorIp 192.168.56.11')
+      && commands[2].includes('golden-activation-cycle.ps1 -Vm actor1 -Mode Handoff')
+      && commands[3].includes('-Mode Confirm -ActorId golden -ActorHostname actor1 -ActorIp 192.168.56.11')
+      && commands[4].includes('-Mode Package -ActorId golden -ActorHostname actor1 -ActorIp 192.168.56.11')
+      && commands[5].includes('golden-actor1-activation-receipt.json --registry cleanroom/ubuntu-labview/mesh-actors.csv --vm actor1')
+      && !commands.some((command) => command.includes('probe-activation.sh'));
+  }],
+  ['lba init completes the original source golden before downstream Vagrant cloning', () => {
+    const commands = sourceGoldenCompletionCommands({ vm: 'lba-golden' });
+    return commands[0] === 'VBoxManage startvm lba-golden --type gui'
+      && commands.some((command) => command.includes('labview2026-activated-ready'))
+      && commands.some((command) => command.includes('vagrant package --base lba-golden'))
+      && commands.some((command) => command.includes('vagrant box add actor/ubuntu2404-labview'));
+  }],
   ['govern-check confirms a modern fully-governed requirement across all surfaces', () => governCheck('LBA-REQ-034').ok],
   ['govern-check fails closed for a non-existent requirement', () => governCheck('LBA-REQ-999').ok === false],
   ['release-preflight static checks pass for a consistent node-24 / version / CHANGELOG set', () => {

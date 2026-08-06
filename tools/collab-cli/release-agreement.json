@@ -513,6 +513,73 @@
               "signature": "joWvdN1isMuuJIMxIwNhfHR6BI36V9f/veEoUOSsWrzGVWoNs1t8zvubUJIBuLlLlA1Jlh7GMj1z5ndbqRt4Dw=="
             }
           }
+        },
+        "1.3.0": {
+          "summary": "extension 1.3.0 -- discover WinGet package-store ffmpeg (Gyan.FFmpeg_*) when Links shim is absent; local dual-plane attestation + WIN human PASS",
+          "signoffs": {
+            "WIN": {
+              "agreed": true,
+              "reviewedCommit": "a4a917027dde07b43838518ad609682f62483c53",
+              "at": "2026-08-06T16:51:33.924Z",
+              "note": "WIN reviewer VM shared-folder staging + human PASS WINDOWS_VM reviewer@vi-tech.nl; FFmpeg package-store discovery validated; visual+quorum signed"
+            },
+            "LINUX": {
+              "agreed": true,
+              "reviewedCommit": "a4a917027dde07b43838518ad609682f62483c53",
+              "at": "2026-08-06T16:51:33.924Z",
+              "note": "local dual-plane attestation LOCAL-linux+LOCAL-windows at a4a9170 crossPlaneCorroborated; FFmpeg package-store discovery fix"
+            }
+          },
+          "visualReview": {
+            "verdict": {
+              "schema": "labview-benchmark-actor/reviewer-verdict@1",
+              "target": {
+                "component": "extension",
+                "version": "1.3.0",
+                "commit": "a4a917027dde07b43838518ad609682f62483c53",
+                "vsixSha256": "a1e2c4bb49768ea7de874796a41a3d9b91cd133ec8c4dc5e40d0ffebabf2350b"
+              },
+              "verdict": "pass",
+              "reviewer": "reviewer@vi-tech.nl",
+              "station": "WINDOWS_VM",
+              "notes": "",
+              "evidence": [
+                {
+                  "kind": "attestation",
+                  "ref": "C:\\lba-review\\attestation-1.3.0.json"
+                },
+                {
+                  "kind": "note",
+                  "ref": "local dual-plane witnesses LOCAL-windows + LOCAL-linux; no GitHub Actions"
+                },
+                {
+                  "kind": "note",
+                  "ref": "FFmpeg discovery fix: WinGet package-store Gyan.FFmpeg_* fallback"
+                }
+              ],
+              "renderedAt": "2026-08-06T16:46:39.519Z"
+            },
+            "signOff": {
+              "schema": "labview-benchmark-actor/acg-human-signoff-v1",
+              "subject": {
+                "verdictDigest": "e1dd8fac78d715853850b427d82a476d38bdc1493436da65578a64c2f3aa9260",
+                "consensusVerdict": "pass",
+                "target": {
+                  "component": "extension",
+                  "version": "1.3.0",
+                  "commit": "a4a917027dde07b43838518ad609682f62483c53",
+                  "vsixSha256": "a1e2c4bb49768ea7de874796a41a3d9b91cd133ec8c4dc5e40d0ffebabf2350b"
+                }
+              },
+              "reviewer": "reviewer@vi-tech.nl",
+              "decision": "approve",
+              "station": "WINDOWS_VM",
+              "algorithm": "ed25519",
+              "publicKeyPem": "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEAWRnlX++0MkQq+vtVEEMnBDON+cQEjNi49qFY07DwV2g=\n-----END PUBLIC KEY-----\n",
+              "signedAt": "2026-08-06T16:46:39.525Z",
+              "signature": "th3UJETDYYv3+vsBiZnPxateFbjCQwFo+jisoGmzaIUI/LJL8Ie+ymDtPosQdslnGYroBLaR1tUpGgfdAYwrCQ=="
+            }
+          }
         }
       }
     }
