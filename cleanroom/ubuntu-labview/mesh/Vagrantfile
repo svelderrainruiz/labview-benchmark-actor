@@ -48,6 +48,11 @@ ACTORS.each do |actor|
   raise "mesh actor #{actor["hostname"]} has invalid node_type #{actor["node_type"].inspect}; expected source, sink, or both"
 end
 
+raise "mesh topology needs at least two actors for a cross-actor proof" if ACTORS.length < 2
+mesh_emitters = ACTORS.count { |actor| %w[source both].include?(normalized_mesh_node_type(actor)) }
+mesh_listeners = ACTORS.count { |actor| %w[sink both].include?(normalized_mesh_node_type(actor)) }
+raise "mesh topology needs at least one emitter and one listener" if mesh_emitters.zero? || mesh_listeners.zero?
+
 # The per-actor mesh workload is SHARED with Docker-CI (tools/collab-cli/ci/mesh-actor.sh). Read + normalize it
 # to LF here (a Windows host checkout may be CRLF) and deliver it base64 so no line ending survives to the guest.
 MESH_ACTOR_SRC = File.expand_path("../../../tools/collab-cli/ci/mesh-actor.sh", __dir__)

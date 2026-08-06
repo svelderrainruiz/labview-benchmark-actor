@@ -143,6 +143,17 @@ function Get-MeshSuccessMarker {
   return 'MESH OK (TCP+UDP)'
 }
 
+function Get-ExpectedMeshPeerSets {
+  param([Parameter(Mandatory = $true)]$Actor, [Parameter(Mandatory = $true)][object[]]$Actors)
+  $remoteActors = @($Actors | Where-Object { ([string]$_.hostname).Trim().ToLowerInvariant() -ne ([string]$Actor.hostname).Trim().ToLowerInvariant() })
+  $listeners = @($remoteActors | Where-Object { ([string]$_.node_type).Trim().ToLowerInvariant() -in @('sink', 'both') } | ForEach-Object { ([string]$_.ip).Trim() })
+  $emitters = @($remoteActors | Where-Object { ([string]$_.node_type).Trim().ToLowerInvariant() -in @('source', 'both') } | ForEach-Object { ([string]$_.ip).Trim() })
+  return [pscustomobject]@{
+    listeners = [string]::Join(',', $listeners)
+    emitters = [string]::Join(',', $emitters)
+  }
+}
+
 function Get-InputState {
   param([Parameter(Mandatory = $true)][object[]]$Actors, [Parameter(Mandatory = $true)][string]$SourceRef)
   $topology = Get-NormalizedTopology -Actors $Actors -IdField 'actor_id' -TcpField 'tcp_port' -UdpField 'udp_port' -NodeTypeField 'node_type'
@@ -254,6 +265,7 @@ function Get-GuestProofs {
   foreach ($actor in $Actors) {
     $nodeType = ([string]$actor.node_type).Trim().ToLowerInvariant()
     $marker = Get-MeshSuccessMarker -NodeType $nodeType
+    $peerSets = Get-ExpectedMeshPeerSets -Actor $actor -Actors $Actors
     $guestCheck = (@'
 set -e
 before_cursor="$(journalctl -u lba-mesh.service --no-pager --show-cursor -n 0 2>/dev/null | sed -n 's/^-- cursor: //p')"
@@ -262,15 +274,20 @@ test ! -e /tmp/lba-{0}.credential
 test "$(/usr/local/bin/lbabus version)" = "{1}"
 test "$(systemctl show -p ActiveState --value lba-gate-suite.service)" = active
 grep -Fx 'NODE_TYPE={2}' /etc/lba-mesh-actor >/dev/null
-systemctl show -p Environment --value lba-mesh.service | tr ' ' '\n' | grep -Fx 'NODE_TYPE={2}' >/dev/null
+service_environment="$(systemctl show -p Environment --value lba-mesh.service | tr ' ' '\n')"
+service_value() {{ printf '%s\n' "$service_environment" | sed -n "s/^$1=//p" | tail -n 1; }}
+canonical_peers() {{ printf '%s\n' "$1" | tr ',' '\n' | sed '/^[[:space:]]*$/d' | sort | paste -sd, -; }}
+test "$(service_value NODE_TYPE)" = "{2}"
+test "$(canonical_peers "$(service_value MESH_LISTENERS)")" = "$(canonical_peers "{3}")"
+test "$(canonical_peers "$(service_value MESH_EMITTERS)")" = "$(canonical_peers "{4}")"
 sudo systemctl restart --no-block lba-mesh.service
 if [ -n "$before_cursor" ]; then
-  timeout {3} sh -c 'until journalctl -u lba-mesh.service --no-pager --after-cursor "$1" | grep -Fq "$2"; do sleep 1; done' sh "$before_cursor" "{4}"
+  timeout {5} sh -c 'until journalctl -u lba-mesh.service --no-pager --after-cursor "$1" | grep -Fq "$2"; do sleep 1; done' sh "$before_cursor" "{6}"
 else
-  timeout {3} sh -c 'until journalctl -u lba-mesh.service --no-pager --since "$1" | grep -Fq "$2"; do sleep 1; done' sh "$restart_since" "{4}"
+  timeout {5} sh -c 'until journalctl -u lba-mesh.service --no-pager --since "$1" | grep -Fq "$2"; do sleep 1; done' sh "$restart_since" "{6}"
 fi
 printf 'lbabus=%s nodeType={2} meshProof=ok\n' "$(/usr/local/bin/lbabus version)"
-'@ -f $actor.hostname, $ExpectedVersion, $nodeType, $TimeoutSec, $marker).Replace("`r`n", "`n")
+'@ -f $actor.hostname, $ExpectedVersion, $nodeType, $peerSets.listeners, $peerSets.emitters, $TimeoutSec, $marker).Replace("`r`n", "`n")
     $guestOutput = & vagrant ssh ([string]$actor.hostname) '-c' $guestCheck
     if ($LASTEXITCODE -ne 0) { throw "guest verification failed for $($actor.hostname) during $Action" }
     $verification = (($guestOutput | Out-String).Trim())
@@ -342,6 +359,14 @@ if ($SelfTest) {
     $scriptText = Get-Content -LiteralPath $PSCommandPath -Raw
     if ($scriptText -notmatch 'before_cursor="\$\(journalctl' -or $scriptText -notmatch '--after-cursor') { throw 'self-test expected a cursor-bound post-restart mesh proof' }
     if ($scriptText -match 'date -u \+%%') { throw 'self-test found an invalid escaped date format in the journal fallback' }
+    $typedActors = @(
+      [pscustomobject]@{ hostname = 'source'; ip = '192.168.56.11'; node_type = 'source' },
+      [pscustomobject]@{ hostname = 'both'; ip = '192.168.56.12'; node_type = 'both' },
+      [pscustomobject]@{ hostname = 'sink'; ip = '192.168.56.13'; node_type = 'sink' }
+    )
+    $sourcePeers = Get-ExpectedMeshPeerSets -Actor $typedActors[0] -Actors $typedActors
+    if ($sourcePeers.listeners -ne '192.168.56.12,192.168.56.13' -or $sourcePeers.emitters -ne '192.168.56.12') { throw 'self-test expected typed listener and emitter peer sets' }
+    if ($scriptText -notmatch 'MESH_LISTENERS' -or $scriptText -notmatch 'MESH_EMITTERS' -or $scriptText -notmatch 'canonical_peers') { throw 'self-test expected guest typed-peer verification before mesh proof' }
     Write-Output 'mesh provision cycle self-test passed: canonical receipt, tamper rejection, and drift classification'
   } finally { Remove-Item -LiteralPath $tempRoot -Recurse -Force -ErrorAction SilentlyContinue }
   return
