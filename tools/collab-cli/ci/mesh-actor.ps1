@@ -26,7 +26,7 @@
 [CmdletBinding()]
 param(
   [string]$Lbabus = 'C:\out\cli\lbabus.dll',
-  [Parameter(Mandatory)][string]$Peers,   # comma-separated actor hostnames (self is filtered out)
+  [Parameter(Mandatory)][string]$Peers,   # legacy all-peer fallback for symmetric Docker meshes
   [int]$TcpPort = 7420,
   [int]$UdpPort = 7421,
   [int]$TimeoutSec = 90,
@@ -47,19 +47,22 @@ if ($nodeType -notin @('source', 'sink', 'both')) { Write-Error "unknown NODE_TY
 $isListener = $nodeType -in @('sink', 'both')
 $isEmitter  = $nodeType -in @('source', 'both')
 
-$others = $Peers.Split(',') | ForEach-Object { $_.Trim() } | Where-Object { $_ -and ($_ -ne $actor) }
-$expected = @($others).Count
+$listenerCsv = if (Test-Path Env:MESH_LISTENERS) { $env:MESH_LISTENERS } else { $Peers }
+$emitterCsv = if (Test-Path Env:MESH_EMITTERS) { $env:MESH_EMITTERS } else { $Peers }
+$listeners = $listenerCsv.Split(',') | ForEach-Object { $_.Trim() } | Where-Object { $_ -and ($_ -ne $actor) }
+$emitters = $emitterCsv.Split(',') | ForEach-Object { $_.Trim() } | Where-Object { $_ -and ($_ -ne $actor) }
+$expected = @($emitters).Count
 $tcpOut = Join-Path $env:TEMP "tcp-$actor.out"
 $tcpErr = Join-Path $env:TEMP "tcp-$actor.err"
 $udpOut = Join-Path $env:TEMP "udp-$actor.out"
 $udpErr = Join-Path $env:TEMP "udp-$actor.err"
 
-Write-Host "[$actor] mesh start: peers=$($others -join ',') expected=$expected tcp=$TcpPort udp=$UdpPort"
+Write-Host "[$actor] mesh start: listeners=$($listeners -join ',') emitters=$($emitters -join ',') expected=$expected tcp=$TcpPort udp=$UdpPort"
 
 # 1. background listeners (sink|both only): TCP collects exactly $expected reliable frames (--echo returns an
 # ACK to each sender); UDP collects presence beacons, exiting on every distinct peer (--count-distinct) or the
 # timeout. A pure source starts NO listeners (node types are enforced).
-if ($isListener) {
+if ($isListener -and $expected -gt 0) {
   $tcpListener = Start-Process -FilePath dotnet -PassThru -NoNewWindow `
     -RedirectStandardOutput $tcpOut -RedirectStandardError $tcpErr `
     -ArgumentList @($Lbabus, 'net', 'listen', '--tcp', "$TcpPort", '--echo', '--count', "$expected", '--timeout', "$TimeoutSec")
@@ -71,22 +74,27 @@ if ($isListener) {
 
 Start-Sleep -Seconds 2   # let our own listeners bind before the peers start hammering them
 
-$peerCsv = $others -join ','
+$peerCsv = $listeners -join ','
+$tcpSendOk = $true
 if ($isEmitter) {
   # 2. TCP: ONE `lbabus net send` fans a CLAIM out to EVERY other actor via --hosts, retrying each peer until
   # its listener accepts. A clean exit is also our barrier that every peer is alive.
-  & dotnet $Lbabus net send --hosts $peerCsv --tcp $TcpPort --type CLAIM --task mesh --message "hello from $actor" --await 2 --retries $SendRetries --retry-ms $SendRetryMs 2>$null | Out-Null
-  if ($LASTEXITCODE -ne 0) { Write-Host "[$actor] WARN one or more TCP peers unreachable after $SendRetries tries" }
+  if ($peerCsv) {
+    & dotnet $Lbabus net send --hosts $peerCsv --tcp $TcpPort --type CLAIM --task mesh --message "hello from $actor" --await 2 --retries $SendRetries --retry-ms $SendRetryMs 2>$null | Out-Null
+    if ($LASTEXITCODE -ne 0) { $tcpSendOk = $false; Write-Host "[$actor] WARN one or more listener peers unreachable after $SendRetries tries" }
+  }
   # 3. UDP: ONE `lbabus net beacon` fans presence beacons out to EVERY peer via --hosts; each envelope carries
   # THIS actor's identity so a peer attributes it regardless of datagram loss or address translation.
-  & dotnet $Lbabus net beacon --hosts $peerCsv --udp $UdpPort --count $UdpBeacons --interval 1 --task mesh 2>$null | Out-Null
+  if ($peerCsv) { & dotnet $Lbabus net beacon --hosts $peerCsv --udp $UdpPort --count $UdpBeacons --interval 1 --task mesh 2>$null | Out-Null }
 }
 
 # 4. verdict. A sink|both waits for its listeners and counts DISTINCT peers heard over each transport; a pure
 # source has nothing to hear -- its success is that it fanned its stream out to every peer.
 if ($isListener) {
-  $tcpListener.WaitForExit()
-  $udpListener.WaitForExit()
+  if ($expected -gt 0) {
+    $tcpListener.WaitForExit()
+    $udpListener.WaitForExit()
+  }
 
   $tcpReceived = 0
   if (Test-Path $tcpOut) {
@@ -103,10 +111,11 @@ if ($isListener) {
   $udpDistinct = @($udpSenders).Count
 
   Write-Host "[$actor] TCP heard from $tcpReceived / $expected ; UDP heard from $udpDistinct / $expected ($($udpSenders -join ','))"
-  if (($tcpReceived -ge $expected) -and ($udpDistinct -ge $expected)) { Write-Host "[$actor] MESH OK (TCP+UDP)"; exit 0 }
+  if ($tcpSendOk -and ($tcpReceived -ge $expected) -and ($udpDistinct -ge $expected)) { Write-Host "[$actor] MESH OK (TCP+UDP)"; exit 0 }
   Write-Host "[$actor] MESH INCOMPLETE"; exit 1
 }
 else {
-  Write-Host "[$actor] SOURCE emitted to $expected peer(s)"
-  Write-Host "[$actor] MESH OK (source)"; exit 0
+  Write-Host "[$actor] SOURCE emitted to $(@($listeners).Count) listener peer(s)"
+  if ($tcpSendOk) { Write-Host "[$actor] MESH OK (source)"; exit 0 }
+  Write-Host "[$actor] MESH INCOMPLETE"; exit 1
 }

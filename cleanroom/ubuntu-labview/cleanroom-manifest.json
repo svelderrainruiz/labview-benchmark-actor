@@ -36,7 +36,7 @@
     "note": "each VM builds lbabus itself on first boot from pinned public source + a vendored offline NuGet cache; no pre-built binary is downloaded or baked (see provision-lbabus-fromsource.sh).",
     "dotnet_sdk_pkg": "dotnet-sdk-8.0",
     "source_repo": "https://github.com/LabVIEW-Community-CI-CD/labview-benchmark-actor",
-    "source_ref": "collab-cli-v0.11.0",
+    "source_ref": "collab-cli-v0.15.0",
     "runtime_identifier": "linux-x64"
   }
 }

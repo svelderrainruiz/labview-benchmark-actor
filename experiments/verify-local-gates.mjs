@@ -654,6 +654,18 @@ check('cleanroom-provisioner-scripts-pure-ascii', () => {
   return { scripts: scanned };
 });
 
+// Typed mesh actors must send only to listener-capable peers and wait only for emitter-capable peers.
+// Bash is available in Linux CI and local WSL; Windows runners may not expose it as an executable.
+check('mesh-typed-peer-routing', () => {
+  try {
+    execFileSync('bash', ['tools/collab-cli/ci/mesh-actor-typed-peers.selftest.sh'], { cwd: pkgRoot, stdio: 'pipe' });
+  } catch (error) {
+    if (error.code === 'ENOENT') return { skipped: 'bash is unavailable on this host' };
+    throw error;
+  }
+  return { selftest: 'mesh-actor-typed-peers 3/3', proves: 'source targets listeners; listeners await emitters; empty typed lists remain empty' };
+});
+
 // 14. The clean-room bootstrap installs its toolchain winget-free. `winget` is an MSIX app-execution alias
 //     that is NOT resolvable on the non-interactive WinRM provisioner PATH, so `winget install ...` in the
 //     bootstrap fails over Vagrant. Enforce winget-free installs (dotnet-install + release archives) so the

@@ -138,3 +138,30 @@ box `vihs/labview-cleanroom-sc`, `vmware_desktop`, two actors on a host-only `pr
 CLAIM/ACK/HANDOFF/DONE + UDP presence — LBA-REQ-006/007). An Ubuntu mesh mirrors it 1:1 — swap the
 communicator to **ssh**, the box to the Ubuntu golden box, and the provider to **virtualbox** (LINUX) or
 **vmware_desktop** (WIN). Vagrant is cross-provider, so the *same* topology meshes on both planes.
+
+### Agent-friendly mesh cycle
+
+For the checked-out VMware mesh, use the lifecycle wrapper instead of manually issuing separate destroy,
+up, provision, and SSH verification commands:
+
+```powershell
+pwsh -File cleanroom/ubuntu-labview/mesh/provision-cycle.ps1 -Plan
+pwsh -File cleanroom/ubuntu-labview/mesh/provision-cycle.ps1 -VerifyReceipt
+pwsh -File cleanroom/ubuntu-labview/mesh/provision-cycle.ps1 -Apply
+pwsh -File cleanroom/ubuntu-labview/mesh/provision-cycle.ps1 -Replace
+```
+
+`-Plan` validates the ignored local `mesh-actors.csv` and reports the cheapest safe action without changing
+VMs. `-VerifyReceipt` validates the current non-secret receipt's content digest and input fingerprints without
+changing VMs. `-Apply` verifies healthy unchanged actors in place, or runs only Vagrant up/provision when the
+source pin, mesh worker, provisioner, or local registry fingerprint changed. It never destroys actors.
+`-Replace` is the explicit clean-slate path: it rebuilds only the currently declared mesh actors.
+
+The v2 receipt at `cleanroom/ubuntu-labview/mesh/.vagrant/provision-cycle-receipt.json` is UTF-8, content-bound,
+and non-secret. It records the public topology, pinned source, provisioning input hashes, actor proof summaries,
+and a SHA-256 digest. Topology, provider, or Vagrantfile drift requires `-Replace`; safe implementation drift
+can use `-Apply`.
+
+Actor removal is deliberately not automatic. Before removing an actor from `mesh-actors.csv`, explicitly run
+`vagrant destroy -f <hostname>` in `cleanroom/ubuntu-labview/mesh`; then make the topology change and use
+`-Replace`. This prevents an agent from silently destroying a VM no longer declared in the local registry.
