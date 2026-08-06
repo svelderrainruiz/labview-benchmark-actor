@@ -173,6 +173,12 @@ Vagrant.configure("2") do |config|
       # boot (lbabus present before the mesh starts), and a Condition-skip on later boots is treated as
       # satisfied for ordering -- clean both boots. Restart=always stays as the self-heal belt-and-suspenders.
       peers    = ACTORS.reject { |x| x["hostname"] == a["hostname"] }.map { |x| x["ip"] }.join(",")
+      listeners = ACTORS.reject { |x| x["hostname"] == a["hostname"] }
+        .select { |x| %w[sink both].include?(String(x["node_type"]).strip.downcase) }
+        .map { |x| x["ip"] }.join(",")
+      emitters  = ACTORS.reject { |x| x["hostname"] == a["hostname"] }
+        .select { |x| %w[source both].include?(String(x["node_type"]).strip.downcase) }
+        .map { |x| x["ip"] }.join(",")
       observer = a["ip"].sub(/\.\d+$/, ".1")   # host-only gateway = the host running the read-only viewers
       unit = <<~UNIT
         [Unit]
@@ -189,6 +195,8 @@ Vagrant.configure("2") do |config|
         Environment=VIHS_COLLAB_AGENT=#{a['actor_id']}
         Environment=LBABUS=/usr/local/bin/lbabus
         Environment=MESH_PEERS=#{peers}
+        Environment=MESH_LISTENERS=#{listeners}
+        Environment=MESH_EMITTERS=#{emitters}
         Environment=MESH_READY_PORT=22
         Environment=MESH_BIND=#{a['ip']}
         Environment=MESH_OBSERVERS=#{observer}
