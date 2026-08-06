@@ -33,13 +33,14 @@ export function parseProbeOutput(text) {
 
 // Canonical, deterministic verdict-bearing view (the digest input) — no wall time / port / temp paths.
 function canonical(receipt) {
-  const p = receipt.probe, r = receipt.result, h = receipt.host;
+  const p = receipt?.probe, r = receipt?.result, h = receipt?.host;
   return JSON.stringify({
-    schema: receipt.schema,
-    probe: { viName: p.viName, inputs: p.inputs, expectedOutput: p.expectedOutput, knownAnswer: p.knownAnswer },
-    result: { exitCode: r.exitCode, operationSucceeded: r.operationSucceeded, parsedOutput: r.parsedOutput },
-    host: { os: h.os, labviewVersion: h.labviewVersion },
-    verdict: { activated: receipt.verdict.activated },
+    schema: receipt?.schema,
+    probe: { viName: p?.viName, inputs: p?.inputs, expectedOutput: p?.expectedOutput, knownAnswer: p?.knownAnswer },
+    result: { exitCode: r?.exitCode, operationSucceeded: r?.operationSucceeded, parsedOutput: r?.parsedOutput },
+    host: { os: h?.os, labviewVersion: h?.labviewVersion },
+    ...(receipt?.actor ? { actor: receipt.actor } : {}),
+    verdict: { activated: receipt?.verdict?.activated },
   });
 }
 
@@ -61,6 +62,7 @@ export function buildActivationReceipt(capture) {
   const viName = basename(capture.probeVi || 'AddTwoNumbers.vi');
   const os = capture.host?.os || 'linux';
   const labviewVersion = parsed.labviewVersion || capture.labviewVersion || null;
+  const actor = capture.actor && ['actorId', 'hostname', 'ip'].every((field) => typeof capture.actor[field] === 'string' && capture.actor[field].trim());
   const result = {
     exitCode: capture.exitCode,
     operationSucceeded: parsed.operationSucceeded,
@@ -78,6 +80,7 @@ export function buildActivationReceipt(capture) {
     },
     result,
     host: { os, labviewVersion },
+    ...(actor ? { actor: { actorId: capture.actor.actorId.trim(), hostname: capture.actor.hostname.trim(), ip: capture.actor.ip.trim() } } : {}),
     verdict: {
       activated,
       reason: activated
@@ -93,15 +96,22 @@ export function buildActivationReceipt(capture) {
 export function validateActivationReceipt(receipt) {
   const findings = [];
   if (!receipt || receipt.schema !== RECEIPT_SCHEMA) findings.push(`schema must be ${RECEIPT_SCHEMA}`);
-  const p = receipt?.probe, r = receipt?.result;
-  if (!p || !r || !receipt.verdict) return { ok: false, activated: false, findings: findings.concat('missing probe/result/verdict') };
+  const p = receipt?.probe, r = receipt?.result, h = receipt?.host;
+  if (!p || !r || !h || !receipt?.verdict) return { ok: false, activated: false, findings: findings.concat('missing probe/result/host/verdict') };
   if (p.knownAnswer !== true) findings.push('probe.knownAnswer must be true (functional activation proof)');
+  if (receipt.actor !== undefined && (!receipt.actor || ['actorId', 'hostname', 'ip'].some((field) => typeof receipt.actor[field] !== 'string' || !receipt.actor[field].trim()))) {
+    findings.push('actor identity must contain non-empty actorId, hostname, and ip strings');
+  }
   const expectedVerdict = decideActivated({
     exitCode: r.exitCode, operationSucceeded: r.operationSucceeded,
     parsedOutput: r.parsedOutput, expectedOutput: p.expectedOutput, knownAnswer: p.knownAnswer,
   });
   if (receipt.verdict.activated !== expectedVerdict) findings.push(`verdict.activated=${receipt.verdict.activated} contradicts the rule (${expectedVerdict})`);
-  if (receipt.digest !== digestReceipt(receipt)) findings.push('digest does not match the verdict-bearing fields (tampered)');
+  try {
+    if (receipt.digest !== digestReceipt(receipt)) findings.push('digest does not match the verdict-bearing fields (tampered)');
+  } catch {
+    findings.push('receipt digest-bearing fields are malformed');
+  }
   return { ok: findings.length === 0, activated: !!receipt.verdict.activated && findings.length === 0, findings };
 }
 

@@ -91,4 +91,17 @@ const ok = (m) => { console.log(`  PASS  ${m}`); passed += 1; };
   }
 }
 
+// 7. Public actor identity is digest-bound when supplied, while malformed receipt objects fail closed.
+{
+  const bound = buildActivationReceipt({ ...capture, actor: { actorId: 'golden', hostname: 'actor', ip: '192.168.56.10' } });
+  assert.deepEqual(bound.actor, { actorId: 'golden', hostname: 'actor', ip: '192.168.56.10' });
+  assert.ok(validateActivationReceipt(bound).ok, 'a bound public actor identity validates');
+  const tamperedActor = { ...bound, actor: { ...bound.actor, ip: '192.168.56.99' } };
+  assert.equal(validateActivationReceipt(tamperedActor).ok, false, 'changing the bound actor identity breaks the digest');
+  const malformed = { probe: bound.probe, result: bound.result, verdict: bound.verdict, digest: bound.digest };
+  assert.doesNotThrow(() => validateActivationReceipt(malformed), 'missing digest-bearing objects never throw');
+  assert.equal(validateActivationReceipt(malformed).ok, false, 'a structurally incomplete receipt is invalid evidence');
+  ok('actor identity is digest-bound and malformed receipt structures fail closed');
+}
+
 console.log(`\nbuildActivationReceipt.selftest: ${passed}/${passed} checks passed`);

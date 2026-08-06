@@ -49,6 +49,13 @@ record = {
     "output": output,
     "host": {"os": platform.system().lower(), "hostname": socket.gethostname()},
 }
+  actor_fields = {
+    "actorId": os.environ.get("LBA_ACTOR_ID", "").strip(),
+    "hostname": os.environ.get("LBA_ACTOR_HOSTNAME", "").strip(),
+    "ip": os.environ.get("LBA_ACTOR_IP", "").strip(),
+  }
+  if all(actor_fields.values()):
+    record["actor"] = actor_fields
 with open(destination, "w", encoding="utf-8") as handle:
     json.dump(record, handle, indent=2)
     handle.write("\n")

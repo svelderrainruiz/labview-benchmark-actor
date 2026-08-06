@@ -25,10 +25,13 @@ Open the actor's VMware console, launch LabVIEW Community Edition, and complete 
 After activation, the agent can verify it functionally:
 
 ```powershell
-pwsh -File cleanroom/ubuntu-labview/golden-activation-cycle.ps1 -Vm actor1 -Mode Confirm
+pwsh -File cleanroom/ubuntu-labview/golden-activation-cycle.ps1 -Vm actor1 -Mode Confirm `
+	-ActorId golden -ActorHostname actor -ActorIp 192.168.56.10
 ```
 
-A successful confirmation writes `golden-actor1-activation-receipt.json` under `mesh/.vagrant/`. Only a receipt with `verdict.activated: true` may be passed to the actor enrollment workflow.
+A successful confirmation writes `golden-actor1-activation-receipt.json` under `mesh/.vagrant/`. Pass the public
+actor identity for enrollment-bound confirmation; it is digest-bound into the receipt. Only a receipt with
+`verdict.activated: true` and a matching actor identity may be passed to the actor enrollment workflow.
 
 ## Enrollment
 

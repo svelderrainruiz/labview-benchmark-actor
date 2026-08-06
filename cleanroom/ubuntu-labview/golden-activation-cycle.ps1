@@ -21,7 +21,13 @@ param(
   [ValidateSet('Check', 'Repair', 'Handoff', 'Confirm')]
   [string]$Mode = 'Check',
 
-  [string]$VagrantRoot = (Join-Path $PSScriptRoot 'mesh')
+  [string]$VagrantRoot = (Join-Path $PSScriptRoot 'mesh'),
+
+  [string]$ActorId = '',
+
+  [string]$ActorHostname = '',
+
+  [string]$ActorIp = ''
 )
 
 Set-StrictMode -Version Latest
@@ -119,7 +125,18 @@ function Get-Readiness {
 
 function Confirm-Activation {
   Send-GuestFile -Source $activationProbe -Destination '/tmp/lba-probe-activation.sh'
-  $probeExit = Invoke-VagrantAllowFailure -Arguments @('ssh', $Vm, '-c', 'rm -f /tmp/lba-activation-capture.json && chmod 700 /tmp/lba-probe-activation.sh && bash /tmp/lba-probe-activation.sh 20 22 /tmp/lba-activation-capture.json')
+  $identityValues = @($ActorId, $ActorHostname, $ActorIp)
+  $identityPrefix = ''
+  if ($identityValues | Where-Object { -not [string]::IsNullOrWhiteSpace($_) }) {
+    if ($identityValues | Where-Object { [string]::IsNullOrWhiteSpace($_) }) {
+      throw 'ActorId, ActorHostname, and ActorIp must be supplied together for enrollment-bound confirmation'
+    }
+    if ($ActorId -notmatch '^[A-Za-z0-9._-]+$' -or $ActorHostname -notmatch '^[A-Za-z0-9.-]+$' -or $ActorIp -notmatch '^\d{1,3}(\.\d{1,3}){3}$') {
+      throw 'actor identity values contain unsupported characters'
+    }
+    $identityPrefix = "LBA_ACTOR_ID=$ActorId LBA_ACTOR_HOSTNAME=$ActorHostname LBA_ACTOR_IP=$ActorIp "
+  }
+  $probeExit = Invoke-VagrantAllowFailure -Arguments @('ssh', $Vm, '-c', "rm -f /tmp/lba-activation-capture.json && chmod 700 /tmp/lba-probe-activation.sh && ${identityPrefix}bash /tmp/lba-probe-activation.sh 20 22 /tmp/lba-activation-capture.json")
   Receive-GuestFile -Source '/tmp/lba-activation-capture.json' -Destination $activationCapture
   & node $activationBuilder $activationCapture $activationReceipt | Out-Host
   $builderExit = $LASTEXITCODE
