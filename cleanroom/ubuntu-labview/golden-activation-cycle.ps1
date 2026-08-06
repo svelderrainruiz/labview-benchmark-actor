@@ -11,8 +11,8 @@
 .EXAMPLE
   pwsh -File cleanroom/ubuntu-labview/golden-activation-cycle.ps1 -Vm actor1 -Mode Check
   pwsh -File cleanroom/ubuntu-labview/golden-activation-cycle.ps1 -Vm actor1 -Mode Repair
-  pwsh -File cleanroom/ubuntu-labview/golden-activation-cycle.ps1 -Vm actor1 -Mode Handoff -ActorId golden -ActorHostname actor -ActorIp 192.168.56.10
-  pwsh -File cleanroom/ubuntu-labview/golden-activation-cycle.ps1 -Vm actor1 -Mode Confirm -ActorId golden -ActorHostname actor -ActorIp 192.168.56.10
+  pwsh -File cleanroom/ubuntu-labview/golden-activation-cycle.ps1 -Vm actor1 -Mode Handoff -ActorId golden -ActorHostname actor1 -ActorIp 192.168.56.11
+  pwsh -File cleanroom/ubuntu-labview/golden-activation-cycle.ps1 -Vm actor1 -Mode Confirm -ActorId golden -ActorHostname actor1 -ActorIp 192.168.56.11
 #>
 [CmdletBinding()]
 param(

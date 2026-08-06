@@ -14,7 +14,7 @@ From the repository root, use a declared mesh actor as the temporary golden acti
 pwsh -File cleanroom/ubuntu-labview/golden-activation-cycle.ps1 -Vm actor1 -Mode Check
 pwsh -File cleanroom/ubuntu-labview/golden-activation-cycle.ps1 -Vm actor1 -Mode Repair
 pwsh -File cleanroom/ubuntu-labview/golden-activation-cycle.ps1 -Vm actor1 -Mode Handoff `
-	-ActorId golden -ActorHostname actor -ActorIp 192.168.56.10
+  -ActorId golden -ActorHostname actor1 -ActorIp 192.168.56.11
 ```
 
 `Check` writes a non-secret readiness capture and receipt. `Repair` reruns the public dependency provisioner, reboots once for VI Server readiness, and checks again. `Handoff` is available only after readiness is confirmed.
@@ -27,7 +27,7 @@ After activation, the agent can verify it functionally:
 
 ```powershell
 pwsh -File cleanroom/ubuntu-labview/golden-activation-cycle.ps1 -Vm actor1 -Mode Confirm `
-	-ActorId golden -ActorHostname actor -ActorIp 192.168.56.10
+  -ActorId golden -ActorHostname actor1 -ActorIp 192.168.56.11
 ```
 
 A successful confirmation writes `golden-actor1-activation-receipt.json` under `mesh/.vagrant/`. Pass the public

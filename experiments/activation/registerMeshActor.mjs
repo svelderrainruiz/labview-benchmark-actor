@@ -92,14 +92,14 @@ export function registerGoldenActor({ receipt, registry = '', actor = {} } = {})
       findings: ['activation not confirmed — refusing to register the golden VM as a mesh actor', evidence.nextStep, ...evidence.findings],
     };
   }
-  const row = { ...GOLDEN_DEFAULTS, ...actor };
+  const identity = receipt.actor;
+  const row = { ...GOLDEN_DEFAULTS, hostname: identity.hostname, ip: identity.ip, ...actor };
   if (row.role !== 'golden' || row.actor_id !== 'golden') {
     return {
       ok: false, refused: true, csv: registry, row: null,
       findings: ['golden enrollment only permits role=golden and actor_id=golden'],
     };
   }
-  const identity = receipt.actor;
   if (row.hostname !== identity.hostname || row.ip !== identity.ip || row.actor_id !== identity.actorId) {
     return {
       ok: false, refused: true, csv: registry, row: null,
