@@ -6,6 +6,7 @@
     "ghcr.io/devcontainers/features/node:1": { "version": "22" },
     "ghcr.io/devcontainers/features/sshd:1": {}
   },
+  "initializeCommand": "node .devcontainer/cleanroom-witness/capture-source-commit.mjs",
   "postCreateCommand": "bash cleanroom/ubuntu-labview/codespace/bootstrap-validate.sh",
   "customizations": {
     "vscode": { "extensions": ["ms-dotnettools.csharp"] }
