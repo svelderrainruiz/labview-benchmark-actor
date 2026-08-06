@@ -30,6 +30,20 @@ pwsh -File cleanroom/ubuntu-labview/golden-activation-cycle.ps1 -Vm actor1 -Mode
 
 A successful confirmation writes `golden-actor1-activation-receipt.json` under `mesh/.vagrant/`. Only a receipt with `verdict.activated: true` may be passed to the actor enrollment workflow.
 
+## Enrollment
+
+After `Confirm` exits successfully, register the local golden actor with the receipt it produced:
+
+```powershell
+node experiments/activation/registerMeshActor.mjs `
+	--receipt cleanroom/ubuntu-labview/mesh/.vagrant/golden-actor1-activation-receipt.json `
+	--registry cleanroom/ubuntu-labview/mesh-actors.csv
+```
+
+The command validates the receipt before changing the ignored local registry. It never accepts a password;
+the local provisioning flow generates credentials separately. If confirmation is unconfirmed, crashed, or
+tampered, enrollment leaves the registry unchanged and prints the next safe action.
+
 ## Handoff Evidence
 
 The activation cycle keeps these non-secret local artifacts in `mesh/.vagrant/`:

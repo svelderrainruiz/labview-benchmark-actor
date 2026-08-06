@@ -45,7 +45,7 @@ import { ingestRun, readReturned } from '../experiments/mesh-fulfillment/meshIng
 import { corroborateRun } from '../experiments/mesh-fulfillment/meshCorroborate.mjs';
 import { assembleLiveN2 } from '../experiments/mesh-fulfillment/driveLiveN2.mjs';
 
-export const ITERATION = 16; // bump when you refine this tool (see the banner above)
+export const ITERATION = 17; // bump when you refine this tool (see the banner above)
 
 const here = dirname(fileURLToPath(import.meta.url));
 export const repoRoot = resolve(here, '..');
@@ -635,8 +635,9 @@ export const COMMANDS = {
       console.log('\n\u25b6 provisioning the golden VM (cleanroom/ubuntu-labview/build-virtualbox.sh --run)\u2026');
       execFileSync('bash', [join(repoRoot, 'cleanroom/ubuntu-labview/build-virtualbox.sh'), '--run'], { stdio: 'inherit' });
       console.log('\nNEXT (hybrid \u2014 the one human step): activate LabVIEW CE + VIPM in the VM, then confirm + register:');
-      console.log('  bash experiments/activation/probe-activation.sh      # headless RunVI probe -> activation-receipt@1');
-      console.log('  node experiments/activation/registerMeshActor.mjs    # mint + register the VM as a mesh actor');
+      console.log('  bash experiments/activation/probe-activation.sh 20 22 /tmp/lba-activation-capture.json');
+      console.log('  node experiments/activation/buildActivationReceipt.mjs /tmp/lba-activation-capture.json /tmp/lba-activation-receipt.json');
+      console.log('  node experiments/activation/registerMeshActor.mjs --receipt /tmp/lba-activation-receipt.json --registry cleanroom/ubuntu-labview/mesh-actors.csv');
     },
   },
   'mesh-run': {
