@@ -1,7 +1,7 @@
 # Ubuntu clean-room MESH — spawns N actor instances from the golden box `actor/ubuntu2404-labview`.
 #
 # Reads the gitignored per-actor store `../mesh-actors.csv` (schema: role,actor_id,hostname,username,
-# ip,tcp_port,udp_port,password). One VM per `role=mesh` row, on a host-only private network so the
+# ip,tcp_port,udp_port,node_type,password). One VM per `role=mesh` row, on a host-only private network so the
 # actors coordinate over `lbabus net` (TCP bus + UDP presence) at the recorded ports, and the host can
 # observe the traffic per actor.
 #
@@ -11,11 +11,38 @@
 # the golden box before packaging). The golden box is the USER's property; AGENTS.md just facilitates it.
 require "csv"
 require "base64"
+require "json"
+require "tempfile"
 
 CSV_PATH = File.expand_path("../mesh-actors.csv", __dir__)
 raise "missing #{CSV_PATH} (copy mesh-actors.csv.example and let the agent fill it)" unless File.exist?(CSV_PATH)
-ACTORS = CSV.read(CSV_PATH, headers: true).select { |r| r["role"] == "mesh" }
+CSV_ROWS = File.readlines(CSV_PATH, chomp: true).reject { |line| line.lstrip.start_with?("#") || line.strip.empty? }
+ACTORS = CSV.parse(CSV_ROWS.join("\n"), headers: true).select { |r| r["role"] == "mesh" }
 raise "no role=mesh rows in #{CSV_PATH}" if ACTORS.empty?
+
+def strong_mesh_password?(password, username)
+  value = String(password)
+  account = String(username).downcase
+  value.length >= 16 &&
+    !account.empty? &&
+    !value.downcase.include?(account) &&
+    value.match?(/[A-Z]/) && value.match?(/[a-z]/) &&
+    value.match?(/\d/) && value.match?(/[^A-Za-z0-9]/) &&
+    !value.match?(/[\r\n,]/)
+end
+
+ACTORS.each do |actor|
+  next if strong_mesh_password?(actor["password"], actor["username"])
+  raise "mesh actor #{actor["hostname"]} needs a local password with 16+ mixed characters that does not contain its username"
+end
+
+MESH_NODE_TYPES = %w[source sink both].freeze
+ACTORS.each do |actor|
+  node_type = String(actor["node_type"]).strip.downcase
+  node_type = "both" if node_type.empty?
+  next if MESH_NODE_TYPES.include?(node_type)
+  raise "mesh actor #{actor["hostname"]} has invalid node_type #{actor["node_type"].inspect}; expected source, sink, or both"
+end
 
 # The per-actor mesh workload is SHARED with Docker-CI (tools/collab-cli/ci/mesh-actor.sh). Read + normalize it
 # to LF here (a Windows host checkout may be CRLF) and deliver it base64 so no line ending survives to the guest.
@@ -23,9 +50,45 @@ MESH_ACTOR_SRC = File.expand_path("../../../tools/collab-cli/ci/mesh-actor.sh", 
 raise "missing #{MESH_ACTOR_SRC}" unless File.exist?(MESH_ACTOR_SRC)
 MESH_ACTOR_B64 = Base64.strict_encode64(File.read(MESH_ACTOR_SRC).gsub(/\r\n?/, "\n"))
 
+# Wait for every peer's SSH daemon before the full TCP/UDP proof. This avoids recording an avoidable
+# first-round failure while Vagrant is still creating a neighboring actor.
+MESH_PEER_WAIT_B64 = Base64.strict_encode64(<<~'SH')
+  #!/usr/bin/env bash
+  set -euo pipefail
+  IFS=',' read -ra peers <<< "${MESH_PEERS:-}"
+  ready_port="${MESH_READY_PORT:-22}"
+  for peer in "${peers[@]}"; do
+    peer="$(printf '%s' "$peer" | tr -d '[:space:]')"
+    [ -z "$peer" ] && continue
+    echo "[mesh] waiting for peer SSH $peer:$ready_port"
+    until timeout 1 bash -c ":</dev/tcp/$peer/$ready_port" >/dev/null 2>&1; do
+      sleep 1
+    done
+    echo "[mesh] peer SSH ready $peer:$ready_port"
+  done
+SH
+
+# Every fresh mesh clone rebuilds the manifest-pinned lbabus source so a stale golden image cannot form
+# a mixed-version mesh.
+CLEANROOM_MANIFEST_PATH = File.expand_path("../cleanroom-manifest.json", __dir__)
+raise "missing #{CLEANROOM_MANIFEST_PATH}" unless File.exist?(CLEANROOM_MANIFEST_PATH)
+LBABUS_SOURCE_REF = JSON.parse(File.read(CLEANROOM_MANIFEST_PATH)).dig("lbabus", "source_ref")
+raise "cleanroom manifest has no lbabus.source_ref" unless LBABUS_SOURCE_REF.is_a?(String) && !LBABUS_SOURCE_REF.empty?
+LBABUS_SOURCE_VERSION = LBABUS_SOURCE_REF[/\Acollab-cli-v(\d+\.\d+\.\d+)\z/, 1]
+raise "lbabus.source_ref must be a collab-cli SemVer tag, got #{LBABUS_SOURCE_REF.inspect}" unless LBABUS_SOURCE_VERSION
+LBABUS_PROVISIONER_SRC = File.expand_path("../provision-lbabus-fromsource.sh", __dir__)
+raise "missing #{LBABUS_PROVISIONER_SRC}" unless File.exist?(LBABUS_PROVISIONER_SRC)
+LBABUS_PROVISIONER_B64 = Base64.strict_encode64(File.read(LBABUS_PROVISIONER_SRC).gsub(/\r\n?/, "\n"))
+LBABUS_SOURCE_REF_B64 = Base64.strict_encode64(LBABUS_SOURCE_REF)
+
 # Mesh instances are lighter than the 12 GB golden (coordination, not heavy LabVIEW work).
 MESH_MEM_MB = ENV.fetch("MESH_MEM_MB", "4096")
 MESH_VCPUS  = ENV.fetch("MESH_VCPUS", "2")
+
+# File provisioning keeps passwords out of inline commands and their logs. Tempfiles are unlinked when
+# Vagrant exits, after upload has completed.
+CREDENTIAL_FILES = []
+at_exit { CREDENTIAL_FILES.each(&:close!) }
 
 Vagrant.configure("2") do |config|
   config.vm.box = "actor/ubuntu2404-labview"
@@ -35,6 +98,14 @@ Vagrant.configure("2") do |config|
 
   ACTORS.each do |a|
     config.vm.define a["hostname"] do |node|
+      node_type = String(a["node_type"]).strip.downcase
+      node_type = "both" if node_type.empty?
+      credential = Tempfile.new(["lba-#{a['hostname']}-", ".credential"])
+      credential.write("#{a['username']}:#{a['password']}\n")
+      credential.close
+      File.chmod(0o600, credential.path) rescue nil
+      CREDENTIAL_FILES << credential
+      guest_credential = "/tmp/lba-#{a['hostname']}.credential"
       node.vm.hostname = a["hostname"]
       node.vm.network "private_network", ip: a["ip"]  # host-only vmnet -> stable inter-actor IPs
 
@@ -60,19 +131,39 @@ Vagrant.configure("2") do |config|
         v.vmx["pciBridge7.functions"]  = "8"
       end
 
-      # Per-actor dev credential (from the CSV row) + record this actor's lbabus net endpoint so the
-      # host-side viewers can attribute traffic. Password is dev-only + local (gitignored source).
+      # Upload the per-actor credential as a file, apply it in-guest, then delete it before recording only
+      # non-secret endpoint metadata for host-side viewers.
+      node.vm.provision "actor-credential", type: "file",
+        source: credential.path, destination: guest_credential
+
       node.vm.provision "shell", inline: <<~SH
         set -e
-        echo "actor:#{a['password']}" | sudo chpasswd
-        printf 'ACTOR_ID=%s\nHOSTNAME=%s\nIP=%s\nTCP_PORT=%s\nUDP_PORT=%s\n' \
-          "#{a['actor_id']}" "#{a['hostname']}" "#{a['ip']}" "#{a['tcp_port']}" "#{a['udp_port']}" \
+        sudo sh -c 'chpasswd < "$1"; rm -f "$1"' sh "#{guest_credential}"
+        printf 'ACTOR_ID=%s\nHOSTNAME=%s\nIP=%s\nTCP_PORT=%s\nUDP_PORT=%s\nNODE_TYPE=%s\n' \
+          "#{a['actor_id']}" "#{a['hostname']}" "#{a['ip']}" "#{a['tcp_port']}" "#{a['udp_port']}" "#{node_type}" \
           | sudo tee /etc/lba-mesh-actor >/dev/null
-        echo "[mesh] actor #{a['actor_id']} (#{a['hostname']}) ready at #{a['ip']} tcp=#{a['tcp_port']} udp=#{a['udp_port']}"
+        echo "[mesh] actor #{a['actor_id']} (#{a['hostname']}) ready at #{a['ip']} tcp=#{a['tcp_port']} udp=#{a['udp_port']} node_type=#{node_type}"
+      SH
+
+      node.vm.provision "shell", inline: <<~SH
+        set -euo pipefail
+        sudo systemctl stop lba-mesh.service 2>/dev/null || true
+        sudo rm -f /usr/local/bin/lbabus
+        echo "#{LBABUS_PROVISIONER_B64}" | base64 -d | sudo tee /usr/local/sbin/lba-provision-lbabus-fromsource.sh >/dev/null
+        sudo chmod 0755 /usr/local/sbin/lba-provision-lbabus-fromsource.sh
+        lbabus_ref="$(echo "#{LBABUS_SOURCE_REF_B64}" | base64 -d)"
+        sudo env LBABUS_REF="$lbabus_ref" /usr/local/sbin/lba-provision-lbabus-fromsource.sh
+        sudo systemctl daemon-reload
+        sudo systemctl restart lba-lbabus-build.service
+        sudo systemctl restart lba-gate-suite.service
+        test "$(/usr/local/bin/lbabus version)" = "#{LBABUS_SOURCE_VERSION}"
+        test -f /opt/lba/gate-suite-receipt.json
+        grep -q '"verdict": "pass"' /opt/lba/gate-suite-receipt.json
+        echo "[mesh] lbabus #{LBABUS_SOURCE_VERSION} built and self-certified"
       SH
 
       # Auto-form the host-only lbabus mesh ON BOOT: install the shared mesh workload + a systemd unit that runs
-      # it (listen 7420/7421 + send/beacon --hosts <peer IPs> with 0.11.0 --bind <self host-only IP>) in a
+      # it (listen 7420/7421 + send/beacon --hosts <peer IPs> with the manifest-pinned CLI --bind <self host-only IP>) in a
       # CONTINUOUS prove loop (Restart=always, no rate limit): each round exits 0 on MESH OK then restarts, so
       # listeners/beacons stay live and a peer that completes first keeps beaconing for a slower, staggered peer
       # (Restart=on-failure would let the first finisher exit and strand the other). The mesh forms regardless
@@ -94,13 +185,17 @@ Vagrant.configure("2") do |config|
 
         [Service]
         Type=simple
+        TimeoutStartSec=infinity
         Environment=VIHS_COLLAB_AGENT=#{a['actor_id']}
         Environment=LBABUS=/usr/local/bin/lbabus
         Environment=MESH_PEERS=#{peers}
+        Environment=MESH_READY_PORT=22
         Environment=MESH_BIND=#{a['ip']}
         Environment=MESH_OBSERVERS=#{observer}
         Environment=TCP_PORT=#{a['tcp_port']}
         Environment=UDP_PORT=#{a['udp_port']}
+        Environment=NODE_TYPE=#{node_type}
+        ExecStartPre=/usr/local/bin/lba-wait-for-peers.sh
         ExecStart=/usr/local/bin/lba-mesh-actor.sh
         Restart=always
         RestartSec=2
@@ -114,11 +209,13 @@ Vagrant.configure("2") do |config|
         set -e
         echo "#{MESH_ACTOR_B64}" | base64 -d | sudo tee /usr/local/bin/lba-mesh-actor.sh >/dev/null
         sudo chmod +x /usr/local/bin/lba-mesh-actor.sh
+        echo "#{MESH_PEER_WAIT_B64}" | base64 -d | sudo tee /usr/local/bin/lba-wait-for-peers.sh >/dev/null
+        sudo chmod +x /usr/local/bin/lba-wait-for-peers.sh
         echo "#{unit_b64}" | base64 -d | sudo tee /etc/systemd/system/lba-mesh.service >/dev/null
         sudo systemctl daemon-reload
         sudo systemctl enable lba-mesh.service >/dev/null 2>&1 || true
-        sudo systemctl restart lba-mesh.service || true
-        echo "[mesh] lba-mesh.service installed + started (peers=#{peers} bind=#{a['ip']} observer=#{observer})"
+        sudo systemctl restart --no-block lba-mesh.service || true
+        echo "[mesh] lba-mesh.service installed + waiting for peer SSH (peers=#{peers} bind=#{a['ip']} observer=#{observer})"
       SH
     end
   end

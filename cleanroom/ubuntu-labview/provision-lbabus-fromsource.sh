@@ -33,11 +33,12 @@ extract_role() { # <repo> <ref>
 LBA_DIR="${LBA_DIR:-/opt/lba}"
 SRC="$LBA_DIR/src"
 NUGET="$LBA_DIR/nuget"
+DOCS_ROOT="$(dirname "$LBA_DIR")/docs"
 DEST="${LBABUS_DEST:-/usr/local/bin/lbabus}"
 EMIT="${LBABUS_EMIT:-/usr/local/bin/emit-boot-marker.sh}"  # PATH-standard, next to lbabus; where mesh-actor.sh expects it
 SDK_PKG="${DOTNET_SDK_PKG:-dotnet-sdk-8.0}"          # Ubuntu 24.04 ships this; net8.0 builds natively
 REPO_URL="${LBABUS_REPO_URL:-https://github.com/LabVIEW-Community-CI-CD/labview-benchmark-actor}"  # PUBLIC
-REF="${LBABUS_REF:-main}"                            # pin to a tag/commit for reproducible clone builds
+REF="${LBABUS_REF:-collab-cli-v0.15.0}"              # cleanroom baseline; env may pin a tag or commit explicitly
 SRC_DIR="${LBABUS_SRC_DIR:-}"                        # optional: bake a LOCAL tools/collab-cli instead of cloning
 RID="${LBABUS_RID:-linux-x64}"
 
@@ -52,11 +53,16 @@ fi
 DOTNET_ROOT_DIR="$(dirname "$(readlink -f "$(command -v dotnet)")")"
 log "dotnet $(dotnet --version) (root $DOTNET_ROOT_DIR)"
 
-# 2) Bake the PINNED collab-cli source into /opt/lba/src.
-rm -rf "$LBA_DIR"; mkdir -p "$SRC"
+# 2) Bake the PINNED collab-cli source into /opt/lba/src and its embedded documentation inputs into /opt/docs.
+# LbaBus.csproj embeds ../../docs/requirements/{srs.md,rtm.csv}; preserve that relative layout for the
+# isolated first-boot build.
+rm -rf "$LBA_DIR" "$DOCS_ROOT/requirements"; mkdir -p "$SRC" "$DOCS_ROOT"
 if [ -n "$SRC_DIR" ] && [ -f "$SRC_DIR/LbaBus.csproj" ]; then
   log "baking source from local $SRC_DIR"
   cp -r "$SRC_DIR/." "$SRC"/
+  LOCAL_REPO="$(cd "$SRC_DIR/../.." && pwd)"
+  [ -d "$LOCAL_REPO/docs/requirements" ] || { echo "[abort] missing $LOCAL_REPO/docs/requirements for embedded lbabus docs" >&2; exit 1; }
+  cp -r "$LOCAL_REPO/docs/requirements" "$DOCS_ROOT"/
   COMMIT="$(git -C "$SRC_DIR" rev-parse HEAD 2>/dev/null || echo local)"
   ROLE="$(extract_role "$SRC_DIR" HEAD 2>/dev/null || true)"
 else
@@ -65,10 +71,15 @@ else
   git clone "$REPO_URL" "$tmp/repo" >/dev/null 2>&1
   git -C "$tmp/repo" checkout -q "$REF"
   cp -r "$tmp/repo/tools/collab-cli/." "$SRC"/
+  cp -r "$tmp/repo/docs/requirements" "$DOCS_ROOT"/
   COMMIT="$(git -C "$tmp/repo" rev-parse HEAD)"
   ROLE="$(extract_role "$tmp/repo" HEAD 2>/dev/null || true)"
   rm -rf "$tmp"
 fi
+[ -f "$DOCS_ROOT/requirements/srs.md" ] && [ -f "$DOCS_ROOT/requirements/rtm.csv" ] || {
+  echo "[abort] embedded lbabus documentation inputs are incomplete under $DOCS_ROOT/requirements" >&2
+  exit 1
+}
 rm -rf "$SRC"/obj "$SRC"/bin "$SRC"/ci/obj "$SRC"/ci/bin 2>/dev/null || true
 echo "$COMMIT" > "$LBA_DIR/SOURCE_COMMIT"
 printf '%s' "${ROLE:-}" > "$LBA_DIR/SOURCE_ROLE"
