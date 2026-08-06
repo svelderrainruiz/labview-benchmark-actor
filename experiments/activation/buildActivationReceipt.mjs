@@ -40,6 +40,7 @@ function canonical(receipt) {
     result: { exitCode: r?.exitCode, operationSucceeded: r?.operationSucceeded, parsedOutput: r?.parsedOutput },
     host: { os: h?.os, labviewVersion: h?.labviewVersion, ...(h?.bootId ? { bootId: h.bootId } : {}) },
     ...(receipt?.actor ? { actor: receipt.actor } : {}),
+    ...(receipt?.freshness !== undefined ? { freshness: { challenge: receipt?.freshness?.challenge } } : {}),
     verdict: { activated: receipt?.verdict?.activated },
   });
 }
@@ -63,6 +64,8 @@ export function buildActivationReceipt(capture) {
   const os = capture.host?.os || 'linux';
   const labviewVersion = parsed.labviewVersion || capture.labviewVersion || null;
   const bootId = typeof capture.host?.bootId === 'string' && capture.host.bootId.trim() ? capture.host.bootId.trim().toLowerCase() : null;
+  const activationChallenge = capture.freshness?.challenge;
+  const freshness = activationChallenge === undefined ? undefined : { challenge: String(activationChallenge).trim().toLowerCase() };
   const actor = capture.actor && ['actorId', 'hostname', 'ip'].every((field) => typeof capture.actor[field] === 'string' && capture.actor[field].trim());
   const result = {
     exitCode: capture.exitCode,
@@ -82,6 +85,7 @@ export function buildActivationReceipt(capture) {
     result,
     host: { os, labviewVersion, ...(bootId ? { bootId } : {}) },
     ...(actor ? { actor: { actorId: capture.actor.actorId.trim(), hostname: capture.actor.hostname.trim(), ip: capture.actor.ip.trim() } } : {}),
+    ...(freshness ? { freshness } : {}),
     verdict: {
       activated,
       reason: activated
@@ -106,6 +110,9 @@ export function validateActivationReceipt(receipt) {
   if (receipt.actor !== undefined && (!receipt.actor || ['actorId', 'hostname', 'ip'].some((field) => typeof receipt.actor[field] !== 'string' || !receipt.actor[field].trim()))) {
     findings.push('actor identity must contain non-empty actorId, hostname, and ip strings');
   }
+  if (receipt.freshness !== undefined && (!receipt.freshness || !/^[a-f0-9]{32}$/.test(String(receipt.freshness.challenge)))) {
+    findings.push('freshness.challenge must be a 32-character lowercase hexadecimal host challenge when present');
+  }
   const expectedVerdict = decideActivated({
     exitCode: r.exitCode, operationSucceeded: r.operationSucceeded,
     parsedOutput: r.parsedOutput, expectedOutput: p.expectedOutput, knownAnswer: p.knownAnswer,
@@ -120,9 +127,30 @@ export function validateActivationReceipt(receipt) {
 }
 
 function main() {
-  const [, , capturePath, receiptPath] = process.argv;
+  const [, , ...args] = process.argv;
+  if (args[0] === '--validate') {
+    if (args.length !== 2) {
+      console.error('usage: node buildActivationReceipt.mjs --validate <receipt.json>');
+      process.exit(2);
+    }
+    let receipt;
+    try {
+      receipt = JSON.parse(readFileSync(args[1], 'utf8'));
+    } catch (error) {
+      console.error(`activation receipt: cannot read ${args[1]}: ${error.message}`);
+      process.exit(1);
+    }
+    const result = validateActivationReceipt(receipt);
+    if (!result.ok) {
+      console.error(`activation receipt: INVALID: ${result.findings.join('; ')}`);
+      process.exit(1);
+    }
+    console.log(`activation receipt: ${result.activated ? 'ACTIVATED' : 'UNCONFIRMED'}`);
+    process.exit(result.activated ? 0 : 1);
+  }
+  const [capturePath, receiptPath] = args;
   if (!capturePath || !receiptPath) {
-    console.error('usage: node buildActivationReceipt.mjs <capture.json> <receipt.json>');
+    console.error('usage: node buildActivationReceipt.mjs <capture.json> <receipt.json> | --validate <receipt.json>');
     process.exit(2);
   }
   const capture = JSON.parse(readFileSync(capturePath, 'utf8'));

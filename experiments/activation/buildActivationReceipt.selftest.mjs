@@ -6,7 +6,7 @@
 // activation. Run: node buildActivationReceipt.selftest.mjs  (exit 0 = all pass).
 
 import assert from 'node:assert/strict';
-import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
@@ -85,6 +85,12 @@ const ok = (m) => { console.log(`  PASS  ${m}`); passed += 1; };
     const run = spawnSync(process.execPath, [join(here, 'buildActivationReceipt.mjs'), join(here, 'fixtures', 'activation-capture.json'), output], { encoding: 'utf8' });
     assert.equal(run.status, 0, `activation receipt CLI succeeds for a valid capture: ${run.stderr}`);
     assert.deepEqual(JSON.parse(readFileSync(output, 'utf8')), committed, 'activation receipt CLI writes the deterministic receipt');
+    const validate = spawnSync(process.execPath, [join(here, 'buildActivationReceipt.mjs'), '--validate', output], { encoding: 'utf8' });
+    assert.equal(validate.status, 0, `activation receipt validation CLI accepts an activated receipt: ${validate.stderr}`);
+    const unconfirmed = join(temp, 'unconfirmed.json');
+    writeFileSync(unconfirmed, `${JSON.stringify(buildActivationReceipt({ ...capture, exitCode: 1 }))}\n`);
+    const reject = spawnSync(process.execPath, [join(here, 'buildActivationReceipt.mjs'), '--validate', unconfirmed], { encoding: 'utf8' });
+    assert.equal(reject.status, 1, 'activation receipt validation CLI refuses an unconfirmed receipt');
     ok('activation receipt CLI writes the same deterministic receipt from a valid capture');
   } finally {
     rmSync(temp, { recursive: true, force: true });
@@ -108,6 +114,9 @@ const ok = (m) => { console.log(`  PASS  ${m}`); passed += 1; };
   assert.match(python, /actual_hostname = socket\.gethostname\(\)/, 'actor hostname is measured from the probed guest');
   assert.match(python, /actor_fields\["hostname"\] != actual_hostname/, 'requested hostname is verified against the probed guest');
   assert.match(python, /actor_fields\["ip"\] not in actual_ips/, 'requested IP is verified against guest interfaces');
+  assert.match(python, /record\["freshness"\] = \{"challenge": activation_challenge\}/, 'a persisted host challenge is included in the raw capture');
+  assert.match(probeScript, /LBA_ACTIVATION_CHALLENGE must be 32 lowercase hexadecimal characters/, 'the probe validates the host challenge format');
+  assert.match(probeScript, /\/var\/lib\/lba-golden-activation\/challenge/, 'a successful probe persists the challenge outside the pre-activation snapshot');
   ok('actor identity is digest-bound and malformed receipt structures fail closed');
 }
 
@@ -123,6 +132,20 @@ const ok = (m) => { console.log(`  PASS  ${m}`); passed += 1; };
   malformed.digest = digestReceipt(malformed);
   assert.equal(validateActivationReceipt(malformed).ok, false, 'a malformed boot ID is rejected even if resealed');
   ok('guest boot identity is digest-bound and format-validated');
+}
+
+// 9. A post-confirmation host challenge is digest-bound and rejects malformed or tampered values.
+{
+  const challenge = '0123456789abcdef0123456789abcdef';
+  const fresh = buildActivationReceipt({ ...capture, freshness: { challenge } });
+  assert.equal(fresh.freshness.challenge, challenge, 'preserves the host-generated challenge');
+  assert.ok(validateActivationReceipt(fresh).ok, 'a valid freshness challenge validates');
+  const tampered = { ...fresh, freshness: { challenge: 'fedcba9876543210fedcba9876543210' } };
+  assert.equal(validateActivationReceipt(tampered).ok, false, 'changing the challenge breaks the digest');
+  const malformed = { ...fresh, freshness: { challenge: 'not-a-challenge' } };
+  malformed.digest = digestReceipt(malformed);
+  assert.equal(validateActivationReceipt(malformed).ok, false, 'a malformed challenge is rejected even if resealed');
+  ok('post-confirmation host challenges are digest-bound and format-validated');
 }
 
 console.log(`\nbuildActivationReceipt.selftest: ${passed}/${passed} checks passed`);

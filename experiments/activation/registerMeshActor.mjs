@@ -8,8 +8,8 @@
 //   role,actor_id,hostname,username,ip,tcp_port,udp_port,node_type,password
 // The real mesh-actors.csv is gitignored and its passwords are AGENT-generated locally; this module only
 // composes the row deterministically (password stays the AGENT_GENERATED placeholder). The CLI additionally
-// challenges the current Vagrant guest boot/hostname/IP before it writes the registry, so an old receipt from
-// a reverted or recreated actor cannot be replayed.
+// challenges the current Vagrant guest boot/hostname/IP plus a post-confirmation challenge before it writes the
+// registry, so an old receipt from a reverted or recreated actor cannot be replayed.
 
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
@@ -21,6 +21,7 @@ export const REGISTRY_HEADER = 'role,actor_id,hostname,username,ip,tcp_port,udp_
 const here = dirname(fileURLToPath(import.meta.url));
 export const DEFAULT_REGISTRY_PATH = join(here, '..', '..', 'cleanroom', 'ubuntu-labview', 'mesh-actors.csv');
 export const DEFAULT_VAGRANT_ROOT = join(here, '..', '..', 'cleanroom', 'ubuntu-labview', 'mesh');
+export const ACTIVATION_CHALLENGE_PATH = '/var/lib/lba-golden-activation/challenge';
 export const GOLDEN_DEFAULTS = {
   role: 'golden', actor_id: 'golden', hostname: 'actor', username: 'actor',
   ip: '192.168.56.10', tcp_port: '7420', udp_port: '7421', node_type: 'both', password: 'AGENT_GENERATED',
@@ -36,23 +37,26 @@ export function parseCurrentGuestIdentity(output) {
     bootId: String(values.bootId || '').toLowerCase(),
     hostname: String(values.hostname || ''),
     ips: String(values.ips || '').split(/\s+/).filter(Boolean),
+    activationChallenge: String(values.activationChallenge || '').toLowerCase(),
   };
 }
 
 export function verifyCurrentGuestIdentity({ receipt, guest } = {}) {
   const expected = receipt?.actor;
   const bootId = receipt?.host?.bootId;
+  const activationChallenge = receipt?.freshness?.challenge;
   const findings = [];
-  if (!expected || !bootId) findings.push('receipt lacks the guest identity and boot proof required for enrollment');
+  if (!expected || !bootId || !activationChallenge) findings.push('receipt lacks the guest identity, boot proof, or snapshot-resistant activation challenge required for enrollment');
   if (expected && guest?.hostname !== expected.hostname) findings.push('current guest hostname does not match the activation receipt');
   if (expected && !guest?.ips?.includes(expected.ip)) findings.push('current guest IP does not match the activation receipt');
   if (bootId && guest?.bootId !== bootId) findings.push('current guest boot ID does not match the activation receipt; run a fresh confirmation');
+  if (activationChallenge && guest?.activationChallenge !== activationChallenge) findings.push('current guest activation challenge does not match the activation receipt; run a fresh confirmation');
   return { ok: findings.length === 0, findings };
 }
 
 export function readCurrentGuestIdentity({ vm, vagrantRoot = DEFAULT_VAGRANT_ROOT, run = execFileSync } = {}) {
   if (!vm) throw new Error('a Vagrant VM name is required to verify the current guest');
-  const guestCommand = 'printf "bootId=%s\\nhostname=%s\\nips=%s\\n" "$(cat /proc/sys/kernel/random/boot_id)" "$(hostname)" "$(hostname -I)"';
+  const guestCommand = `activation_challenge="$(sudo -n cat ${ACTIVATION_CHALLENGE_PATH} 2>/dev/null || true)"; printf "bootId=%s\\nhostname=%s\\nips=%s\\nactivationChallenge=%s\\n" "$(cat /proc/sys/kernel/random/boot_id)" "$(hostname)" "$(hostname -I)" "$activation_challenge"`;
   const output = run('vagrant', ['ssh', vm, '-c', guestCommand], { cwd: vagrantRoot, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] });
   return parseCurrentGuestIdentity(output);
 }
@@ -130,6 +134,25 @@ export function describeActivationEvidence(receipt) {
   };
 }
 
+export function validateGoldenActorRow(row = {}) {
+  const findings = [];
+  const cellValues = Object.entries(row);
+  for (const [field, value] of cellValues) {
+    if (/[\r\n,]/.test(String(value))) findings.push(`${field} must not contain CSV delimiters or line breaks`);
+  }
+  if (!/^[A-Za-z0-9][A-Za-z0-9.-]*$/.test(String(row.hostname || ''))) findings.push('hostname must be a safe DNS-style value');
+  if (!/^[a-z_][a-z0-9_-]*\$?$/.test(String(row.username || ''))) findings.push('username must be a safe Linux account name');
+  const ipParts = String(row.ip || '').split('.');
+  if (ipParts.length !== 4 || ipParts.some((part) => !/^\d{1,3}$/.test(part) || Number(part) > 255)) findings.push('ip must be an IPv4 address');
+  for (const field of ['tcp_port', 'udp_port']) {
+    const value = String(row[field] || '');
+    if (!/^\d{1,5}$/.test(value) || Number(value) < 1 || Number(value) > 65535) findings.push(`${field} must be a TCP/UDP port from 1 through 65535`);
+  }
+  if (!['source', 'sink', 'both'].includes(String(row.node_type || ''))) findings.push('node_type must be source, sink, or both');
+  if (row.password !== 'AGENT_GENERATED') findings.push('password must remain the local AGENT_GENERATED placeholder');
+  return { ok: findings.length === 0, findings };
+}
+
 // Register the golden VM as a mesh actor -- ONLY if its activation receipt confirms activation.
 // Idempotent: re-registering the same role+actor_id replaces the row rather than duplicating it.
 export function registerGoldenActor({ receipt, registry = '', actor = {} } = {}) {
@@ -152,6 +175,13 @@ export function registerGoldenActor({ receipt, registry = '', actor = {} } = {})
     return {
       ok: false, refused: true, csv: registry, row: null,
       findings: ['receipt actor identity does not match the requested local golden actor'],
+    };
+  }
+  const rowValidation = validateGoldenActorRow(row);
+  if (!rowValidation.ok) {
+    return {
+      ok: false, refused: true, csv: registry, row: null,
+      findings: ['golden actor overrides are not valid CSV-safe registry values', ...rowValidation.findings],
     };
   }
   const cells = COLS.map((c) => String(row[c]));

@@ -138,3 +138,9 @@ box `vihs/labview-cleanroom-sc`, `vmware_desktop`, two actors on a host-only `pr
 CLAIM/ACK/HANDOFF/DONE + UDP presence — LBA-REQ-006/007). An Ubuntu mesh mirrors it 1:1 — swap the
 communicator to **ssh**, the box to the Ubuntu golden box, and the provider to **virtualbox** (LINUX) or
 **vmware_desktop** (WIN). Vagrant is cross-provider, so the *same* topology meshes on both planes.
+
+For the Vagrant production-golden path, use the enforced sequence in [ACTIVATION.md](ACTIVATION.md):
+`Provision` (including a reboot and LabVIEWCLI/console check), `ConsoleReady -OperatorDesktopConfirmed`,
+`Handoff`, `Confirm`, then `Package`. Packaging is blocked unless a fresh identity-bound functional receipt and its
+post-confirmation challenge still match the current guest; this prevents a pre-activation snapshot from being
+packaged or enrolled as activated.
