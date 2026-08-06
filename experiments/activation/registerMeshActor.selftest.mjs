@@ -123,4 +123,16 @@ const goldenRows = (csv) => csv.split(/\r?\n/).filter((l) => l.startsWith('golde
   ok('receipt identity and the golden-only role are both enforced');
 }
 
+// 9. A verified Vagrant target identity becomes the golden row endpoint without caller-controlled overrides.
+{
+  const targetIdentity = { actorId: 'golden', hostname: 'actor1', ip: '192.168.56.11' };
+  const targetReceipt = buildActivationReceipt({ ...capture, actor: targetIdentity });
+  const result = registerGoldenActor({ receipt: targetReceipt, registry: '' });
+  assert.equal(result.ok, true, result.findings.join('; '));
+  assert.equal(result.row.hostname, 'actor1');
+  assert.equal(result.row.ip, '192.168.56.11');
+  assert.match(result.csv, /^golden,golden,actor1,actor,192\.168\.56\.11,7420,7421,both,AGENT_GENERATED$/m);
+  ok('verified target identity supplies the golden registry endpoint');
+}
+
 console.log(`\nregisterMeshActor.selftest: ${passed}/${passed} checks passed`);
