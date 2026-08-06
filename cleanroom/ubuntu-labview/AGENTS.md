@@ -4,8 +4,8 @@ Use this folder only for public dependency repair and non-secret readiness work.
 
 1. Start with `golden-activation-cycle.ps1 -Vm <actor> -Mode Check`.
 2. If the receipt is incomplete, use `-Mode Repair`; it may install public packages and reboot the actor once.
-3. When readiness is confirmed, use `-Mode Handoff` and stop at the user interaction boundary.
-4. After the user activates LabVIEW, use `-Mode Confirm`; only an `activation-receipt@1` with `verdict.activated: true` permits golden actor enrollment.
+3. When readiness is confirmed, use `-Mode Handoff -ActorId <golden-id> -ActorHostname <golden-host> -ActorIp <golden-ip>` and stop at the user interaction boundary.
+4. After the user activates LabVIEW, use the same required actor identity with `-Mode Confirm`; only an identity-bound `activation-receipt@1` with `verdict.activated: true` permits golden actor enrollment.
 5. Do not ask for or route passwords, MFA codes, tokens, or license keys through chat, environment variables, arguments, or uploaded files.
 
 For mesh lifecycle work, use `mesh/provision-cycle.ps1 -Plan` before `-Apply` or `-Replace`, and verify the local receipt before reusing existing actors.

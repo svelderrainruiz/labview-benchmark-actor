@@ -175,4 +175,14 @@ const ok = (m) => { n++; console.log(`ok ${n} - ${m}`); };
   ok('golden activation readiness: VI Server settings must be active and exact');
 }
 
+// 12. Handoff and confirmation require the same public actor identity needed for enrollment.
+{
+  const activationCycle = readFileSync(join(repoRoot, 'cleanroom', 'ubuntu-labview', 'golden-activation-cycle.ps1'), 'utf8');
+  assert.match(activationCycle, /function Assert-EnrollmentIdentity/, 'the cycle centralizes actor identity validation');
+  assert.match(activationCycle, /'Handoff' \{\s+Assert-EnrollmentIdentity/s, 'handoff requires identity before issuing its command');
+  assert.match(activationCycle, /'Confirm' \{\s+Assert-EnrollmentIdentity/s, 'confirmation requires identity before probing');
+  assert.match(activationCycle, /-Mode Confirm -ActorId \$ActorId -ActorHostname \$ActorHostname -ActorIp \$ActorIp/, 'handoff emits an enrollment-compatible confirmation command');
+  ok('golden activation handoff and confirmation require an enrollment-bound actor identity');
+}
+
 console.log(`\n# provisioner-headless-readiness self-test: ${n}/${n} passed`);

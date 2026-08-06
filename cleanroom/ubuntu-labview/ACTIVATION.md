@@ -13,7 +13,8 @@ From the repository root, use a declared mesh actor as the temporary golden acti
 ```powershell
 pwsh -File cleanroom/ubuntu-labview/golden-activation-cycle.ps1 -Vm actor1 -Mode Check
 pwsh -File cleanroom/ubuntu-labview/golden-activation-cycle.ps1 -Vm actor1 -Mode Repair
-pwsh -File cleanroom/ubuntu-labview/golden-activation-cycle.ps1 -Vm actor1 -Mode Handoff
+pwsh -File cleanroom/ubuntu-labview/golden-activation-cycle.ps1 -Vm actor1 -Mode Handoff `
+	-ActorId golden -ActorHostname actor -ActorIp 192.168.56.10
 ```
 
 `Check` writes a non-secret readiness capture and receipt. `Repair` reruns the public dependency provisioner, reboots once for VI Server readiness, and checks again. `Handoff` is available only after readiness is confirmed.

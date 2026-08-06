@@ -11,8 +11,8 @@
 .EXAMPLE
   pwsh -File cleanroom/ubuntu-labview/golden-activation-cycle.ps1 -Vm actor1 -Mode Check
   pwsh -File cleanroom/ubuntu-labview/golden-activation-cycle.ps1 -Vm actor1 -Mode Repair
-  pwsh -File cleanroom/ubuntu-labview/golden-activation-cycle.ps1 -Vm actor1 -Mode Handoff
-  pwsh -File cleanroom/ubuntu-labview/golden-activation-cycle.ps1 -Vm actor1 -Mode Confirm
+  pwsh -File cleanroom/ubuntu-labview/golden-activation-cycle.ps1 -Vm actor1 -Mode Handoff -ActorId golden -ActorHostname actor -ActorIp 192.168.56.10
+  pwsh -File cleanroom/ubuntu-labview/golden-activation-cycle.ps1 -Vm actor1 -Mode Confirm -ActorId golden -ActorHostname actor -ActorIp 192.168.56.10
 #>
 [CmdletBinding()]
 param(
@@ -79,6 +79,16 @@ function Receive-GuestFile {
   }
 }
 
+function Assert-EnrollmentIdentity {
+  $identityValues = @($ActorId, $ActorHostname, $ActorIp)
+  if ($identityValues | Where-Object { [string]::IsNullOrWhiteSpace($_) }) {
+    throw 'ActorId, ActorHostname, and ActorIp are required together for enrollment-bound handoff and confirmation'
+  }
+  if ($ActorId -notmatch '^[A-Za-z0-9._-]+$' -or $ActorHostname -notmatch '^[A-Za-z0-9.-]+$' -or $ActorIp -notmatch '^\d{1,3}(\.\d{1,3}){3}$') {
+    throw 'actor identity values contain unsupported characters'
+  }
+}
+
 function Build-ReadinessReceipt {
   if (-not (Test-Path -LiteralPath $readinessCapture -PathType Leaf)) {
     throw 'golden activation readiness capture was not downloaded'
@@ -125,17 +135,8 @@ function Get-Readiness {
 
 function Confirm-Activation {
   Send-GuestFile -Source $activationProbe -Destination '/tmp/lba-probe-activation.sh'
-  $identityValues = @($ActorId, $ActorHostname, $ActorIp)
-  $identityPrefix = ''
-  if ($identityValues | Where-Object { -not [string]::IsNullOrWhiteSpace($_) }) {
-    if ($identityValues | Where-Object { [string]::IsNullOrWhiteSpace($_) }) {
-      throw 'ActorId, ActorHostname, and ActorIp must be supplied together for enrollment-bound confirmation'
-    }
-    if ($ActorId -notmatch '^[A-Za-z0-9._-]+$' -or $ActorHostname -notmatch '^[A-Za-z0-9.-]+$' -or $ActorIp -notmatch '^\d{1,3}(\.\d{1,3}){3}$') {
-      throw 'actor identity values contain unsupported characters'
-    }
-    $identityPrefix = "LBA_ACTOR_ID=$ActorId LBA_ACTOR_HOSTNAME=$ActorHostname LBA_ACTOR_IP=$ActorIp "
-  }
+  Assert-EnrollmentIdentity
+  $identityPrefix = "LBA_ACTOR_ID=$ActorId LBA_ACTOR_HOSTNAME=$ActorHostname LBA_ACTOR_IP=$ActorIp "
   $probeExit = Invoke-VagrantAllowFailure -Arguments @('ssh', $Vm, '-c', "rm -f /tmp/lba-activation-capture.json && chmod 700 /tmp/lba-probe-activation.sh && ${identityPrefix}bash /tmp/lba-probe-activation.sh 20 22 /tmp/lba-activation-capture.json")
   Receive-GuestFile -Source '/tmp/lba-activation-capture.json' -Destination $activationCapture
   & node $activationBuilder $activationCapture $activationReceipt | Out-Host
@@ -175,6 +176,7 @@ try {
       exit 0
     }
     'Handoff' {
+      Assert-EnrollmentIdentity
       $receipt = Get-Readiness
       if (-not $receipt.ready) {
         Write-Output "golden actor '$Vm' is not ready; run -Mode Repair first: $($receipt.missing -join ', ')"
@@ -184,10 +186,11 @@ try {
       Write-Output '1. Open the VMware console for the golden actor and launch LabVIEW Community Edition.'
       Write-Output '2. Sign in to NI and activate LabVIEW (and VIPM if it requests activation).'
       Write-Output '3. Type credentials only in the VM console; do not provide them to automation or chat.'
-      Write-Output "4. After activation, run: pwsh -File cleanroom/ubuntu-labview/golden-activation-cycle.ps1 -Vm $Vm -Mode Confirm"
+      Write-Output "4. After activation, run: pwsh -File cleanroom/ubuntu-labview/golden-activation-cycle.ps1 -Vm $Vm -Mode Confirm -ActorId $ActorId -ActorHostname $ActorHostname -ActorIp $ActorIp"
       exit 0
     }
     'Confirm' {
+      Assert-EnrollmentIdentity
       $readiness = Get-Readiness
       if (-not $readiness.ready) {
         Write-Output "golden actor '$Vm' is not activation-ready: $($readiness.missing -join ', ')"
