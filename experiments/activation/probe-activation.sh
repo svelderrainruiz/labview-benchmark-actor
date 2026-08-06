@@ -29,6 +29,7 @@ import json
 import os
 import platform
 import socket
+import subprocess
 import sys
 
 a, b, expected, exit_code, wall_ms, probe_vi, labview_path, probe_out, destination = sys.argv[1:]
@@ -55,7 +56,19 @@ actor_fields = {
     "ip": os.environ.get("LBA_ACTOR_IP", "").strip(),
 }
 if all(actor_fields.values()):
-    record["actor"] = actor_fields
+  actual_hostname = socket.gethostname()
+  try:
+    actual_ips = set(subprocess.check_output(["hostname", "-I"], text=True).split())
+  except (OSError, subprocess.CalledProcessError):
+    actual_ips = {entry[4][0] for entry in socket.getaddrinfo(actual_hostname, None) if entry[4]}
+  if actor_fields["actorId"] != "golden":
+    record["actorIdentityError"] = "actorId must be golden for golden actor enrollment"
+  elif actor_fields["hostname"] != actual_hostname:
+    record["actorIdentityError"] = "requested actor hostname does not match the probed guest"
+  elif actor_fields["ip"] not in actual_ips:
+    record["actorIdentityError"] = "requested actor IP is not assigned to the probed guest"
+  else:
+    record["actor"] = {"actorId": "golden", "hostname": actual_hostname, "ip": actor_fields["ip"]}
 with open(destination, "w", encoding="utf-8") as handle:
     json.dump(record, handle, indent=2)
     handle.write("\n")
