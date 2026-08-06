@@ -635,7 +635,7 @@ export const COMMANDS = {
       console.log('\n\u25b6 provisioning the golden VM (cleanroom/ubuntu-labview/build-virtualbox.sh --run)\u2026');
       execFileSync('bash', [join(repoRoot, 'cleanroom/ubuntu-labview/build-virtualbox.sh'), '--run'], { stdio: 'inherit' });
       console.log('\nNEXT (hybrid \u2014 the one human step): activate LabVIEW CE + VIPM in the VM, then confirm + register:');
-      console.log('  bash experiments/activation/probe-activation.sh 20 22 /tmp/lba-activation-capture.json');
+      console.log('  LBA_ACTOR_ID=golden LBA_ACTOR_HOSTNAME=actor LBA_ACTOR_IP=192.168.56.10 bash experiments/activation/probe-activation.sh 20 22 /tmp/lba-activation-capture.json');
       console.log('  node experiments/activation/buildActivationReceipt.mjs /tmp/lba-activation-capture.json /tmp/lba-activation-receipt.json');
       console.log('  node experiments/activation/registerMeshActor.mjs --receipt /tmp/lba-activation-receipt.json --registry cleanroom/ubuntu-labview/mesh-actors.csv');
     },

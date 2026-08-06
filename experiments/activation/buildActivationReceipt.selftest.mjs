@@ -105,6 +105,9 @@ const ok = (m) => { console.log(`  PASS  ${m}`); passed += 1; };
   const python = probeScript.match(/<<'PY'\n([\s\S]*?)\nPY\n/)?.[1] ?? '';
   assert.match(python, /^actor_fields = \{/m, 'actor identity capture begins at Python top level');
   assert.doesNotMatch(python, /^\s+actor_fields = \{/m, 'actor identity capture is not accidentally indented');
+  assert.match(python, /actual_hostname = socket\.gethostname\(\)/, 'actor hostname is measured from the probed guest');
+  assert.match(python, /actor_fields\["hostname"\] != actual_hostname/, 'requested hostname is verified against the probed guest');
+  assert.match(python, /actor_fields\["ip"\] not in actual_ips/, 'requested IP is verified against guest interfaces');
   ok('actor identity is digest-bound and malformed receipt structures fail closed');
 }
 

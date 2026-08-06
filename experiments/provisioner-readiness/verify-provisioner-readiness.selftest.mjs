@@ -141,7 +141,7 @@ const ok = (m) => { n++; console.log(`ok ${n} - ${m}`); };
 {
   const activationCycle = readFileSync(join(repoRoot, 'cleanroom', 'ubuntu-labview', 'golden-activation-cycle.ps1'), 'utf8');
   assert.match(activationCycle, /rm -f \/tmp\/lba-activation-capture\.json && chmod 700/, 'the guest capture is cleared before each probe');
-  assert.match(activationCycle, /\$result\.ProbeExit -eq 0 -and \$result\.Receipt\.verdict\.activated -eq \$true/, 'confirmation requires the current probe to succeed');
+  assert.match(activationCycle, /\$result\.ProbeExit -eq 0 -and \$result\.IdentityVerified -and \$result\.Receipt\.verdict\.activated -eq \$true/, 'confirmation requires the current probe and guest identity verification to succeed');
   ok('golden activation confirmation: stale captures and failed current probes cannot confirm activation');
 }
 
@@ -182,6 +182,8 @@ const ok = (m) => { n++; console.log(`ok ${n} - ${m}`); };
   assert.match(activationCycle, /'Handoff' \{\s+Assert-EnrollmentIdentity/s, 'handoff requires identity before issuing its command');
   assert.match(activationCycle, /'Confirm' \{\s+Assert-EnrollmentIdentity/s, 'confirmation requires identity before probing');
   assert.match(activationCycle, /-Mode Confirm -ActorId \$ActorId -ActorHostname \$ActorHostname -ActorIp \$ActorIp/, 'handoff emits an enrollment-compatible confirmation command');
+  assert.match(activationCycle, /if \(\$ActorId -ne 'golden'\)/, 'the golden cycle rejects a different actor ID before probing');
+  assert.match(activationCycle, /\$result\.IdentityVerified -and \$result\.Receipt\.verdict\.activated/, 'confirmation requires the receipt identity to match the probed guest');
   ok('golden activation handoff and confirmation require an enrollment-bound actor identity');
 }
 

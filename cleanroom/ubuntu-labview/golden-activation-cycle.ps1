@@ -84,6 +84,9 @@ function Assert-EnrollmentIdentity {
   if ($identityValues | Where-Object { [string]::IsNullOrWhiteSpace($_) }) {
     throw 'ActorId, ActorHostname, and ActorIp are required together for enrollment-bound handoff and confirmation'
   }
+  if ($ActorId -ne 'golden') {
+    throw 'ActorId must be golden for the golden actor enrollment workflow'
+  }
   if ($ActorId -notmatch '^[A-Za-z0-9._-]+$' -or $ActorHostname -notmatch '^[A-Za-z0-9.-]+$' -or $ActorIp -notmatch '^\d{1,3}(\.\d{1,3}){3}$') {
     throw 'actor identity values contain unsupported characters'
   }
@@ -148,7 +151,8 @@ function Confirm-Activation {
   if ($builderExit -ne 0 -and $receipt.verdict.activated -eq $true) {
     throw 'activation receipt builder failed despite an activated verdict'
   }
-  return [pscustomobject]@{ ProbeExit = $probeExit; Receipt = $receipt }
+  $identityVerified = $null -ne $receipt.actor -and $receipt.actor.actorId -eq $ActorId -and $receipt.actor.hostname -eq $ActorHostname -and $receipt.actor.ip -eq $ActorIp
+  return [pscustomobject]@{ ProbeExit = $probeExit; Receipt = $receipt; IdentityVerified = $identityVerified }
 }
 
 Push-Location $VagrantRoot
@@ -197,11 +201,15 @@ try {
         exit 1
       }
       $result = Confirm-Activation
-      if ($result.ProbeExit -eq 0 -and $result.Receipt.verdict.activated -eq $true) {
+      if ($result.ProbeExit -eq 0 -and $result.IdentityVerified -and $result.Receipt.verdict.activated -eq $true) {
         Write-Output "golden actor '$Vm' activation is CONFIRMED; activation receipt: $activationReceipt"
         exit 0
       }
-      Write-Output "golden actor '$Vm' activation remains unconfirmed (probe exit $($result.ProbeExit)); complete the user-only handoff and retry Confirm"
+      if (-not $result.IdentityVerified) {
+        Write-Output "golden actor '$Vm' activation is not enrollable: the requested actor identity did not match the probed guest"
+      } else {
+        Write-Output "golden actor '$Vm' activation remains unconfirmed (probe exit $($result.ProbeExit)); complete the user-only handoff and retry Confirm"
+      }
       exit 1
     }
   }
