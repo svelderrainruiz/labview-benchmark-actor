@@ -30,6 +30,17 @@ Your activated golden VM is registered in your **local** actor registry (it stay
 machine — no boxes are published to a shared registry). Registration binds the actor to its
 activation receipt, so an unactivated box can never join as a benchmark actor.
 
+After a successful functional confirmation, enroll it with the non-secret receipt:
+
+```powershell
+node experiments/activation/registerMeshActor.mjs `
+  --receipt <activation-receipt.json> `
+  --registry cleanroom/ubuntu-labview/mesh-actors.csv
+```
+
+The command refuses an unconfirmed, crashed, or tampered receipt and leaves the local registry unchanged.
+It does not accept credentials or passwords; those remain local to the VM provisioning flow.
+
 ## 2. Watch for a dispatched run
 
 On-demand runs are dispatched **GitHub-natively** — a `repository_dispatch` event (type
