@@ -44,6 +44,8 @@ import { describeFlow, analyzeFlow } from '../experiments/first-win/firstWinOnbo
 import { ingestRun, readReturned } from '../experiments/mesh-fulfillment/meshIngest.mjs';
 import { corroborateRun } from '../experiments/mesh-fulfillment/meshCorroborate.mjs';
 import { assembleLiveN2 } from '../experiments/mesh-fulfillment/driveLiveN2.mjs';
+import { stagedOk } from '../reviewer-workstation/release-with-review-drive.mjs';
+import { buildReleaseStage } from '../reviewer-workstation/record-release-stage.mjs';
 
 export const ITERATION = 17; // bump when you refine this tool (see the banner above)
 
@@ -212,7 +214,7 @@ const PHASE_PROBE = {
   'dispatch-corroboration': 'attestationReady', 'build-attestation': 'attestationReady',
   'quorum-signoff': 'quorumSigned', 'stage-benchmark': 'staged', 'visual-verdict': 'visualSigned',
   'assemble-composite': 'compositeSealed', 'record-agreement': 'agreementRecorded',
-  'merge-main': 'mergedToMain', 'cut-gh-release': 'ghReleaseCut', 'publish-backmerge': 'published',
+  'merge-main': 'mergedToMain', 'cut-gh-release': 'ghReleaseCut', 'publish-backmerge': 'publishedAndBackMerged',
 };
 
 // Pure: annotate each phase with done/next/pending from the probe facts; the FIRST not-done phase is `next`.
@@ -248,15 +250,20 @@ export function renderReleaseStatus(status) {
 }
 
 export function isStagedReleaseFrame(staged, version) {
-  return staged?.candidate?.component === 'extension'
-    && staged?.candidate?.version === String(version)
-    && staged?.frame?.type === 'DONE'
-    && staged?.frame?.senderId === 'WIN';
+  return stagedOk(staged, { component: 'extension', version: String(version) });
+}
+
+export function isReleaseMergedTo(version, targetRef, isAncestor) {
+  const v = String(version);
+  return [`ext-v${v}`, `origin/release/${v}`, `release/${v}`].some((ref) => isAncestor(ref, targetRef));
 }
 
 export function isReleaseMergedToMain(version, isAncestor) {
-  const v = String(version);
-  return [`ext-v${v}`, `origin/release/${v}`, `release/${v}`].some((ref) => isAncestor(ref, 'origin/main'));
+  return isReleaseMergedTo(version, 'origin/main', isAncestor);
+}
+
+export function isReleaseBackMergedToDevelop(version, isAncestor) {
+  return isReleaseMergedTo(version, 'origin/develop', isAncestor);
 }
 
 export const MARKETPLACE_VERIFICATION_SCHEMA = 'labview-benchmark-actor/marketplace-verification@1';
@@ -296,13 +303,14 @@ export function liveReleaseProbes(version, { env = process.env } = {}) {
   const agreement = (() => { try { return read('tools/collab-cli/release-agreement.json'); } catch { return null; } })();
   const shareHas = (name) => !!share && existsSync(join(share, name));
   const compositeSealed = !!composite && composite.candidate?.version === v && composite.verdict?.compositeReleaseProven === true;
-  const stagedFrame = (() => { try { return JSON.parse(readFileSync(join(share, `staged-frame-WIN-${v}.json`), 'utf8')); } catch { return null; } })();
+  const stagedFrame = (() => { if (!share) return null; try { return JSON.parse(readFileSync(join(share, `staged-frame-WIN-${v}.json`), 'utf8')); } catch { return null; } })();
   const extensionId = pkg.publisher && pkg.name ? `${pkg.publisher}.${pkg.name}` : '';
   const marketplaceReceipt = (() => {
     if (!share || !extensionId) return null;
     try { return JSON.parse(readFileSync(marketplaceVerificationPath(share, v), 'utf8')); } catch { return null; }
   })();
   const mergedToMain = isReleaseMergedToMain(v, (ref, main) => tryGit(['merge-base', '--is-ancestor', ref, main]));
+  const backMergedToDevelop = isReleaseBackMergedToDevelop(v, (ref, develop) => tryGit(['merge-base', '--is-ancestor', ref, develop]));
   // Once a release has a sealed composite or is merged to main, it got PAST the early scaffolding (branch cut,
   // version bumped, vsix built, attestation ready) even if the release branch was later deleted -- so those
   // transient probes read done. A sealed composite also implies the quorum + visual + staging were completed.
@@ -320,6 +328,8 @@ export function liveReleaseProbes(version, { env = process.env } = {}) {
     mergedToMain,
     ghReleaseCut: (() => { try { execFileSync('gh', ['release', 'view', `ext-v${v}`], { stdio: 'pipe' }); return true; } catch { return false; } })(),
     published: isMarketplaceVerificationReceipt(marketplaceReceipt, { extension: extensionId, version: v }),
+    backMergedToDevelop,
+    publishedAndBackMerged: isMarketplaceVerificationReceipt(marketplaceReceipt, { extension: extensionId, version: v }) && backMergedToDevelop,
   };
 }
 
@@ -780,12 +790,23 @@ const SELFTEST = [
     return /NEXT/.test(out) && /phase 6/.test(out) && /OPERATOR/.test(out) && out.includes('\u2713') && out.includes('\u25cb');
   }],
   ['release status accepts only a version-bound WIN DONE staging frame for phase 7', () => {
-    const staged = { candidate: { component: 'extension', version: '1.2.0' }, frame: { type: 'DONE', senderId: 'WIN' } };
+    const staged = { matched: true, candidate: { component: 'extension', version: '1.2.0' }, frame: { type: 'DONE', senderId: 'WIN', task: 'stage-1.2.0', payload: 'staged' } };
     const wrongPlane = { ...staged, frame: { ...staged.frame, senderId: 'LINUX' } };
     const wrongVersion = { ...staged, candidate: { ...staged.candidate, version: '1.2.1' } };
-    return isStagedReleaseFrame(staged, '1.2.0') && !isStagedReleaseFrame(wrongPlane, '1.2.0') && !isStagedReleaseFrame(wrongVersion, '1.2.0');
+    const incomplete = { ...staged, matched: false };
+    return isStagedReleaseFrame(staged, '1.2.0') && !isStagedReleaseFrame(wrongPlane, '1.2.0') && !isStagedReleaseFrame(wrongVersion, '1.2.0') && !isStagedReleaseFrame(incomplete, '1.2.0');
+  }],
+  ['release-stage producer normalizes a correlated WIN readback into the composite staging shape', () => {
+    const candidate = { component: 'extension', version: '1.2.0', commit: 'a'.repeat(40), vsixSha256: 'b'.repeat(64) };
+    const staged = buildReleaseStage({ candidate, readback: { matched: true, reply: { senderId: 'WIN', type: 'DONE', task: 'stage-1.2.0', payload: 'staged' } } });
+    return isStagedReleaseFrame(staged, '1.2.0') && staged.candidate.commit === candidate.commit;
   }],
   ['release status detects a merged release branch before the later ext-v tag exists', () => isReleaseMergedToMain('1.2.0', (ref, main) => ref === 'origin/release/1.2.0' && main === 'origin/main')],
+  ['release status requires the release ancestry in develop before phase 13 is complete', () => {
+    const backMerged = isReleaseBackMergedToDevelop('1.2.0', (ref, develop) => ref === 'origin/release/1.2.0' && develop === 'origin/develop');
+    const publishedOnly = releaseStatus({ version: '1.2.0', probes: { branchExists: true, versionBumped: true, vsixBuilt: true, attestationReady: true, quorumSigned: true, staged: true, visualSigned: true, compositeSealed: true, agreementRecorded: true, mergedToMain: true, ghReleaseCut: true, published: true, publishedAndBackMerged: false } });
+    return backMerged && publishedOnly.next?.key === 'publish-backmerge';
+  }],
   ['release-verify-published (#412) confirms a version present in the Marketplace query result', () => {
     const q = { results: [{ extensions: [{ publisher: { publisherName: 'pub' }, extensionName: 'ext', versions: [{ version: '1.2.0' }, { version: '1.1.1' }] }] }] };
     const r = assertPublished(q, { publisher: 'pub', name: 'ext', version: '1.2.0' });

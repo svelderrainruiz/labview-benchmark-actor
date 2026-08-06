@@ -57,6 +57,20 @@ as `~/lba-vm-share/staged-frame-WIN-X.Y.Z.json`; this is the independent, versio
 completion evidence for release phase 7 (neither a quorum sign-off nor a visual verdict
 can substitute for it).
 
+Capture and normalize that frame instead of hand-authoring JSON. After the WIN reviewer agent reports its
+stage task, await its correlated `DONE` frame and then build the composite-ready artifact:
+
+```
+node reviewer-workstation/await-agent-reply.mjs \
+   --task <stage-task-id> --type DONE \
+   --out ~/lba-vm-share/stage-readback-X.Y.Z.json
+node reviewer-workstation/record-release-stage.mjs \
+   --component extension --version X.Y.Z --commit <candidate-commit> \
+   --vsix256 <candidate-vsix-sha256> \
+   --readback ~/lba-vm-share/stage-readback-X.Y.Z.json \
+   --out ~/lba-vm-share/staged-frame-WIN-X.Y.Z.json
+```
+
 ## 4. Signing (the two human sign-offs, in the VM)
 
 The enrolled reviewer key lives in the VM (issue #414), so signing happens guest-side.
@@ -158,8 +172,8 @@ key material). Then:
 3. Re-check the Marketplace listing (the gallery API lags a few minutes) with
    `npm run lba -- release-verify-published X.Y.Z`. A successful query records
    `~/lba-vm-share/marketplace-verification-X.Y.Z.json`, allowing the resumable driver to
-   recognize phase 13 without publishing twice. Record the closeout in the regenerated
-   `docs/testing/test-report.md` counts.
+   recognize phase 13 only after the required release-tip back-merge to `develop` is also
+   proven. Record the closeout in the regenerated `docs/testing/test-report.md` counts.
 
 ## Artifact + credential map
 
