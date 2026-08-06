@@ -101,6 +101,10 @@ const ok = (m) => { console.log(`  PASS  ${m}`); passed += 1; };
   const malformed = { probe: bound.probe, result: bound.result, verdict: bound.verdict, digest: bound.digest };
   assert.doesNotThrow(() => validateActivationReceipt(malformed), 'missing digest-bearing objects never throw');
   assert.equal(validateActivationReceipt(malformed).ok, false, 'a structurally incomplete receipt is invalid evidence');
+  const probeScript = readFileSync(join(here, 'probe-activation.sh'), 'utf8');
+  const python = probeScript.match(/<<'PY'\n([\s\S]*?)\nPY\n/)?.[1] ?? '';
+  assert.match(python, /^actor_fields = \{/m, 'actor identity capture begins at Python top level');
+  assert.doesNotMatch(python, /^\s+actor_fields = \{/m, 'actor identity capture is not accidentally indented');
   ok('actor identity is digest-bound and malformed receipt structures fail closed');
 }
 
