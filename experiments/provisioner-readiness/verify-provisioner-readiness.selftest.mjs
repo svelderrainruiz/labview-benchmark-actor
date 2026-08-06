@@ -141,7 +141,8 @@ const ok = (m) => { n++; console.log(`ok ${n} - ${m}`); };
 {
   const activationCycle = readFileSync(join(repoRoot, 'cleanroom', 'ubuntu-labview', 'golden-activation-cycle.ps1'), 'utf8');
   assert.match(activationCycle, /rm -f \/tmp\/lba-activation-capture\.json && chmod 700/, 'the guest capture is cleared before each probe');
-  assert.match(activationCycle, /\$result\.ProbeExit -eq 0 -and \$result\.Receipt\.verdict\.activated -eq \$true/, 'confirmation requires the current probe to succeed');
+  assert.match(activationCycle, /LBA_ACTIVATION_CHALLENGE=\$activationChallenge/, 'confirmation supplies a new host challenge to the guest probe');
+  assert.match(activationCycle, /\$result\.ProbeExit -eq 0 -and \$result\.IdentityVerified -and \$result\.FreshnessVerified -and \$result\.Receipt\.verdict\.activated -eq \$true/, 'confirmation requires the current probe, identity, and challenge verification to succeed');
   ok('golden activation confirmation: stale captures and failed current probes cannot confirm activation');
 }
 
@@ -173,6 +174,29 @@ const ok = (m) => { n++; console.log(`ok ${n} - ${m}`); };
     rmSync(fixtureDirectory, { recursive: true, force: true });
   }
   ok('golden activation readiness: VI Server settings must be active and exact');
+}
+
+// 12. Handoff and confirmation require the same public actor identity needed for enrollment.
+{
+  const activationCycle = readFileSync(join(repoRoot, 'cleanroom', 'ubuntu-labview', 'golden-activation-cycle.ps1'), 'utf8');
+  assert.match(activationCycle, /function Assert-EnrollmentIdentity/, 'the cycle centralizes actor identity validation');
+  assert.match(activationCycle, /'Handoff' \{\s+Assert-EnrollmentIdentity/s, 'handoff requires identity before issuing its command');
+  assert.match(activationCycle, /'Confirm' \{\s+Assert-EnrollmentIdentity/s, 'confirmation requires identity before probing');
+  assert.match(activationCycle, /-Mode Confirm -ActorId \$ActorId -ActorHostname \$ActorHostname -ActorIp \$ActorIp/, 'handoff emits an enrollment-compatible confirmation command');
+  assert.match(activationCycle, /if \(\$ActorId -ne 'golden'\)/, 'the golden cycle rejects a different actor ID before probing');
+  assert.match(activationCycle, /\$result\.IdentityVerified -and \$result\.FreshnessVerified -and \$result\.Receipt\.verdict\.activated/, 'confirmation requires the receipt identity and persisted challenge to match the probed guest');
+  ok('golden activation handoff and confirmation require an enrollment-bound actor identity');
+}
+
+// 12. Production packaging requires the staged console acknowledgement and a current persisted activation challenge.
+{
+  const activationCycle = readFileSync(join(repoRoot, 'cleanroom', 'ubuntu-labview', 'golden-activation-cycle.ps1'), 'utf8');
+  assert.match(activationCycle, /if \(-not \(Test-ConsoleReadinessReceipt\)\) \{ throw 'operator desktop-unlock confirmation is missing or stale/, 'package requires the current console acknowledgement before any Vagrant action');
+  assert.match(activationCycle, /activation receipt lacks a valid post-confirmation challenge/, 'package rejects legacy or challenge-less activation evidence');
+  assert.match(activationCycle, /\$current\.activationChallenge -ne \$activationChallenge/, 'package compares the guest challenge to the digest-bound receipt challenge');
+  assert.match(activationCycle, /Invoke-Vagrant -Arguments @\('halt', \$Vm\)/, 'packaging halts only after activation assertion returns');
+  assert.match(activationCycle, /Invoke-Vagrant -Arguments @\('package', \$Vm, '--output', \$ProductionBoxPath/, 'packaging uses the declared production output after the guard');
+  ok('production packaging is gated by current console and activation challenge evidence');
 }
 
 console.log(`\n# provisioner-headless-readiness self-test: ${n}/${n} passed`);

@@ -89,6 +89,9 @@ check_xvfb=false; has_command Xvfb && check_xvfb=true
 check_xdpyinfo=false; has_command xdpyinfo && check_xdpyinfo=true
 check_vipm_package=false; dpkg -s vipm >/dev/null 2>&1 && check_vipm_package=true
 check_vipm_command=false; has_command vipm && check_vipm_command=true
+check_graphical_target=false; [ "$(systemctl get-default 2>/dev/null || true)" = 'graphical.target' ] && check_graphical_target=true
+check_display_manager=false; systemctl is-active --quiet display-manager 2>/dev/null && check_display_manager=true
+check_console_seat=false; loginctl show-seat seat0 -p CanGraphical --value 2>/dev/null | grep -Fxq yes && check_console_seat=true
 check_labview_conf=false; [ -f "$labview_conf" ] && check_labview_conf=true
 check_community_conf=false; [ -f "$community_conf" ] && check_community_conf=true
 check_vi_server_tcp=false
@@ -105,7 +108,8 @@ check_sudo=false; sudo -n true >/dev/null 2>&1 && check_sudo=true
 
 python3 - "$OUT" "$MODE" "$repair_performed" "$PRIMARY_USER" \
   "$check_labview_cli" "$check_labview_binary" "$check_probe_vi" "$check_python" "$check_xvfb" "$check_xdpyinfo" \
-  "$check_vipm_package" "$check_vipm_command" "$check_labview_conf" "$check_community_conf" "$check_vi_server_tcp" "$check_vi_server_access" "$check_sudo" <<'PY'
+  "$check_vipm_package" "$check_vipm_command" "$check_graphical_target" "$check_display_manager" "$check_console_seat" \
+  "$check_labview_conf" "$check_community_conf" "$check_vi_server_tcp" "$check_vi_server_access" "$check_sudo" <<'PY'
 import json
 import socket
 import sys
@@ -113,7 +117,8 @@ import sys
 (
     destination, mode, repaired, user,
     labview_cli, labview_binary, probe_vi, python3, xvfb, xdpyinfo,
-    vipm_package, vipm_command, labview_conf, community_conf, vi_server_tcp, vi_server_access, sudo_ready,
+    vipm_package, vipm_command, graphical_target, display_manager, console_seat,
+    labview_conf, community_conf, vi_server_tcp, vi_server_access, sudo_ready,
 ) = sys.argv[1:]
 
 def as_bool(value):
@@ -128,6 +133,9 @@ checks = {
     "xdpyinfo": as_bool(xdpyinfo),
     "vipmPackage": as_bool(vipm_package),
     "vipmCommand": as_bool(vipm_command),
+    "graphicalTarget": as_bool(graphical_target),
+    "displayManager": as_bool(display_manager),
+    "consoleSeat": as_bool(console_seat),
     "labviewConf": as_bool(labview_conf),
     "labviewCommunityConf": as_bool(community_conf),
     "viServerTcp": as_bool(vi_server_tcp),
@@ -154,7 +162,8 @@ if [ "$repair_performed" = true ]; then
 fi
 if [ "$check_labview_cli" = true ] && [ "$check_labview_binary" = true ] && [ "$check_probe_vi" = true ] && \
    [ "$check_python" = true ] && [ "$check_xvfb" = true ] && [ "$check_xdpyinfo" = true ] && \
-   [ "$check_vipm_package" = true ] && [ "$check_vipm_command" = true ] && [ "$check_labview_conf" = true ] && \
+  [ "$check_vipm_package" = true ] && [ "$check_vipm_command" = true ] && [ "$check_graphical_target" = true ] && \
+  [ "$check_display_manager" = true ] && [ "$check_console_seat" = true ] && [ "$check_labview_conf" = true ] && \
    [ "$check_community_conf" = true ] && [ "$check_vi_server_tcp" = true ] && [ "$check_vi_server_access" = true ] && \
    [ "$check_sudo" = true ]; then
   echo "activation readiness capture -> $OUT (READY)"
