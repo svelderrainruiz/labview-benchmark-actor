@@ -713,13 +713,17 @@ check('cleanroom-gate-suite-shared-in-sync', () => {
 check('codespace-witness-bootstrap-valid', () => {
   const dc = JSON.parse(readFileSync(join(pkgRoot, '.devcontainer', 'cleanroom-witness', 'devcontainer.json'), 'utf8'));
   assert(String(dc.postCreateCommand || '').includes('bootstrap-validate.sh'), 'the witness devcontainer runs bootstrap-validate on postCreate');
+  assert(String(dc.initializeCommand || '').includes('capture-source-commit.mjs'), 'the witness captures host Git provenance before the container starts');
   assert(/ubuntu-24\.04/.test(String(dc.image || '')), 'the witness devcontainer is Ubuntu 24.04 (noble) to match the VBox golden VM');
   const bs = readFileSync(join(pkgRoot, 'cleanroom', 'ubuntu-labview', 'codespace', 'bootstrap-validate.sh'), 'utf8');
   assert(bs.startsWith('#!/usr/bin/env bash'), 'bootstrap-validate.sh has a bash shebang');
   assert(bs.includes('set -euo pipefail'), 'bootstrap-validate.sh runs in strict mode');
+  assert(bs.includes('LBA_SOURCE_COMMIT') && bs.includes('.source-commit'), 'the witness fails closed unless it can resolve source provenance from Git or the host handoff');
   assert(bs.includes('cleanroom/ubuntu-labview/lba/gate-suite.sh'), 'the witness runs the SHARED gate-suite (single source), not a copy');
   assert(bs.includes('dotnet publish') && bs.includes('LbaBus.csproj'), 'the witness builds lbabus from source');
-  return { devcontainer: 'noble', runsSharedGateSuite: true };
+  const attributes = readFileSync(join(pkgRoot, '.gitattributes'), 'utf8');
+  assert(attributes.includes('cleanroom/ubuntu-labview/**/*.sh text eol=lf'), 'nested Ubuntu cleanroom shell scripts are forced to LF for Linux containers');
+  return { devcontainer: 'noble', runsSharedGateSuite: true, hostGitProvenance: true };
 });
 
 // The ACG codespace-witness PREBUILD workflow (ADR-0014/ADR-0015): a REAL container build of the witness
