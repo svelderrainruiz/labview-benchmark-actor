@@ -65,6 +65,21 @@ export function buildListenArgs({ tcp, timeout } = {}) {
   return ['net', 'listen', '--tcp', String(tcp), '--echo', '--timeout', String(timeout)];
 }
 
+export function listenerDeadlineMs(timeoutSec) {
+  const seconds = Number(timeoutSec);
+  if (!Number.isFinite(seconds) || seconds <= 0) throw new Error('await timeout must be a positive number of seconds');
+  return Math.ceil(seconds * 1000);
+}
+
+export function installListenerDeadline({ child, timeoutSec, isMatched, onTimeout = () => {} } = {}) {
+  return setTimeout(() => {
+    if (!isMatched()) {
+      onTimeout();
+      child.kill();
+    }
+  }, listenerDeadlineMs(timeoutSec));
+}
+
 function resolveLbabus() {
   const lbabus = process.env.LBABUS || 'lbabus';
   if (lbabus.endsWith('.dll')) {
@@ -86,6 +101,13 @@ async function main() {
   const child = spawn(cmd, args, { env });
   const frames = [];
   let matched = null;
+  let deadlineExpired = false;
+  const deadlineTimer = installListenerDeadline({
+    child,
+    timeoutSec: a.timeout,
+    isMatched: () => matched !== null,
+    onTimeout: () => { deadlineExpired = true; },
+  });
   let buf = '';
   child.stdout.on('data', (d) => {
     buf += d.toString();
@@ -103,6 +125,7 @@ async function main() {
   });
 
   const code = await new Promise((res) => child.on('close', res));
+  clearTimeout(deadlineTimer);
   const resolvedAt = new Date().toISOString();
 
   const receipt = {
@@ -118,7 +141,7 @@ async function main() {
     listenerExit: code,
     note: matched
       ? 'VM agent reply correlated by task id; loop closed over TCP (no GitHub Discussion).'
-      : 'no correlated reply before the listener stopped (timeout or task mismatch) -- fail-closed.',
+      : `no correlated reply before the listener stopped (${deadlineExpired ? 'wrapper deadline' : 'listener timeout or task mismatch'}) -- fail-closed.`,
   };
 
   if (a.out) { writeFileSync(a.out, JSON.stringify(receipt, null, 2)); console.error(`[await-agent-reply] receipt -> ${a.out}`); }

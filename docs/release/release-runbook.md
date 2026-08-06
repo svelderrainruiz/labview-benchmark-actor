@@ -71,8 +71,8 @@ node reviewer-workstation/record-release-stage.mjs \
    --out ~/lba-vm-share/staged-frame-WIN-X.Y.Z.json
 ```
 
-The awaiter ignores unrelated traffic and stops only when the correlated `DONE` arrives or its timeout
-expires; `record-release-stage.mjs` rejects non-terminal, mismatched, or uncorrelated readbacks.
+The awaiter ignores unrelated traffic and stops only when the correlated `DONE` arrives or its wrapper-enforced
+timeout expires; `record-release-stage.mjs` rejects non-terminal, mismatched, or uncorrelated readbacks.
 
 ## 4. Signing (the two human sign-offs, in the VM)
 
