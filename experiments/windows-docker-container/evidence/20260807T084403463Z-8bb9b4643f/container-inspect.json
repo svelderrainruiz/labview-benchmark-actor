@@ -1,0 +1,278 @@
+[
+    {
+        "Id": "8ca4eff7551d2243327437cf5bd0fcad391a75b6d8755bc2521965a8c9d388af",
+        "Created": "2026-08-07T08:46:11.9272241Z",
+        "Path": "powershell.exe",
+        "Args": [
+            "-NoLogo",
+            "-NoProfile",
+            "-NonInteractive",
+            "-ExecutionPolicy",
+            "Bypass",
+            "-File",
+            "C:\\experiment\\container-bootstrap.ps1",
+            "-Action",
+            "Serve",
+            "-PasswordFile",
+            "C:\\run-secrets\\vnc-password.txt",
+            "-ExpectedInstallerSha256",
+            "0d6402e530a563c90040d7c07b98ab68670d3669e4cc573ad24056ff960c9dcb",
+            "-DesktopTarget",
+            "Inherited",
+            "-TightVncCaptureMode",
+            "StandardGdi",
+            "-RunId",
+            "20260807T084403463Z-8bb9b4643f",
+            "-InstallerPath",
+            "C:\\run-secrets\\tightvnc.msi",
+            "-TightVncVersion",
+            "2.8.81"
+        ],
+        "State": {
+            "Status": "exited",
+            "Running": false,
+            "Paused": false,
+            "Restarting": false,
+            "OOMKilled": false,
+            "Dead": false,
+            "Pid": 0,
+            "ExitCode": 1,
+            "Error": "",
+            "StartedAt": "2026-08-07T08:46:15.6638781Z",
+            "FinishedAt": "2026-08-07T10:46:18.0823005+02:00"
+        },
+        "Image": "sha256:f45c639a201f51875465a0d02aa69e65a3630054e564c8724c105f2e1b5eee30",
+        "ResolvConfPath": "",
+        "HostnamePath": "",
+        "HostsPath": "",
+        "LogPath": "C:\\ProgramData\\Docker\\containers\\8ca4eff7551d2243327437cf5bd0fcad391a75b6d8755bc2521965a8c9d388af\\8ca4eff7551d2243327437cf5bd0fcad391a75b6d8755bc2521965a8c9d388af-json.log",
+        "Name": "/lba-win-vnc-8bb9b4643f",
+        "RestartCount": 0,
+        "Driver": "windowsfilter",
+        "Platform": "windows",
+        "MountLabel": "",
+        "ProcessLabel": "",
+        "AppArmorProfile": "",
+        "ExecIDs": null,
+        "HostConfig": {
+            "Binds": null,
+            "ContainerIDFile": "",
+            "LogConfig": {
+                "Type": "json-file",
+                "Config": {}
+            },
+            "NetworkMode": "nat",
+            "PortBindings": {},
+            "RestartPolicy": {
+                "Name": "no",
+                "MaximumRetryCount": 0
+            },
+            "AutoRemove": false,
+            "VolumeDriver": "",
+            "VolumesFrom": null,
+            "ConsoleSize": [
+                0,
+                0
+            ],
+            "CapAdd": null,
+            "CapDrop": null,
+            "CgroupnsMode": "",
+            "Dns": null,
+            "DnsOptions": [],
+            "DnsSearch": [],
+            "ExtraHosts": null,
+            "GroupAdd": null,
+            "IpcMode": "",
+            "Cgroup": "",
+            "Links": null,
+            "OomScoreAdj": 0,
+            "PidMode": "",
+            "Privileged": false,
+            "PublishAllPorts": false,
+            "ReadonlyRootfs": false,
+            "SecurityOpt": null,
+            "UTSMode": "",
+            "UsernsMode": "",
+            "ShmSize": 0,
+            "Runtime": "io.containerd.runhcs.v1",
+            "Isolation": "process",
+            "CpuShares": 0,
+            "Memory": 0,
+            "NanoCpus": 0,
+            "CgroupParent": "",
+            "BlkioWeight": 0,
+            "BlkioWeightDevice": [],
+            "BlkioDeviceReadBps": [],
+            "BlkioDeviceWriteBps": [],
+            "BlkioDeviceReadIOps": [],
+            "BlkioDeviceWriteIOps": [],
+            "CpuPeriod": 0,
+            "CpuQuota": 0,
+            "CpuRealtimePeriod": 0,
+            "CpuRealtimeRuntime": 0,
+            "CpusetCpus": "",
+            "CpusetMems": "",
+            "Devices": [
+                {
+                    "PathOnHost": "class/5B45201D-F2F2-4F3B-85BB-30FF1F953599",
+                    "PathInContainer": "",
+                    "CgroupPermissions": ""
+                }
+            ],
+            "DeviceCgroupRules": null,
+            "DeviceRequests": null,
+            "MemoryReservation": 0,
+            "MemorySwap": 0,
+            "MemorySwappiness": null,
+            "OomKillDisable": false,
+            "PidsLimit": null,
+            "Ulimits": [],
+            "CpuCount": 0,
+            "CpuPercent": 0,
+            "IOMaximumIOps": 0,
+            "IOMaximumBandwidth": 0,
+            "Mounts": [
+                {
+                    "Type": "bind",
+                    "Source": "C:\\dev\\gh\\labview-benchmark-actor.worktrees\\windows-docker-tightvnc-labview-experiment\\experiments\\windows-docker-container",
+                    "Target": "C:\\experiment",
+                    "ReadOnly": true
+                },
+                {
+                    "Type": "bind",
+                    "Source": "C:\\dev\\gh\\labview-benchmark-actor.worktrees\\windows-docker-tightvnc-labview-experiment\\experiments\\windows-docker-container\\evidence\\20260807T084403463Z-8bb9b4643f",
+                    "Target": "C:\\evidence"
+                },
+                {
+                    "Type": "bind",
+                    "Source": "C:\\Users\\sveld\\AppData\\Local\\Temp\\lba-win-vnc-20260807T084403463Z-8bb9b4643f",
+                    "Target": "C:\\run-secrets",
+                    "ReadOnly": true
+                }
+            ],
+            "MaskedPaths": null,
+            "ReadonlyPaths": null
+        },
+        "GraphDriver": {
+            "Data": {
+                "ID": "8ca4eff7551d2243327437cf5bd0fcad391a75b6d8755bc2521965a8c9d388af",
+                "dir": "C:\\ProgramData\\Docker\\windowsfilter\\8ca4eff7551d2243327437cf5bd0fcad391a75b6d8755bc2521965a8c9d388af"
+            },
+            "Name": "windowsfilter"
+        },
+        "Mounts": [
+            {
+                "Type": "bind",
+                "Source": "C:\\dev\\gh\\labview-benchmark-actor.worktrees\\windows-docker-tightvnc-labview-experiment\\experiments\\windows-docker-container",
+                "Destination": "C:\\experiment",
+                "Mode": "",
+                "RW": false,
+                "Propagation": ""
+            },
+            {
+                "Type": "bind",
+                "Source": "C:\\dev\\gh\\labview-benchmark-actor.worktrees\\windows-docker-tightvnc-labview-experiment\\experiments\\windows-docker-container\\evidence\\20260807T084403463Z-8bb9b4643f",
+                "Destination": "C:\\evidence",
+                "Mode": "",
+                "RW": true,
+                "Propagation": ""
+            },
+            {
+                "Type": "bind",
+                "Source": "C:\\Users\\sveld\\AppData\\Local\\Temp\\lba-win-vnc-20260807T084403463Z-8bb9b4643f",
+                "Destination": "C:\\run-secrets",
+                "Mode": "",
+                "RW": false,
+                "Propagation": ""
+            }
+        ],
+        "Config": {
+            "Hostname": "8ca4eff7551d",
+            "Domainname": "",
+            "User": "",
+            "AttachStdin": false,
+            "AttachStdout": true,
+            "AttachStderr": true,
+            "Tty": false,
+            "OpenStdin": false,
+            "StdinOnce": false,
+            "Env": [
+                "LV_YEAR=2026",
+                "LV_FEED_LOCATION=http://argohttp.natinst.com/ni/nipkg/feeds/ni-l/ni-labview-2026/26.3.0/26.3.0.49795-0+f643/offline"
+            ],
+            "Cmd": [
+                "powershell.exe",
+                "-NoLogo",
+                "-NoProfile",
+                "-NonInteractive",
+                "-ExecutionPolicy",
+                "Bypass",
+                "-File",
+                "C:\\experiment\\container-bootstrap.ps1",
+                "-Action",
+                "Serve",
+                "-PasswordFile",
+                "C:\\run-secrets\\vnc-password.txt",
+                "-ExpectedInstallerSha256",
+                "0d6402e530a563c90040d7c07b98ab68670d3669e4cc573ad24056ff960c9dcb",
+                "-DesktopTarget",
+                "Inherited",
+                "-TightVncCaptureMode",
+                "StandardGdi",
+                "-RunId",
+                "20260807T084403463Z-8bb9b4643f",
+                "-InstallerPath",
+                "C:\\run-secrets\\tightvnc.msi",
+                "-TightVncVersion",
+                "2.8.81"
+            ],
+            "Image": "nationalinstruments/labview:2026q3-windows",
+            "Volumes": null,
+            "WorkingDir": "",
+            "Entrypoint": null,
+            "Labels": {
+                "com.azure.dev.image.build.buildnumber": "build-labview-windows-docker-image_26.3.0f643",
+                "com.azure.dev.image.build.builduri": "vstfs:///Build/Build/20455058",
+                "com.azure.dev.image.build.definitionname": "build-labview-windows-docker-image",
+                "com.azure.dev.image.build.repository.name": "labview",
+                "com.azure.dev.image.build.repository.uri": "https://ni@dev.azure.com/ni/DevCentral/_git/labview",
+                "com.azure.dev.image.build.sourcebranchname": "26C2",
+                "com.azure.dev.image.build.sourceversion": "805ea9a457307188252525a990fd2369aaab1d1e",
+                "com.azure.dev.image.system.teamfoundationcollectionuri": "https://dev.azure.com/ni/",
+                "com.azure.dev.image.system.teamproject": "DevCentral",
+                "image.base.digest": "sha256:cb330037cc8e00785a8fe1066ea701e8fa0f370263dcc5d179118d75e0f568e8",
+                "image.base.ref.name": "mcr.microsoft.com/windows/server:ltsc2022",
+                "org.labview-benchmark-actor.experiment": "windows-docker-tightvnc",
+                "org.labview-benchmark-actor.windows-docker-run": "20260807T084403463Z-8bb9b4643f"
+            },
+            "StopTimeout": 1
+        },
+        "NetworkSettings": {
+            "SandboxID": "",
+            "SandboxKey": "",
+            "Ports": {},
+            "Networks": {
+                "nat": {
+                    "IPAMConfig": null,
+                    "Links": null,
+                    "Aliases": null,
+                    "DriverOpts": null,
+                    "GwPriority": 0,
+                    "NetworkID": "a2e0cc3906121020b3f96d9b1f588923c7500cd463bb89bf975d3c218c588cbf",
+                    "EndpointID": "",
+                    "Gateway": "",
+                    "IPAddress": "",
+                    "MacAddress": "",
+                    "IPPrefixLen": 0,
+                    "IPv6Gateway": "",
+                    "GlobalIPv6Address": "",
+                    "GlobalIPv6PrefixLen": 0,
+                    "DNSNames": [
+                        "lba-win-vnc-8bb9b4643f",
+                        "8ca4eff7551d"
+                    ]
+                }
+            }
+        }
+    }
+]

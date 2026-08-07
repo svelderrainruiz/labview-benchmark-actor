@@ -1,0 +1,89 @@
+{
+    "schema":  "labview-benchmark-actor/windows-container-display@1",
+    "wallTime":  "2026-08-07T08:46:17.3778407Z",
+    "desktopTarget":  "Inherited",
+    "tightVncCaptureMode":  "StandardGdi",
+    "processId":  27304,
+    "sessionId":  2,
+    "api":  {
+                "processId":  27304,
+                "sessionId":  2,
+                "context":  {
+                                "mode":  "Inherited",
+                                "windowStation":  "Service-0x0-548d070$",
+                                "desktop":  "Default",
+                                "qualifiedDesktop":  "Service-0x0-548d070$\\Default",
+                                "explicitStartupDesktop":  null,
+                                "processWindowStationChanged":  false,
+                                "threadDesktopSet":  false,
+                                "threadDesktopError":  0
+                            },
+                "smCmonitors":  1,
+                "primaryWidth":  1024,
+                "primaryHeight":  768,
+                "virtualLeft":  0,
+                "virtualTop":  0,
+                "virtualWidth":  1024,
+                "virtualHeight":  768,
+                "getDcSucceeded":  true,
+                "getDcError":  0,
+                "enumDisplayMonitorsError":  0,
+                "monitorRectangles":  [
+
+                                      ],
+                "screenBitsPixel":  32,
+                "screenPlanes":  1,
+                "screenColorDepth":  32,
+                "screenHorzRes":  1024,
+                "screenVertRes":  768,
+                "displayDevices":  [
+
+                                   ],
+                "queryDisplayConfigBufferResult":  0,
+                "queryDisplayConfigResult":  5,
+                "activePathCount":  0,
+                "activeModeCount":  0
+            },
+    "videoControllers":  [
+                             {
+                                 "Name":  "Intel(R) Graphics",
+                                 "PNPDeviceID":  "PCI\\VEN_8086\u0026DEV_7D67\u0026SUBSYS_234717AA\u0026REV_06\\3\u002611583659\u00260\u002610",
+                                 "DriverVersion":  "32.0.101.8724",
+                                 "VideoModeDescription":  null,
+                                 "CurrentHorizontalResolution":  null,
+                                 "CurrentVerticalResolution":  null,
+                                 "CurrentBitsPerPixel":  null,
+                                 "AdapterCompatibility":  "Intel Corporation",
+                                 "Status":  "OK"
+                             },
+                             {
+                                 "Name":  "NVIDIA RTX PRO 1000 Blackwell Generation Laptop GPU",
+                                 "PNPDeviceID":  "PCI\\VEN_10DE\u0026DEV_2DB8\u0026SUBSYS_234717AA\u0026REV_A1\\7A097376FB2DB04800",
+                                 "DriverVersion":  "32.0.15.9571",
+                                 "VideoModeDescription":  null,
+                                 "CurrentHorizontalResolution":  null,
+                                 "CurrentVerticalResolution":  null,
+                                 "CurrentBitsPerPixel":  null,
+                                 "AdapterCompatibility":  "NVIDIA",
+                                 "Status":  "OK"
+                             }
+                         ],
+    "desktopMonitors":  [
+                            {
+                                "Name":  "Wide viewing angle \u0026 High density FlexView Display 1920x1200",
+                                "PNPDeviceID":  "DISPLAY\\LEN41B5\\4\u0026318A8933\u00260\u0026UID8388688",
+                                "ScreenWidth":  null,
+                                "ScreenHeight":  null,
+                                "Status":  "OK"
+                            },
+                            {
+                                "Name":  "Default Monitor",
+                                "PNPDeviceID":  null,
+                                "ScreenWidth":  null,
+                                "ScreenHeight":  null,
+                                "Status":  "OK"
+                            }
+                        ],
+    "desktopProbe":  null,
+    "localGdi":  null
+}

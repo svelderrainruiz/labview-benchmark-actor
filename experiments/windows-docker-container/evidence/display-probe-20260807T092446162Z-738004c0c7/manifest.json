@@ -1,0 +1,58 @@
+{
+  "schema": "labview-benchmark-actor/windows-container-display-probe-manifest@1",
+  "runId": "display-probe-20260807T092446162Z-738004c0c7",
+  "outcome": "unsupported-display-surface",
+  "isolation": "hyperv",
+  "desktopTarget": "Inherited",
+  "generatedWallTime": "2026-08-07T09:25:25.217Z",
+  "files": [
+    {
+      "path": "cleanup-verification.json",
+      "size": 310,
+      "sha256": "fe7e8360ba5d6614ace13ddd6df606a43273f27b45e8e3af7e7f2a98801efa7f",
+      "modifiedWallTime": "2026-08-07T09:25:25.144Z"
+    },
+    {
+      "path": "container-inspect.json",
+      "size": 13154,
+      "sha256": "b4a46bab1c52b36cf260c0aefe9bba8c50b8ef3c468139479a77f6472bf1d318",
+      "modifiedWallTime": "2026-08-07T09:25:24.821Z"
+    },
+    {
+      "path": "container.log",
+      "size": 1845,
+      "sha256": "fcd9f74eea3f0055b3dfde2148dd4f875d1ef90d2cdb369f19c8704e22b4ba21",
+      "modifiedWallTime": "2026-08-07T09:25:24.669Z"
+    },
+    {
+      "path": "display-diagnostics.json",
+      "size": 2960,
+      "sha256": "d2be346499bda3a8d78620e553d1f3973bbea9834e0cf78c2a7aa749e869a7c0",
+      "modifiedWallTime": "2026-08-07T09:25:16.657Z"
+    },
+    {
+      "path": "display-probe.json",
+      "size": 4674,
+      "sha256": "d81a4f8b342480ab8a6a8318c5e6d421647750ff9cf546cbbd2e982251982b46",
+      "modifiedWallTime": "2026-08-07T09:25:16.671Z"
+    },
+    {
+      "path": "docker-info.json",
+      "size": 5415,
+      "sha256": "96b4fa3dcb2fddeab3d937a9a2a161af3ae94793d35446fb3841ce594da8ad99",
+      "modifiedWallTime": "2026-08-07T09:24:46.579Z"
+    },
+    {
+      "path": "image-inspect.json",
+      "size": 4698,
+      "sha256": "17cebe606d1f0a79f94f57c54077ed2e7bb0218b5d305df996585a1135cdab45",
+      "modifiedWallTime": "2026-08-07T09:24:46.814Z"
+    },
+    {
+      "path": "probe-environment.json",
+      "size": 2725,
+      "sha256": "328d34f2eb73ff4377e7d1d2714ce5a997d2b81b8e586ce809877524ce9e80c4",
+      "modifiedWallTime": "2026-08-07T09:25:00.613Z"
+    }
+  ]
+}

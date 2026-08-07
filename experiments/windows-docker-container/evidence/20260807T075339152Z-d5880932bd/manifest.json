@@ -1,0 +1,178 @@
+{
+  "schema": "labview-benchmark-actor/windows-docker-evidence-manifest@1",
+  "runId": "20260807T075339152Z-d5880932bd",
+  "outcome": "inconclusive",
+  "generatedWallTime": "2026-08-07T08:00:27.042Z",
+  "network": {
+    "containerId": "b5e78ac9cc31423de78ba45e22ebb0eddbe0608a4a11be868a7773c2a91f690e",
+    "networkName": "nat",
+    "networkId": "a2e0cc3906121020b3f96d9b1f588923c7500cd463bb89bf975d3c218c588cbf",
+    "endpointId": "304a2af9d0ab8bdb4c57dcaa0a249707fed6fe331b8f61103704cd612e2cc1ac",
+    "ipAddress": "172.21.9.62",
+    "ipPrefixLength": 16,
+    "gateway": "172.21.0.1"
+  },
+  "relay": {
+    "processId": 23976,
+    "bound": {
+      "address": "127.0.0.1",
+      "family": "IPv4",
+      "port": 54778,
+      "requestedPort": 0
+    },
+    "upstream": {
+      "host": "172.21.9.62",
+      "port": 5900
+    },
+    "stats": {
+      "acceptedConnections": 1,
+      "successfulUpstreamConnections": 1,
+      "upstreamConnectionFailures": 0,
+      "downstreamErrors": 0,
+      "downstreamToUpstreamBytes": 88,
+      "upstreamToDownstreamBytes": 6291559,
+      "serverErrors": 0,
+      "lastUpstreamError": null,
+      "lastServerError": null,
+      "activeConnections": 0
+    },
+    "cleanup": {
+      "closed": true,
+      "listenerReachable": false,
+      "elapsedMs": 1.409,
+      "activeConnections": 1,
+      "listenerBindingsAfterClose": [],
+      "closedWallTime": "2026-08-07T07:56:04.340Z"
+    }
+  },
+  "files": [
+    {
+      "path": "bootstrap-ready.json",
+      "size": 5249,
+      "sha256": "dc3da681820e217f72a4bd3fbf8d95d26e9cbcddc857b01303873209c6c923ed",
+      "modifiedWallTime": "2026-08-07T07:55:56.972Z",
+      "frameIndex": null,
+      "role": null
+    },
+    {
+      "path": "bootstrap-stopped.json",
+      "size": 140,
+      "sha256": "83b1527cb3071dc7c1ace8e6aa0c86628b2271cfc4a4127fd96c79b043b17135",
+      "modifiedWallTime": "2026-08-07T07:56:07.771Z",
+      "frameIndex": null,
+      "role": null
+    },
+    {
+      "path": "capture-summary.json",
+      "size": 5894,
+      "sha256": "24c8b4b5a4f712b17de895a79a0879e237433ed6cd43225566189656004a9556",
+      "modifiedWallTime": "2026-08-07T07:56:01.354Z",
+      "frameIndex": null,
+      "role": null
+    },
+    {
+      "path": "cleanup-verification.json",
+      "size": 415,
+      "sha256": "185027dc390177f0bdb7e5ae06665472f55b7b979045ef25b29da21cb33eca64",
+      "modifiedWallTime": "2026-08-07T07:58:12.208Z",
+      "frameIndex": null,
+      "role": null
+    },
+    {
+      "path": "container-inspect-pre-relay.json",
+      "size": 14588,
+      "sha256": "aec4ed8671426be43d8f665df86a10871541c915f145d5f9bca240c1dcb33a2d",
+      "modifiedWallTime": "2026-08-07T07:55:57.396Z",
+      "frameIndex": null,
+      "role": null
+    },
+    {
+      "path": "container-inspect.json",
+      "size": 10576,
+      "sha256": "e57a1397ff677b73aa682100af4e43b9df8c92ed5db9eb95cb4018fd1474c204",
+      "modifiedWallTime": "2026-08-07T07:56:04.880Z",
+      "frameIndex": null,
+      "role": null
+    },
+    {
+      "path": "container.log",
+      "size": 521,
+      "sha256": "6431e4694c72bf1e76761658580c15cf10ae707c8b20f52273bcc2e31fa0c18a",
+      "modifiedWallTime": "2026-08-07T07:56:05.025Z",
+      "frameIndex": null,
+      "role": null
+    },
+    {
+      "path": "docker-info.json",
+      "size": 5415,
+      "sha256": "daa91a75c74d2932dedcb51f15b2e95f1844e1efb4589f879a050cdc6a3b140e",
+      "modifiedWallTime": "2026-08-07T07:53:39.575Z",
+      "frameIndex": null,
+      "role": null
+    },
+    {
+      "path": "environment.json",
+      "size": 2645,
+      "sha256": "24eeebb6f237db3af8d36aa6a8a6212509bf5c62e9ce5240d424aa7e2699bc38",
+      "modifiedWallTime": "2026-08-07T07:55:57.926Z",
+      "frameIndex": null,
+      "role": null
+    },
+    {
+      "path": "failure-receipt.json",
+      "size": 5894,
+      "sha256": "24c8b4b5a4f712b17de895a79a0879e237433ed6cd43225566189656004a9556",
+      "modifiedWallTime": "2026-08-07T07:56:01.353Z",
+      "frameIndex": null,
+      "role": null
+    },
+    {
+      "path": "host-orchestration.log",
+      "size": 1367,
+      "sha256": "f9e770dbf719f573907f69f7dd09941c2eb96b19b630cac744c3c037dee05246",
+      "modifiedWallTime": "2026-08-07T07:58:12.216Z",
+      "frameIndex": null,
+      "role": null
+    },
+    {
+      "path": "image-inspect.json",
+      "size": 4698,
+      "sha256": "17cebe606d1f0a79f94f57c54077ed2e7bb0218b5d305df996585a1135cdab45",
+      "modifiedWallTime": "2026-08-07T07:53:39.759Z",
+      "frameIndex": null,
+      "role": null
+    },
+    {
+      "path": "network-preflight.json",
+      "size": 866,
+      "sha256": "9689caa3623b08ad86e973236e147642103c1ab98cbe16f2623efcb52fd26739",
+      "modifiedWallTime": "2026-08-07T07:55:57.631Z",
+      "frameIndex": null,
+      "role": null
+    },
+    {
+      "path": "network-relay.json",
+      "size": 1784,
+      "sha256": "765068f452d25a11df0dc6d216dfb112b40f421252017a2d2ea715da3d5246ab",
+      "modifiedWallTime": "2026-08-07T07:56:04.344Z",
+      "frameIndex": null,
+      "role": null
+    },
+    {
+      "path": "stop.signal",
+      "size": 28,
+      "sha256": "7b46c4c22b1ed3fb42af2261c9a81c258caba239df5dd6a02978ffd23bf896ea",
+      "modifiedWallTime": "2026-08-07T07:56:05.688Z",
+      "frameIndex": null,
+      "role": null
+    },
+    {
+      "path": "tvnserver.log",
+      "size": 89614,
+      "sha256": "db7d34e6d18caf83388f6802804467d7b0502f6735460f397a6a0e69bd5e1808",
+      "modifiedWallTime": "2026-08-07T07:56:06.258Z",
+      "frameIndex": null,
+      "role": null
+    }
+  ]
+}

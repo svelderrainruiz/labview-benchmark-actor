@@ -160,11 +160,16 @@ workspace root.
 - **Pre:** an **MCP-capable client** (e.g. the editor's AI agent) that can discover the
   extension-provided MCP server. No CLI or LabVIEW needed.
 - **Steps:**
-  1. With the extension active, have the MCP client list available MCP servers/tools.
-  2. Confirm the **`labviewBenchmarkActor`** server is present and exposes the four tools:
+  1. Run **MCP: List Servers**, select **LabVIEW Benchmark Actor: MCP tools**
+     (internal provider id `labviewBenchmarkActor`), and choose **Restart
+     Server**. Fully terminate and relaunch VS Code; a window reload is
+     insufficient.
+  2. With the extension active, have the MCP client list available MCP servers/tools.
+  3. Confirm **LabVIEW Benchmark Actor: MCP tools** (`labviewBenchmarkActor`) is
+     present and exposes the four tools:
      `get_host_capabilities`, `get_benchmark_series`, `poll_coordination_bus`,
      `post_coordination_note`.
-  3. Invoke **`get_benchmark_series`** and confirm it returns the bundled MPRR series
+  4. Invoke **`get_benchmark_series`** and confirm it returns the bundled MPRR series
      (the same data the viewer renders in TC-06).
 - **Expected:** the server is discoverable and starts locally over stdio; the four tools are
   listed; `get_benchmark_series` returns a structured series with no error. Nothing is sent to the
@@ -190,9 +195,12 @@ workspace root.
   schema is well-formed.
 - **Gotcha — MCP schema changes do not hot-reload:** VS Code **caches MCP tool schemas** and keeps
   MCP servers alive **across window reloads**. After reinstalling a `.vsix` that changes any MCP
-  tool schema, run **MCP: Reset Cached Tools** *and* fully restart VS Code (kill + relaunch, not
-  just **Developer: Reload Window**) before re-testing, or the stale schema persists and the tool
-  keeps failing validation. The offline guard in
+  tool schema, run **MCP: List Servers**, select **LabVIEW Benchmark Actor: MCP tools**
+  (`labviewBenchmarkActor`), choose **Restart Server**, and fully restart VS Code (kill + relaunch, not just
+  **Developer: Reload Window**) before re-testing, or the stale schema persists and the tool
+  keeps failing validation. Older instructions referred to a global **MCP: Reset Cached Tools**
+  command; VS Code 1.130 exposes **Restart Server** from the selected server's
+  management actions and rediscovers the tools on startup. The offline guard in
   `experiments/acg-mcp/grid-tools.selftest.mjs` (gate `acg-mcp`) catches malformed tool schemas at
   build time so this defect cannot ship again.
 - **Result:** _____

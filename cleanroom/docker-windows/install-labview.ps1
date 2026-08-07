@@ -20,6 +20,8 @@
 
 [CmdletBinding()]
 param(
+    # Keep the clean-room default on the release with a verified LabVIEWCLI mapping.
+    # The Windows VM experiment selects 2026q3 explicitly.
     [string]$Version = $(if ($env:LV_VERSION) { $env:LV_VERSION } else { '2026q1' }),
     [ValidateSet('x86', 'x64')] [string]$Arch = $(if ($env:LV_ARCH) { $env:LV_ARCH } else { 'x86' }), # x86 = 32-bit
     [string]$IsoMap = (Join-Path $PSScriptRoot 'lv-iso-map.json'),
@@ -36,9 +38,12 @@ if (-not (Test-Path $IsoMap)) { throw "[lv-install] iso map not found: $IsoMap" 
 $map = Get-Content -Raw $IsoMap | ConvertFrom-Json
 $entry = $map.versions.$Version.windows
 if (-not $entry) { throw "[lv-install] no windows entry for version '$Version' in $IsoMap" }
-$package = $entry.package
+$package = if ($entry.packages -and $entry.packages.$Arch) { $entry.packages.$Arch } else { $entry.package }
 $cliPackage = $entry.cli_package
 if (-not $package) { throw "[lv-install] no 'package' (nipkg meta-package) for '$Version'/$Arch in $IsoMap" }
+if (-not $cliPackage) {
+    Write-Host "[lv-install] WARN: '$Version' has no LabVIEW CLI package mapping; only the LabVIEW product will be installed."
+}
 Write-Host "[lv-install] version=$Version arch=$Arch package=$package cli=$cliPackage"
 
 # 2. Resolve the offline FEED directory. PRIMARY = a host-extracted feed (works under Hyper-V isolation).

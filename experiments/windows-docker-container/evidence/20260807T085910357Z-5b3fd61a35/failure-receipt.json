@@ -1,0 +1,21 @@
+{
+    "schema":  "labview-benchmark-actor/windows-docker-tightvnc-failure@1",
+    "outcome":  "inconclusive",
+    "failedGate":  3,
+    "classification":  "desktop-has-zero-displays",
+    "error":  "Container exited before TightVNC readiness. Logs:\n2026-08-07T09:01:23.1539833Z [container-bootstrap] Selected Inherited desktop \u0027Service-0x0-5bbfc69$\\Default\u0027 (explicit startup desktop=\u003cinherited\u003e).\r\nException calling \"CaptureScreen\" with \"1\" argument(s): \"BitBlt failed: 5\"\r\nAt C:\\experiment\\container-bootstrap.ps1:266 char:7\r\n+       $localGdiAnalysis = [LbaDesktop]::CaptureScreen($localGdiPath)\r\n+       ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\r\n    + CategoryInfo          : NotSpecified: (:) [], ParentContainsErrorRecordE \r\n   xception\r\n    + FullyQualifiedErrorId : InvalidOperationException\r\n ",
+    "wallTime":  "2026-08-07T09:03:37.8641534Z",
+    "runId":  "20260807T085910357Z-5b3fd61a35",
+    "image":  {
+                  "reference":  "nationalinstruments/labview:2026q3-windows",
+                  "expectedId":  "sha256:f45c639a201f51875465a0d02aa69e65a3630054e564c8724c105f2e1b5eee30",
+                  "resolvedId":  "sha256:f45c639a201f51875465a0d02aa69e65a3630054e564c8724c105f2e1b5eee30"
+              },
+    "containerId":  "0ed3c87f72763a690da880d772208308749ae9d2f2127dcb10b0b7a0c7428643",
+    "isolation":  "process",
+    "desktopTarget":  "Inherited",
+    "tightVncCaptureMode":  "StandardGdi",
+    "gpuDeviceAssigned":  false,
+    "tightVncInstallerSha256":  "0d6402e530a563c90040d7c07b98ab68670d3669e4cc573ad24056ff960c9dcb",
+    "recommendedNextHypothesis":  "Inspect the preserved container and RFB diagnostics for the failed proof gate."
+}

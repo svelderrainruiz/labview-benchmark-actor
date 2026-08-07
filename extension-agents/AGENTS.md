@@ -26,6 +26,8 @@ Code:
 | Command | When to use |
 | --- | --- |
 | `LabVIEW Benchmark Actor: Open Benchmark Viewer` | Show the rendered mprr benchmark series. |
+| `LabVIEW Benchmark Actor: Capture LabVIEW Launch` | Record a real Windows LabVIEW launch with FFmpeg plus CPU/RAM/disk samples. |
+| `LabVIEW Benchmark Actor: Capture LabVIEW Launch (mprr, cross-platform VM)` | Capture a VM LabVIEW launch through the mprr visual ring. |
 | `LabVIEW Benchmark Actor: Show Host Capabilities` | Learn the host's real runtime before proposing benchmark work. |
 | `LabVIEW Benchmark Actor: Poll Coordination Bus` | Read the latest cross-plane coordination messages. |
 | `LabVIEW Benchmark Actor: Post Coordination Note` | Post a coordination note to the bus. |
@@ -59,6 +61,13 @@ Windows-specific guidance for agents using this extension on a Windows host:
   ("failed to establish a connection with LabVIEW"), the VI Server TCP port does not match: the CLI defaults to
   port **3363**, so pass the matching `-LabVIEWPath <the intended bitness>` and `-PortNumber 3363` (or enable
   VI Server / align `server.tcp.port` in that LabVIEW's `.ini`).
+- **FFmpeg capture prerequisite.** **Capture LabVIEW Launch** uses FFmpeg `gdigrab`. On a fresh machine, choose
+  **Install ffmpeg (winget)** when prompted and let the install finish, then fully close every VS Code window
+  and reopen VS Code before running the capture again. The extension host can retain its pre-install
+  environment; without a full restart it can show the install prompt again even though FFmpeg is present. Do
+  not reinstall repeatedly. If the winget install failed or was cancelled, choose **Retry ffmpeg setup...**;
+  otherwise restart VS Code. If restart is undesirable, set `labviewBenchmarkActor.ffmpegPath` explicitly to
+  the installed `ffmpeg.exe`.
 - **Docker engine.** Windows containers require Docker Desktop's **Windows** engine (Hyper-V isolation); Linux
   containers require its **Linux** engine — you switch between them, they are not both active at once. On
   Hyper-V Windows containers, `docker run -p` port publishing can fail with `hnsCall ... 0x490`; reach the

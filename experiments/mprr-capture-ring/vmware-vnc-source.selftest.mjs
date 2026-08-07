@@ -40,6 +40,25 @@ function buildServerBytes() {
   ]);
 }
 
+function buildResizeThenRawServerBytes() {
+  const initialW = 8, initialH = 8;
+  const si = Buffer.alloc(24);
+  si.writeUInt16BE(initialW, 0); si.writeUInt16BE(initialH, 2); si.writeUInt32BE(0, 20);
+  const resize = Buffer.alloc(16);
+  resize[0] = 0; resize[1] = 0; resize.writeUInt16BE(1, 2);
+  resize.writeUInt16BE(0, 4); resize.writeUInt16BE(0, 6);
+  resize.writeUInt16BE(W, 8); resize.writeUInt16BE(H, 10);
+  resize.writeInt32BE(-223, 12);
+  return Buffer.concat([
+    Buffer.from('RFB 003.008\n', 'latin1'),
+    Buffer.from([1, 1]),
+    Buffer.from([0, 0, 0, 0]),
+    si,
+    resize,
+    buildUpdate(0, 0, W, H, (x) => { const v = (x % 3) * 110; return [v, v, v]; }),
+  ]);
+}
+
 function makeFakeSocket(serverBytes) {
   const sock = new EventEmitter();
   sock.write = () => true;                            // ignore client writes
@@ -60,6 +79,8 @@ const ok = (m) => { console.log(`  ok - ${m}`); passed += 1; };
 const stream = createStreamingFramebuffer({ host: 'x', port: 0, connect: () => makeFakeSocket(buildServerBytes()) });
 const dims = await stream.ready;
 assert.equal(dims.width, W); assert.equal(dims.height, H);
+assert.equal(dims.rfbVersion, '3.8');
+assert.equal(dims.securityType, 1); assert.equal(dims.securityTypeName, 'None');
 assert.equal(stream.updateCount(), 1, 'first (full) update applied by ready');
 const dhashFull = dhash64FromRgba(stream.current(), W, H);
 assert.equal(dhashFull.length, 16);
@@ -95,4 +116,20 @@ assert.equal(frames[1].timingTicks64, BigInt(83 * 10_000));
 ok('makeSampler emits monotonic frameIndex + guest-clock ticks at cadence');
 
 stream.close();
-console.log(`\nvmware-vnc-source self-test: ${passed}/4 PASS`);
+
+// 5) DesktopSize interoperability: readiness waits through a resize-only update, reallocates, then accepts Raw.
+{
+  const resized = createStreamingFramebuffer({
+    host: 'x', port: 0, connect: () => makeFakeSocket(buildResizeThenRawServerBytes()),
+  });
+  const info = await resized.ready;
+  assert.equal(info.width, W); assert.equal(info.height, H);
+  assert.equal(info.resizeCount, 1);
+  assert.equal(resized.updateCount(), 2, 'DesktopSize plus full Raw update both counted');
+  assert.equal(resized.current().length, W * H * 4);
+  assert.equal(dhash64FromRgba(resized.current(), W, H).length, 16);
+  resized.close();
+  ok('DesktopSize(-223) reallocates the framebuffer and readiness waits for a full Raw update');
+}
+
+console.log(`\nvmware-vnc-source self-test: ${passed}/5 PASS`);

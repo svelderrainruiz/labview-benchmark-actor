@@ -62,6 +62,7 @@ const ok = (m) => { console.log(`  ok - ${m}`); passed += 1; };
   assert.equal(VBOX_DEFAULT_VNC_PORT, 5900);
   assert.equal(seenPort, 5900, 'createVboxVncSource defaults to the VBox VNC port');
   assert.equal(dims.width, W); assert.equal(dims.height, H);
+  assert.equal(dims.securityType, 1); assert.equal(dims.securityTypeName, 'None');
   src.stop();
   ok('createVboxVncSource wires the shared RFB core at the VBox default VNC port (5900)');
 }

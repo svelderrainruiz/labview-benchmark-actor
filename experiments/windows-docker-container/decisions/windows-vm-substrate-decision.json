@@ -1,0 +1,163 @@
+{
+  "schema": "labview-benchmark-actor/windows-vm-substrate-decision@1",
+  "decision": "provision-actor-win11-labview2026-virtualbox-box",
+  "decisionStatus": "feedback-resolved-precommit-ready",
+  "decisionSource": "maintainer-selection",
+  "recommendedFutureOption": "retain-the-verified-cache-and-prepare-the-uncommitted-change-set-for-commit-or-pr",
+  "reason": "The superseding offline reviewer gate passes all eight required local cases. Post-review feedback then added a recoverable two-phase cache seal, runtime-configurable destroy ownership, and a safe FFmpeg retry path. AGENTS.md v0.3.2, the feedback-remediated VSIX, targeted retained-VM UI proof, and all automated gates pass.",
+  "actionsAuthorized": [
+    "Download official Microsoft Windows 11 x64 English multi-edition ISO",
+    "Automate Windows 11 Pro setup EULA acceptance inside a disposable VirtualBox VM",
+    "Download official NI LabVIEW 2026 Q3 Community x64 offline ISO",
+    "Run the repository NI Package Manager installer with --accept-eulas inside the VM",
+    "Defer Windows and LabVIEW activation to the fork owner"
+  ],
+  "actionsApplied": [
+    "Created VirtualBox VM lba-win11-labview2026-build",
+    "Installed Windows 11 Pro 25H2 and VirtualBox Guest Additions 7.2.8",
+    "Installed ni-labview-2026-community 26.3.0.49795-0+f643",
+    "Installed TightVNC 2.8.81 and proved authenticated local-only RFB with DesktopSize negotiation",
+    "Captured LabVIEW splash and NI License Manager wizard through the MPRR pipeline",
+    "Completed interactive NI activation in the retained VM",
+    "Captured the activated LabVIEW IDE through the governed TightVNC/MPRR pipeline",
+    "Removed ephemeral VNC credentials, NAT mapping, scheduled tasks, capture processes, and transient shares",
+    "Retained powered-off activated snapshot labview-q3-activated",
+    "Preserved D:\\lba-vm-assets\\actor-win11-labview2026-20260807.box as rollback",
+    "Prepared a run-owned clone with the public vagrant/Vagrant1234! credential, WinRM Negotiate transport, startup self-heal, and interactive auto-login",
+    "Proved the repaired clone across a real reboot",
+    "Packaged D:\\lba-vm-assets\\actor-win11-labview2026-vagrant-ready-20260807.box",
+    "Consumed the exact repaired package with reviewer-workstation/Vagrantfile and --no-provision",
+    "Proved Vagrant boot, WinRM, interactive desktop, authenticated RFB, NI activation blocker, and complete cleanup",
+    "Registered the repaired package as actor/win11-labview2026 in VAGRANT_HOME D:\\vagrant-home",
+    "Created retained Vagrant VM actor-reviewer-local with stable UUID f296a95b-7470-496a-bab7-791c973efd37",
+    "Completed NI activation for that exact retained hardware identity",
+    "Captured and verified the activated LabVIEW IDE through TightVNC/MPRR",
+    "Installed official Visual Studio Code 1.130.0 inside the retained VM with maintainer approval",
+    "Built, size-gated, and installed local VSIX 1.3.0 in the interactive reviewer profile",
+    "Sealed powered-off snapshot reviewer-activated-vsix-57bd4d44d497 and released the cache lock",
+    "Added AGENTS.md v0.3.1 FFmpeg restart/capture guidance and a same-session duplicate-install guard",
+    "Updated TC-10 to use the visible MCP server label and VS Code 1.130 Restart Server workflow",
+    "Restaged local VSIX SHA-256 cd08be2dfc6f7e0a8f9ed69d6ddd05faf5adabca468aadb2e47be7705e0e748e",
+    "Reran TC-08 and TC-10 successfully and sealed the superseding PASS verdict",
+    "Sealed powered-off snapshot reviewer-activated-vsix-cd08be2dfc6f-20260807210815",
+    "Added recoverable seal-verification-pending cache finalization",
+    "Removed the fixed reviewer VM name from intentional destroy ownership checks",
+    "Added Retry ffmpeg setup for failed/cancelled winget while retaining duplicate-install protection",
+    "Sealed feedback-remediated VSIX SHA-256 48074c046a03b69d1c83d5608ecc40560074059d69fab3668cb92adeb6e3fb03"
+  ],
+  "machineStateChanged": true,
+  "boxRegistered": true,
+  "blocker": null,
+  "resumeCondition": "Use the ownership-checked reviewer-cache resume command, preserve UUID f296a95b-7470-496a-bab7-791c973efd37, and re-probe activation after every resume or snapshot restore.",
+  "lifecycleCache": {
+    "path": "experiments/windows-docker-container/decisions/windows-vm-lifecycle-cache.json",
+    "size": 18291,
+    "sha256": "61edf8ade85ac15a01abef4e5b68d511c8b18db1291694c5675f8dde92fc621d",
+    "nextPhase": "ACTIVATION-RESUME-START"
+  },
+  "completedLifecycle": {
+    "path": "experiments/windows-docker-container/evidence/vm-activation-20260807T133232933Z-80e478ed/vm-lifecycle.json",
+    "activatedCaptureEvidence": "experiments/windows-docker-container/evidence/vm-activation-20260807T133232933Z-80e478ed",
+    "registeredBox": {
+      "name": "actor/win11-labview2026",
+      "provider": "virtualbox",
+      "vagrantHome": "D:\\vagrant-home",
+      "packageFile": "D:\\lba-vm-assets\\actor-win11-labview2026-vagrant-ready-20260807.box",
+      "size": 28450796737,
+      "sha256": "225228f7385033545e57f61ab0fc90bb29c1337072e2bd18209af1aa0c859336",
+      "activationContract": "per-new-virtual-hardware-identity"
+    }
+  },
+  "vagrantRepairLifecycle": {
+    "path": "experiments/windows-docker-container/evidence/vagrant-repair-20260807T151447227Z-a0c3daba/vm-lifecycle.json",
+    "state": "sealed",
+    "repairCloneRemoved": true
+  },
+  "vagrantConsumerProof": {
+    "path": "experiments/windows-docker-container/evidence/vagrant-box-20260807T161810446Z-003c1538/vagrant-box-proof.json",
+    "schema": "labview-benchmark-actor/windows-vagrant-box-consumer@1",
+    "status": "activation-required",
+    "reason": "new-vm-identity-requires-ni-activation",
+    "sourceHardwareUuid": "3e29a8af-ee1f-442f-8e28-2eaa07832786",
+    "consumerHardwareUuid": "f5de7ff5-d858-4f0e-9bab-3b2e252926b5",
+    "cleanupVerified": true
+  },
+  "retainedReviewerCache": {
+    "schema": "labview-benchmark-actor/windows-vagrant-reviewer-cache@1",
+    "path": "experiments/windows-docker-container/evidence/reviewer-cache-20260807T170315959Z-8fe3fe79/reviewer-cache.json",
+    "status": "passed",
+    "reason": "reviewer-cache-ready",
+    "cacheRoot": "D:\\lba-vagrant-instances\\actor-reviewer-local",
+    "storagePath": "D:\\VirtualBox VMs\\actor-reviewer-local\\actor-reviewer-local.vbox",
+    "vagrantHome": "D:\\vagrant-home",
+    "vagrantDotfilePath": "D:\\lba-vagrant-instances\\actor-reviewer-local\\.vagrant",
+    "vm": {
+      "name": "actor-reviewer-local",
+      "uuid": "f296a95b-7470-496a-bab7-791c973efd37",
+      "hardwareUuid": "f296a95b-7470-496a-bab7-791c973efd37",
+      "state": "poweroff"
+    },
+    "snapshot": {
+      "name": "reviewer-activated-vsix-48074c046a03-20260807220426",
+      "uuid": "c5d7e440-707d-4522-a06e-f2d358f3e4c3"
+    },
+    "capture": {
+      "launchMs": 31700.9841,
+      "settleMs": 35436.0477,
+      "frames": 1116,
+      "resourceSamples": 94
+    },
+    "vsix": {
+      "version": "1.3.0",
+      "size": 126105,
+      "sha256": "48074c046a03b69d1c83d5608ecc40560074059d69fab3668cb92adeb6e3fb03",
+      "profile": "interactive"
+    },
+    "lockReleased": true,
+    "activationPortable": false,
+    "maintenanceLifecycle": "experiments/windows-docker-container/evidence/reviewer-cache-move-20260807T185418357Z-a2f4598f/vm-lifecycle.json"
+  },
+  "offlineReviewerGate": {
+    "schema": "labview-benchmark-actor/windows-reviewer-offline-gate@1",
+    "path": "experiments/windows-docker-container/evidence/reviewer-cache-resume-20260807T202743398Z-cb1a928f/offline-review-verdict.json",
+    "reviewer": "reviewer@vi-tech.nl",
+    "verdict": "PASS",
+    "reason": "reviewer-offline-gate-ready",
+    "requiredPasses": [
+      "TC-00",
+      "TC-01",
+      "TC-02",
+      "TC-03",
+      "TC-06",
+      "TC-08",
+      "TC-09",
+      "TC-10"
+    ],
+    "requiredFailures": {},
+    "notRun": {
+      "TC-04": "GitHub auth/bus",
+      "TC-05": "GitHub auth/bus",
+      "TC-07": "lbabus",
+      "TC-11": "Copilot agent auth"
+    },
+    "lifecycle": "experiments/windows-docker-container/evidence/reviewer-cache-resume-20260807T202743398Z-cb1a928f/vm-lifecycle.json",
+    "supersedes": "experiments/windows-docker-container/evidence/reviewer-cache-resume-20260807T193416615Z-eac6c074/offline-review-verdict.json",
+    "cacheRestored": true,
+    "lockReleased": true
+  },
+  "postReviewFeedback": {
+    "schema": "labview-benchmark-actor/session-feedback-resolution@1",
+    "path": "experiments/windows-docker-container/evidence/reviewer-cache-resume-20260807T213425759Z-13591007/feedback-resolution.json",
+    "commentIds": [
+      "b235d125-229a-4b51-a766-0d7bc2ea6e89",
+      "3881b34e-133d-4783-a87e-8e5645f56b76",
+      "ba691e2c-8cb5-4212-82ab-927e65ca418d"
+    ],
+    "agentsVersion": "0.3.2",
+    "agentsSha256": "e46b297dba17f230a22feb18551a208eab863307d25d42b3b91eb81161f3533a",
+    "vsixSha256": "48074c046a03b69d1c83d5608ecc40560074059d69fab3668cb92adeb6e3fb03",
+    "uiProof": "PASS",
+    "cacheSealed": true,
+    "lockReleased": true
+  }
+}

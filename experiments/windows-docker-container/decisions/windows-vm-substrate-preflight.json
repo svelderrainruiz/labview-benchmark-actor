@@ -1,0 +1,119 @@
+{
+  "schema": "labview-benchmark-actor/windows-vm-substrate-preflight@1",
+  "generatedWallTime": "2026-08-07T12:39:49.607Z",
+  "tools": {
+    "generatedWallTime": "2026-08-07T12:39:49.607Z",
+    "virtualBox": {
+      "available": true,
+      "version": "7.2.8r173730",
+      "error": null,
+      "vms": [
+        {
+          "name": "lba-ubuntu2404-labview2026-scratch",
+          "id": "6680988b-5eb3-434d-96c6-8cf22f3055b9",
+          "osType": "Ubuntu 24.04 LTS (Noble Numbat) (64-bit)",
+          "state": "poweroff",
+          "configFile": "D:\\\\VirtualBox VMs\\\\lba-ubuntu2404-labview2026-scratch\\\\lba-ubuntu2404-labview2026-scratch.vbox",
+          "vrde": "off",
+          "description": null,
+          "inspectionError": null
+        },
+        {
+          "name": "lba-win11-labview2026-build",
+          "id": "3e29a8af-ee1f-442f-8e28-2eaa07832786",
+          "osType": "Windows 11 (64-bit)",
+          "state": "poweroff",
+          "configFile": "D:\\\\VirtualBox VMs\\\\lba-win11-labview2026-build\\\\lba-win11-labview2026-build.vbox",
+          "vrde": "off",
+          "description": null,
+          "inspectionError": null
+        }
+      ]
+    },
+    "vagrant": {
+      "available": true,
+      "version": "Vagrant 2.4.9",
+      "error": null,
+      "boxes": []
+    },
+    "hyperv": {
+      "available": true,
+      "managementPermitted": false,
+      "vms": [],
+      "error": "You do not have the required permission to complete this task. Contact the administrator of the authorization policy for the computer 'SERGIO'."
+    },
+    "vmware": {
+      "available": false,
+      "version": null,
+      "probeResult": null,
+      "error": "spawnSync vmrun ENOENT",
+      "windowsLabviewVmEstablished": false
+    },
+    "assets": {
+      "windowsInstallationSource": {
+        "present": false,
+        "path": null,
+        "source": "not-supplied"
+      },
+      "labviewInstallationSource": {
+        "present": false,
+        "path": null,
+        "source": "not-supplied"
+      },
+      "labviewLicensingReady": null
+    }
+  },
+  "discovered": {
+    "virtualBoxWindowsLabviewVms": [
+      {
+        "name": "lba-win11-labview2026-build",
+        "id": "3e29a8af-ee1f-442f-8e28-2eaa07832786",
+        "osType": "Windows 11 (64-bit)",
+        "state": "poweroff",
+        "configFile": "D:\\\\VirtualBox VMs\\\\lba-win11-labview2026-build\\\\lba-win11-labview2026-build.vbox",
+        "vrde": "off",
+        "description": null,
+        "inspectionError": null
+      }
+    ],
+    "approvedVirtualBoxVagrantBox": null
+  },
+  "options": {
+    "virtualboxVagrant": {
+      "status": "blocked-missing-approved-asset",
+      "recommended": true,
+      "missing": [
+        "successful interactive LabVIEW activation/licensing proof for the existing Windows/LabVIEW VM"
+      ],
+      "capturePath": "VirtualBox VRDE VNC -> existing vbox-vnc-source.mjs -> MPRR workload pipeline"
+    },
+    "hyperv": {
+      "status": "blocked-missing-permission-or-assets",
+      "recommended": false,
+      "missing": [
+        "authorized elevated Hyper-V management access",
+        "approved Windows installation source",
+        "approved LabVIEW 2026 installation source",
+        "approved LabVIEW activation/licensing readiness"
+      ],
+      "capturePath": "full Windows VM interactive desktop -> guest TightVNC on local-only transport -> shared RFB/MPRR pipeline"
+    },
+    "vmware": {
+      "status": "unavailable",
+      "recommended": false,
+      "missing": [
+        "VMware vmrun/provider tooling"
+      ],
+      "capturePath": "VMware RemoteDisplay VNC -> existing vmware-vnc-source.mjs -> MPRR workload pipeline"
+    }
+  },
+  "ready": false,
+  "recommendedOption": "virtualbox-vagrant",
+  "nextDecisionRequired": "activate-existing-windows-labview-vm",
+  "constraints": {
+    "noDownloadsPerformed": true,
+    "noVmsStartedOrModified": true,
+    "noEulasAccepted": true,
+    "noLicensingChanges": true
+  }
+}

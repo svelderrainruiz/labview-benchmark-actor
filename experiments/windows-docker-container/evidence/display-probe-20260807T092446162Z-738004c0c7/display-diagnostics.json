@@ -1,0 +1,74 @@
+{
+    "schema":  "labview-benchmark-actor/windows-container-display@1",
+    "wallTime":  "2026-08-07T09:25:05.7748789Z",
+    "desktopTarget":  "Inherited",
+    "tightVncCaptureMode":  "StandardGdi",
+    "processId":  2264,
+    "sessionId":  1,
+    "api":  {
+                "processId":  2264,
+                "sessionId":  1,
+                "context":  {
+                                "mode":  "Inherited",
+                                "windowStation":  "Service-0x0-11a8f$",
+                                "desktop":  "Default",
+                                "qualifiedDesktop":  "Service-0x0-11a8f$\\Default",
+                                "explicitStartupDesktop":  null,
+                                "processWindowStationChanged":  false,
+                                "threadDesktopSet":  false,
+                                "threadDesktopError":  0
+                            },
+                "smCmonitors":  1,
+                "primaryWidth":  1024,
+                "primaryHeight":  768,
+                "virtualLeft":  0,
+                "virtualTop":  0,
+                "virtualWidth":  1024,
+                "virtualHeight":  768,
+                "getDcSucceeded":  true,
+                "getDcError":  0,
+                "enumDisplayMonitorsError":  0,
+                "monitorRectangles":  [
+
+                                      ],
+                "screenBitsPixel":  32,
+                "screenPlanes":  1,
+                "screenColorDepth":  32,
+                "screenHorzRes":  1024,
+                "screenVertRes":  768,
+                "displayDevices":  [
+
+                                   ],
+                "queryDisplayConfigBufferResult":  0,
+                "queryDisplayConfigResult":  87,
+                "activePathCount":  0,
+                "activeModeCount":  0
+            },
+    "videoControllers":  [
+
+                         ],
+    "desktopMonitors":  [
+
+                        ],
+    "desktopProbe":  {
+                         "processId":  3100,
+                         "sessionId":  1,
+                         "marker":  "display-probe-20260807T092446162Z-738004c0c7",
+                         "visible":  false,
+                         "exited":  false,
+                         "exitCode":  null,
+                         "window":  {
+
+                                    }
+                     },
+    "localGdi":  {
+                     "path":  null,
+                     "sha256":  null,
+                     "analysis":  {
+                                      "passed":  false,
+                                      "reason":  "capture-error"
+                                  },
+                     "captureMethod":  "GetDC(NULL)+BitBlt(SRCCOPY|CAPTUREBLT)+GetDIBits",
+                     "error":  "Exception calling \"CaptureScreen\" with \"1\" argument(s): \"BitBlt failed: 5\""
+                 }
+}
