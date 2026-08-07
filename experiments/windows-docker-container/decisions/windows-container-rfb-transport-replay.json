@@ -1,0 +1,178 @@
+{
+  "schema": "labview-benchmark-actor/windows-container-rfb-transport-replay@1",
+  "replayId": "20260807T075339152Z-d5880932bd-transport-replay",
+  "sourceRunId": "20260807T075339152Z-d5880932bd",
+  "sourceOutcome": "inconclusive",
+  "benchmarkOutcome": "transport-supported-framebuffer-unavailable",
+  "benchmarkScope": "windows-container-rfb-transport-only",
+  "timing": {
+    "liveMonotonicMetrics": [
+      "directProbeMs",
+      "relayCleanupMs"
+    ],
+    "replayTimelineAuthority": "relative UTC evidence ordering encoded as MPRR 100ns ticks",
+    "replayTimelinePerformanceAuthority": false,
+    "wallClockProvenancePreserved": true
+  },
+  "transport": {
+    "dockerPublishedPorts": 0,
+    "directEndpoint": "172.21.9.62:5900",
+    "directProbeMs": 1.4552,
+    "relayBoundAddress": "127.0.0.1",
+    "relayHostPortAssigned": 54778,
+    "relayUpstream": "172.21.9.62:5900",
+    "acceptedConnections": 1,
+    "successfulUpstreamConnections": 1,
+    "downstreamToUpstreamBytes": 88,
+    "upstreamToDownstreamBytes": 6291559,
+    "totalRelayBytes": 6291647,
+    "upstreamDownstreamByteRatio": 71494.9886,
+    "relayCleanupMs": 1.409,
+    "relayClosed": true
+  },
+  "rfb": {
+    "version": "3.8",
+    "securityType": 2,
+    "securityTypeName": "VNC Authentication",
+    "width": 1024,
+    "height": 768,
+    "updateCount": 2,
+    "observedFramePollCount": 18,
+    "retainedVisualFrameCount": 0,
+    "authenticated": true,
+    "traversedLoopbackRelay": true
+  },
+  "framebuffer": {
+    "payloadBytesDelivered": true,
+    "blackFraction": 1,
+    "meaningfulLumaPopulations": 1,
+    "classification": "uniform-black-zero-display-surface",
+    "interactiveDisplayAvailable": false,
+    "screenshotBenchmarkAvailable": false
+  },
+  "capabilities": {
+    "networkRelay": "supported-and-proven",
+    "rfbProtocolAndAuthentication": "supported-and-proven",
+    "framebufferPayloadTransport": "supported-and-proven",
+    "interactiveWindowsContainerDisplay": "unsupported-by-windows-container-platform",
+    "labviewVisualLaunchBenchmark": "unsupported-by-windows-container-platform"
+  },
+  "forbiddenClaims": {
+    "labviewLaunchMs": null,
+    "visualSettleMs": null,
+    "screenshotFingerprint": null,
+    "interactiveDesktop": false
+  },
+  "mprr": {
+    "schema": "labview-benchmark-actor/capture-ring-packet@v1",
+    "packetBytes": 24,
+    "ticksPerMs": 10000,
+    "visualFramesEncoded": 0,
+    "markers": [
+      {
+        "milestoneId": 5,
+        "name": "DIRECT-PROBE-COMPLETE",
+        "frameIndex": 0,
+        "wallOffsetMs": 0,
+        "timingTicks64": "0",
+        "packetBytes": 24,
+        "packetHex": "000000000000000000000000000000000000000005000100",
+        "packetSha256": "6231005ca444aab2bb9163d88c7ff4a43bc6bac7c05f2dd799a3a001d47b7520",
+        "visualFrame": false
+      },
+      {
+        "milestoneId": 6,
+        "name": "RELAY-READY",
+        "frameIndex": 1,
+        "wallOffsetMs": 2322,
+        "timingTicks64": "23220000",
+        "packetBytes": 24,
+        "packetHex": "204f62010000000001000000000000000000000006000100",
+        "packetSha256": "b078535b27b8b4db3f3405df08cacc43da77b973a56a9c5a5756a5f43c507a42",
+        "visualFrame": false
+      },
+      {
+        "milestoneId": 7,
+        "name": "RFB-TRAVERSED",
+        "frameIndex": 2,
+        "wallOffsetMs": 2408,
+        "timingTicks64": "24080000",
+        "packetBytes": 24,
+        "packetHex": "806e6f010000000002000000000000000000000007000100",
+        "packetSha256": "3aac6af9c77738b2f5f44d273260cddf77d6c9fec8e2817ed4daf434ded76151",
+        "visualFrame": false
+      },
+      {
+        "milestoneId": 8,
+        "name": "FRAMEBUFFER-CLASSIFIED",
+        "frameIndex": 3,
+        "wallOffsetMs": 3884,
+        "timingTicks64": "38840000",
+        "packetBytes": 24,
+        "packetHex": "c0a650020000000003000000000000000000000008000100",
+        "packetSha256": "1305b9d38f20f6b26efd087d0aa06e1f3589043ada98bc9070396187483eab1f",
+        "visualFrame": false
+      },
+      {
+        "milestoneId": 9,
+        "name": "RELAY-CLOSED",
+        "frameIndex": 4,
+        "wallOffsetMs": 6875,
+        "timingTicks64": "68750000",
+        "packetBytes": 24,
+        "packetHex": "b00a19040000000004000000000000000000000009000100",
+        "packetSha256": "2a13e2af3d91bd39f11dc4b9c41dbf574d3f73f3a9b1359a68e480033c458aba",
+        "visualFrame": false
+      },
+      {
+        "milestoneId": 10,
+        "name": "CLEANUP-PROVEN",
+        "frameIndex": 5,
+        "wallOffsetMs": 134741,
+        "timingTicks64": "1347410000",
+        "packetBytes": 24,
+        "packetHex": "50d84f50000000000500000000000000000000000a000100",
+        "packetSha256": "48de21fa30c9d0dbb5588831743d6422b62785f63ae75c2c582c9dcc70abd8b1",
+        "visualFrame": false
+      }
+    ]
+  },
+  "sources": [
+    {
+      "role": "manifest",
+      "path": "experiments/windows-docker-container/evidence/20260807T075339152Z-d5880932bd/manifest.json",
+      "size": 5488,
+      "sha256": "2a0981de810e881f77e064112b65e24b7ad964254ff7ff145ce7f5ab3cfd841a"
+    },
+    {
+      "role": "failureReceipt",
+      "path": "experiments/windows-docker-container/evidence/20260807T075339152Z-d5880932bd/failure-receipt.json",
+      "size": 5894,
+      "sha256": "24c8b4b5a4f712b17de895a79a0879e237433ed6cd43225566189656004a9556"
+    },
+    {
+      "role": "networkPreflight",
+      "path": "experiments/windows-docker-container/evidence/20260807T075339152Z-d5880932bd/network-preflight.json",
+      "size": 866,
+      "sha256": "9689caa3623b08ad86e973236e147642103c1ab98cbe16f2623efcb52fd26739"
+    },
+    {
+      "role": "networkRelay",
+      "path": "experiments/windows-docker-container/evidence/20260807T075339152Z-d5880932bd/network-relay.json",
+      "size": 1784,
+      "sha256": "765068f452d25a11df0dc6d216dfb112b40f421252017a2d2ea715da3d5246ab"
+    },
+    {
+      "role": "cleanupVerification",
+      "path": "experiments/windows-docker-container/evidence/20260807T075339152Z-d5880932bd/cleanup-verification.json",
+      "size": 415,
+      "sha256": "185027dc390177f0bdb7e5ae06665472f55b7b979045ef25b29da21cb33eca64"
+    },
+    {
+      "role": "tightVncLog",
+      "path": "experiments/windows-docker-container/evidence/20260807T075339152Z-d5880932bd/tvnserver.log",
+      "size": 89614,
+      "sha256": "db7d34e6d18caf83388f6802804467d7b0502f6735460f397a6a0e69bd5e1808"
+    }
+  ]
+}

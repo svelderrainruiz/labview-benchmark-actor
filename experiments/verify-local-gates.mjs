@@ -2367,6 +2367,60 @@ check('capture-ring-vbox-source', () => {
   return { port: VBOX_DEFAULT_VNC_PORT, marker: rec.caseId, suite: 'vbox-vnc-source subprocess 3/3' };
 });
 
+// Windows-container transport replay: reconstruct MPRR milestone packets from
+// committed loopback relay/RFB evidence. This is intentionally transport-only:
+// it proves authenticated payload traversal and cleanup while retaining the
+// unsupported interactive-display conclusion and encoding zero visual frames.
+check('windows-container-rfb-transport-replay', () => {
+  execFileSync(process.execPath, [
+    join(here, 'windows-docker-container', 'transport-replay-core.selftest.mjs'),
+  ], { stdio: 'pipe' });
+  const generated = join(
+    tmpdir(),
+    `lba-windows-container-transport-replay-${process.pid}.json`,
+  );
+  try {
+    execFileSync(process.execPath, [
+      join(here, 'windows-docker-container', 'build-transport-replay.mjs'),
+      join(here, 'windows-docker-container', 'evidence', '20260807T075339152Z-d5880932bd'),
+      generated,
+    ], { stdio: 'pipe' });
+    const committed = JSON.parse(readFileSync(
+      join(here, 'windows-docker-container', 'decisions', 'windows-container-rfb-transport-replay.json'),
+      'utf8',
+    ));
+    assert(
+      JSON.stringify(JSON.parse(readFileSync(generated, 'utf8'))) === JSON.stringify(committed),
+      'documented transport replay builder must reproduce the committed receipt',
+    );
+  } finally {
+    rmSync(generated, { force: true });
+  }
+  const stdout = execFileSync(process.execPath, [
+    join(here, 'windows-docker-container', 'verify-transport-replay.mjs'),
+    join(here, 'windows-docker-container', 'decisions', 'windows-container-rfb-transport-replay.json'),
+  ], { encoding: 'utf8' });
+  const result = JSON.parse(stdout);
+  assert(result.visualFramesEncoded === 0, 'transport replay must encode zero visual frames');
+  assert(
+    result.interactiveDisplay === 'unsupported-by-windows-container-platform',
+    'transport replay must preserve the unsupported display conclusion',
+  );
+  return {
+    outcome: result.outcome,
+    totalRelayBytes: result.totalRelayBytes,
+    rfbUpdates: result.rfbUpdates,
+    visualFramesEncoded: result.visualFramesEncoded,
+  };
+});
+
+check('windows-container-rfb-transport-replay-tamper', () => {
+  execFileSync(process.execPath, [
+    join(here, 'windows-docker-container', 'verify-transport-replay.selftest.mjs'),
+  ], { stdio: 'pipe' });
+  return { suite: 'transport replay verifier tamper self-test' };
+});
+
 // Fiducial ground truth (mprr-capture-ring/fiducial-vnc-server.mjs): a host-controlled "stopwatch" fiducial
 // whose every tick is deterministic + non-uniform (so no frame is skipped as an all-zero no-frame sentinel).
 // In-process asserts those properties, then runs the REAL server<->client<->ring round-trip self-test as a

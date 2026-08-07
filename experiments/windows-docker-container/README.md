@@ -400,6 +400,55 @@ interactive display path inside the container session. Do not install a
 speculative virtual-display driver, share an undocumented display GUID, enable
 test-signing, or change Secure Boot.
 
+## CI-safe TightVNC/RFB transport replay
+
+The platform-negative display result does not prevent deterministic CI
+benchmarking of the proven transport layer. The committed replay receipt is
+[decisions/windows-container-rfb-transport-replay.json](decisions/windows-container-rfb-transport-replay.json),
+schema `labview-benchmark-actor/windows-container-rfb-transport-replay@1`.
+
+Build and verify it without Docker, Windows, a VNC listener, or a secret:
+
+```powershell
+node .\experiments\windows-docker-container\build-transport-replay.mjs
+node .\experiments\windows-docker-container\verify-transport-replay.mjs `
+  .\experiments\windows-docker-container\decisions\windows-container-rfb-transport-replay.json
+```
+
+The replay hashes and re-derives the retained Gate 2/3 evidence, then encodes
+six milestone-only MPRR capture-ring packets:
+
+1. direct container-network probe complete;
+2. loopback relay ready;
+3. authenticated RFB traversed;
+4. framebuffer classified;
+5. relay closed;
+6. cleanup proven.
+
+The MPRR packets carry `dhash64=0`, encode **zero visual frames**, and use the
+workload marker range (`milestoneId` 5–10). Their 100 ns ticks are reconstructed
+from relative UTC evidence ordering for deterministic replay; they are not a
+live monotonic performance authority. Only `directProbeMs` and
+`relayCleanupMs` retain their original host-monotonic timing authority.
+
+Current replay metrics:
+
+- direct private-network probe: `1.4552 ms`;
+- relay cleanup: `1.409 ms`;
+- authenticated RFB `3.8`, VNC security type `2`;
+- relay bytes: `88` downstream-to-upstream and `6,291,559`
+  upstream-to-downstream (`6,291,647` total);
+- two RFB updates and 18 observed frame polls;
+- uniformly black framebuffer, `blackFraction=1`;
+- retained visual frames, screenshots, fingerprints, `launchMs`, and visual
+  settle metrics: **none**.
+
+The benchmark outcome is
+`transport-supported-framebuffer-unavailable`. It proves the relay, RFB
+authentication, payload traversal, packet serialization, and cleanup. It
+cannot be used to claim an interactive Windows-container desktop or a visual
+LabVIEW benchmark.
+
 ## Probe-only isolation evidence
 
 [run-display-probe.ps1](run-display-probe.ps1) runs display diagnostics without
