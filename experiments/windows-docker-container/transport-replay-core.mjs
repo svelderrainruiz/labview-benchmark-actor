@@ -224,8 +224,16 @@ export function deriveTransportReplay({
   if (!/console desktop has 0 displays/i.test(tightVncLog)) {
     throw new Error('TightVNC zero-display log proof is missing');
   }
-  if (!/sending blank screen/i.test(tightVncLog)) {
-    throw new Error('TightVNC blank-screen behavior is missing');
+  const tightVncZeroDisplayMode = /sending blank screen/i.test(tightVncLog)
+    ? 'blank-screen'
+    : (
+        /sending NewFBSize/i.test(tightVncLog)
+        && /update requested/i.test(tightVncLog)
+      )
+      ? 'desktop-size-then-black-update'
+      : null;
+  if (!tightVncZeroDisplayMode) {
+    throw new Error('TightVNC zero-display update behavior is missing');
   }
 
   if (
@@ -313,6 +321,7 @@ export function deriveTransportReplay({
       blackFraction: analysis.blackFraction,
       meaningfulLumaPopulations: analysis.meaningfulLumaPopulations,
       classification: 'uniform-black-zero-display-surface',
+      tightVncZeroDisplayMode,
       interactiveDisplayAvailable: false,
       screenshotBenchmarkAvailable: false,
     },
@@ -400,6 +409,9 @@ export function validateTransportReplay(record) {
     || record.rfb.securityType !== 2
     || record.framebuffer?.interactiveDisplayAvailable !== false
     || record.framebuffer.blackFraction !== 1
+    || !['blank-screen', 'desktop-size-then-black-update'].includes(
+      record.framebuffer.tightVncZeroDisplayMode,
+    )
   ) {
     throw new Error('transport replay RFB/framebuffer boundary is invalid');
   }

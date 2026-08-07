@@ -8,6 +8,7 @@ param(
   [string]$OutputPath = 'C:\evidence\launch-diagnostics.json',
   [ValidateSet('Inherited', 'WinSta0')][string]$DesktopTarget = 'Inherited',
   [ValidateSet('StandardGdi', 'D3d')][string]$TightVncCaptureMode = 'StandardGdi',
+  [switch]$TransportOnly,
   [ValidatePattern('^[A-Za-z0-9._-]+$')][string]$RunId = 'standalone',
   [ValidateRange(15, 300)][int]$WindowTimeoutSeconds = 45,
   [ValidateRange(5, 30)][int]$AliveHoldSeconds = 10
@@ -22,6 +23,9 @@ $LabViewExe = 'C:\Program Files\National Instruments\LabVIEW 2026\LabVIEW.exe'
 $RegistryPath = 'HKCU:\Software\TightVNC\Server'
 $ServiceOnlyRegistryPath = 'HKLM:\SOFTWARE\TightVNC\Server\ServiceOnly'
 $StopSignal = 'C:\evidence\stop.signal'
+if ($TransportOnly -and $DesktopTarget -ne 'WinSta0') {
+  throw 'TransportOnly is restricted to the explicit WinSta0 baseline.'
+}
 
 function Write-BootstrapLog([string]$Message) {
   Write-Host ('{0} [container-bootstrap] {1}' -f [DateTime]::UtcNow.ToString('o'), $Message)
@@ -31,7 +35,15 @@ function Write-AtomicJson([string]$Path, $Value) {
   $temp = "$Path.$PID.tmp"
   $json = $Value | ConvertTo-Json -Depth 20
   [System.IO.File]::WriteAllText($temp, "$json`n", [System.Text.UTF8Encoding]::new($false))
-  Move-Item -LiteralPath $temp -Destination $Path -Force
+  try {
+    Move-Item -LiteralPath $temp -Destination $Path -Force
+  } catch [System.IO.DirectoryNotFoundException] {
+    # Windows Docker bind mounts can reject an otherwise same-directory rename.
+    # Preserve the temp-write discipline and use an overwrite copy for that
+    # mount-specific case rather than failing before evidence readiness.
+    [System.IO.File]::Copy($temp, $Path, $true)
+    Remove-Item -LiteralPath $temp -Force
+  }
 }
 
 if ($Action -in @('Serve', 'DisplayProbe', 'LaunchLabVIEW')) {
@@ -262,8 +274,10 @@ function Invoke-Serve {
     }
     $zeroDisplays = @($displayRecord.api.monitorRectangles).Count -eq 0
     $localGdiPath = 'C:\evidence\local-gdi-capture.png'
+    $localGdiCaptured = $false
     try {
       $localGdiAnalysis = [LbaDesktop]::CaptureScreen($localGdiPath)
+      $localGdiCaptured = $true
     } catch {
       $failureClassification = if ($zeroDisplays) { 'desktop-has-zero-displays' } else { 'desktop-local-gdi-capture-black' }
       $displayRecord.localGdi = [ordered]@{
@@ -273,17 +287,20 @@ function Invoke-Serve {
         captureMethod = 'GetDC(NULL)+BitBlt(SRCCOPY|CAPTUREBLT)+GetDIBits'
         error = $_.Exception.Message
       }
+      $localGdiAnalysis = $displayRecord.localGdi.analysis
       Write-AtomicJson 'C:\evidence\display-diagnostics.json' $displayRecord
-      throw
+      if (-not ($TransportOnly -and $zeroDisplays)) { throw }
     }
-    $displayRecord.localGdi = [ordered]@{
-      path = 'local-gdi-capture.png'
-      sha256 = (Get-FileHash -LiteralPath $localGdiPath -Algorithm SHA256).Hash.ToLowerInvariant()
-      analysis = $localGdiAnalysis
-      captureMethod = 'GetDC(NULL)+BitBlt(SRCCOPY|CAPTUREBLT)+GetDIBits'
+    if ($localGdiCaptured) {
+      $displayRecord.localGdi = [ordered]@{
+        path = 'local-gdi-capture.png'
+        sha256 = (Get-FileHash -LiteralPath $localGdiPath -Algorithm SHA256).Hash.ToLowerInvariant()
+        analysis = $localGdiAnalysis
+        captureMethod = 'GetDC(NULL)+BitBlt(SRCCOPY|CAPTUREBLT)+GetDIBits'
+      }
     }
     Write-AtomicJson 'C:\evidence\display-diagnostics.json' $displayRecord
-    if ($zeroDisplays) {
+    if ($zeroDisplays -and -not $TransportOnly) {
       $failureClassification = 'desktop-has-zero-displays'
       throw "EnumDisplayMonitors found zero displays on '$($desktopContext.qualifiedDesktop)'."
     }
@@ -294,11 +311,11 @@ function Invoke-Serve {
       $failureClassification = 'desktop-has-zero-displays'
       throw "Display metrics are degenerate on '$($desktopContext.qualifiedDesktop)'."
     }
-    if (-not $desktopProbe.visible -or $desktopProbe.exited) {
+    if ((-not $desktopProbe.visible -or $desktopProbe.exited) -and -not $TransportOnly) {
       $failureClassification = 'desktop-probe-window-unavailable'
       throw "The deterministic probe did not produce a visible window on '$($desktopContext.qualifiedDesktop)'."
     }
-    if (-not $localGdiAnalysis.passed) {
+    if (-not $localGdiAnalysis.passed -and -not $TransportOnly) {
       $failureClassification = 'desktop-local-gdi-capture-black'
       throw "Local GDI capture failed pixel proof: $($localGdiAnalysis.reason)."
     }
@@ -391,6 +408,7 @@ function Invoke-Serve {
         desktopContext = $desktopContext
       }
       display = $displayRecord
+      transportOnly = [bool]$TransportOnly
       vnc = [ordered]@{
         processId = $vncProcess.Id
         sessionId = $vncProcess.SessionId

@@ -63,6 +63,37 @@ if ($createArgs -notcontains '--mount' -or $createArgs -notcontains '--isolation
 if ($createArgs -contains '--device' -or $createArgs -notcontains 'Inherited' -or $createArgs -notcontains 'StandardGdi') {
   throw 'Default container arguments must select inherited standard-GDI mode without a GPU device.'
 }
+$transportArgs = @(New-ExperimentContainerCreateArgs `
+  -ContainerName 'lba-transport-test' `
+  -RunId 'run-transport-selftest' `
+  -Isolation 'process' `
+  -ExperimentRoot 'C:\experiment-source' `
+  -RunRoot 'C:\evidence-source' `
+  -SecretRoot 'C:\secret-source' `
+  -ImageReference 'nationalinstruments/labview:2026q3-windows' `
+  -TightVncSha256 ('a' * 64) `
+  -TightVncVersion '2.8.81' `
+  -DesktopTarget 'WinSta0' `
+  -TightVncCaptureMode 'StandardGdi' `
+  -TransportOnly)
+if ($transportArgs -notcontains '-TransportOnly' -or $transportArgs -notcontains 'WinSta0') {
+  throw 'Transport-only arguments did not retain the explicit WinSta0 boundary.'
+}
+Assert-Throws {
+  New-ExperimentContainerCreateArgs `
+    -ContainerName 'lba-invalid-transport' `
+    -RunId 'run-invalid-transport' `
+    -Isolation 'process' `
+    -ExperimentRoot 'C:\experiment-source' `
+    -RunRoot 'C:\evidence-source' `
+    -SecretRoot 'C:\secret-source' `
+    -ImageReference 'nationalinstruments/labview:2026q3-windows' `
+    -TightVncSha256 ('a' * 64) `
+    -TightVncVersion '2.8.81' `
+    -DesktopTarget 'Inherited' `
+    -TightVncCaptureMode 'StandardGdi' `
+    -TransportOnly
+} 'restricted to the explicit WinSta0'
 $gpuArgs = @(New-ExperimentContainerCreateArgs `
   -ContainerName 'lba-gpu-test' `
   -RunId 'run-gpu-selftest' `

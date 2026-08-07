@@ -178,11 +178,18 @@ async function main() {
   const environment = JSON.parse(readFileSync(environmentFile, 'utf8'));
   const networkPreflight = JSON.parse(readFileSync(networkPreflightFile, 'utf8'));
   const bootstrapReady = JSON.parse(readFileSync(bootstrapReadyFile, 'utf8'));
+  const transportOnly = environment.container?.transportOnly === true;
   if (networkPreflight.status !== 'passed' || networkPreflight.containerId !== containerId) {
     throw new Error('capture requires a passing, current network preflight record');
   }
   if (bootstrapReady.status !== 'ready' || bootstrapReady.bootstrap?.desktopContext?.mode !== environment.container?.desktopTarget) {
     throw new Error('capture requires matching bootstrap desktop-target evidence');
+  }
+  if (bootstrapReady.transportOnly !== transportOnly) {
+    throw new Error('capture transport-only mode disagrees with bootstrap evidence');
+  }
+  if (transportOnly && environment.container.desktopTarget !== 'WinSta0') {
+    throw new Error('capture transport-only mode is restricted to the explicit WinSta0 baseline');
   }
   const password = readFileSync(passwordFile, 'utf8').trim();
   if (!password) throw new Error('VNC password file is empty');
@@ -311,19 +318,31 @@ async function main() {
         throw new Error(`selected desktop screen DC is unavailable (Win32 ${display?.api?.getDcError ?? 'unknown'})`);
       }
       if (!Array.isArray(display.api.monitorRectangles) || display.api.monitorRectangles.length === 0) {
-        classification = 'desktop-has-zero-displays';
-        throw new Error('selected desktop has zero EnumDisplayMonitors rectangles');
+        if (transportOnly && display.localGdi?.analysis?.passed === false) {
+          localGdiAnalysis = display.localGdi.analysis;
+          classification = 'desktop-has-zero-displays';
+          // This is the explicit transport baseline: retain the failed display
+          // evidence and continue only far enough to exercise authenticated RFB.
+        } else {
+          classification = 'desktop-has-zero-displays';
+          throw new Error('selected desktop has zero EnumDisplayMonitors rectangles');
+        }
+      } else if (transportOnly) {
+        classification = 'transport-only-display-precondition-changed';
+        throw new Error('transport-only WinSta0 baseline unexpectedly has a display');
       }
-      const localGdiPath = path.join(evidenceDir, display.localGdi?.path ?? '');
-      localGdiDecoded = decodePng(readFileSync(localGdiPath));
-      localGdiAnalysis = analyzePixels(localGdiDecoded.rgba, localGdiDecoded.width, localGdiDecoded.height);
-      if (
-        localGdiDecoded.width !== display.localGdi.analysis.width
-        || localGdiDecoded.height !== display.localGdi.analysis.height
-      ) throw new Error('local GDI PNG dimensions disagree with container diagnostics');
-      if (!localGdiAnalysis.passed || display.localGdi.analysis.passed !== true) {
-        classification = 'desktop-local-gdi-capture-black';
-        throw new Error(`local GDI capture failed pixel proof: ${localGdiAnalysis.reason ?? display.localGdi.analysis.reason}`);
+      if (!transportOnly) {
+        const localGdiPath = path.join(evidenceDir, display.localGdi?.path ?? '');
+        localGdiDecoded = decodePng(readFileSync(localGdiPath));
+        localGdiAnalysis = analyzePixels(localGdiDecoded.rgba, localGdiDecoded.width, localGdiDecoded.height);
+        if (
+          localGdiDecoded.width !== display.localGdi.analysis.width
+          || localGdiDecoded.height !== display.localGdi.analysis.height
+        ) throw new Error('local GDI PNG dimensions disagree with container diagnostics');
+        if (!localGdiAnalysis.passed || display.localGdi.analysis.passed !== true) {
+          classification = 'desktop-local-gdi-capture-black';
+          throw new Error(`local GDI capture failed pixel proof: ${localGdiAnalysis.reason ?? display.localGdi.analysis.reason}`);
+        }
       }
     } catch (error) {
       failedGate = 3;
@@ -482,6 +501,23 @@ async function main() {
 
     const initialDecoded = decodePng(readFileSync(frames[0].cacheFile));
     const initialAnalysis = analyzePixels(initialDecoded.rgba, initialDecoded.width, initialDecoded.height);
+    if (transportOnly) {
+      classification = initialAnalysis.passed
+        ? 'transport-only-nonuniform-framebuffer'
+        : 'black-or-uniform-framebuffer';
+      failedGate = 3;
+      writeFailure(new Error(
+        initialAnalysis.passed
+          ? 'transport-only mode received a non-uniform framebuffer; visual interpretation and LabVIEW launch are forbidden'
+          : `initial framebuffer failed pixel proof: ${initialAnalysis.reason}`,
+      ), {
+        initialAnalysis,
+        localGdiAnalysis,
+        transportOnly: true,
+        labviewLaunchTriggered: false,
+      });
+      return 3;
+    }
     if (initialDecoded.width === localGdiDecoded.width && initialDecoded.height === localGdiDecoded.height) {
       probeMatch = matchDesktopProbe({
         localRgba: localGdiDecoded.rgba,

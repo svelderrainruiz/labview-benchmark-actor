@@ -10,6 +10,7 @@ param(
   [ValidateRange(0, 64)][int]$SettleTolerance = 2,
   [ValidateSet('Inherited', 'WinSta0')][string]$DesktopTarget = 'Inherited',
   [ValidateSet('StandardGdi', 'D3d')][string]$TightVncCaptureMode = 'StandardGdi',
+  [switch]$TransportOnly,
   [switch]$AssignGpuDevice,
   [string]$TightVncInstaller,
   [switch]$AllowUnexpectedImageId
@@ -220,6 +221,7 @@ try {
     -TightVncVersion $TightVncVersion `
     -DesktopTarget $DesktopTarget `
     -TightVncCaptureMode $TightVncCaptureMode `
+    -TransportOnly:$TransportOnly `
     -AssignGpuDevice:$AssignGpuDevice `
     -BootstrapInstaller $bootstrapInstaller)
   $createResult = Invoke-Docker $createArgs
@@ -290,6 +292,7 @@ try {
       name = $containerName
       isolation = $Isolation
       desktopTarget = $DesktopTarget
+      transportOnly = [bool]$TransportOnly
       gpuDeviceAssigned = [bool]$AssignGpuDevice
       network = $networkPreflight.target
       dockerPublishedPorts = @()

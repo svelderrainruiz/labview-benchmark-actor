@@ -449,6 +449,42 @@ authentication, payload traversal, packet serialization, and cleanup. It
 cannot be used to claim an interactive Windows-container desktop or a visual
 LabVIEW benchmark.
 
+### Live transport-only demonstration
+
+`-TransportOnly` is an explicit `WinSta0` baseline mode. It bypasses only the
+already-proven local display precondition, starts TightVNC, authenticates RFB,
+captures enough baseline frames to classify the framebuffer, and then exits
+Gate 3 **before any LabVIEW launch**:
+
+```powershell
+powershell.exe -NoLogo -NoProfile -ExecutionPolicy Bypass `
+  -File .\experiments\windows-docker-container\run-experiment.ps1 `
+  -Isolation process `
+  -DesktopTarget WinSta0 `
+  -TightVncCaptureMode StandardGdi `
+  -TransportOnly `
+  -TightVncInstaller D:\lba-vm-assets\tightvnc-2.8.81-gpl-setup-64bit.msi
+```
+
+The expected script exit is nonzero because the required visual proof remains
+unavailable. A valid transport demonstration has:
+
+- `failedGate=3`, `classification=black-or-uniform-framebuffer`;
+- authenticated RFB security type `2`;
+- positive traffic in both relay directions;
+- `transportOnly=true`, `labviewLaunchTriggered=false`;
+- `blackFraction=1`;
+- container, relay, VNC listener, installer, and secret cleanup proven.
+
+Live run `20260807T232334651Z-1242a6acb8` demonstrated this path on the exact
+image. It negotiated RFB `3.8`/VNC Authentication at `1024x768`, delivered
+`6,291,677` relay bytes, observed three RFB updates and 19 frame polls, encoded
+zero replay visual frames, did not launch LabVIEW, and removed all run-owned
+state. Its replay SHA-256 was
+`0f74e79e7983a12d94649e0a04b97b7e1e6a2e50af29b5939faa1e1bbc15239d`.
+This run remains machine-local evidence; the committed CI replay continues to
+derive from the byte-retained Gate 2/3 evidence.
+
 ## Probe-only isolation evidence
 
 [run-display-probe.ps1](run-display-probe.ps1) runs display diagnostics without

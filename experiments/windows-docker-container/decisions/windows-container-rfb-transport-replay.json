@@ -47,6 +47,7 @@
     "blackFraction": 1,
     "meaningfulLumaPopulations": 1,
     "classification": "uniform-black-zero-display-surface",
+    "tightVncZeroDisplayMode": "blank-screen",
     "interactiveDisplayAvailable": false,
     "screenshotBenchmarkAvailable": false
   },

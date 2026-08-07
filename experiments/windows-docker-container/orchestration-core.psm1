@@ -62,11 +62,15 @@ function New-ExperimentContainerCreateArgs {
     [Parameter(Mandatory = $true)][string]$TightVncVersion,
     [Parameter(Mandatory = $true)][ValidateSet('Inherited', 'WinSta0')][string]$DesktopTarget,
     [Parameter(Mandatory = $true)][ValidateSet('StandardGdi', 'D3d')][string]$TightVncCaptureMode,
+    [switch]$TransportOnly,
     [switch]$AssignGpuDevice,
     [string]$BootstrapInstaller
   )
   if ($Isolation -eq 'hyperv' -and $AssignGpuDevice) {
     throw 'Device assignment is unsupported for Hyper-V-isolated Windows containers.'
+  }
+  if ($TransportOnly -and $DesktopTarget -ne 'WinSta0') {
+    throw 'TransportOnly is restricted to the explicit WinSta0 baseline.'
   }
   $arguments = @(
     'create',
@@ -94,6 +98,7 @@ function New-ExperimentContainerCreateArgs {
     '-RunId', $RunId
   )
   if ($BootstrapInstaller) { $arguments += @('-InstallerPath', $BootstrapInstaller) }
+  if ($TransportOnly) { $arguments += '-TransportOnly' }
   $arguments += @('-TightVncVersion', $TightVncVersion)
   return $arguments
 }

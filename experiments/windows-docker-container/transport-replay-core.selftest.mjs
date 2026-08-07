@@ -123,6 +123,14 @@ assert.equal(record.mprr.markers.length, 6);
 assert.equal(record.mprr.visualFramesEncoded, 0);
 assert.equal(record.transport.totalRelayBytes, 6291647);
 assert.equal(record.capabilities.labviewVisualLaunchBenchmark, 'unsupported-by-windows-container-platform');
+assert.equal(record.framebuffer.tightVncZeroDisplayMode, 'blank-screen');
+const desktopSizeInput = base();
+desktopSizeInput.tightVncLog =
+  'The console desktop has 0 displays\nDesktop resize is enabled, sending NewFBSize 1024x768\nupdate requested\n';
+assert.equal(
+  deriveTransportReplay(desktopSizeInput).framebuffer.tightVncZeroDisplayMode,
+  'desktop-size-then-black-update',
+);
 
 for (const [mutate, pattern] of [
   [(value) => { value.networkRelay.bound.address = '0.0.0.0'; }, /loopback-only relay/],
