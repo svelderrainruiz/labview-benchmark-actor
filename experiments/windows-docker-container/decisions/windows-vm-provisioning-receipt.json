@@ -1,0 +1,85 @@
+{
+  "schema": "labview-benchmark-actor/windows-vm-provisioning@1",
+  "outcome": "blocked-activation",
+  "provider": "virtualbox",
+  "vm": {
+    "name": "lba-win11-labview2026-build",
+    "uuid": "3e29a8af-ee1f-442f-8e28-2eaa07832786",
+    "state": "poweroff",
+    "os": "Microsoft Windows 11 Pro",
+    "displayVersion": "25H2",
+    "build": "26200.8037",
+    "windowsActivation": "deferred",
+    "guestAdditions": "7.2.8",
+    "snapshots": {
+      "preLabview": "01702c17-1d86-4d94-9d2e-62a8c3fec3f1",
+      "labviewInstalledUnactivated": "843abc82-62b4-4fa6-97a0-0106c1bf03c6"
+    }
+  },
+  "sources": {
+    "windows": {
+      "officialPage": "https://www.microsoft.com/en-us/software-download/windows11",
+      "edition": "Windows 11 Pro",
+      "imageIndex": 6,
+      "file": "D:\\lba-vm-assets\\Win11_25H2_English_x64_v2.iso",
+      "size": 8471603200,
+      "sha256": "768984706b909479417b2368438909440f2967ff05c6a9195ed2667254e465e3"
+    },
+    "labview": {
+      "url": "https://download.ni.com/support/softlib/labview/labview_development_system/2026_Q3/ni-labview-2026-community_26.3.0_offline.iso",
+      "file": "D:\\lba-vm-assets\\ni-labview-2026-community_26.3.0_offline.iso",
+      "size": 4151752704,
+      "sha256": "735f0185182d51d2a91dc7181a9ff34514be41c516ebf7070dff73c1562b24c5",
+      "package": "ni-labview-2026-community",
+      "packageVersion": "26.3.0.49795-0+f643",
+      "fileVersion": "26.3f0",
+      "bitness": "x64"
+    },
+    "tightVnc": {
+      "version": "2.8.81",
+      "sha256": "0d6402e530a563c90040d7c07b98ab68670d3669e4cc573ad24056ff960c9dcb"
+    }
+  },
+  "visualProof": {
+    "evidence": "experiments/windows-docker-container/evidence/vm-20260807T122440763Z",
+    "outcome": "blocked",
+    "classification": "labview-activation-required",
+    "rfb": {
+      "version": "3.8",
+      "securityType": 2,
+      "securityTypeName": "VNC Authentication",
+      "width": 1020,
+      "height": 535,
+      "updateCount": 93
+    },
+    "frameCount": 1089,
+    "uniqueFingerprintCount": 3,
+    "transitionCount": 2,
+    "capturedWindow": {
+      "title": "LabVIEW 2026 Q3",
+      "className": "HwndWrapper[NI License Manager Wizard;;1ff19451-f96e-42df-92fe-b786355ab60e]"
+    },
+    "manifestSha256": "1f3fdb2bd46ce027113606b0880bd350d4d6a77438c51b81b4db5e40fe52cba7"
+  },
+  "cleanup": {
+    "vmPoweredOff": true,
+    "natRuleRemoved": true,
+    "hostVncSecretRemoved": true,
+    "guestVncSecretRemoved": true,
+    "vncPasswordRegistryRemoved": true,
+    "captureTasksRemoved": true,
+    "captureProcessesStopped": true,
+    "opticalMediaDetached": true,
+    "guestCleanupSha256": "a12b4bc55d8d134968ace1d1e00befb5d652ac374228010ad39d175e5e00635d"
+  },
+  "registration": {
+    "requestedBox": "actor/win11-labview2026",
+    "registered": false,
+    "reason": "A golden box must not be registered until LabVIEW activation succeeds."
+  },
+  "rollback": {
+    "software": "Restore snapshot pre-labview-q3.",
+    "completeVm": "Power off and unregister/delete only lba-win11-labview2026-build and its run-owned disks.",
+    "assets": "Delete only D:\\lba-vm-assets after the VM is no longer needed."
+  }
+}

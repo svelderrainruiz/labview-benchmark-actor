@@ -45,6 +45,9 @@ cleanroom/ubuntu-labview/mesh/.vagrant/
 # Agent-last-gate per-run verdict receipt (regenerated each run)
 experiments/agent-last-gate/receipt.json
 
+# Local Windows-container TightVNC experiment evidence (logs, screenshots, records, and receipts)
+experiments/windows-docker-container/evidence/
+
 # Coverage: keep the retained artifact coverage/cobertura-coverage.xml; ignore raw V8 tmp + transient summary.
 coverage/tmp/
 coverage/coverage-summary.json

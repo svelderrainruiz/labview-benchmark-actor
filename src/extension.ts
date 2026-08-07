@@ -928,6 +928,12 @@ export function resolveFfmpegChecked(): string | null {
 // When ffmpeg is missing, GUIDE the user (one-click winget, manual download, or point at an existing ffmpeg.exe)
 // instead of failing the capture with a raw spawn error. gdigrab needs ffmpeg present; the Marketplace build does
 // not bundle it (that would add ~70MB + ffmpeg's GPL/LGPL licensing to the listing).
+let ffmpegInstallPendingRestart = false;
+
+export function resetFfmpegInstallPendingForTest(): void {
+  ffmpegInstallPendingRestart = false;
+}
+
 async function promptInstallFfmpeg(output: vscode.OutputChannel): Promise<void> {
   const INSTALL = 'Install ffmpeg (winget)';
   const DOWNLOAD = 'Download ffmpeg\u2026';
@@ -940,17 +946,19 @@ async function promptInstallFfmpeg(output: vscode.OutputChannel): Promise<void> 
     SET_PATH
   );
   if (choice === INSTALL) {
+    ffmpegInstallPendingRestart = true;
     const term = vscode.window.createTerminal('Install ffmpeg');
     term.show(true);
     term.sendText('winget install --id Gyan.FFmpeg -e --accept-source-agreements --accept-package-agreements');
     void vscode.window.showInformationMessage(
-      'Installing ffmpeg via winget in the terminal. When it finishes, just run the capture again \u2014 the extension detects the freshly installed ffmpeg (from %LOCALAPPDATA%\\Microsoft\\WinGet\\Links), so no VS Code restart is needed.'
+      'Installing ffmpeg via winget in the terminal. When it finishes, fully close every VS Code window and reopen VS Code before running the capture again. The extension host can retain its pre-install environment and otherwise show this prompt again.'
     );
   } else if (choice === DOWNLOAD) {
     void vscode.env.openExternal(vscode.Uri.parse('https://www.gyan.dev/ffmpeg/builds/'));
   } else if (choice === SET_PATH) {
     void vscode.commands.executeCommand('workbench.action.openSettings', 'labviewBenchmarkActor.ffmpegPath');
   }
+
   output.appendLine('capture aborted: ffmpeg not found (prompted winget install / download / set-path).');
 }
 
@@ -1094,6 +1102,24 @@ async function captureLaunchCommand(context: vscode.ExtensionContext, output: vs
   // Fail-fast with an actionable prompt instead of launching a doomed capture (LabVIEW + sampler + beacon).
   const ffmpeg = resolveFfmpegChecked();
   if (!ffmpeg) {
+    if (ffmpegInstallPendingRestart) {
+      const retry = 'Retry ffmpeg setup\u2026';
+      const setPath = 'Set ffmpeg path\u2026';
+      const action = await vscode.window.showErrorMessage(
+        'ffmpeg installation was started in this VS Code session. Fully close every VS Code window and reopen VS Code before running Capture LabVIEW Launch again; do not reinstall ffmpeg. If the install failed or was cancelled, retry setup.',
+        { modal: true },
+        retry,
+        setPath,
+      );
+      if (action === retry) {
+        ffmpegInstallPendingRestart = false;
+        await promptInstallFfmpeg(output);
+      } else if (action === setPath) {
+        void vscode.commands.executeCommand('workbench.action.openSettings', 'labviewBenchmarkActor.ffmpegPath');
+      }
+      output.appendLine('capture aborted: ffmpeg install is pending a full VS Code restart.');
+      return;
+    }
     await promptInstallFfmpeg(output);
     return;
   }

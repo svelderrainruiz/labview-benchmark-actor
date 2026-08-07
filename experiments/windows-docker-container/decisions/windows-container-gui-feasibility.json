@@ -1,0 +1,589 @@
+{
+  "schema": "labview-benchmark-actor/windows-container-gui-feasibility@1",
+  "generatedWallTime": "2026-08-07T09:38:57.391Z",
+  "rows": [
+    {
+      "variantId": "process-winsta0-standard-gdi",
+      "evidenceId": "20260807T075339152Z-d5880932bd",
+      "imageReference": "nationalinstruments/labview:2026q3-windows",
+      "imageId": "sha256:f45c639a201f51875465a0d02aa69e65a3630054e564c8724c105f2e1b5eee30",
+      "isolation": "process",
+      "desktopTarget": "WinSta0",
+      "deviceAssignment": "none",
+      "session": {
+        "id": 2,
+        "windowStation": "WinSta0",
+        "desktop": "Default"
+      },
+      "display": {
+        "monitorRectangles": [],
+        "attachedDisplayDevices": {
+          "status": "not-collected",
+          "devices": []
+        },
+        "activePathCount": null,
+        "activeModeCount": null,
+        "usableDisplay": false,
+        "evidence": "TightVNC log: The console desktop has 0 displays"
+      },
+      "processWindow": {
+        "created": true,
+        "visible": true,
+        "bounds": {
+          "left": 80,
+          "top": 60,
+          "right": 880,
+          "bottom": 660
+        }
+      },
+      "localComposition": {
+        "attempted": false,
+        "available": false,
+        "result": "not-tested"
+      },
+      "rfb": {
+        "attempted": true,
+        "transportProven": true,
+        "protocolProven": true,
+        "usableFramebuffer": false,
+        "result": "uniform-black",
+        "width": 1024,
+        "height": 768,
+        "updateCount": 2,
+        "securityTypeName": "VNC Authentication",
+        "blackFraction": 1
+      },
+      "labviewVisualBenchmark": "not-attempted-display-precondition",
+      "cleanup": {
+        "proven": true,
+        "checks": {
+          "containerAbsent": {
+            "proven": true,
+            "basis": "cleanup-verification.containerAbsent"
+          },
+          "relayClosed": {
+            "proven": true,
+            "basis": "cleanup-verification.relayCleanupProven"
+          },
+          "secretRemoved": {
+            "proven": true,
+            "basis": "cleanup-verification.secretDirectoryRemoved"
+          },
+          "probeTemporaryStateRemoved": {
+            "proven": true,
+            "basis": "legacy-row-probe-was-container-scoped; verified container removal deleted its writable layer"
+          },
+          "installerTemporaryStateRemoved": {
+            "proven": true,
+            "basis": "legacy-row-installer-state-was container-scoped; verified container removal deleted its writable layer"
+          }
+        },
+        "details": {
+          "wallTime": "2026-08-07T07:58:12.2062455Z",
+          "containerId": "b5e78ac9cc31423de78ba45e22ebb0eddbe0608a4a11be868a7773c2a91f690e",
+          "containerAbsent": true,
+          "dockerPublishedPortsAbsent": true,
+          "relayInCaptureProcess": true,
+          "relayPort": 54778,
+          "relayListenerClosed": true,
+          "relayCleanupProven": true,
+          "vncPortClosed": true,
+          "secretDirectoryRemoved": true
+        }
+      },
+      "status": "tested",
+      "reason": "WinSta0 produced authenticated RFB traffic but TightVNC enumerated zero displays and intentionally returned a blank framebuffer.",
+      "evidence": {
+        "root": "experiments/windows-docker-container/evidence/20260807T075339152Z-d5880932bd",
+        "files": {
+          "manifest": {
+            "path": "experiments/windows-docker-container/evidence/20260807T075339152Z-d5880932bd/manifest.json",
+            "size": 5488,
+            "sha256": "2a0981de810e881f77e064112b65e24b7ad964254ff7ff145ce7f5ab3cfd841a"
+          },
+          "failure-receipt": {
+            "path": "experiments/windows-docker-container/evidence/20260807T075339152Z-d5880932bd/failure-receipt.json",
+            "size": 5894,
+            "sha256": "24c8b4b5a4f712b17de895a79a0879e237433ed6cd43225566189656004a9556"
+          },
+          "bootstrap-ready": {
+            "path": "experiments/windows-docker-container/evidence/20260807T075339152Z-d5880932bd/bootstrap-ready.json",
+            "size": 5249,
+            "sha256": "dc3da681820e217f72a4bd3fbf8d95d26e9cbcddc857b01303873209c6c923ed"
+          },
+          "network-relay": {
+            "path": "experiments/windows-docker-container/evidence/20260807T075339152Z-d5880932bd/network-relay.json",
+            "size": 1784,
+            "sha256": "765068f452d25a11df0dc6d216dfb112b40f421252017a2d2ea715da3d5246ab"
+          },
+          "network-preflight": {
+            "path": "experiments/windows-docker-container/evidence/20260807T075339152Z-d5880932bd/network-preflight.json",
+            "size": 866,
+            "sha256": "9689caa3623b08ad86e973236e147642103c1ab98cbe16f2623efcb52fd26739"
+          },
+          "tvnserver": {
+            "path": "experiments/windows-docker-container/evidence/20260807T075339152Z-d5880932bd/tvnserver.log",
+            "size": 89614,
+            "sha256": "db7d34e6d18caf83388f6802804467d7b0502f6735460f397a6a0e69bd5e1808"
+          },
+          "cleanup-verification": {
+            "path": "experiments/windows-docker-container/evidence/20260807T075339152Z-d5880932bd/cleanup-verification.json",
+            "size": 415,
+            "sha256": "185027dc390177f0bdb7e5ae06665472f55b7b979045ef25b29da21cb33eca64"
+          }
+        }
+      }
+    },
+    {
+      "variantId": "process-inherited-no-device",
+      "evidenceId": "20260807T085910357Z-5b3fd61a35",
+      "imageReference": "nationalinstruments/labview:2026q3-windows",
+      "imageId": "sha256:f45c639a201f51875465a0d02aa69e65a3630054e564c8724c105f2e1b5eee30",
+      "isolation": "process",
+      "desktopTarget": "Inherited",
+      "deviceAssignment": "none",
+      "session": {
+        "id": 2,
+        "windowStation": "Service-0x0-5bbfc69$",
+        "desktop": "Default"
+      },
+      "display": {
+        "smCmonitors": 1,
+        "primary": {
+          "width": 1024,
+          "height": 768
+        },
+        "monitorRectangles": [],
+        "attachedDisplayDevices": {
+          "status": "collected",
+          "devices": []
+        },
+        "activePathCount": 0,
+        "activeModeCount": 0,
+        "queryDisplayConfigResult": 5,
+        "usableDisplay": false
+      },
+      "processWindow": {
+        "created": true,
+        "visible": false,
+        "bounds": {
+          "left": 80,
+          "top": 60,
+          "right": 880,
+          "bottom": 660
+        }
+      },
+      "localComposition": {
+        "attempted": true,
+        "available": false,
+        "result": "capture-error",
+        "error": "Exception calling \"CaptureScreen\" with \"1\" argument(s): \"BitBlt failed: 5\""
+      },
+      "rfb": {
+        "attempted": false,
+        "transportProven": false,
+        "protocolProven": false,
+        "usableFramebuffer": false,
+        "result": "not-attempted"
+      },
+      "labviewVisualBenchmark": "not-attempted-display-precondition",
+      "cleanup": {
+        "proven": true,
+        "checks": {
+          "containerAbsent": {
+            "proven": true,
+            "basis": "cleanup-verification.containerAbsent"
+          },
+          "relayClosed": {
+            "proven": true,
+            "basis": "cleanup-verification.relayCleanupProven"
+          },
+          "secretRemoved": {
+            "proven": true,
+            "basis": "cleanup-verification.secretDirectoryRemoved"
+          },
+          "probeTemporaryStateRemoved": {
+            "proven": true,
+            "basis": "cleanup-verification.probeTemporaryStateRemoved"
+          },
+          "installerTemporaryStateRemoved": {
+            "proven": true,
+            "basis": "cleanup-verification.containerInstallerRemoved"
+          }
+        },
+        "details": {
+          "wallTime": "2026-08-07T09:03:38.9004906Z",
+          "containerId": "0ed3c87f72763a690da880d772208308749ae9d2f2127dcb10b0b7a0c7428643",
+          "containerAbsent": true,
+          "dockerPublishedPortsAbsent": true,
+          "relayInCaptureProcess": true,
+          "relayPort": null,
+          "relayListenerClosed": true,
+          "relayCleanupProven": true,
+          "vncPortClosed": true,
+          "secretDirectoryRemoved": true,
+          "probeTemporaryStateRemoved": true,
+          "containerInstallerRemoved": true
+        }
+      },
+      "status": "tested",
+      "reason": "Inherited service station had nominal compatibility metrics but zero monitor rectangles/active paths; probe was not visible and BitBlt was access denied.",
+      "evidence": {
+        "root": "experiments/windows-docker-container/evidence/20260807T085910357Z-5b3fd61a35",
+        "files": {
+          "manifest": {
+            "path": "experiments/windows-docker-container/evidence/20260807T085910357Z-5b3fd61a35/manifest.json",
+            "size": 4027,
+            "sha256": "3826347b39829692dc1c9063d37d0c242ebf188114291532014abd70a4ca7f6f"
+          },
+          "failure-receipt": {
+            "path": "experiments/windows-docker-container/evidence/20260807T085910357Z-5b3fd61a35/failure-receipt.json",
+            "size": 1761,
+            "sha256": "a7440665b39ac234a35239bf9d3dcd9a7891463f43d7501d3181b8e8fc853008"
+          },
+          "display-diagnostics": {
+            "path": "experiments/windows-docker-container/evidence/20260807T085910357Z-5b3fd61a35/display-diagnostics.json",
+            "size": 5226,
+            "sha256": "04cc73050280a249e101a2809406b92ad75edfa2e36674740f14e2efbcc40614"
+          },
+          "bootstrap-failure": {
+            "path": "experiments/windows-docker-container/evidence/20260807T085910357Z-5b3fd61a35/bootstrap-failure.json",
+            "size": 9557,
+            "sha256": "749bf5190036b21d6d3741e0eb591364a8a509cf765c3a55ded9ed5850c18e36"
+          },
+          "container-inspect": {
+            "path": "experiments/windows-docker-container/evidence/20260807T085910357Z-5b3fd61a35/container-inspect.json",
+            "size": 10763,
+            "sha256": "77f174c12fb0ea6ad9e79a0886db4dcf79084fe043a48d2b023de3d1b63e74a7"
+          },
+          "cleanup-verification": {
+            "path": "experiments/windows-docker-container/evidence/20260807T085910357Z-5b3fd61a35/cleanup-verification.json",
+            "size": 497,
+            "sha256": "21a7893e4409d79dfa115dea1f955142ab1016d1f81ec803c37d2a6db48bb21e"
+          }
+        }
+      }
+    },
+    {
+      "variantId": "process-inherited-directx-gpu",
+      "evidenceId": "20260807T084403463Z-8bb9b4643f",
+      "imageReference": "nationalinstruments/labview:2026q3-windows",
+      "imageId": "sha256:f45c639a201f51875465a0d02aa69e65a3630054e564c8724c105f2e1b5eee30",
+      "isolation": "process",
+      "desktopTarget": "Inherited",
+      "deviceAssignment": "directx-gpu-class",
+      "session": {
+        "id": 2,
+        "windowStation": "Service-0x0-548d070$",
+        "desktop": "Default"
+      },
+      "display": {
+        "smCmonitors": 1,
+        "primary": {
+          "width": 1024,
+          "height": 768
+        },
+        "monitorRectangles": [],
+        "attachedDisplayDevices": {
+          "status": "collected",
+          "devices": []
+        },
+        "activePathCount": 0,
+        "activeModeCount": 0,
+        "queryDisplayConfigResult": 5,
+        "usableDisplay": false
+      },
+      "processWindow": {
+        "created": false,
+        "visible": false,
+        "bounds": null
+      },
+      "localComposition": {
+        "attempted": false,
+        "available": false,
+        "result": "not-tested",
+        "error": null
+      },
+      "rfb": {
+        "attempted": false,
+        "transportProven": false,
+        "protocolProven": false,
+        "usableFramebuffer": false,
+        "result": "not-attempted"
+      },
+      "labviewVisualBenchmark": "not-attempted-display-precondition",
+      "cleanup": {
+        "proven": true,
+        "checks": {
+          "containerAbsent": {
+            "proven": true,
+            "basis": "cleanup-verification.containerAbsent"
+          },
+          "relayClosed": {
+            "proven": true,
+            "basis": "cleanup-verification.relayCleanupProven"
+          },
+          "secretRemoved": {
+            "proven": true,
+            "basis": "cleanup-verification.secretDirectoryRemoved"
+          },
+          "probeTemporaryStateRemoved": {
+            "proven": true,
+            "basis": "cleanup-verification.probeTemporaryStateRemoved"
+          },
+          "installerTemporaryStateRemoved": {
+            "proven": true,
+            "basis": "cleanup-verification.containerInstallerRemoved"
+          }
+        },
+        "details": {
+          "wallTime": "2026-08-07T08:48:21.9332276Z",
+          "containerId": "8ca4eff7551d2243327437cf5bd0fcad391a75b6d8755bc2521965a8c9d388af",
+          "containerAbsent": true,
+          "dockerPublishedPortsAbsent": true,
+          "relayInCaptureProcess": true,
+          "relayPort": null,
+          "relayListenerClosed": true,
+          "relayCleanupProven": true,
+          "vncPortClosed": true,
+          "secretDirectoryRemoved": true,
+          "probeTemporaryStateRemoved": true,
+          "containerInstallerRemoved": true
+        }
+      },
+      "status": "tested",
+      "reason": "DirectX GPU device assignment did not create monitor rectangles, attached display devices, active paths, or a usable composition surface.",
+      "evidence": {
+        "root": "experiments/windows-docker-container/evidence/20260807T084403463Z-8bb9b4643f",
+        "files": {
+          "manifest": {
+            "path": "experiments/windows-docker-container/evidence/20260807T084403463Z-8bb9b4643f/manifest.json",
+            "size": 3530,
+            "sha256": "efd1a18e2e041f860edc002ef68572cbea06461a4d5c14f8ceb3856ea956c6fc"
+          },
+          "failure-receipt": {
+            "path": "experiments/windows-docker-container/evidence/20260807T084403463Z-8bb9b4643f/failure-receipt.json",
+            "size": 1876,
+            "sha256": "f0b1bb9b5b964a31e33411680b222e1842fe9c54025faab731cf9aab36d65a8c"
+          },
+          "display-diagnostics": {
+            "path": "experiments/windows-docker-container/evidence/20260807T084403463Z-8bb9b4643f/display-diagnostics.json",
+            "size": 4334,
+            "sha256": "277c23712f9b9f87fa23fe4bf2afa22cbfa786fa4e0d14675c8c8a1780ee3dc1"
+          },
+          "bootstrap-failure": {
+            "path": "experiments/windows-docker-container/evidence/20260807T084403463Z-8bb9b4643f/bootstrap-failure.json",
+            "size": 6178,
+            "sha256": "5ec62668227e0c7cd123646d32d88fab8c53e4b095f5da2fc6dd3805e77916ed"
+          },
+          "container-inspect": {
+            "path": "experiments/windows-docker-container/evidence/20260807T084403463Z-8bb9b4643f/container-inspect.json",
+            "size": 10985,
+            "sha256": "afef4fe39f9c548cf0626004095ffed076c0b5ab44db766c9132cf13af5b5f25"
+          },
+          "cleanup-verification": {
+            "path": "experiments/windows-docker-container/evidence/20260807T084403463Z-8bb9b4643f/cleanup-verification.json",
+            "size": 497,
+            "sha256": "28a8661da1b7c81d7c5fc19f6daae2d3de2e99c0490bb45d7068ef232920272d"
+          }
+        }
+      }
+    },
+    {
+      "variantId": "hyperv-inherited-no-device",
+      "evidenceId": "display-probe-20260807T092446162Z-738004c0c7",
+      "imageReference": "nationalinstruments/labview:2026q3-windows",
+      "imageId": "sha256:f45c639a201f51875465a0d02aa69e65a3630054e564c8724c105f2e1b5eee30",
+      "isolation": "hyperv",
+      "desktopTarget": "Inherited",
+      "deviceAssignment": "none",
+      "session": {
+        "id": 1,
+        "windowStation": "Service-0x0-11a8f$",
+        "desktop": "Default"
+      },
+      "display": {
+        "smCmonitors": 1,
+        "primary": {
+          "width": 1024,
+          "height": 768
+        },
+        "monitorRectangles": [],
+        "attachedDisplayDevices": {
+          "status": "collected",
+          "devices": []
+        },
+        "activePathCount": 0,
+        "activeModeCount": 0,
+        "queryDisplayConfigResult": 87,
+        "videoControllerCount": 0,
+        "usableDisplay": false
+      },
+      "processWindow": {
+        "created": true,
+        "visible": false,
+        "bounds": null
+      },
+      "localComposition": {
+        "attempted": true,
+        "available": false,
+        "result": "capture-error",
+        "error": "Exception calling \"CaptureScreen\" with \"1\" argument(s): \"BitBlt failed: 5\""
+      },
+      "rfb": {
+        "attempted": false,
+        "transportProven": false,
+        "protocolProven": false,
+        "usableFramebuffer": false,
+        "result": "not-attempted"
+      },
+      "labviewVisualBenchmark": "not-attempted-display-precondition",
+      "cleanup": {
+        "proven": true,
+        "checks": {
+          "containerAbsent": {
+            "proven": true,
+            "basis": "cleanup-verification.containerAbsent"
+          },
+          "relayClosed": {
+            "proven": true,
+            "basis": "relay-not-started-or-not-applicable-to-this-row"
+          },
+          "secretRemoved": {
+            "proven": true,
+            "basis": "probe-only-row-never-created-a-secret"
+          },
+          "probeTemporaryStateRemoved": {
+            "proven": true,
+            "basis": "cleanup-verification.probeTemporaryStateRemoved"
+          },
+          "installerTemporaryStateRemoved": {
+            "proven": true,
+            "basis": "legacy-row-installer-state-was container-scoped; verified container removal deleted its writable layer"
+          }
+        },
+        "details": {
+          "wallTime": "2026-08-07T09:25:25.1442189Z",
+          "containerId": "3c51e041fa8f5492a6c1fa04de9622a2a5ea1b15447d7ced10a61252c8a428a1",
+          "containerAbsent": true,
+          "noRelayListener": true,
+          "noVncListener": true,
+          "secretNeverCreated": true,
+          "probeTemporaryStateRemoved": true
+        }
+      },
+      "status": "tested",
+      "reason": "Hyper-V isolation produced zero monitor rectangles/devices/active paths and no usable local composition surface (desktop-has-zero-displays).",
+      "evidence": {
+        "root": "experiments/windows-docker-container/evidence/display-probe-20260807T092446162Z-738004c0c7",
+        "files": {
+          "manifest": {
+            "path": "experiments/windows-docker-container/evidence/display-probe-20260807T092446162Z-738004c0c7/manifest.json",
+            "size": 1975,
+            "sha256": "ee6dfe56a4b3a57a2be8c0b89c43c66422b6a05de749dc95ebe64e8ee421b136"
+          },
+          "probe-environment": {
+            "path": "experiments/windows-docker-container/evidence/display-probe-20260807T092446162Z-738004c0c7/probe-environment.json",
+            "size": 2725,
+            "sha256": "328d34f2eb73ff4377e7d1d2714ce5a997d2b81b8e586ce809877524ce9e80c4"
+          },
+          "display-probe": {
+            "path": "experiments/windows-docker-container/evidence/display-probe-20260807T092446162Z-738004c0c7/display-probe.json",
+            "size": 4674,
+            "sha256": "d81a4f8b342480ab8a6a8318c5e6d421647750ff9cf546cbbd2e982251982b46"
+          },
+          "display-diagnostics": {
+            "path": "experiments/windows-docker-container/evidence/display-probe-20260807T092446162Z-738004c0c7/display-diagnostics.json",
+            "size": 2960,
+            "sha256": "d2be346499bda3a8d78620e553d1f3973bbea9834e0cf78c2a7aa749e869a7c0"
+          },
+          "container-inspect": {
+            "path": "experiments/windows-docker-container/evidence/display-probe-20260807T092446162Z-738004c0c7/container-inspect.json",
+            "size": 13154,
+            "sha256": "b4a46bab1c52b36cf260c0aefe9bba8c50b8ef3c468139479a77f6472bf1d318"
+          },
+          "cleanup-verification": {
+            "path": "experiments/windows-docker-container/evidence/display-probe-20260807T092446162Z-738004c0c7/cleanup-verification.json",
+            "size": 310,
+            "sha256": "fe7e8360ba5d6614ace13ddd6df606a43273f27b45e8e3af7e7f2a98801efa7f"
+          }
+        }
+      }
+    }
+  ],
+  "aggregate": {
+    "decision": "unsupported-by-windows-container-platform",
+    "complete": true,
+    "reason": "All required variants lack a usable display/composition surface and Microsoft excludes interactive GUI workloads from Windows containers.",
+    "capabilities": {
+      "networkRelay": "supported-and-proven",
+      "rfbProtocolAndAuthentication": "supported-and-proven",
+      "processAndWindowCreation": "window-objects-created-without-supported-interactive-display",
+      "monitorAndDisplayPath": "unavailable-in-tested-substrates",
+      "desktopComposition": "unavailable-in-tested-substrates",
+      "tightVncFramebuffer": "protocol-proven-but-no-usable-framebuffer",
+      "labviewVisualBenchmark": "unsupported-display-precondition",
+      "platformSupport": "interactive-gui-unsupported"
+    }
+  },
+  "officialSources": [
+    {
+      "url": "https://learn.microsoft.com/en-us/virtualization/windowscontainers/quick-start/lift-shift-to-containers",
+      "publisher": "Microsoft",
+      "claims": [
+        "interactive-gui-unsupported",
+        "desktop-applications-unsupported",
+        "rdp-interactive-session-unsupported"
+      ]
+    },
+    {
+      "url": "https://learn.microsoft.com/en-us/virtualization/windowscontainers/deploy-containers/hardware-devices-in-containers",
+      "publisher": "Microsoft",
+      "claims": [
+        "device-list-limited",
+        "unsupported-guids-undefined",
+        "hyperv-device-sharing-unsupported"
+      ]
+    },
+    {
+      "url": "https://learn.microsoft.com/en-us/virtualization/windowscontainers/deploy-containers/gpu-acceleration",
+      "publisher": "Microsoft",
+      "claims": [
+        "directx-only",
+        "hyperv-gpu-unsupported",
+        "gpu-does-not-assert-interactive-display"
+      ]
+    },
+    {
+      "url": "https://learn.microsoft.com/en-us/windows-hardware/drivers/display/indirect-display-driver-model-overview",
+      "publisher": "Microsoft",
+      "claims": [
+        "idd-is-host-session-zero-driver",
+        "no-container-display-sharing-claim"
+      ]
+    },
+    {
+      "url": "https://github.com/microsoft/Windows-driver-samples/tree/main/video/IndirectDisplay",
+      "publisher": "Microsoft",
+      "claims": [
+        "sample-is-simplistic",
+        "production-critical-todos",
+        "inf-requires-customization"
+      ]
+    }
+  ],
+  "stopCondition": "Do not retry Windows-container GUI/display variants without new authoritative vendor support for an interactive container display path.",
+  "reusableSuccesses": [
+    "loopback-only host TCP relay",
+    "authenticated RFB 3.8 client and TightVNC transport",
+    "MPRR framebuffer, fingerprint, settle, resource, evidence, and cleanup components"
+  ],
+  "supportedPivot": {
+    "substrate": "full-windows-vm-with-interactive-session",
+    "capturePaths": [
+      "virtualbox-vrde-vnc",
+      "vmware-remote-display-vnc",
+      "guest-tightvnc-over-loopback-only-host-transport"
+    ]
+  }
+}

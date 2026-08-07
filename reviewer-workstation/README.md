@@ -23,15 +23,82 @@ Reviewers **without** a box build one per the golden-box docs (bring your own **
 LabVIEW, required for the end-to-end LabVIEW case TC-09) and register it under the name above,
 or point the override env var at their own box.
 
+The local VirtualBox package is Vagrant-ready but not preactivated. NI
+activation from the source VM did not transfer when Vagrant assigned a new
+hardware UUID. Every imported VM therefore requires its own NI-supported
+activation before TC-09 or an activated-IDE benchmark. The verified local
+registration currently lives under `VAGRANT_HOME=D:\vagrant-home`; see
+[the consumer proof](../experiments/windows-docker-container/evidence/vagrant-box-20260807T161810446Z-003c1538/vagrant-box-proof.json).
+
 ## Bring the box up
 
 ```sh
 # VirtualBox (Linux host)
 VAGRANT_CWD=reviewer-workstation vagrant up --provider virtualbox
 
+# VirtualBox (Windows host, verified local box store)
+$env:VAGRANT_HOME = 'D:\vagrant-home'
+$env:VAGRANT_CWD = (Resolve-Path .\reviewer-workstation).Path
+vagrant up --provider virtualbox
+
 # VMware (Windows host)
 VAGRANT_CWD=reviewer-workstation vagrant up --provider vmware_desktop
 ```
+
+For a box-only smoke test with no private release downloads or provisioning,
+append `--no-provision`. Complete NI activation inside that disposable VM
+before attempting LabVIEW capture.
+
+### Reuse the retained activated local reviewer
+
+This worktree has one verified local cache whose activation remains tied to its
+exact VirtualBox UUID. It is powered off when idle:
+
+```powershell
+powershell.exe -NoLogo -NoProfile -ExecutionPolicy Bypass `
+  -File .\experiments\windows-docker-container\reviewer-cache.ps1 `
+  -Action Status
+
+powershell.exe -NoLogo -NoProfile -ExecutionPolicy Bypass `
+  -File .\experiments\windows-docker-container\reviewer-cache.ps1 `
+  -Action Resume
+```
+
+The retained VM is `actor-reviewer-local`, UUID
+`f296a95b-7470-496a-bab7-791c973efd37`, with local VSIX `1.3.0` installed in
+the interactive profile. Its state is isolated under
+`D:\lba-vagrant-instances\actor-reviewer-local`, while its VirtualBox VM files
+live under `D:\VirtualBox VMs\actor-reviewer-local`.
+
+Do not run `vagrant destroy` against this cache: reimporting the box creates a
+new hardware UUID and NI activation must then be completed again. After every
+resume or snapshot restore, re-probe activation before relying on the cached
+state.
+
+The first offline review found two issues: missing FFmpeg restart/duplicate
+install guidance and a stale global MCP reset-command name. Both were
+remediated. The superseding offline reviewer verdict is **PASS**:
+
+- TC-00/01/02/03/06/08/09/10 passed;
+- TC-04/05/07/11 were not run because network/auth dependencies were excluded.
+
+AGENTS.md `0.3.1` now documents the capture/restart flow, same-session capture
+attempts cannot trigger duplicate FFmpeg installs, and TC-10 uses
+**MCP: List Servers** → **LabVIEW Benchmark Actor: MCP tools** → **Restart
+Server**, followed by a full VS Code restart.
+
+Superseding evidence is under
+`experiments/windows-docker-container/evidence/reviewer-cache-resume-20260807T202743398Z-cb1a928f/`.
+The historical FAIL remains under
+`experiments/windows-docker-container/evidence/reviewer-cache-resume-20260807T193416615Z-eac6c074/`.
+
+Post-review feedback is staged in the current cache as AGENTS.md `0.3.2` /
+VSIX SHA-256
+`48074c046a03b69d1c83d5608ecc40560074059d69fab3668cb92adeb6e3fb03`.
+The FFmpeg restart guard now permits explicit setup retry after a failed or
+cancelled install without allowing accidental duplicate installation. Evidence
+and the current snapshot are under
+`experiments/windows-docker-container/evidence/reviewer-cache-resume-20260807T213425759Z-13591007/`.
 
 Then, inside the guest, open the scratch workspace in VS Code (the extension is already installed):
 
@@ -124,6 +191,7 @@ them without any menu hunting.
 | `VIHS_REVIEWER_REPO` | `LabVIEW-Community-CI-CD/labview-benchmark-actor` | Release source for the `.vsix` + `lbabus`. |
 | `VIHS_REVIEWER_EXT_TAG` | `latest` | `ext-v*` tag to install (`latest` = newest gated release). |
 | `VIHS_REVIEWER_LBABUS_TAG` | `latest` | `collab-cli-v*` tag to install (`latest` = newest release). |
+| `VAGRANT_HOME` | Vagrant default | Box store. The verified local VirtualBox registration is in `D:\vagrant-home`. |
 
 ## What provisioning does
 
