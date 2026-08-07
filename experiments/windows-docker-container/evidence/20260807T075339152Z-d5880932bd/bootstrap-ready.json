@@ -1,0 +1,112 @@
+{
+    "status":  "ready",
+    "wallTime":  "2026-08-07T07:55:56.8161307Z",
+    "containerOs":  {
+                        "Caption":  "Microsoft Windows Server 2022 Datacenter",
+                        "Version":  "10.0.20348",
+                        "BuildNumber":  "20348",
+                        "OSArchitecture":  "64-bit"
+                    },
+    "bootstrap":  {
+                      "processId":  26456,
+                      "sessionId":  2,
+                      "targetDesktop":  "WinSta0\\Default",
+                      "threadDesktopSet":  false,
+                      "threadDesktopError":  170
+                  },
+    "vnc":  {
+                "processId":  28776,
+                "sessionId":  2,
+                "processAlive":  true,
+                "port5900Listening":  true,
+                "mode":  "application",
+                "version":  "2.8.81.0",
+                "authentication":  "VNC authentication with ephemeral eight-character secret",
+                "registryHive":  "HKCU",
+                "serviceOnlyMarkerRemoved":  false
+            },
+    "desktopProbe":  {
+                         "processId":  28268,
+                         "sessionId":  2,
+                         "visible":  true,
+                         "exited":  false,
+                         "exitCode":  null,
+                         "window":  {
+                                        "handle":  196700,
+                                        "processId":  28268,
+                                        "title":  "LBA-VNC-DESKTOP-PROBE",
+                                        "className":  "WindowsForms10.Window.8.app.0.34f5582_r7_ad1",
+                                        "visible":  true,
+                                        "minimized":  false,
+                                        "desktop":  "WinSta0\\Default",
+                                        "bounds":  {
+                                                       "left":  80,
+                                                       "top":  60,
+                                                       "right":  880,
+                                                       "bottom":  660
+                                                   }
+                                    }
+                     },
+    "windows":  [
+                    {
+                        "handle":  196700,
+                        "processId":  28268,
+                        "title":  "LBA-VNC-DESKTOP-PROBE",
+                        "className":  "WindowsForms10.Window.8.app.0.34f5582_r7_ad1",
+                        "visible":  true,
+                        "minimized":  false,
+                        "desktop":  "WinSta0\\Default",
+                        "bounds":  {
+                                       "left":  80,
+                                       "top":  60,
+                                       "right":  880,
+                                       "bottom":  660
+                                   }
+                    },
+                    {
+                        "handle":  131162,
+                        "processId":  28268,
+                        "title":  "GDI+ Window (lba-vnc-desktop-probe.exe)",
+                        "className":  "GDI+ Hook Window Class",
+                        "visible":  false,
+                        "minimized":  false,
+                        "desktop":  "WinSta0\\Default",
+                        "bounds":  {
+                                       "left":  0,
+                                       "top":  0,
+                                       "right":  1,
+                                       "bottom":  1
+                                   }
+                    },
+                    {
+                        "handle":  131160,
+                        "processId":  28268,
+                        "title":  ".NET-BroadcastEventWindow.4.0.0.0.34f5582.0",
+                        "className":  ".NET-BroadcastEventWindow.4.0.0.0.34f5582.0",
+                        "visible":  false,
+                        "minimized":  false,
+                        "desktop":  "WinSta0\\Default",
+                        "bounds":  {
+                                       "left":  0,
+                                       "top":  0,
+                                       "right":  0,
+                                       "bottom":  0
+                                   }
+                    },
+                    {
+                        "handle":  131168,
+                        "processId":  10468,
+                        "title":  "NotifyIconWindowTitle",
+                        "className":  "NotifyIconWindowClass",
+                        "visible":  false,
+                        "minimized":  false,
+                        "desktop":  "WinSta0\\Default",
+                        "bounds":  {
+                                       "left":  66,
+                                       "top":  66,
+                                       "right":  834,
+                                       "bottom":  624
+                                   }
+                    }
+                ]
+}

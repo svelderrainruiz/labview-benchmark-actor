@@ -52,7 +52,7 @@
   "lifecycleCache": {
     "path": "experiments/windows-docker-container/decisions/windows-vm-lifecycle-cache.json",
     "size": 18291,
-    "sha256": "050fefa47f4970ae97863ae74de0e7f0530b1853d2f7aa8d8a8bfdcc2025dc80",
+    "sha256": "61edf8ade85ac15a01abef4e5b68d511c8b18db1291694c5675f8dde92fc621d",
     "nextPhase": "ACTIVATION-RESUME-START"
   },
   "completedLifecycle": {

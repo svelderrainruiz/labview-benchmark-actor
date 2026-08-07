@@ -28,7 +28,8 @@ activation from the source VM did not transfer when Vagrant assigned a new
 hardware UUID. Every imported VM therefore requires its own NI-supported
 activation before TC-09 or an activated-IDE benchmark. The verified local
 registration currently lives under `VAGRANT_HOME=D:\vagrant-home`; see
-[the consumer proof](../experiments/windows-docker-container/evidence/vagrant-box-20260807T161810446Z-003c1538/vagrant-box-proof.json).
+[the committed VM substrate decision](../experiments/windows-docker-container/decisions/windows-vm-substrate-decision.json).
+The large machine-local consumer evidence remains ignored by design.
 
 ## Bring the box up
 

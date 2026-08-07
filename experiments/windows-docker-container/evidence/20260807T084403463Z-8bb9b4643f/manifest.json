@@ -1,0 +1,115 @@
+{
+  "schema": "labview-benchmark-actor/windows-docker-evidence-manifest@1",
+  "runId": "20260807T084403463Z-8bb9b4643f",
+  "outcome": "inconclusive",
+  "generatedWallTime": "2026-08-07T08:48:21.999Z",
+  "desktop": {
+    "target": "Inherited",
+    "context": {
+      "mode": "Inherited",
+      "windowStation": "Service-0x0-548d070$",
+      "desktop": "Default",
+      "qualifiedDesktop": "Service-0x0-548d070$\\Default",
+      "explicitStartupDesktop": null,
+      "processWindowStationChanged": false,
+      "threadDesktopSet": false,
+      "threadDesktopError": 0
+    },
+    "monitorRectangles": [],
+    "localGdi": null,
+    "desktopProbe": null
+  },
+  "tightVncDriver": null,
+  "network": null,
+  "relay": null,
+  "files": [
+    {
+      "path": "bootstrap-failure.json",
+      "size": 6178,
+      "sha256": "5ec62668227e0c7cd123646d32d88fab8c53e4b095f5da2fc6dd3805e77916ed",
+      "modifiedWallTime": "2026-08-07T08:46:17.978Z",
+      "frameIndex": null,
+      "role": null
+    },
+    {
+      "path": "bootstrap-stopped.json",
+      "size": 213,
+      "sha256": "a98aee56ecf979e956f195343b84faa93cba4df88a9896a95980445cd64e1776",
+      "modifiedWallTime": "2026-08-07T08:46:17.996Z",
+      "frameIndex": null,
+      "role": null
+    },
+    {
+      "path": "capture-summary.json",
+      "size": 1876,
+      "sha256": "f0b1bb9b5b964a31e33411680b222e1842fe9c54025faab731cf9aab36d65a8c",
+      "modifiedWallTime": "2026-08-07T08:48:20.922Z",
+      "frameIndex": null,
+      "role": null
+    },
+    {
+      "path": "cleanup-verification.json",
+      "size": 497,
+      "sha256": "28a8661da1b7c81d7c5fc19f6daae2d3de2e99c0490bb45d7068ef232920272d",
+      "modifiedWallTime": "2026-08-07T08:48:21.933Z",
+      "frameIndex": null,
+      "role": null
+    },
+    {
+      "path": "container-inspect.json",
+      "size": 10985,
+      "sha256": "afef4fe39f9c548cf0626004095ffed076c0b5ab44db766c9132cf13af5b5f25",
+      "modifiedWallTime": "2026-08-07T08:48:21.349Z",
+      "frameIndex": null,
+      "role": null
+    },
+    {
+      "path": "container.log",
+      "size": 973,
+      "sha256": "328751e35161ac7a05caf5331600d4f5578bba8669be7d80ed8ecf3709ad9881",
+      "modifiedWallTime": "2026-08-07T08:48:21.495Z",
+      "frameIndex": null,
+      "role": null
+    },
+    {
+      "path": "display-diagnostics.json",
+      "size": 4334,
+      "sha256": "277c23712f9b9f87fa23fe4bf2afa22cbfa786fa4e0d14675c8c8a1780ee3dc1",
+      "modifiedWallTime": "2026-08-07T08:46:17.931Z",
+      "frameIndex": null,
+      "role": null
+    },
+    {
+      "path": "docker-info.json",
+      "size": 5415,
+      "sha256": "fa69e679c28c2751566357d46d3af5816716ede60e6b332890e3c33733fe49f0",
+      "modifiedWallTime": "2026-08-07T08:44:03.877Z",
+      "frameIndex": null,
+      "role": null
+    },
+    {
+      "path": "failure-receipt.json",
+      "size": 1876,
+      "sha256": "f0b1bb9b5b964a31e33411680b222e1842fe9c54025faab731cf9aab36d65a8c",
+      "modifiedWallTime": "2026-08-07T08:48:20.922Z",
+      "frameIndex": null,
+      "role": null
+    },
+    {
+      "path": "host-orchestration.log",
+      "size": 1780,
+      "sha256": "6a04e01a3d173833234043ccbfc321db90c91f425eae3b42d78e173b994246cd",
+      "modifiedWallTime": "2026-08-07T08:48:21.940Z",
+      "frameIndex": null,
+      "role": null
+    },
+    {
+      "path": "image-inspect.json",
+      "size": 4698,
+      "sha256": "17cebe606d1f0a79f94f57c54077ed2e7bb0218b5d305df996585a1135cdab45",
+      "modifiedWallTime": "2026-08-07T08:44:04.068Z",
+      "frameIndex": null,
+      "role": null
+    }
+  ]
+}

@@ -3,14 +3,14 @@
   "lifecycleId": "windows-vm-provisioning-20260807",
   "vmName": "lba-win11-labview2026-build",
   "createdWallTime": null,
-  "updatedWallTime": "2026-08-07T13:22:35.572Z",
+  "updatedWallTime": "2026-08-07T22:37:51.995Z",
   "state": "sealed",
   "clockSegments": [
     {
       "id": "clock-0",
-      "t0WallTime": "2026-08-07T13:22:35.572Z",
-      "t0MonotonicNs": "27992333623500",
-      "hostBootEpochMsApprox": 1786080963000,
+      "t0WallTime": "2026-08-07T22:37:51.995Z",
+      "t0MonotonicNs": "61308004895400",
+      "hostBootEpochMsApprox": 1786080964000,
       "clock": "host-monotonic-100ns"
     }
   ],
@@ -60,8 +60,8 @@
       "evidence": [
         {
           "path": "experiments/windows-docker-container/decisions/windows-vm-provisioning-receipt.json",
-          "size": 3213,
-          "sha256": "bf4a45b5d4f46fe97804a0a1f7dd728ec02f14cd7e5537e9f258c0be0bf868e1"
+          "size": 3129,
+          "sha256": "57ba8b1b6162cafef391a29804770d846db27f03d6b4cf41015c1fd2443160dc"
         }
       ]
     },
@@ -77,8 +77,8 @@
       "evidence": [
         {
           "path": "experiments/windows-docker-container/decisions/windows-vm-provisioning-receipt.json",
-          "size": 3213,
-          "sha256": "bf4a45b5d4f46fe97804a0a1f7dd728ec02f14cd7e5537e9f258c0be0bf868e1"
+          "size": 3129,
+          "sha256": "57ba8b1b6162cafef391a29804770d846db27f03d6b4cf41015c1fd2443160dc"
         }
       ]
     },
@@ -94,8 +94,8 @@
       "evidence": [
         {
           "path": "experiments/windows-docker-container/decisions/windows-vm-provisioning-receipt.json",
-          "size": 3213,
-          "sha256": "bf4a45b5d4f46fe97804a0a1f7dd728ec02f14cd7e5537e9f258c0be0bf868e1"
+          "size": 3129,
+          "sha256": "57ba8b1b6162cafef391a29804770d846db27f03d6b4cf41015c1fd2443160dc"
         }
       ]
     },
@@ -111,8 +111,8 @@
       "evidence": [
         {
           "path": "experiments/windows-docker-container/decisions/windows-vm-provisioning-receipt.json",
-          "size": 3213,
-          "sha256": "bf4a45b5d4f46fe97804a0a1f7dd728ec02f14cd7e5537e9f258c0be0bf868e1"
+          "size": 3129,
+          "sha256": "57ba8b1b6162cafef391a29804770d846db27f03d6b4cf41015c1fd2443160dc"
         }
       ]
     },
@@ -128,8 +128,8 @@
       "evidence": [
         {
           "path": "experiments/windows-docker-container/decisions/windows-vm-provisioning-receipt.json",
-          "size": 3213,
-          "sha256": "bf4a45b5d4f46fe97804a0a1f7dd728ec02f14cd7e5537e9f258c0be0bf868e1"
+          "size": 3129,
+          "sha256": "57ba8b1b6162cafef391a29804770d846db27f03d6b4cf41015c1fd2443160dc"
         }
       ]
     },
@@ -145,8 +145,8 @@
       "evidence": [
         {
           "path": "experiments/windows-docker-container/decisions/windows-vm-provisioning-receipt.json",
-          "size": 3213,
-          "sha256": "bf4a45b5d4f46fe97804a0a1f7dd728ec02f14cd7e5537e9f258c0be0bf868e1"
+          "size": 3129,
+          "sha256": "57ba8b1b6162cafef391a29804770d846db27f03d6b4cf41015c1fd2443160dc"
         }
       ]
     },
@@ -227,16 +227,16 @@
       "phase": "CACHE-SEALED",
       "status": "completed",
       "authority": "live-dual-clock",
-      "wallTime": "2026-08-07T13:22:35.572Z",
+      "wallTime": "2026-08-07T22:37:51.995Z",
       "clockSegmentId": "clock-0",
-      "monotonicNs": "27992333623500",
+      "monotonicNs": "61308004895400",
       "timingTicks64": "0",
       "detail": "Verified VM cache sealed for future activation/capture/package resume.",
       "evidence": [
         {
           "path": "experiments/windows-docker-container/decisions/windows-vm-provisioning-receipt.json",
-          "size": 3213,
-          "sha256": "bf4a45b5d4f46fe97804a0a1f7dd728ec02f14cd7e5537e9f258c0be0bf868e1"
+          "size": 3129,
+          "sha256": "57ba8b1b6162cafef391a29804770d846db27f03d6b4cf41015c1fd2443160dc"
         },
         {
           "path": "experiments/windows-docker-container/decisions/windows-vm-substrate-preflight.json",
@@ -290,8 +290,8 @@
         },
         {
           "path": "D:\\VirtualBox VMs\\lba-win11-labview2026-build\\lba-win11-labview2026-build.vbox",
-          "size": 22593,
-          "sha256": "775c65bee1d873dcf2ee9319fab3e8079e11479bb5505df719cdc7856e3c5e51"
+          "size": 27452,
+          "sha256": "869a2bf26076269875331c3e9012bb901e2822bdbd9e94d14a58fa6b5ac62e82"
         },
         {
           "path": "D:\\lba-vm-assets\\Win11_25H2_English_x64_v2.iso",
@@ -329,8 +329,8 @@
     "artifacts": [
       {
         "path": "experiments/windows-docker-container/decisions/windows-vm-provisioning-receipt.json",
-        "size": 3213,
-        "sha256": "bf4a45b5d4f46fe97804a0a1f7dd728ec02f14cd7e5537e9f258c0be0bf868e1"
+        "size": 3129,
+        "sha256": "57ba8b1b6162cafef391a29804770d846db27f03d6b4cf41015c1fd2443160dc"
       },
       {
         "path": "experiments/windows-docker-container/decisions/windows-vm-substrate-preflight.json",
@@ -384,8 +384,8 @@
       },
       {
         "path": "D:\\VirtualBox VMs\\lba-win11-labview2026-build\\lba-win11-labview2026-build.vbox",
-        "size": 22593,
-        "sha256": "775c65bee1d873dcf2ee9319fab3e8079e11479bb5505df719cdc7856e3c5e51"
+        "size": 27452,
+        "sha256": "869a2bf26076269875331c3e9012bb901e2822bdbd9e94d14a58fa6b5ac62e82"
       },
       {
         "path": "D:\\lba-vm-assets\\Win11_25H2_English_x64_v2.iso",

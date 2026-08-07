@@ -1,0 +1,12 @@
+{
+    "wallTime":  "2026-08-07T07:58:12.2062455Z",
+    "containerId":  "b5e78ac9cc31423de78ba45e22ebb0eddbe0608a4a11be868a7773c2a91f690e",
+    "containerAbsent":  true,
+    "dockerPublishedPortsAbsent":  true,
+    "relayInCaptureProcess":  true,
+    "relayPort":  54778,
+    "relayListenerClosed":  true,
+    "relayCleanupProven":  true,
+    "vncPortClosed":  true,
+    "secretDirectoryRemoved":  true
+}
