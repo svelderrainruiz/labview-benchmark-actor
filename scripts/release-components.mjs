@@ -153,7 +153,10 @@ export function verifyStagedReleaseMetadata({ staged, unstaged, previous, curren
   const reasons = [];
   const changed = (prefixes) => staged.some((file) => prefixes.some((prefix) => file === prefix || file.startsWith(`${prefix}/`)));
   const agentsChanged = changed(['extension-agents', 'release-risk-baseline.json', 'standards-score-baseline.json']);
-  const lbabusChanged = changed(['tools/collab-cli']);
+  const lbabusChanged = staged.some((file) => (
+    (file === 'tools/collab-cli' || file.startsWith('tools/collab-cli/'))
+    && file !== 'tools/collab-cli/release-agreement.json'
+  ));
   const tasksChanged = changed(['extension-tasks', 'src/humanTasks.ts']);
   const experimentsChanged = changed([
     'experiments/experiment-governance.mjs',

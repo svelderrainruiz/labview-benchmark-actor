@@ -141,6 +141,9 @@ key material). Then:
    `tools/collab-cli/release-agreement.json`, refuses to clobber an existing version, and
    fails closed unless `tools/collab-cli/verify-release-agreement.mjs` +
    `tools/collab-cli/verify-visual-review.mjs` both pass for that version.
+   These two generated sealing receipts are release evidence, not product-component source;
+   the precommit version classifier therefore permits their post-signing update without
+   forcing a new extension or `lbabus` identity.
 3. **Preflight.** `npm run lba -- release-preflight X.Y.Z` must be all green: it asserts
    the local node equals `.nvmrc`, `package.json` + `CHANGELOG.md` are at `X.Y.Z`, the
    composite receipt `candidate.version == X.Y.Z`, and the three live publish gates clear

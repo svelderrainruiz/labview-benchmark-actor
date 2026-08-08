@@ -99,5 +99,20 @@ assert.equal(verifyStagedReleaseMetadata({
   previous: { extension: '1.4.7', agents: '0.3.11', lbabus: '0.15.6', humanTasks: '1.0.6', experimentGovernance: '1.0.1' },
   current: base.components,
 }).ok, false);
+assert.equal(verifyStagedReleaseMetadata({
+  staged: [
+    'reviewer-workstation/composite-release-decision-receipt.json',
+    'tools/collab-cli/release-agreement.json',
+  ],
+  unstaged: [],
+  previous: base.components,
+  current: base.components,
+}).ok, true);
+assert.equal(verifyStagedReleaseMetadata({
+  staged: ['tools/collab-cli/Program.cs'],
+  unstaged: [],
+  previous: base.components,
+  current: base.components,
+}).ok, false);
 
 console.log('release-components: PASS');
