@@ -3,6 +3,10 @@ Set-StrictMode -Version Latest
 
 Import-Module (Join-Path $PSScriptRoot 'orchestration-core.psm1') -Force
 Add-Type -Path (Join-Path $PSScriptRoot 'display-surface.cs') -ReferencedAssemblies @('System', 'System.Core', 'System.Drawing')
+$windowInfo = [LbaWindowInfo]::new()
+if (-not $windowInfo.PSObject.Properties['extendedFrameBoundsAvailable']) {
+  throw 'Window diagnostics do not expose DWM extended-frame bounds.'
+}
 
 function Assert-Throws([scriptblock]$Body, [string]$Pattern) {
   try {

@@ -29,6 +29,13 @@ follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project
   VSIX under the cache root instead of retaining a mutable worktree path. The historical cache has an
   explicit recovery path that verifies and binds an installed-extension archive and per-file manifest
   to the powered-off source snapshot when the original timestamped VSIX was not retained.
+- **Activated LabVIEW capture accepts its real content window layout.** When LabVIEW exposes a
+  zero-sized titled frame plus a usable untitled child window, the launcher binds the largest usable
+  process-owned window to the same-process `LabVIEW` title evidence instead of failing the fresh
+  activation probe. DWM extended-frame bounds replace zero/client-only `GetWindowRect` values when
+  available. When LabVIEW's titled `LVFrame` still reports `0x0`, a recorded narrow expansion around
+  the same-process client bounds includes its visible title, menu, and frame without promoting the ROI
+  to a full-desktop claim. Missing capture summaries now surface the original capture failure directly.
 
 ## [1.3.0] - 2026-08-06
 

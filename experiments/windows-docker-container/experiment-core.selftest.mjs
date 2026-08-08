@@ -132,6 +132,24 @@ assert.equal(proveLabviewVisibility({
   initialFingerprint: '0000000000000000',
   candidateFingerprint: 'ffffffffffffffff',
   labviewPid: 42,
+  window: {
+    processId: 42,
+    title: '',
+    titleEvidence: 'LabVIEW',
+    visible: true,
+    minimized: false,
+    desktop: 'WinSta0\\Default',
+    bounds: { left: 0, top: 0, right: W, bottom: H },
+  },
+}).passed, true);
+assert.equal(proveLabviewVisibility({
+  initialRgba: gray,
+  candidateRgba: varied,
+  width: W,
+  height: H,
+  initialFingerprint: '0000000000000000',
+  candidateFingerprint: 'ffffffffffffffff',
+  labviewPid: 42,
   window: { ...visibility.window, processId: 9 },
 }).passed, false);
 
