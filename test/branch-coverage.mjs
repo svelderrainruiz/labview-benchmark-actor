@@ -261,7 +261,7 @@ assert.equal(validateReviewerVerdict({
 const key = generateEnrolledKeypair();
 const otherKey = generateEnrolledKeypair();
 const passVerdict = buildReviewerVerdict({
-  target: { component: 'extension', version: '1.4.3', commit: 'abc', vsixSha256: 'def' },
+  target: { component: 'extension', version: '1.4.3', commit: 'a'.repeat(40), vsixSha256: 'b'.repeat(64) },
   verdict: 'pass',
   reviewer: 'r',
   station: 'LINUX_CODESPACE',
@@ -315,6 +315,15 @@ assert.equal(gateVisualReview({ verdict: failVerdict, signOffs: [reject], review
 assert.equal(gateVisualReview({ verdict: passVerdict, signOffs: [null, reject], reviewerAllowlist: allowlist, minReviewers: 2 }).publish, false);
 assert.equal(gateVisualReview({ verdict: passVerdict, signOffs: [signOff, signOff], reviewerAllowlist: allowlist, minReviewers: 1 }).publish, true);
 assert.equal(gateVisualReview({}).publish, false);
+assert.equal(validateReviewerVerdict({
+  ...passVerdict,
+  target: { ...passVerdict.target, commit: 'x', vsixSha256: 'y' },
+}).ok, false);
+assert.equal(gateVisualReview({
+  verdict: { ...passVerdict, target: { ...passVerdict.target, vsixSha256: null } },
+  signOffs: [signOff],
+  reviewerAllowlist: allowlist,
+}).publish, false);
 assert.deepEqual(buildVerdictBusPost(null), {
   type: 'BLOCKED',
   task: 'extension-release-0.0.0',

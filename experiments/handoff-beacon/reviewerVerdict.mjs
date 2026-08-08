@@ -109,7 +109,8 @@ export function validateReviewerVerdict(v) {
   if (!r.target || typeof r.target !== 'object') errors.push('verdict needs a target object');
   else {
     if (!r.target.version) errors.push('target needs a version');
-    if (!r.target.commit) errors.push('target needs a commit');
+    if (!/^[0-9a-f]{40}$/i.test(String(r.target.commit || ''))) errors.push('target commit must be a 40-hex Git SHA');
+    if (!/^[0-9a-f]{64}$/i.test(String(r.target.vsixSha256 || ''))) errors.push('target vsixSha256 must be a 64-hex SHA-256');
   }
   if (!r.reviewer) errors.push('verdict needs a reviewer');
   if (!REVIEWER_STATIONS.includes(r.station)) errors.push(`station must be one of ${REVIEWER_STATIONS.join('|')}`);
@@ -182,6 +183,8 @@ export function verifyReviewerVerdict(verdict, signOff, { reviewerAllowlist = {}
  */
 export function gateVisualReview({ verdict, signOffs = [], reviewerAllowlist = {}, minReviewers = 1 } = {}) {
   const reasons = [];
+  const verdictValidation = validateReviewerVerdict(verdict);
+  if (!verdictValidation.ok) reasons.push(...verdictValidation.errors.map((error) => `invalid verdict: ${error}`));
   const verdictPass = verdict?.verdict === 'pass';
   if (!verdictPass) reasons.push(`reviewer verdict is ${verdict?.verdict ?? 'missing'}, not pass`);
   const approvals = [];
@@ -195,7 +198,8 @@ export function gateVisualReview({ verdict, signOffs = [], reviewerAllowlist = {
   if (distinct.length < minReviewers) reasons.push(`need >= ${minReviewers} distinct enrolled approving reviewer(s); have ${distinct.length}`);
   return {
     schema: 'labview-benchmark-actor/acg-visual-review-decision-v1',
-    publish: verdictPass && distinct.length >= minReviewers,
+    publish: verdictValidation.ok && verdictPass && distinct.length >= minReviewers,
+    verdictValid: verdictValidation.ok,
     verdictPass,
     approvals: distinct,
     minReviewers,

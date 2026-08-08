@@ -6,6 +6,17 @@ follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project
 
 ## [Unreleased]
 
+## [1.4.7] - 2026-08-08
+
+### Fixed
+
+- **Windows compound tasks execute command shims correctly.** `.cmd` invocations route through `cmd.exe` without
+  shell interpolation, with a real Windows shim regression test.
+- **Signing readiness binds the configured key itself.** Host and reviewer-VM discovery derive only the public key
+  from the configured private key, then require a match to the requested version's quorum-purpose enrollment.
+- **Visual verdicts are strictly candidate-bound.** Both verdict validation and the standalone visual gate require
+  a 40-hex Git commit and a 64-hex VSIX SHA-256.
+
 ## [1.4.6] - 2026-08-08
 
 ### Fixed
@@ -16,6 +27,8 @@ follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project
 - **Reviewer task and signing readiness are platform/purpose aware.** Windows compound tasks launch `npm.cmd`,
   and signing status selects only keys valid for the requested version and `quorum` purpose before printing a
   quorum command.
+- **Visual acceptance requires a complete candidate identity.** Reviewer verdict validation and the standalone
+  visual gate reject anything without a 40-hex Git commit and 64-hex VSIX SHA-256.
 - **Clean-checkout governance matches local governance.** The generated agent-last-gate receipt directory now has
   a tracked contract, first-introduction component fallback includes experiment-governance versioning, null frame
   titles remain empty, and MCP environment documentation reflects the always-present resolved lbabus path.

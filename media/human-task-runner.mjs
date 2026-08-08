@@ -5,10 +5,11 @@ import os from 'node:os';
 import path from 'node:path';
 import readline from 'node:readline';
 import { assessReleaseRisk, riskSummaryLines, verifyGovernedRisk } from './release-risk.mjs';
+import { spawnInvocation } from './process-command.mjs';
 
 const mode = process.argv[2];
 const workspace = process.cwd();
-const HUMAN_TASKS_VERSION = '1.0.5';
+const HUMAN_TASKS_VERSION = '1.0.6';
 const startedNs = process.hrtime.bigint();
 const startedWallTime = new Date().toISOString();
 const events = [];
@@ -51,7 +52,8 @@ function event(type, message, detail = {}) {
 async function run(command, args, options = {}) {
   const step = eventIndex + 1;
   event('command-start', `${command} ${args.join(' ')}`, { step });
-  const child = spawn(command, args, {
+  const invocation = spawnInvocation(command, args);
+  const child = spawn(invocation.command, invocation.args, {
     cwd: options.cwd ?? workspace,
     stdio: ['ignore', 'pipe', 'pipe'],
     shell: false,

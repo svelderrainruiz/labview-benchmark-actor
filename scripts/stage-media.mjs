@@ -84,6 +84,10 @@ writeFileSync(
   readFileSync(join(repo, 'extension-tasks', 'release-risk.mjs'))
 );
 writeFileSync(
+  join(repo, 'media', 'process-command.mjs'),
+  readFileSync(join(repo, 'extension-tasks', 'process-command.mjs'))
+);
+writeFileSync(
   join(repo, 'media', 'labview-launch-record.json'),
   readFileSync(join(repo, 'experiments', 'mprr-capture-ring', 'fixtures', 'labview-launch-record.json'))
 );

@@ -2945,6 +2945,7 @@ progressively.
    `lbabus selfcheck` before presenting the candidate.
   - Windows human tasks invoke the npm command shim, and signing readiness accepts only a key valid for the requested
    release version and quorum purpose.
+  - Reviewer verdict validation and the visual gate require a 40-hex source commit and 64-hex VSIX SHA-256.
   - `release-cut-github` explicitly targets `main`.
   - Marketplace publication is opt-in after the canonical GitHub Release exists, verifies the release VSIX hash
    equals the staged VSIX hash, runs from the release tag, and uses `vsce publish --pre-release` on the downloaded

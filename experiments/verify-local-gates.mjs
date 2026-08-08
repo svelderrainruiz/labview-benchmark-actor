@@ -1467,10 +1467,10 @@ check('human-task-shortcuts', () => {
   assert(runner.includes('STANDARDS_ROOT') && runner.includes('governance.standardsRootDefault'), 'governance task lacks local standards-corpus discovery');
   assert(runner.includes("`${corpus}:/standards:ro`") && runner.includes("'STANDARDS_ROOT=/standards'"), 'governance task does not mount standards read-only');
   assert(runner.includes('governance.standardsReviewCommit') && runner.includes('governance.workbenchDigest'), 'governance task does not pin its source commit and image digest');
-  assert(provider.includes("HUMAN_TASKS_VERSION = '1.0.5'"), 'task provider lacks bundle version 1.0.5');
-  assert(runner.includes("HUMAN_TASKS_VERSION = '1.0.5'"), 'task runner lacks bundle version 1.0.5');
+  assert(provider.includes("HUMAN_TASKS_VERSION = '1.0.6'"), 'task provider lacks bundle version 1.0.6');
+  assert(runner.includes("HUMAN_TASKS_VERSION = '1.0.6'"), 'task runner lacks bundle version 1.0.6');
   const agents = readFileSync(join(pkgRoot, 'extension-agents', 'AGENTS.md'), 'utf8');
-  assert(agents.includes('Compound human tasks — bundle v1.0.5'), 'generated AGENTS lacks task bundle version');
+  assert(agents.includes('Compound human tasks — bundle v1.0.6'), 'generated AGENTS lacks task bundle version');
   assert(runner.includes("process.platform === 'win32' ? 'npm.cmd' : 'npm'"), 'human task runner does not use the Windows npm command shim');
   assert(provider.includes('LBA_LBABUS_PATH: resolveLbabusExecutable()'), 'human tasks do not receive the resolved lbabus executable');
   assert(runner.includes("process.env.LBA_LBABUS_PATH || ''"), 'human task runner ignores the resolved lbabus executable');

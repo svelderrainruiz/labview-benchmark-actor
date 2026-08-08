@@ -1,9 +1,9 @@
 {
   "schema": "labview-benchmark-actor/release-components@1",
-  "extension": "1.4.6",
-  "agents": "0.3.10",
-  "lbabus": "0.15.5",
-  "humanTasks": "1.0.5",
+  "extension": "1.4.7",
+  "agents": "0.3.11",
+  "lbabus": "0.15.6",
+  "humanTasks": "1.0.6",
   "experimentGovernance": "1.0.1",
   "canonicalDistribution": "github-release",
   "marketplaceChannel": "prerelease",

@@ -68,15 +68,15 @@
       "purposes": ["quorum"]
     },
     {
-      "publicKeyPem": "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEAT+qiq0AlR4NA0lBqw2W3DTBPjArm4WWd+aBAssRwNpw=\n-----END PUBLIC KEY-----\n",
-      "validFrom": "1.4.6",
-      "validThrough": "1.4.6",
+      "publicKeyPem": "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEA0iI9aFDY23BLk411dS6hogc95iRVCkae1dubyBLYPgI=\n-----END PUBLIC KEY-----\n",
+      "validFrom": "1.4.7",
+      "validThrough": "1.4.7",
       "purposes": ["visual"]
     },
     {
-      "publicKeyPem": "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEABjHGIcWLIh1WSiREK8mAutxUr03bR+/n8XLjqvaLl5Q=\n-----END PUBLIC KEY-----\n",
-      "validFrom": "1.4.6",
-      "validThrough": "1.4.6",
+      "publicKeyPem": "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEABQQaRwFP8zkOxHnfJnEWA8N3UvCT9cfKWlYBvTg/6P4=\n-----END PUBLIC KEY-----\n",
+      "validFrom": "1.4.7",
+      "validThrough": "1.4.7",
       "purposes": ["quorum"]
     }
   ]
