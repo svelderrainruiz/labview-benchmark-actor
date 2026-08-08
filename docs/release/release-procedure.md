@@ -28,8 +28,9 @@ attestation is proven included in that log.
 
 - The change set is merged to `develop` and green: `verify-local-gates` (all
   checks), `coverage`, `dod`, and `Docs Link Check / lychee` pass on `develop`.
-- The version to release is decided (SemVer) and, for the extension, will match
-  `version` in `package.json`.
+- The version to release is decided (SemVer). `release-components.json` binds the
+  extension, AGENTS, `lbabus`, and human-task versions; its extension version matches
+  `package.json` and `package-lock.json`.
 - **Build/review on the pinned node (LBA-REQ-085, issue #408).** The published
   `.vsix` is byte-reproducible only within an exact node version, so the release
   path is pinned by the repo-root `.nvmrc`. Run `nvm use` (or install that exact
@@ -50,8 +51,10 @@ attestation is proven included in that log.
 1. **Cut the release branch (GitFlow, LBA-REQ-016, ADR-0010).** Create
    `release/X.Y.Z` from `develop`. Only release/hotfix heads may target `main`
    (`pr-base-branch-guard`, LBA-REQ-030).
-2. **Set the version.** Bump `version` in `package.json` (extension) to `X.Y.Z`
-   on the release branch; commit with a single-quoted message.
+2. **Set the system version.** Bump every changed component in `release-components.json`,
+   bump the extension to `X.Y.Z`, synchronize package metadata and component sources, and
+   finalize `CHANGELOG.md`. The installed `.githooks/pre-commit` rejects governed component
+   changes unless those release documents are staged and have no unstaged edits.
 3. **Merge to `main` with a merge commit.** Merge `release/X.Y.Z` into `main`
    using `--no-ff` (never squash a release — see `docs/cm/cm-plan.md`, "Merge
    method by branch type"), preserving shared ancestry so `main` ↔ `develop`
@@ -78,17 +81,23 @@ attestation is proven included in that log.
    inclusion proof against the signed tree head.
 8. **Cut the immutable GitHub Release.** A maintainer creates the immutable
    release with the signed assets attached at creation:
-   `gh release create ext-vX.Y.Z staging/*` (or `collab-cli-vX.Y.Z`). Attaching
+   `gh release create ext-vX.Y.Z staging/* --target main` (or `collab-cli-vX.Y.Z`). Attaching
    the signed `.vsix` (+ `.sigstore` / `.pem` / `.sig`) at creation keeps the
    release immutable-safe. The retained `push: tags: ext-v*` trigger is dormant
    under branch protection; `workflow_dispatch` is the live build/stage path.
-9. **Verify before install (LBA-REQ-031).** Consumers admit a release only after
+9. **Publish the secondary Marketplace prerelease.** Only after the canonical GitHub
+   Release exists, dispatch `extension-release.yml` from `ext-vX.Y.Z` with
+   `publish_marketplace=true`.
+   The workflow downloads the release VSIX, proves its SHA-256 equals the staged VSIX,
+   and invokes `vsce publish --pre-release` on that downloaded canonical asset. Stable
+   Marketplace publication is not a governed path.
+10. **Verify before install (LBA-REQ-031).** Consumers admit a release only after
    `experiments/acg-transparency/verify-release-inclusion.mjs` proves at least the
    quorum minimum of enrolled-witness attestations are each included in the signed
    log; a missing or tampered proof blocks the install. This is wired fail-closed
    into `reviewer-workstation/provision.ps1` before the `.vsix` install
    (`acg-transparency-verify-before-install-wired`).
-10. **Merge back and close out.** Merge `release/X.Y.Z` into `develop` (`--no-ff`)
+11. **Merge back and close out.** Merge `release/X.Y.Z` into `develop` (`--no-ff`)
     so the version bump and any release fixes return to integration; delete the
     release branch after both merges complete. Record the release (source commit,
     tag, corroboration result) as status-accounting closeout in

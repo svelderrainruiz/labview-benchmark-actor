@@ -53,6 +53,7 @@ const inputQueue = [];
 const errorResponseQueue = [];
 const openedExternal = [];
 const configStore = {};
+const taskProviders = [];
 let agentsContentProvider = null;
 const mockVscode = {
   window: {
@@ -130,6 +131,23 @@ const mockVscode = {
     },
     executeCommand: async (id) => { executedCommands.push(id); return undefined; },
   },
+  tasks: {
+    registerTaskProvider: (type, provider) => {
+      taskProviders.push({ type, provider });
+      return { dispose() {} };
+    },
+  },
+  TaskScope: { Workspace: 1 },
+  TaskRevealKind: { Always: 1 },
+  TaskPanelKind: { Dedicated: 2 },
+  ProcessExecution: class {
+    constructor(process, args, options) { this.process = process; this.args = args; this.options = options; }
+  },
+  Task: class {
+    constructor(definition, scope, name, source, execution) {
+      Object.assign(this, { definition, scope, name, source, execution });
+    }
+  },
   env: {
     openExternal: (uri) => { openedExternal.push(uri && uri.toString ? uri.toString() : String(uri)); return Promise.resolve(true); },
   },
@@ -180,15 +198,26 @@ const mockVscode = {
 // captureLaunchMprr spawns a real `node` run of the mprr runner; this mock lets the test drive its
 // success / non-zero-exit / spawn-error branches deterministically (the test sets `spawnMode`).
 let spawnMode = { code: 0 };
+let execFileHandler = () => {
+  throw Object.assign(new Error('spawn lbabus ENOENT'), { code: 'ENOENT' });
+};
+let spawnSyncHandler = (...args) => realChildProcess.spawnSync(...args);
 // spawnSync stays REAL (captured before the Module._load patch below): resolveFfmpegChecked/ffmpegRunnable probe
 // `<ffmpeg> -version` to detect ENOENT, and the ffmpeg pre-flight test wants that genuine spawn behaviour.
 const realChildProcess = require('node:child_process');
+const execFileMock = (_file, _args, optionsOrCallback, maybeCallback) => {
+  const callback = typeof optionsOrCallback === 'function' ? optionsOrCallback : maybeCallback;
+  try {
+    const result = execFileHandler(_file, _args);
+    callback(null, result.stdout ?? '', result.stderr ?? '');
+  } catch (error) {
+    callback(error);
+  }
+};
+execFileMock[Symbol.for('nodejs.util.promisify.custom')] = async (file, args) => execFileHandler(file, args);
 const childProcessMock = {
-  spawnSync: (...args) => realChildProcess.spawnSync(...args),
-  execFile: (_file, _args, optionsOrCallback, maybeCallback) => {
-    const callback = typeof optionsOrCallback === 'function' ? optionsOrCallback : maybeCallback;
-    callback(Object.assign(new Error('spawn lbabus ENOENT'), { code: 'ENOENT' }));
-  },
+  spawnSync: (...args) => spawnSyncHandler(...args),
+  execFile: execFileMock,
   spawn: (_file, _args, opts) => {
     const mkStream = () => ({ on(event, cb) { if (event === 'data') { cb(Buffer.from('[mprr] run\n')); } return this; } });
     const handlers = {};
@@ -197,7 +226,9 @@ const childProcessMock = {
       if (spawnMode.error) { if (handlers.error) { handlers.error(new Error('spawn node ENOENT')); } return; }
       const outTrend = opts && opts.env && opts.env.LBA_OUT;
       if (spawnMode.code === 0 && outTrend) {
-        writeFileSync(outTrend, JSON.stringify({ schema: 'labview-benchmark-actor/workload-trend@1', plane: 'LINUX', n: 3, verdict: 'PASS', latest: 1919, stats: { mean: 1866.3 } }));
+        writeFileSync(outTrend, spawnMode.invalidTrend
+          ? '{bad'
+          : JSON.stringify({ schema: 'labview-benchmark-actor/workload-trend@1', plane: 'LINUX', n: 3, verdict: 'PASS', latest: 1919, stats: { mean: 1866.3 } }));
       }
       if (handlers.close) { handlers.close(spawnMode.code); }
     });
@@ -248,10 +279,48 @@ try {
     'labviewBenchmarkActor.showAgents',
     'labviewBenchmarkActor.checkAgents',
   ];
+  const contributedCommands = JSON.parse(readFileSync(join(repoRoot, 'package.json'), 'utf8')).contributes.commands;
+  const generatedAgents = readFileSync(join(repoRoot, 'media', 'AGENTS.md'), 'utf8');
+  for (const contribution of contributedCommands) {
+    assert(
+      generatedAgents.includes(`| \`${contribution.title}\` |`),
+      `generated AGENTS.md documents contributed command: ${contribution.title}`,
+    );
+  }
+  for (const prerequisite of [
+    /lbabus[^]*0\.15\.7/,
+    /Node\.js[^]*24\.19\.0/,
+    /\.NET runtime[^]*>=8\.0/,
+    /Git \/ Git for Windows[^]*>=2\.30/,
+    /Vagrant 2\.4\.9/,
+    /VirtualBox 7\.2\.8/,
+  ]) {
+    assert(prerequisite.test(generatedAgents), `generated AGENTS.md pins next-agent prerequisite ${prerequisite}`);
+  }
   const ids = registered.map((r) => r.id);
   for (const cmd of expected) {
     assert(ids.includes(cmd), `activate() registers command ${cmd}`);
   }
+  assert(taskProviders.length === 1 && taskProviders[0].type === 'labviewBenchmarkActor', 'activate() registers the human task provider');
+  const humanTasks = await taskProviders[0].provider.provideTasks();
+  assert(
+    JSON.stringify(humanTasks.map((task) => task.name)) === JSON.stringify([
+      'LBA: Agent Preflight',
+      'LBA: Governance Review',
+      'LBA: Reviewer Mesh Readiness (compound)',
+      'LBA: Release Candidate Check (compound)',
+    ]),
+    'human task provider exposes the four governed shortcuts',
+  );
+  assert(humanTasks.every((task) => task.execution.options.env.ELECTRON_RUN_AS_NODE === '1'), 'human tasks use the bundled VS Code Node runtime');
+  assert(humanTasks.every((task) => task.detail === 'Governed human task bundle v1.0.6'), 'human tasks expose bundle version 1.0.6');
+  assert(humanTasks.every((task) => typeof task.execution.options.env.LBA_LBABUS_PATH === 'string'), 'human tasks pass the resolved lbabus executable');
+  assert(humanTasks.every((task) => task.execution.options.env.LBA_TASK_EVIDENCE_ROOT === join(gsRoot, 'task-runs')), 'human tasks retain receipts under extension global storage');
+  assert(humanTasks.every((task) => task.presentationOptions.showReuseMessage === false), 'human tasks suppress the terminal reuse prompt');
+  assert(humanTasks.every((task) => task.presentationOptions.panel === mockVscode.TaskPanelKind.Dedicated), 'human tasks use dedicated non-confusing terminals');
+  const resolvedTask = taskProviders[0].provider.resolveTask({ definition: { task: 'agent-preflight' } });
+  assert(resolvedTask && resolvedTask.name === 'LBA: Agent Preflight', 'human task provider resolves a governed task');
+  assert(taskProviders[0].provider.resolveTask({ definition: { task: 'unknown' } }) === undefined, 'human task provider rejects unknown task ids');
   assert(
     subscriptions.length >= expected.length,
     'activate() pushes a disposable per command onto context.subscriptions'
@@ -278,18 +347,43 @@ try {
   assert(/id="lba-series"/.test(html) && /"t":0/.test(html), 'viewer HTML seeds the benchmark series data block');
   assert(/<svg id="chart"/.test(html), 'viewer HTML renders the chart svg surface');
 
-  // Prerequisite-remediation (LBA-REQ-002 / T-002): invoking a CLI-backed command when the `lbabus`
-  // prerequisite is absent must surface actionable remediation via showErrorMessage rather than fail
-  // silently. child_process is mocked to fail with ENOENT, standing in for a missing coordination CLI.
+  // Capabilities remain useful when lbabus is absent: the extension falls back to a read-only native probe.
   const showCapabilities = registered.find((r) => r.id === 'labviewBenchmarkActor.showCapabilities');
   assert(showCapabilities, 'showCapabilities command is registered');
+  const warningsBeforeCapabilities = warnMessages.length;
   await showCapabilities.handler();
-  assert(errorMessages.length === 1, 'a missing-CLI failure surfaces exactly one error message');
-  assert(/lbabus failed/.test(errorMessages[0]), 'the remediation names the failing prerequisite CLI (lbabus)');
+  assert(errorMessages.length === 0, 'missing lbabus does not turn the read-only capabilities command into an error');
+  assert(warnMessages.length === warningsBeforeCapabilities + 1, 'the capabilities fallback surfaces one actionable warning');
   assert(
-    /Install the coordination CLI/.test(errorMessages[0]),
-    'the remediation tells the operator to install the coordination CLI'
+    /built-in fallback/.test(warnMessages.at(-1)) && /install lbabus/i.test(warnMessages.at(-1)),
+    'the warning explains the fallback and how to enable coordination commands'
   );
+  // Cover the native fallback's present-tool branches while lbabus itself remains absent.
+  execFileHandler = (file) => {
+    if (file === 'lbabus') throw Object.assign(new Error('spawn lbabus ENOENT'), { code: 'ENOENT' });
+    const outputs = {
+      docker: 'windows/amd64 engine 29.4.3',
+      vagrant: 'Vagrant 2.4.9',
+      VBoxManage: '7.2.8r173730',
+      vmrun: 'Total running VMs: 1\nvm.vmx',
+      'where.exe': 'C:\\tools\\LabVIEWCLI.exe\n',
+    };
+    return { stdout: outputs[file] ?? '', stderr: '' };
+  };
+  const restoreCapabilitiesPlatform = setPlatform('win32');
+  try {
+    await showCapabilities.handler();
+  } finally {
+    restoreCapabilitiesPlatform();
+  }
+  // A healthy lbabus command covers stdout/stderr forwarding; a non-Error rejection covers conservative folding.
+  execFileHandler = () => ({ stdout: 'capabilities ok\n', stderr: 'diagnostic\n' });
+  await showCapabilities.handler();
+  execFileHandler = () => { throw 'bare failure'; };
+  await registered.find((r) => r.id === 'labviewBenchmarkActor.pollBus').handler();
+  execFileHandler = () => {
+    throw Object.assign(new Error('spawn lbabus ENOENT'), { code: 'ENOENT' });
+  };
 
   // Create Cleanroom Worker VM (LBA distributed CI): the cloner drives VBoxManage + ssh via a bash script, so
   // it is a Linux/macOS HOST tool. Prove BOTH host branches independently of the CI OS by faking
@@ -366,6 +460,10 @@ try {
     assert(sentCommands.length === cmdsBeforeLadder, 'runThroughputLadder sends no command on a Windows host');
 
     Object.defineProperty(process, 'platform', { value: 'linux', configurable: true });
+    inputQueue.push('bad plane!');
+    await runLadderCmd.handler();
+    inputQueue.push('TEST-PLANE', 'bad rungs!');
+    await runLadderCmd.handler();
     inputQueue.push('TEST-PLANE', '256M,512M');
     await runLadderCmd.handler();
     const ladderCmd = sentCommands.find((c) => /node .*throughput-to-disk[/\\]run-ladder\.mjs/.test(c));
@@ -420,6 +518,7 @@ try {
       warnResponseQueue.push('Show Diff');
       await agentsCmd('writeAgents')();
       assert(executedCommands.filter((c) => c === 'vscode.diff').length >= 2, 'writeAgents (Show Diff) opens the diff view');
+      await agentsCmd('writeAgents')(); // dismissed overwrite prompt leaves the existing file unchanged
 
       // writeAgents exists -> Overwrite rewrites the canonical.
       warnResponseQueue.push('Overwrite');
@@ -427,6 +526,10 @@ try {
       const infoBeforeRecheck = infoMessages.length;
       await agentsCmd('checkAgents')();
       assert(infoMessages.slice(infoBeforeRecheck).some((m) => /matches the shipped/i.test(m)), 'the Overwrite-rewritten AGENTS.md matches the canonical again');
+      writeFileSync(writtenAgents, '# drifted again\n');
+      warnResponseQueue.push('Rewrite');
+      await agentsCmd('checkAgents')();
+      assert(/GENERATED:/.test(readFileSync(writtenAgents, 'utf8')), 'checkAgents Rewrite restores the canonical');
     } finally {
       mockVscode.workspace.workspaceFolders = savedFolders;
       rmSync(agentsWs, { recursive: true, force: true });
@@ -737,6 +840,17 @@ try {
   await registered.find((r) => r.id === 'labviewBenchmarkActor.pollBus').handler();
   inputQueue.push('NOTE test coordination note');
   await registered.find((r) => r.id === 'labviewBenchmarkActor.postNote').handler();
+  execFileHandler = () => ({ stdout: '', stderr: '' });
+  configStore.busNetLog = 'C:\\logs\\bus.jsonl';
+  configStore.busNetHosts = '127.0.0.1:7420';
+  await registered.find((r) => r.id === 'labviewBenchmarkActor.pollBus').handler();
+  inputQueue.push('NOTE peer coordination note');
+  await registered.find((r) => r.id === 'labviewBenchmarkActor.postNote').handler();
+  delete configStore.busNetLog;
+  delete configStore.busNetHosts;
+  execFileHandler = () => {
+    throw Object.assign(new Error('spawn lbabus ENOENT'), { code: 'ENOENT' });
+  };
 
   // LM open-benchmark-panel tool: opens a panel (reusing a panel command) and returns descriptive text.
   const openPanelTool = registeredTools.find((t) => t.name === 'lba-open-benchmark-panel');
@@ -744,6 +858,13 @@ try {
   const openResult = await openPanelTool.tool.invoke({ input: { panel: 'run' } }, {});
   const openText = openResult && openResult.content && openResult.content[0] && openResult.content[0].value;
   assert(typeof openText === 'string' && /panel/i.test(openText), 'the open-panel LM tool opens a panel + returns text');
+  // Unknown panel input falls back to trend, and the host-provided LM result classes take the typed result path.
+  mockVscode.LanguageModelTextPart = class { constructor(value) { this.value = value; } };
+  mockVscode.LanguageModelToolResult = class { constructor(content) { this.content = content; } };
+  const typedResult = await openPanelTool.tool.invoke({ input: { panel: 'unknown' } }, {});
+  assert(typedResult instanceof mockVscode.LanguageModelToolResult, 'LM tools use host result classes when available');
+  delete mockVscode.LanguageModelTextPart;
+  delete mockVscode.LanguageModelToolResult;
 
   // captureLaunch Windows body: with no resolvable LabVIEW it short-circuits at resolveLabview with the
   // "LabVIEW.exe not found" guard BEFORE spawning ffmpeg. Force win32 so the Windows body runs on any CI host;
@@ -775,6 +896,9 @@ try {
   {
     assert(ext.ffmpegRunnable(process.execPath) === true, 'ffmpegRunnable detects a spawnable binary (node stands in)');
     assert(ext.ffmpegRunnable(join(tmpdir(), 'no-such-ffmpeg-xyz')) === false, 'ffmpegRunnable is false for a missing binary');
+    spawnSyncHandler = () => { throw new Error('probe failed'); };
+    assert(ext.ffmpegRunnable('ffmpeg') === false, 'ffmpegRunnable contains a thrown probe failure');
+    spawnSyncHandler = (...args) => realChildProcess.spawnSync(...args);
     configStore.ffmpegPath = process.execPath;
     assert(ext.resolveFfmpegChecked() === process.execPath, 'resolveFfmpegChecked returns a configured runnable ffmpeg');
     configStore.ffmpegPath = join(tmpdir(), 'no-such-ffmpeg-xyz');
@@ -912,6 +1036,9 @@ try {
   // against a VM (proven separately); only the extension glue is exercised here.
   {
     const mprr = () => registered.find((r) => r.id === 'labviewBenchmarkActor.captureLaunchMprr').handler();
+    configStore.mprrSshPort = '';
+    configStore.mprrVncPort = '';
+    configStore.mprrTargetVm = 'actor';
     spawnMode = { code: 0 };
     infoResponseQueue.push('Open Trend JSON');
     const infoBefore = infoMessages.length;
@@ -921,6 +1048,8 @@ try {
       'captureLaunchMprr reports the captured launchMs trend on success + offers Open Trend JSON'
     );
     spawnMode = { code: 0 }; // success again, info dismissed -> the open-doc branch is skipped
+    await mprr();
+    spawnMode = { code: 0, invalidTrend: true };
     await mprr();
     spawnMode = { code: 1 };
     const errBefore = errorMessages.length;
@@ -952,6 +1081,9 @@ try {
       'captureLaunchMprr guards on no workspace folder'
     );
     mockVscode.workspace.workspaceFolders = savedFoldersMprr;
+    delete configStore.mprrSshPort;
+    delete configStore.mprrVncPort;
+    delete configStore.mprrTargetVm;
   }
 
   // Open Frame Correlator, three ways. First with NO captures on disk (a clean nonexistent dir): it guides
@@ -1015,10 +1147,11 @@ try {
   // -> each command's catch -> reportUiError (graceful degradation on a corrupt/missing install, not a crash).
   // Route the second activation's registrations to a separate list so the primary command surface stays clean.
   const second = [];
+  const secondTools = [];
   const savedRegisterCommand = mockVscode.commands.registerCommand;
   const savedRegisterTool = mockVscode.lm.registerTool;
   mockVscode.commands.registerCommand = (id, handler) => { second.push({ id, handler }); return { dispose() {} }; };
-  mockVscode.lm.registerTool = () => ({ dispose() {} });
+  mockVscode.lm.registerTool = (name, tool) => { secondTools.push({ name, tool }); return { dispose() {} }; };
   ext.activate({ subscriptions: [], extensionUri: { path: brokenExtRoot, fsPath: brokenExtRoot }, globalStorageUri: { fsPath: brokenGsRoot }, extension: { packageJSON: { version: '0.1.0' } } });
   mockVscode.commands.registerCommand = savedRegisterCommand;
   mockVscode.lm.registerTool = savedRegisterTool;
@@ -1036,6 +1169,33 @@ try {
   const panelsBeforeBrokenViewer = panels.length;
   second.find((r) => r.id === 'labviewBenchmarkActor.openViewer').handler();
   assert(panels.length === panelsBeforeBrokenViewer + 1, 'openViewer still renders on a broken install (loadSeries demo-series fallback)');
+  const brokenSummary = await secondTools.find((tool) => tool.name === 'lba-benchmark-summary').tool.invoke({ input: null }, {});
+  assert(/Open a panel/.test(brokenSummary.content[0].value), 'summary remains useful when every staged evidence fixture is missing');
+  // Malformed-but-readable evidence exercises summary field-level fallbacks rather than the file-missing path.
+  const summaryRoot = join(tmpdir(), 'lba-summary-fallbacks-xyz');
+  const summaryTools = [];
+  rmSync(summaryRoot, { recursive: true, force: true });
+  mkdirSync(join(summaryRoot, 'media'), { recursive: true });
+  for (const [name, value] of Object.entries({
+    'labview-launch-record.json': { spans: 'bad', frames: 'bad', sourceDetail: null },
+    'labview-launch-trend.json': { stats: null, n: 'bad', verdict: null },
+    'cross-plane-trend-receipt.json': { witness: null, linux: null, win: null },
+    'labview-launch-resource-correlation.json': { headline: null },
+    'resource-cross-plane-receipt.json': { metrics: null },
+  })) {
+    writeFileSync(join(summaryRoot, 'media', name), JSON.stringify(value));
+  }
+  mockVscode.lm.registerTool = (name, tool) => { summaryTools.push({ name, tool }); return { dispose() {} }; };
+  ext.activate({
+    subscriptions: [],
+    extensionUri: { path: summaryRoot, fsPath: summaryRoot },
+    globalStorageUri: {},
+    extension: { packageJSON: {} },
+  });
+  mockVscode.lm.registerTool = savedRegisterTool;
+  const fallbackSummary = await summaryTools.find((tool) => tool.name === 'lba-benchmark-summary').tool.invoke({}, {});
+  assert(/\?/.test(fallbackSummary.content[0].value), 'summary uses explicit unknown markers for malformed evidence fields');
+  rmSync(summaryRoot, { recursive: true, force: true });
 
   // Script-resolution guards + the postNote empty-input abort, on the broken install with NO workspace folder:
   // createCleanroom + bootstrapAuthoringLane can resolve no script -> each surfaces its "not found" guidance,
@@ -1090,10 +1250,10 @@ try {
   {
     const mkOut = () => ({ appendLine() {}, show() {}, dispose() {} });
     const ctxFor = (gs) => ({ globalStorageUri: { fsPath: gs }, extensionUri: { path: repoRoot, fsPath: repoRoot } });
-    const seedReq = (gs, id, title, createdAt) => {
+    const seedReq = (gs, id, title, createdAt, body = '') => {
       rmSync(gs, { recursive: true, force: true });
       mkdirSync(join(gs, 'handoff', 'requests'), { recursive: true });
-      writeFileSync(join(gs, 'handoff', 'requests', `${id}.json`), JSON.stringify({ schema: 'labview-benchmark-actor/agent-request@1', id, title, body: '', kind: 'step', createdAt }));
+      writeFileSync(join(gs, 'handoff', 'requests', `${id}.json`), JSON.stringify({ schema: 'labview-benchmark-actor/agent-request@1', id, title, body, kind: 'step', createdAt }));
     };
     const savedInfo = mockVscode.window.showInformationMessage;
     const savedInput = mockVscode.window.showInputBox;
@@ -1117,9 +1277,10 @@ try {
 
     // (3) A dismissed notification (no action chosen) writes no answer.
     const gsDismiss = join(tmpdir(), 'lba-test-handoff-dismiss-xyz');
-    seedReq(gsDismiss, 'req-dismiss', 'Some step', '2026-08-03T00:07:00Z');
+    seedReq(gsDismiss, 'req-dismiss', 'Some step', '2026-08-03T00:07:00Z', 'with details');
     mockVscode.window.showInformationMessage = () => undefined;
     await ext.refreshHandoffRequests(ctxFor(gsDismiss), mkOut());
+    await ext.refreshHandoffRequests(ctxFor(gsDismiss), mkOut()); // same id: duplicate notification is suppressed
     assert(!existsSync(join(gsDismiss, 'handoff', 'done', 'req-dismiss.json')), 'handoff: a dismissed notification writes no op-done');
     mockVscode.window.showInformationMessage = savedInfo;
     mockVscode.window.showInputBox = savedInput;
@@ -1169,6 +1330,22 @@ try {
     writeFileSync(join(vt, 'handoff', 'review-target.json'), JSON.stringify({ component: 'extension', version: '0.5.0', commit: 'c'.repeat(40), vsixSha256: 'd'.repeat(64), evidence: [{ kind: 'capture', ref: 'run-x' }] }));
     const t1 = ext.readReviewTarget(vt, '9.9.9');
     assert(t1.version === '0.5.0' && t1.commit.length === 40 && t1.evidence.length === 1, 'readReviewTarget reads the target file');
+    writeFileSync(join(vt, 'handoff', 'review-target.json'), JSON.stringify({
+      component: 1,
+      version: null,
+      commit: 2,
+      vsixSha256: false,
+      evidence: {},
+    }));
+    const typedFallback = ext.readReviewTarget(vt, '');
+    assert(
+      typedFallback.component === 'extension'
+        && typedFallback.version === '0.0.0'
+        && typedFallback.commit === null
+        && typedFallback.vsixSha256 === null
+        && typedFallback.evidence.length === 0,
+      'readReviewTarget falls back field-by-field on malformed target values',
+    );
     writeFileSync(join(vt, 'handoff', 'review-target.json'), '{bad');
     assert(ext.readReviewTarget(vt, '9.9.9').version === '9.9.9', 'readReviewTarget tolerates bad json');
     const signed = ext.buildSignedVerdict(rv, { target: t1, verdict: 'pass', reviewer: 'rev@x', station: 'WINDOWS_VM', notes: 'ok', evidence: t1.evidence, privateKeyPem: rvKeys.privateKeyPem, renderedAt: 't' });
@@ -1221,15 +1398,52 @@ try {
     assert(rec.verdict.verdict === 'pass' && rec.verdict.target.version === '0.5.0' && rec.signOff.schema === rv.SIGNOFF_SCHEMA && rec.signOff.decision === 'approve' && rec.signOff.reviewer === reviewer, 'the signed verdict records pass + approve + the reviewer');
     assert(rv.verifyReviewerVerdict(rec.verdict, rec.signOff, { reviewerAllowlist: { [reviewer]: rvKeys.publicKeyPem } }).ok, 'the extension-signed verdict verifies against the enrolled key');
 
-    // (4) a dismissed choice -> no throw.
+    // (4) Request changes with dismissed notes and a bare bus failure -> conservative signed reject, no throw.
+    mockVscode.window.showInformationMessage = () => 'Request changes';
+    mockVscode.window.showInputBox = async () => undefined;
+    execFileHandler = () => { throw 'bus unavailable'; };
+    await render();
+    const changesRecord = JSON.parse(readFileSync(verdictFile, 'utf8'));
+    assert(changesRecord.verdict.verdict === 'changes' && changesRecord.signOff.decision === 'reject', 'request changes signs a reject verdict with optional empty notes');
+
+    // (5) Fail with a successful bus post covers stdout/stderr announcement forwarding.
+    mockVscode.window.showInformationMessage = () => 'Fail';
+    mockVscode.window.showInputBox = async () => 'blocking issue';
+    execFileHandler = () => ({ stdout: 'sent\n', stderr: 'notice\n' });
+    await render();
+    const failRecord = JSON.parse(readFileSync(verdictFile, 'utf8'));
+    assert(failRecord.verdict.verdict === 'fail' && failRecord.signOff.decision === 'reject', 'Fail choice signs a rejecting verdict');
+
+    // (6) a dismissed choice -> no throw.
     mockVscode.window.showInformationMessage = () => undefined;
     await render();
+    execFileHandler = () => {
+      throw Object.assign(new Error('spawn lbabus ENOENT'), { code: 'ENOENT' });
+    };
 
     mockVscode.window.showInformationMessage = savedInfo;
     mockVscode.window.showInputBox = savedInput;
     mockVscode.workspace.getConfiguration = savedCfg;
     rmSync(keyFile, { force: true });
     console.log('reviewer-verdict-command: PASS -- Render Reviewer Verdict -> Ed25519-signed verdict written + verifies');
+  }
+
+  // LanguageModelTool API host-compatibility branches: no API is a no-op; registration faults are contained.
+  {
+    const savedLm = mockVscode.lm;
+    const compactContext = {
+      subscriptions: [],
+      extensionUri: { path: repoRoot, fsPath: repoRoot },
+      globalStorageUri: { fsPath: gsRoot },
+      extension: undefined,
+    };
+    mockVscode.lm = undefined;
+    ext.activate(compactContext);
+    const fallbackVersionTasks = await taskProviders.at(-1).provider.provideTasks();
+    assert(fallbackVersionTasks.every((task) => task.execution.options.env.LBA_EXTENSION_VERSION === ''), 'human tasks tolerate a missing extension version');
+    mockVscode.lm = { registerTool() { throw 'registration unavailable'; } };
+    ext.activate({ ...compactContext, subscriptions: [] });
+    mockVscode.lm = savedLm;
   }
 } finally {
   Module._load = originalLoad;

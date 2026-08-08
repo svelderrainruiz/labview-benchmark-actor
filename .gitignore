@@ -51,7 +51,9 @@ experiments/windows-docker-container/evidence/
 # Coverage: keep the retained artifact coverage/cobertura-coverage.xml; ignore raw V8 tmp + transient summary.
 coverage/tmp/
 coverage/coverage-summary.json
+coverage/coverage-final.json
 .nyc_output/
 
 # .NET "runfile discovery" tooling cache the C# extension writes into the workspace root (codespace/cleanroom noise)
 /dotnet/
+.lba/local-ci/

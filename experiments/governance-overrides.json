@@ -1,0 +1,68 @@
+{
+  "schema": "labview-benchmark-actor/experiment-governance-overrides@1",
+  "version": "1.0.1",
+  "overrides": {
+    "agent-last-gate": {
+      "status": "active",
+      "productionUse": "allowed",
+      "owner": "release",
+      "requirements": ["LBA-REQ-057", "LBA-REQ-097"],
+      "productionSurfaces": ["scripts/agent-last-gate.mjs"]
+    },
+    "authoring-lane": {
+      "status": "active",
+      "productionUse": "allowed",
+      "owner": "authoring",
+      "requirements": ["LBA-REQ-017", "LBA-REQ-097"],
+      "productionSurfaces": ["src/extension.ts"]
+    },
+    "hardware-capability": {
+      "status": "superseded",
+      "productionUse": "prohibited",
+      "owner": "runtime",
+      "requirements": ["LBA-REQ-029", "LBA-REQ-097"],
+      "supersededBy": "tools/collab-cli/Capabilities.cs",
+      "exitCriteria": "Retain historical receipts only; remove after no governed evidence references remain."
+    },
+    "mesh-runs": {
+      "status": "prototype",
+      "productionUse": "prohibited",
+      "owner": "mesh",
+      "requirements": ["LBA-REQ-097"],
+      "exitCriteria": "Adopt under a benchmark requirement and add deterministic receipts before any production or release use."
+    },
+    "ocr-primitive-proof": {
+      "status": "active",
+      "productionUse": "evidence-only",
+      "owner": "capture",
+      "requirements": ["LBA-REQ-007", "LBA-REQ-097"]
+    },
+    "ollama-bus": {
+      "status": "superseded",
+      "productionUse": "prohibited",
+      "owner": "coordination",
+      "requirements": ["LBA-REQ-067", "LBA-REQ-097"],
+      "supersededBy": "experiments/net-coordination",
+      "exitCriteria": "Retain historical evidence only; live coordination uses the net-only implementation."
+    },
+    "ring-buffer-mirror": {
+      "status": "active",
+      "productionUse": "evidence-only",
+      "owner": "capture",
+      "requirements": ["LBA-REQ-009", "LBA-REQ-097"]
+    },
+    "self-test-conformance": {
+      "status": "active",
+      "productionUse": "evidence-only",
+      "owner": "capture",
+      "requirements": ["LBA-REQ-007", "LBA-REQ-097"]
+    },
+    "throughput-to-disk": {
+      "status": "active",
+      "productionUse": "allowed",
+      "owner": "benchmark",
+      "requirements": ["LBA-REQ-097"],
+      "productionSurfaces": ["src/extension.ts"]
+    }
+  }
+}

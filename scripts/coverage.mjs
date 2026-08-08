@@ -14,10 +14,13 @@ import { readFileSync, writeFileSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { createRequire } from 'node:module';
 
 const repo = join(dirname(fileURLToPath(import.meta.url)), '..');
 const cfgPath = join(repo, 'coverage-thresholds.json');
 const cfg = JSON.parse(readFileSync(cfgPath, 'utf8'));
+const require = createRequire(import.meta.url);
+const c8Cli = require.resolve('c8/bin/c8.js');
 const METRICS = ['lines', 'statements', 'functions', 'branches'];
 const bump = process.argv.includes('--bump');
 
@@ -30,14 +33,28 @@ for (const m of METRICS) {
 
 // Run the suite under c8 with the parametrized floors as fail-under thresholds.
 const args = [
-  'c8', '--check-coverage',
+  c8Cli, '--all', '--check-coverage',
   ...METRICS.flatMap((m) => [`--${m}`, String(cfg.floor[m])]),
   '--reporter=cobertura', '--reporter=json-summary', '--reporter=text-summary',
   'npm', 'test',
 ];
-const run = spawnSync('npx', args, { cwd: repo, stdio: 'inherit' });
+const run = spawnSync(process.execPath, args, { cwd: repo, stdio: 'inherit' });
+if (run.error) {
+  console.error(`coverage: failed to start c8: ${run.error.message}`);
+  process.exit(1);
+}
 if (run.status !== 0) {
   process.exit(run.status ?? 1);
+}
+
+// c8 writes the current epoch into Cobertura's root `timestamp`, which makes the retained artifact dirty even
+// when source + coverage are unchanged. Pin only that provenance-neutral field so a full local KPI can prove its
+// post-run worktree is still the exact candidate it certified.
+const coberturaPath = join(repo, 'coverage', 'cobertura-coverage.xml');
+const cobertura = readFileSync(coberturaPath, 'utf8');
+const normalizedCobertura = cobertura.replace(/ timestamp="[^"]*"/, ' timestamp="0"');
+if (normalizedCobertura !== cobertura) {
+  writeFileSync(coberturaPath, normalizedCobertura);
 }
 
 // Read the measured totals (json-summary reporter) to report headroom and (optionally) ratchet.

@@ -75,6 +75,36 @@ ok('verifyReviewerVerdict verifies a good sign-off + fails closed on tampering',
   assert.equal(verifyReviewerVerdict(v, s, {
     reviewerAllowlist: { [reviewer]: [other.publicKeyPem, publicKeyPem] },
   }).ok, true);
+  assert.equal(verifyReviewerVerdict(v, s, {
+    reviewerAllowlist: {
+      [reviewer]: [{
+        publicKeyPem,
+        validFrom: '0.5.0',
+        validThrough: '0.5.0',
+        purposes: ['visual'],
+      }],
+    },
+  }).ok, true);
+  assert.equal(verifyReviewerVerdict(v, s, {
+    reviewerAllowlist: {
+      [reviewer]: [{
+        publicKeyPem,
+        validFrom: '0.4.0',
+        validThrough: '0.4.9',
+        purposes: ['visual'],
+      }],
+    },
+  }).ok, false);
+  assert.equal(verifyReviewerVerdict(v, s, {
+    reviewerAllowlist: {
+      [reviewer]: [{
+        publicKeyPem,
+        validFrom: '0.5.0',
+        validThrough: '0.5.0',
+        purposes: ['quorum'],
+      }],
+    },
+  }).ok, false);
   // a tampered verdict (different notes) no longer matches the signed digest
   const tampered = { ...v, notes: 'tampered' };
   assert.equal(verifyReviewerVerdict(tampered, s, { reviewerAllowlist: allowlist }).ok, false);

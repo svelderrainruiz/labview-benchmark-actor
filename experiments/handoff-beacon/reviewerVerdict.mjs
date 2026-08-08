@@ -43,6 +43,36 @@ export function generateEnrolledKeypair() {
 
 const str = (v, dflt = null) => (v != null ? String(v) : dflt);
 const normPem = (p) => String(p || '').replace(/\s+/g, '');
+const parseVersion = (value) => {
+  const match = /^(\d+)\.(\d+)\.(\d+)$/.exec(String(value || ''));
+  return match ? match.slice(1).map(Number) : null;
+};
+const compareVersion = (left, right) => {
+  for (let index = 0; index < 3; index += 1) {
+    if (left[index] !== right[index]) return left[index] < right[index] ? -1 : 1;
+  }
+  return 0;
+};
+
+export function enrolledReviewerPublicKeys(entry, { version, purpose } = {}) {
+  const entries = Array.isArray(entry) ? entry : [entry];
+  const candidateVersion = parseVersion(version);
+  return entries.flatMap((item) => {
+    if (typeof item === 'string' && item.trim()) return [item];
+    if (!item || typeof item !== 'object' || Array.isArray(item)) return [];
+    const publicKeyPem = typeof item.publicKeyPem === 'string' ? item.publicKeyPem.trim() : '';
+    const validFrom = parseVersion(item.validFrom);
+    const validThrough = parseVersion(item.validThrough);
+    const purposes = Array.isArray(item.purposes) ? item.purposes : [];
+    if (!publicKeyPem || !candidateVersion || !validFrom || !validThrough) return [];
+    if (!purposes.includes(purpose)) return [];
+    if (compareVersion(validFrom, validThrough) > 0) return [];
+    return compareVersion(candidateVersion, validFrom) >= 0
+      && compareVersion(candidateVersion, validThrough) <= 0
+      ? [publicKeyPem]
+      : [];
+  });
+}
 // The bytes a reviewer signs: reviewer + decision + station bound to the digest of the exact verdict.
 const signMessage = (reviewer, decision, station, digest) => Buffer.from(`${reviewer}\n${decision}\n${station}\n${digest}`, 'utf8');
 
@@ -79,7 +109,8 @@ export function validateReviewerVerdict(v) {
   if (!r.target || typeof r.target !== 'object') errors.push('verdict needs a target object');
   else {
     if (!r.target.version) errors.push('target needs a version');
-    if (!r.target.commit) errors.push('target needs a commit');
+    if (!/^[0-9a-f]{40}$/i.test(String(r.target.commit || ''))) errors.push('target commit must be a 40-hex Git SHA');
+    if (!/^[0-9a-f]{64}$/i.test(String(r.target.vsixSha256 || ''))) errors.push('target vsixSha256 must be a 64-hex SHA-256');
   }
   if (!r.reviewer) errors.push('verdict needs a reviewer');
   if (!REVIEWER_STATIONS.includes(r.station)) errors.push(`station must be one of ${REVIEWER_STATIONS.join('|')}`);
@@ -128,14 +159,14 @@ export function verifyReviewerVerdict(verdict, signOff, { reviewerAllowlist = {}
   if (!REVIEWER_STATIONS.includes(signOff.station)) reasons.push(`unknown reviewer station ${signOff.station}`);
   const actualDigest = reviewerVerdictDigest(verdict);
   if (signOff.subject?.verdictDigest !== actualDigest) reasons.push('sign-off does not match this verdict');
-  const enrolledKeys = Array.isArray(reviewerAllowlist[signOff.reviewer])
-    ? reviewerAllowlist[signOff.reviewer]
-    : [reviewerAllowlist[signOff.reviewer]];
-  const normalizedKeys = enrolledKeys
-    .filter((key) => typeof key === 'string' && key.trim())
-    .map(normPem);
-  if (normalizedKeys.length === 0) reasons.push(`reviewer "${signOff.reviewer}" is not enrolled`);
-  else if (!normalizedKeys.includes(normPem(signOff.publicKeyPem))) reasons.push(`presented key does not match an enrolled key for "${signOff.reviewer}"`);
+  const enrollment = reviewerAllowlist[signOff.reviewer];
+  const normalizedKeys = enrolledReviewerPublicKeys(enrollment, {
+    version: verdict?.target?.version,
+    purpose: 'visual',
+  }).map(normPem);
+  if (enrollment === undefined) reasons.push(`reviewer "${signOff.reviewer}" is not enrolled`);
+  else if (normalizedKeys.length === 0) reasons.push(`reviewer "${signOff.reviewer}" has no visual key enrolled for version "${verdict?.target?.version ?? ''}"`);
+  else if (!normalizedKeys.includes(normPem(signOff.publicKeyPem))) reasons.push(`presented key does not match a visual key enrolled for "${signOff.reviewer}" at version "${verdict?.target?.version ?? ''}"`);
   try {
     const ok = crypto.verify(null, signMessage(signOff.reviewer, signOff.decision, signOff.station, actualDigest), crypto.createPublicKey(signOff.publicKeyPem), Buffer.from(signOff.signature || '', 'base64'));
     if (!ok) reasons.push('sign-off signature does not verify');
@@ -152,6 +183,8 @@ export function verifyReviewerVerdict(verdict, signOff, { reviewerAllowlist = {}
  */
 export function gateVisualReview({ verdict, signOffs = [], reviewerAllowlist = {}, minReviewers = 1 } = {}) {
   const reasons = [];
+  const verdictValidation = validateReviewerVerdict(verdict);
+  if (!verdictValidation.ok) reasons.push(...verdictValidation.errors.map((error) => `invalid verdict: ${error}`));
   const verdictPass = verdict?.verdict === 'pass';
   if (!verdictPass) reasons.push(`reviewer verdict is ${verdict?.verdict ?? 'missing'}, not pass`);
   const approvals = [];
@@ -165,7 +198,8 @@ export function gateVisualReview({ verdict, signOffs = [], reviewerAllowlist = {
   if (distinct.length < minReviewers) reasons.push(`need >= ${minReviewers} distinct enrolled approving reviewer(s); have ${distinct.length}`);
   return {
     schema: 'labview-benchmark-actor/acg-visual-review-decision-v1',
-    publish: verdictPass && distinct.length >= minReviewers,
+    publish: verdictValidation.ok && verdictPass && distinct.length >= minReviewers,
+    verdictValid: verdictValidation.ok,
     verdictPass,
     approvals: distinct,
     minReviewers,

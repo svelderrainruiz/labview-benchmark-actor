@@ -59,7 +59,7 @@ export function counterBitmap(value, minDigits = 0) {
     const g = GLYPHS[s[i]];
     for (let r = 0; r < GLYPH_H; r++) rows[r] += (i > 0 ? '0'.repeat(GAP) : '') + g[r];
   }
-  return { width: rows[0]?.length ?? 0, height: GLYPH_H, rows };
+  return { width: rows[0].length, height: GLYPH_H, rows };
 }
 
 /**

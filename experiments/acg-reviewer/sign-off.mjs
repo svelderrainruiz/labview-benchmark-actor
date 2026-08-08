@@ -10,6 +10,7 @@
 
 import crypto from 'node:crypto';
 import { bundleDigest, generateEnrolledKeypair } from '../acg-provenance/attest.mjs';
+import { enrolledReviewerPublicKeys } from '../handoff-beacon/reviewerVerdict.mjs';
 
 export const REVIEWER_STATIONS = ['WINDOWS_VM', 'LINUX_CODESPACE'];
 const SIGNOFF_SCHEMA = 'labview-benchmark-actor/acg-human-signoff-v1';
@@ -52,14 +53,15 @@ export function verifyReleaseSignOff(quorumVerdict, signOff, { reviewerAllowlist
   if (!REVIEWER_STATIONS.includes(signOff.station)) reasons.push(`unknown reviewer station ${signOff.station}`);
   const actualDigest = bundleDigest(quorumVerdict);
   if (signOff.subject?.verdictDigest !== actualDigest) reasons.push('sign-off does not match this quorum verdict');
-  const enrolledKeys = Array.isArray(reviewerAllowlist[signOff.reviewer])
-    ? reviewerAllowlist[signOff.reviewer]
-    : [reviewerAllowlist[signOff.reviewer]];
-  const normalizedKeys = enrolledKeys
-    .filter((key) => typeof key === 'string' && key.trim())
-    .map(normPem);
-  if (normalizedKeys.length === 0) reasons.push(`reviewer "${signOff.reviewer}" is not enrolled`);
-  else if (!normalizedKeys.includes(normPem(signOff.publicKeyPem))) reasons.push(`presented key does not match an enrolled key for "${signOff.reviewer}"`);
+  const enrollment = reviewerAllowlist[signOff.reviewer];
+  const version = quorumVerdict?.consensus?.version;
+  const normalizedKeys = enrolledReviewerPublicKeys(enrollment, {
+    version,
+    purpose: 'quorum',
+  }).map(normPem);
+  if (enrollment === undefined) reasons.push(`reviewer "${signOff.reviewer}" is not enrolled`);
+  else if (normalizedKeys.length === 0) reasons.push(`reviewer "${signOff.reviewer}" has no quorum key enrolled for version "${version ?? ''}"`);
+  else if (!normalizedKeys.includes(normPem(signOff.publicKeyPem))) reasons.push(`presented key does not match a quorum key enrolled for "${signOff.reviewer}" at version "${version ?? ''}"`);
   try {
     const ok = crypto.verify(null, signOffMessage(signOff.reviewer, signOff.decision, signOff.station, actualDigest), crypto.createPublicKey(signOff.publicKeyPem), Buffer.from(signOff.signature || '', 'base64'));
     if (!ok) reasons.push('sign-off signature does not verify');
