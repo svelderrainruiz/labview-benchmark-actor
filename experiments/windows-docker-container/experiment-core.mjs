@@ -221,7 +221,11 @@ export function proveLabviewVisibility({
 }) {
   const checks = {
     processMatched: Number.isInteger(labviewPid) && window?.processId === labviewPid,
-    titleMatched: typeof window?.title === 'string' && /labview/i.test(window.title),
+    titleMatched: (
+      typeof window?.title === 'string' && /labview/i.test(window.title)
+    ) || (
+      typeof window?.titleEvidence === 'string' && /labview/i.test(window.titleEvidence)
+    ),
     visible: window?.visible === true && window?.minimized !== true,
     capturedDesktopMatched: window?.desktop === expectedDesktop,
     fingerprintTransition: typeof initialFingerprint === 'string'

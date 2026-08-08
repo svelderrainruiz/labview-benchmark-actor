@@ -16,7 +16,8 @@ const here = dirname(fileURLToPath(import.meta.url));
 const committed = JSON.parse(readFileSync(join(here, 'composite-release-decision-receipt.json'), 'utf8'));
 const clone = (o) => JSON.parse(JSON.stringify(o));
 const reseal = (r) => { r.digest = digestReceipt(r); return r; };
-const STAGED = { drive: 'stage', vm: 'actor', matched: true, candidate: { component: 'extension', version: '9.9.9' }, frame: { type: 'DONE', task: 'rev-x', senderId: 'WIN', payload: 'ext 9.9.9 staged; review OK' } };
+const STAGED_CANDIDATE = { component: 'extension', version: '9.9.9', commit: 'c'.repeat(40), vsixSha256: 'd'.repeat(64) };
+const STAGED = { drive: 'stage', vm: 'actor', matched: true, candidate: STAGED_CANDIDATE, frame: { type: 'DONE', task: 'rev-x', senderId: 'WIN', payload: JSON.stringify({ schema: 'labview-benchmark-actor/release-stage@1', candidate: STAGED_CANDIDATE }) } };
 
 // Build a fully-signed composite round (both gates pass, bound to one candidate) with optional overrides.
 function buildRound({ consensusVersion, verdictTargetCommit, quorumVerdictValue = 'pass' } = {}) {

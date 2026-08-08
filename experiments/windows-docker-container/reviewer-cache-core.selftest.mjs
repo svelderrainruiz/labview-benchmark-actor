@@ -220,6 +220,52 @@ try {
     },
   })).reason, 'wrong-interactive-profile');
 
+  const recoveredReceipt = buildReceipt();
+  const installedManifest = fileRef(
+    'installed-extension-manifest.json',
+    '{"schema":"installed-extension"}',
+    'installed-extension-manifest',
+  );
+  const installedArchive = fileRef(
+    'installed-extension.zip',
+    'installed-extension-archive',
+    'installed-extension-archive',
+  );
+  recoveredReceipt.vsix = {
+    ...recoveredReceipt.vsix,
+    sourceArtifactRetained: false,
+    installedSnapshotProof: {
+      sourceVmUuid: uuidB,
+      sourceSnapshotUuid: snapUuid,
+      extensionId: 'svelderrainruiz.labview-benchmark-actor',
+      version: recoveredReceipt.vsix.version,
+      manifest: installedManifest,
+      archive: installedArchive,
+    },
+  };
+  rmSync(recoveredReceipt.vsix.path);
+  assert.equal(evaluateReviewerCacheReceipt(recoveredReceipt).status, 'passed');
+  await verifyReviewerCacheReceipt(recoveredReceipt, { baseDir: repoRoot, live: false });
+  assert.equal(
+    evaluateReviewerCacheReceipt({
+      ...recoveredReceipt,
+      outcome: undefined,
+      vsix: {
+        ...recoveredReceipt.vsix,
+        installedSnapshotProof: {
+          ...recoveredReceipt.vsix.installedSnapshotProof,
+          sourceSnapshotUuid: uuidA,
+        },
+      },
+    }).reason,
+    'invalid-installed-snapshot-proof',
+  );
+  writeFileSync(installedArchive.path, 'tampered-installed-extension-archive');
+  await assert.rejects(
+    () => verifyReviewerCacheReceipt(recoveredReceipt, { baseDir: repoRoot, live: false }),
+    /size mismatch|SHA-256 mismatch/,
+  );
+
   assert.equal(evaluateReviewerCacheReceipt(buildReceipt({
     outcome: undefined,
     proof: {

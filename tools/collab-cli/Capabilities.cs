@@ -17,6 +17,7 @@ internal static class Capabilities
     {
         ProbeDocker(),
         ProbeVagrant(),
+        ProbeVirtualBox(),
         ProbeVmware(),
         ProbeLabViewCli(),
     };
@@ -56,6 +57,14 @@ internal static class Capabilities
         (int? code, string outText) = Run(vmrun, "list");
         string running = code == 0 && outText.Length > 0 ? outText.Split('\n')[0].Trim() : "vmrun present";
         return new HostCapability("vmware", true, $"{vmrun} — {running}");
+    }
+
+    private static HostCapability ProbeVirtualBox()
+    {
+        (int? code, string outText) = Run("VBoxManage", "--version");
+        return code == 0 && outText.Length > 0
+            ? new HostCapability("virtualbox", true, $"VirtualBox {outText.Trim()}")
+            : new HostCapability("virtualbox", false, "VBoxManage not found");
     }
 
     private static HostCapability ProbeLabViewCli()
@@ -107,9 +116,16 @@ internal static class Capabilities
                 return (null, string.Empty);
             }
 
-            string outText = p.StandardOutput.ReadToEnd();
-            string errText = p.StandardError.ReadToEnd();
-            p.WaitForExit(10_000);
+            Task<string> outTask = p.StandardOutput.ReadToEndAsync();
+            Task<string> errTask = p.StandardError.ReadToEndAsync();
+            if (!p.WaitForExit(10_000))
+            {
+                p.Kill(entireProcessTree: true);
+                p.WaitForExit();
+                return (-1, "probe timed out after 10 seconds");
+            }
+            string outText = outTask.GetAwaiter().GetResult();
+            string errText = errTask.GetAwaiter().GetResult();
             string combined = string.IsNullOrWhiteSpace(outText) ? errText : outText;
             return (p.ExitCode, combined.Replace("\r", string.Empty).Trim());
         }

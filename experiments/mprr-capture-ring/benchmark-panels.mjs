@@ -241,7 +241,7 @@ export function buildTrendPanelHtml(trend, nonce) {
   const padV = Math.max(1, (vMax - vMin) * 0.15);
   const yLo = vMin - padV, yHi = vMax + padV;
   const xOf = (i) => PADL + (n <= 1 ? (W - PADL - PADR) / 2 : (i / (n - 1)) * (W - PADL - PADR));
-  const yOf = (v) => PADT + (1 - (v - yLo) / (yHi - yLo || 1)) * (H - PADT - PADB);
+  const yOf = (v) => PADT + (1 - (v - yLo) / (yHi - yLo)) * (H - PADT - PADB);
 
   // Least-squares slope line across the run index (matches trend.slopeMsPerRun).
   const slope = typeof trend?.slopeMsPerRun === 'number' ? trend.slopeMsPerRun : 0;
@@ -253,7 +253,7 @@ export function buildTrendPanelHtml(trend, nonce) {
   // y grid: baseline + min/max ticks
   const tick = (v, label, cls) => {
     const y = yOf(v);
-    svgParts.push(`<line x1="${PADL}" y1="${y.toFixed(1)}" x2="${W - PADR}" y2="${y.toFixed(1)}" stroke="${cls}" stroke-width="1" stroke-dasharray="${cls === '#888' ? '4 4' : '2 6'}" opacity="0.6"/>`);
+    svgParts.push(`<line x1="${PADL}" y1="${y.toFixed(1)}" x2="${W - PADR}" y2="${y.toFixed(1)}" stroke="${cls}" stroke-width="1" stroke-dasharray="4 4" opacity="0.6"/>`);
     svgParts.push(`<text x="6" y="${(y + 4).toFixed(1)}" fill="var(--vscode-foreground,#ddd)" font-size="11" opacity="0.8">${escapeHtml(label)}</text>`);
   };
   tick(baseline, `base ${Math.round(baseline)}`, '#888');
@@ -358,7 +358,7 @@ export function buildCrossPlaneTrendPanelHtml(receipt, winTrend, linuxTrend, non
   const padV = Math.max(1, (vMax - vMin) * 0.15);
   const yLo = vMin - padV, yHi = vMax + padV;
   const xOf = (i) => PADL + (nMax <= 1 ? (W - PADL - PADR) / 2 : (i / (nMax - 1)) * (W - PADL - PADR));
-  const yOf = (v) => PADT + (1 - (v - yLo) / (yHi - yLo || 1)) * (H - PADT - PADB);
+  const yOf = (v) => PADT + (1 - (v - yLo) / (yHi - yLo)) * (H - PADT - PADB);
 
   const axis = [];
   for (let i = 0; i < nMax; i += 1) {
@@ -433,7 +433,7 @@ function metricSparkline(samples, field, triggerEpochMs, preMean, postMean, colo
   const y0 = yLo - padY, y1 = yHi + padY;
   const PADL = 4, PADR = 4, PADT = 6, PADB = 6;
   const xOf = (x) => PADL + ((x - xLo) / (xHi - xLo || 1)) * (W - PADL - PADR);
-  const yOf = (y) => PADT + (1 - (y - y0) / (y1 - y0 || 1)) * (H - PADT - PADB);
+  const yOf = (y) => PADT + (1 - (y - y0) / (y1 - y0)) * (H - PADT - PADB);
   const parts = [];
   const guide = (v, c) => {
     if (!Number.isFinite(v)) return;
@@ -469,7 +469,7 @@ export function buildResourcePanelHtml(rc, nonce) {
     const preMean = w.pre && typeof w.pre.mean === 'number' ? w.pre.mean : null;
     const postMean = w.post && typeof w.post.mean === 'number' ? w.post.mean : null;
     const delta = typeof w.deltaMean === 'number' ? w.deltaMean : null;
-    const spark = metricSparkline(samples, m.field, rc.triggerEpochMs, preMean, postMean, m.color, W, H);
+    const spark = metricSparkline(samples, m.field, rc?.triggerEpochMs, preMean, postMean, m.color, W, H);
     const fmt = (v) => (v === null ? '\u2014' : Math.round(v * 100) / 100);
     const sign = delta !== null && delta > 0 ? '+' : '';
     return `<tr>
@@ -528,7 +528,7 @@ export function buildCrossPlaneResourcePanelHtml(receipt, nonce) {
     const agree = m.status === 'agree';
     const sign = (v) => (v > 0 ? '+' : '');
     return `<div class="card" style="min-width:220px">
-      <div style="font-weight:600;margin-bottom:6px">${escapeHtml(labels[key] || key)}
+      <div style="font-weight:600;margin-bottom:6px">${escapeHtml(labels[key])}
         <span class="badge ${agree ? 'pass' : 'fail'}" style="float:right">${escapeHtml((m.status || '?').toUpperCase())}</span></div>
       <table>
         <tr><td class="k" style="color:${WIN_COLOR}">WIN \u0394</td><td>${deltaBar(wd, maxAbs, WIN_COLOR)}</td><td class="v">${escapeHtml(sign(wd) + wd)}</td></tr>

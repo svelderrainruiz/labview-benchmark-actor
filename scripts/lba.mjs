@@ -35,8 +35,9 @@
 //   signing-status               discover + report the enrolled reviewer key location + where each sign-off runs
 //   selftest                     self-check this tool (run by the `agent-tooling-selftest` gate)
 
-import { readFileSync, writeFileSync, existsSync, readdirSync } from 'node:fs';
+import { mkdirSync, readFileSync, writeFileSync, existsSync, readdirSync, rmSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
+import { createPrivateKey, createPublicKey, generateKeyPairSync } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import { dirname, join, resolve } from 'node:path';
 import { capacityWeightedPartition } from '../experiments/parallel/parallelWorkload.mjs';
@@ -44,6 +45,9 @@ import { describeFlow, analyzeFlow } from '../experiments/first-win/firstWinOnbo
 import { ingestRun, readReturned } from '../experiments/mesh-fulfillment/meshIngest.mjs';
 import { corroborateRun } from '../experiments/mesh-fulfillment/meshCorroborate.mjs';
 import { assembleLiveN2 } from '../experiments/mesh-fulfillment/driveLiveN2.mjs';
+import { stagedOk } from '../reviewer-workstation/release-with-review-drive.mjs';
+import { buildReleaseStage } from '../reviewer-workstation/record-release-stage.mjs';
+import { enrolledReviewerPublicKeys } from '../experiments/handoff-beacon/reviewerVerdict.mjs';
 
 export const ITERATION = 18; // bump when you refine this tool (see the banner above)
 
@@ -178,7 +182,7 @@ export function releasePlan(version) {
     { id: 4, key: 'dispatch-corroboration', kind: 'auto', exec: 'ci', dependsOn: [3], title: 'dispatch acg-cross-plane-corroboration.yml at the candidate commit', command: 'gh workflow run acg-cross-plane-corroboration.yml --ref <candidate-commit>' },
     { id: 5, key: 'build-attestation', kind: 'auto', exec: 'auto', dependsOn: [4], title: 'build the machine attestation from the run witnesses', command: 'node experiments/acg-quorum/cross-plane-attestation.mjs  (from the corroboration run artifacts)' },
     { id: 6, key: 'quorum-signoff', kind: 'operator', exec: 'operator', signing: true, dependsOn: [5], title: 'Ed25519 quorum sign-off over the attestation (enrolled key)', command: 'lba signing-status  ->  reviewer-workstation/render-quorum.sh all --version ' + v + ' (#415)' },
-    { id: 7, key: 'stage-benchmark', kind: 'operator', exec: 'operator', dependsOn: [3], title: 'stage + live-benchmark the candidate on the WIN VM (net DONE frame)', command: 'reviewer-workstation/render-verdict.sh set-target --version ' + v + ' … (#411)' },
+    { id: 7, key: 'stage-benchmark', kind: 'operator', exec: 'operator', dependsOn: [3], title: 'stage + live-benchmark the candidate on the WIN VM (net DONE frame)', command: 'reviewer-workstation/render-verdict.sh set-target --version ' + v + ' … (#411)  ->  save the WIN DONE frame as ~/lba-vm-share/staged-frame-WIN-' + v + '.json' },
     { id: 8, key: 'visual-verdict', kind: 'operator', exec: 'operator', signing: true, dependsOn: [7], title: 'signed reviewer visual verdict of the built candidate (Ed25519)', command: 'run "Render Reviewer Verdict" in the VM  ->  render-verdict.sh collect' },
     { id: 9, key: 'assemble-composite', kind: 'auto', exec: 'auto', dependsOn: [3, 5, 6, 7, 8], title: 'assemble the composite-release-decision receipt (binds all pieces to one candidate)', command: 'node reviewer-workstation/assemble-composite.mjs --component extension --version ' + v + ' … --out reviewer-workstation/composite-release-decision-receipt.json (#410)' },
     { id: 10, key: 'record-agreement', kind: 'auto', exec: 'auto', dependsOn: [9], title: 'record WIN+LINUX agreed + visualReview in release-agreement.json', command: 'node tools/collab-cli/record-release-agreement.mjs … (#419)' },
@@ -236,7 +240,7 @@ const PHASE_PROBE = {
   'dispatch-corroboration': 'attestationReady', 'build-attestation': 'attestationReady',
   'quorum-signoff': 'quorumSigned', 'stage-benchmark': 'staged', 'visual-verdict': 'visualSigned',
   'assemble-composite': 'compositeSealed', 'record-agreement': 'agreementRecorded',
-  'merge-main': 'mergedToMain', 'cut-gh-release': 'ghReleaseCut', 'publish-backmerge': 'published',
+  'merge-main': 'mergedToMain', 'cut-gh-release': 'ghReleaseCut', 'publish-backmerge': 'publishedAndBackMerged',
 };
 
 // Pure: annotate each phase with done/next/pending from the probe facts; the FIRST not-done phase is `next`.
@@ -271,6 +275,52 @@ export function renderReleaseStatus(status) {
   return lines.join('\n');
 }
 
+export function isStagedReleaseFrame(staged, version) {
+  const candidate = staged?.candidate;
+  return candidate?.component === 'extension'
+    && candidate?.version === String(version)
+    && stagedOk(staged, candidate);
+}
+
+export function isReleaseMergedTo(version, targetRef, isAncestor) {
+  const v = String(version);
+  return [`ext-v${v}`, `origin/release/${v}`, `release/${v}`].some((ref) => isAncestor(ref, targetRef));
+}
+
+export function isReleaseMergedToMain(version, isAncestor) {
+  return isReleaseMergedTo(version, 'origin/main', isAncestor);
+}
+
+export function isReleaseBackMergedToDevelop(version, isAncestor) {
+  return isReleaseMergedTo(version, 'origin/develop', isAncestor);
+}
+
+export const MARKETPLACE_VERIFICATION_SCHEMA = 'labview-benchmark-actor/marketplace-verification@1';
+
+export function marketplaceVerificationPath(share, version) {
+  return join(share, `marketplace-verification-${String(version)}.json`);
+}
+
+export function buildMarketplaceVerificationReceipt({ extension, version, result, verifiedAt = new Date().toISOString() } = {}) {
+  return {
+    schema: MARKETPLACE_VERIFICATION_SCHEMA,
+    extension: String(extension),
+    version: String(version),
+    verifiedAt,
+    observed: { latest: result?.latest ?? null, versions: Array.isArray(result?.versions) ? result.versions.map(String) : [] },
+    verdict: { published: result?.ok === true && result?.live === true },
+  };
+}
+
+export function isMarketplaceVerificationReceipt(receipt, { extension, version } = {}) {
+  return receipt?.schema === MARKETPLACE_VERIFICATION_SCHEMA
+    && receipt.extension === String(extension)
+    && receipt.version === String(version)
+    && receipt.verdict?.published === true
+    && Array.isArray(receipt.observed?.versions)
+    && receipt.observed.versions.map(String).includes(String(version));
+}
+
 // Impure live probes: best-effort, never throws. Reads git / package.json / CHANGELOG / the ~/lba-vm-share receipts /
 // the committed composite receipt + agreement / gh -- to detect which phases are already complete for `version`.
 export function liveReleaseProbes(version, { env = process.env } = {}) {
@@ -282,7 +332,14 @@ export function liveReleaseProbes(version, { env = process.env } = {}) {
   const agreement = (() => { try { return read('tools/collab-cli/release-agreement.json'); } catch { return null; } })();
   const shareHas = (name) => !!share && existsSync(join(share, name));
   const compositeSealed = !!composite && composite.candidate?.version === v && composite.verdict?.compositeReleaseProven === true;
-  const mergedToMain = tryGit(['merge-base', '--is-ancestor', `ext-v${v}`, 'origin/main']);
+  const stagedFrame = (() => { if (!share) return null; try { return JSON.parse(readFileSync(join(share, `staged-frame-WIN-${v}.json`), 'utf8')); } catch { return null; } })();
+  const extensionId = pkg.publisher && pkg.name ? `${pkg.publisher}.${pkg.name}` : '';
+  const marketplaceReceipt = (() => {
+    if (!share || !extensionId) return null;
+    try { return JSON.parse(readFileSync(marketplaceVerificationPath(share, v), 'utf8')); } catch { return null; }
+  })();
+  const mergedToMain = isReleaseMergedToMain(v, (ref, main) => tryGit(['merge-base', '--is-ancestor', ref, main]));
+  const backMergedToDevelop = isReleaseBackMergedToDevelop(v, (ref, develop) => tryGit(['merge-base', '--is-ancestor', ref, develop]));
   // Once a release has a sealed composite or is merged to main, it got PAST the early scaffolding (branch cut,
   // version bumped, vsix built, attestation ready) even if the release branch was later deleted -- so those
   // transient probes read done. A sealed composite also implies the quorum + visual + staging were completed.
@@ -293,13 +350,15 @@ export function liveReleaseProbes(version, { env = process.env } = {}) {
     vsixBuilt: progressed || (existsSync(join(repoRoot, 'labview-benchmark-actor.vsix')) && pkg.version === v),
     attestationReady: progressed || shareHas(`attestation-${v}.json`),
     quorumSigned: compositeSealed || shareHas(`quorum-signoff-${v}.json`),
-    staged: compositeSealed || shareHas(`visual-verdict-${v}.json`) || shareHas(`quorum-signoff-${v}.json`),
+    staged: compositeSealed || isStagedReleaseFrame(stagedFrame, v),
     visualSigned: compositeSealed || shareHas(`visual-verdict-${v}.json`),
     compositeSealed,
     agreementRecorded: !!agreement && agreement.includes(v),
     mergedToMain,
     ghReleaseCut: (() => { try { execFileSync('gh', ['release', 'view', `ext-v${v}`], { stdio: 'pipe' }); return true; } catch { return false; } })(),
-    published: false, // confirmed separately by `lba release-verify-published` (live Marketplace query)
+    published: isMarketplaceVerificationReceipt(marketplaceReceipt, { extension: extensionId, version: v }),
+    backMergedToDevelop,
+    publishedAndBackMerged: isMarketplaceVerificationReceipt(marketplaceReceipt, { extension: extensionId, version: v }) && backMergedToDevelop,
   };
 }
 
@@ -366,7 +425,21 @@ export function readReviewerAllowlist() {
   try {
     const raw = JSON.parse(read('tools/collab-cli/reviewer-allowlist.json') || '{}');
     const out = {};
-    for (const [k, v] of Object.entries(raw)) if (k !== '_comment' && typeof v === 'string') out[k] = v;
+    const validKey = (key) => typeof key === 'string'
+      ? key.trim() !== ''
+      : key && typeof key === 'object' && !Array.isArray(key)
+        && typeof key.publicKeyPem === 'string' && key.publicKeyPem.trim() !== ''
+        && typeof key.validFrom === 'string' && typeof key.validThrough === 'string'
+        && Array.isArray(key.purposes) && key.purposes.length > 0;
+    for (const [k, v] of Object.entries(raw)) {
+      if (
+        k !== '_comment'
+        && (
+          validKey(v)
+          || (Array.isArray(v) && v.length > 0 && v.every(validKey))
+        )
+      ) out[k] = v;
+    }
     return out;
   } catch { return {}; }
 }
@@ -396,15 +469,20 @@ export function signingStatus({ reviewerId, reviewerKeyPath, keyExists, station,
   const problems = [];
   const id = String(reviewerId || '').trim();
   const st = station || STATIONS.UNKNOWN;
-  const enrolled = enrolledPublicKey != null && String(enrolledPublicKey).trim() !== '';
+  const enrolledKeys = enrolledReviewerPublicKeys(enrolledPublicKey, { version, purpose: 'quorum' })
+    .filter((key) => typeof key === 'string' && key.trim());
+  const enrolled = enrolledKeys.length > 0;
   const norm = (k) => String(k || '').replace(/-----(BEGIN|END) PUBLIC KEY-----/g, '').replace(/\s+/g, '');
   let keyMatch = 'unknown';
-  if (presentedPublicKey != null && enrolled) keyMatch = norm(presentedPublicKey) === norm(enrolledPublicKey) ? 'match' : 'mismatch';
+  if (presentedPublicKey != null && enrolled) {
+    keyMatch = enrolledKeys.some((key) => norm(presentedPublicKey) === norm(key)) ? 'match' : 'mismatch';
+  }
 
   if (!id) problems.push('no reviewerId configured (set labviewBenchmarkActor.reviewerId in the reviewer VM)');
   if (st === STATIONS.UNKNOWN) problems.push('could not locate the signing station or the enrolled key (VM not reachable and no host key configured)');
   else if (keyExists === false) problems.push(`enrolled key not found at ${reviewerKeyPath || '<unset>'} on ${st}`);
-  if (id && !enrolled) problems.push(`reviewer ${id} is not enrolled in tools/collab-cli/reviewer-allowlist.json`);
+  if (id && !enrolled) problems.push(`reviewer ${id} has no quorum key enrolled for version ${version || '<missing>'}`);
+  if (enrolled && keyExists === true && presentedPublicKey == null) problems.push('configured key public identity could not be verified');
   if (keyMatch === 'mismatch') problems.push(`the presented public key does not match the enrolled allowlist entry for ${id}`);
 
   const commands = signingCommands({ station: st, reviewerId: id, reviewerKeyPath, version });
@@ -433,21 +511,54 @@ export function discoverSigningStation({ env = process.env, run } = {}) {
   const hostId = String(env.LBA_REVIEWER_ID || '').trim();
   const hostKey = String(env.LBA_REVIEWER_KEY || '').trim();
   if (hostId && hostKey) {
-    return { reviewerId: hostId, reviewerKeyPath: hostKey, keyExists: existsSync(hostKey), station: STATIONS.HOST, source: 'host env (LBA_REVIEWER_ID + LBA_REVIEWER_KEY)' };
+    const keyExists = existsSync(hostKey);
+    let presentedPublicKey = null;
+    if (keyExists) {
+      try {
+        presentedPublicKey = createPublicKey(createPrivateKey(readFileSync(hostKey))).export({
+          type: 'spki',
+          format: 'pem',
+        });
+      } catch { /* fail closed in signingStatus */ }
+    }
+    return { reviewerId: hostId, reviewerKeyPath: hostKey, keyExists, presentedPublicKey, station: STATIONS.HOST, source: 'host env (LBA_REVIEWER_ID + LBA_REVIEWER_KEY)' };
   }
   // 2) the reviewer VM: read its VS Code settings.json for reviewerId + reviewerKeyPath, then probe the key.
   if (pass) {
     try {
       const settings = `C:\\Users\\${user}\\AppData\\Roaming\\Code\\User\\settings.json`;
-      const gc = (inner) => exec('VBoxManage', ['guestcontrol', vm, '--username', user, '--password', pass, 'run', '--exe', 'C:\\Windows\\System32\\cmd.exe', '--wait-stdout', '--', 'cmd', '/c', inner]);
-      const cfg = JSON.parse(gc(`type "${settings}"`));
+      const ps = (inner) => exec('VBoxManage', [
+        'guestcontrol', vm, '--username', user, '--password', pass,
+        'run', '--exe', 'C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe',
+        '--wait-stdout', '--wait-stderr', '--',
+        '-NoLogo', '-NoProfile', '-NonInteractive', '-Command', inner,
+      ]);
+      const psLiteral = (value) => `'${String(value).replaceAll("'", "''")}'`;
+      const cfg = JSON.parse(ps(`Get-Content -LiteralPath ${psLiteral(settings)} -Raw`));
       const reviewerId = String(cfg['labviewBenchmarkActor.reviewerId'] || '').trim();
       const reviewerKeyPath = String(cfg['labviewBenchmarkActor.reviewerKeyPath'] || '').trim();
       let keyExists = null;
+      let presentedPublicKey = null;
       if (reviewerKeyPath) {
-        try { keyExists = /(^|\s)YES(\s|$)/.test(gc(`if exist "${reviewerKeyPath}" (echo YES) else (echo NO)`)); } catch { keyExists = null; }
+        try {
+          keyExists = /(^|\s)YES(\s|$)/.test(ps(
+            `if (Test-Path -LiteralPath ${psLiteral(reviewerKeyPath)}) { 'YES' } else { 'NO' }`,
+          ));
+        } catch { keyExists = null; }
+        if (keyExists) {
+          try {
+            const publicOut = 'C:\\Windows\\Temp\\lba-reviewer-public.pem';
+            const nodeScript = "const fs=require('fs'),c=require('crypto');fs.writeFileSync(process.argv[2],c.createPublicKey(c.createPrivateKey(fs.readFileSync(process.argv[1]))).export({type:'spki',format:'pem'}))";
+            presentedPublicKey = ps(
+              `$env:ELECTRON_RUN_AS_NODE='1'; $out=${psLiteral(publicOut)}; `
+              + `& 'C:\\Program Files\\Microsoft VS Code\\Code.exe' -e ${psLiteral(nodeScript)} ${psLiteral(reviewerKeyPath)} $out; `
+              + `if ($null -ne $LASTEXITCODE -and $LASTEXITCODE -ne 0) { exit $LASTEXITCODE }; `
+              + `$pem=Get-Content -LiteralPath $out -Raw; Remove-Item -LiteralPath $out -Force; $pem`,
+            ).trim() || null;
+          } catch { presentedPublicKey = null; }
+        }
       }
-      return { reviewerId, reviewerKeyPath: reviewerKeyPath || null, keyExists, station: STATIONS.VM, source: `reviewer VM "${vm}" VS Code settings.json` };
+      return { reviewerId, reviewerKeyPath: reviewerKeyPath || null, keyExists, presentedPublicKey, station: STATIONS.VM, source: `reviewer VM "${vm}" VS Code settings.json` };
     } catch { /* VM not reachable / VBoxManage absent -> fall through to UNKNOWN */ }
   }
   return { reviewerId: '', reviewerKeyPath: null, keyExists: null, station: STATIONS.UNKNOWN, source: 'none (set LBA_VM_PASS for the VM, or LBA_REVIEWER_ID + LBA_REVIEWER_KEY for a host key)' };
@@ -566,7 +677,7 @@ export const COMMANDS = {
     },
   },
   'release-verify-published': {
-    desc: 'confirm the VS Code Marketplace listing shows X.Y.Z live after publish (#412)',
+    desc: 'confirm the VS Code Marketplace listing shows X.Y.Z live after publish and record resumable local evidence (#412)',
     run: async (args) => {
       const version = args.find((a) => !a.startsWith('--'));
       if (!/^\d+\.\d+\.\d+/.test(version || '')) { console.error('usage: lba release-verify-published X.Y.Z [--extension <publisher.name>]'); process.exit(2); }
@@ -577,9 +688,27 @@ export const COMMANDS = {
       try {
         const q = await queryMarketplaceExtension({ publisher, name });
         const r = assertPublished(q, { publisher, name, version });
-        if (!r.ok) { console.error(`\u2717 ${extId} ${version} NOT confirmed live: ${r.reason}`); process.exit(1); }
+        if (!r.ok) {
+          console.error(`\u2717 ${extId} ${version} NOT confirmed live: ${r.reason}`);
+          process.exitCode = 1;
+          return;
+        }
+        const share = process.env.LBA_VM_SHARE || (process.env.HOME ? join(process.env.HOME, 'lba-vm-share') : '');
+        if (!share) {
+          console.error('\u2717 Marketplace verification succeeded but no local share is configured; set HOME or LBA_VM_SHARE to persist resumable evidence');
+          process.exitCode = 1;
+          return;
+        }
+        const receiptPath = marketplaceVerificationPath(share, version);
+        const receipt = buildMarketplaceVerificationReceipt({ extension: extId, version, result: r });
+        mkdirSync(share, { recursive: true });
+        writeFileSync(receiptPath, `${JSON.stringify(receipt, null, 2)}\n`);
         console.log(`\u2713 ${extId} ${version} is LIVE on the Marketplace (latest ${r.latest}; recent: ${r.versions.slice(0, 5).join(', ')})`);
-      } catch (e) { console.error(`\u2717 Marketplace query error: ${e.message}`); process.exit(1); }
+        console.log(`  recorded resumable Marketplace verification: ${receiptPath}`);
+      } catch (e) {
+        console.error(`\u2717 Marketplace query error: ${e.message}`);
+        process.exitCode = 1;
+      }
     },
   },
   'release-cut-github': {
@@ -601,10 +730,10 @@ export const COMMANDS = {
       const quoted = assets.map((a) => `'${a}'`).join(' ');
       if (!args.includes('--create')) {
         console.log(`\u2713 artifact verified for ${r.tag} (vsix ${String(r.vsix)}). DRY-RUN -- re-run with --create (needs your authorized bypass token) to cut it:`);
-        console.log(`  gh release create ${r.tag} ${quoted} --title '${r.tag}' --notes 'Immutable release ${version}.'`);
+        console.log(`  gh release create ${r.tag} ${quoted} --target main --title '${r.tag}' --notes 'Immutable release ${version}.'`);
         return;
       }
-      execFileSync('gh', ['release', 'create', r.tag, ...assets, '--title', r.tag, '--notes', `Immutable release ${version}.`], { stdio: 'inherit' });
+      execFileSync('gh', ['release', 'create', r.tag, ...assets, '--target', 'main', '--title', r.tag, '--notes', `Immutable release ${version}.`], { stdio: 'inherit' });
       console.log(`\u2713 cut ${r.tag} with ${assets.length} asset(s).`);
     },
   },
@@ -770,10 +899,39 @@ const SELFTEST = [
     const out = renderReleaseStatus(st);
     return /NEXT/.test(out) && /phase 6/.test(out) && /OPERATOR/.test(out) && out.includes('\u2713') && out.includes('\u25cb');
   }],
+  ['release status accepts only a version-bound WIN DONE staging frame for phase 7', () => {
+    const candidate = { component: 'extension', version: '1.2.0', commit: 'a'.repeat(40), vsixSha256: 'b'.repeat(64) };
+    const staged = { matched: true, candidate, frame: { type: 'DONE', senderId: 'WIN', task: 'stage-1.2.0', payload: JSON.stringify({ schema: 'labview-benchmark-actor/release-stage@1', candidate }) } };
+    const wrongPlane = { ...staged, frame: { ...staged.frame, senderId: 'LINUX' } };
+    const wrongVersion = { ...staged, candidate: { ...staged.candidate, version: '1.2.1' } };
+    const wrongCommit = { ...staged, frame: { ...staged.frame, payload: JSON.stringify({ schema: 'labview-benchmark-actor/release-stage@1', candidate: { ...candidate, commit: 'c'.repeat(40) } }) } };
+    const wrongVsix = { ...staged, frame: { ...staged.frame, payload: JSON.stringify({ schema: 'labview-benchmark-actor/release-stage@1', candidate: { ...candidate, vsixSha256: 'd'.repeat(64) } }) } };
+    const incomplete = { ...staged, matched: false };
+    return isStagedReleaseFrame(staged, '1.2.0') && !isStagedReleaseFrame(wrongPlane, '1.2.0') && !isStagedReleaseFrame(wrongVersion, '1.2.0') && !isStagedReleaseFrame(wrongCommit, '1.2.0') && !isStagedReleaseFrame(wrongVsix, '1.2.0') && !isStagedReleaseFrame(incomplete, '1.2.0');
+  }],
+  ['release-stage producer normalizes a correlated WIN readback into the composite staging shape', () => {
+    const candidate = { component: 'extension', version: '1.2.0', commit: 'a'.repeat(40), vsixSha256: 'b'.repeat(64) };
+    const payload = JSON.stringify({ schema: 'labview-benchmark-actor/release-stage@1', candidate });
+    const staged = buildReleaseStage({ candidate, readback: { matched: true, expected: { type: 'DONE', task: 'stage-1.2.0' }, reply: { senderId: 'WIN', type: 'DONE', task: 'stage-1.2.0', payload } } });
+    return isStagedReleaseFrame(staged, '1.2.0') && staged.candidate.commit === candidate.commit && staged.candidate.vsixSha256 === candidate.vsixSha256;
+  }],
+  ['release status detects a merged release branch before the later ext-v tag exists', () => isReleaseMergedToMain('1.2.0', (ref, main) => ref === 'origin/release/1.2.0' && main === 'origin/main')],
+  ['release status requires the release ancestry in develop before phase 13 is complete', () => {
+    const backMerged = isReleaseBackMergedToDevelop('1.2.0', (ref, develop) => ref === 'origin/release/1.2.0' && develop === 'origin/develop');
+    const publishedOnly = releaseStatus({ version: '1.2.0', probes: { branchExists: true, versionBumped: true, vsixBuilt: true, attestationReady: true, quorumSigned: true, staged: true, visualSigned: true, compositeSealed: true, agreementRecorded: true, mergedToMain: true, ghReleaseCut: true, published: true, publishedAndBackMerged: false } });
+    return backMerged && publishedOnly.next?.key === 'publish-backmerge';
+  }],
   ['release-verify-published (#412) confirms a version present in the Marketplace query result', () => {
     const q = { results: [{ extensions: [{ publisher: { publisherName: 'pub' }, extensionName: 'ext', versions: [{ version: '1.2.0' }, { version: '1.1.1' }] }] }] };
     const r = assertPublished(q, { publisher: 'pub', name: 'ext', version: '1.2.0' });
     return r.ok === true && r.live === true && r.latest === '1.2.0';
+  }],
+  ['release-verify-published records only a matching successful Marketplace observation as resumable evidence', () => {
+    const result = { ok: true, live: true, latest: '1.2.0', versions: ['1.2.0', '1.1.1'] };
+    const receipt = buildMarketplaceVerificationReceipt({ extension: 'pub.ext', version: '1.2.0', result, verifiedAt: '2026-08-06T00:00:00.000Z' });
+    const wrongVersion = { ...receipt, version: '1.2.1' };
+    return isMarketplaceVerificationReceipt(receipt, { extension: 'pub.ext', version: '1.2.0' })
+      && !isMarketplaceVerificationReceipt(wrongVersion, { extension: 'pub.ext', version: '1.2.0' });
   }],
   ['release-verify-published (#412) fails closed on absent version / publisher mismatch / no extension', () => {
     const q = { results: [{ extensions: [{ publisher: { publisherName: 'pub' }, extensionName: 'ext', versions: [{ version: '1.1.1' }] }] }] };
@@ -795,7 +953,8 @@ const SELFTEST = [
   }],
   ['signing-status binds the QUORUM sign-off to the VM when the enrolled key lives there (#414), key never read', () => {
     const enrolled = readReviewerAllowlist()['reviewer@vi-tech.nl'];
-    const s = signingStatus({ reviewerId: 'reviewer@vi-tech.nl', reviewerKeyPath: 'C:\\lba-review\\reviewer-vitech.pem', keyExists: true, station: STATIONS.VM, enrolledPublicKey: enrolled, version: '1.2.0' });
+    const presentedPublicKey = enrolledReviewerPublicKeys(enrolled, { version: '1.2.0', purpose: 'quorum' })[0];
+    const s = signingStatus({ reviewerId: 'reviewer@vi-tech.nl', reviewerKeyPath: 'C:\\lba-review\\reviewer-vitech.pem', keyExists: true, station: STATIONS.VM, enrolledPublicKey: enrolled, presentedPublicKey, version: '1.2.0' });
     // ok, quorum command runs IN the VM (cmd /c from the repo clone), visual uses render-verdict.sh, and the
     // committed private-key PATH is echoed but never its material.
     return s.ok && s.station === STATIONS.VM && /cmd \/c .*sign-release-quorum\.mjs/.test(s.commands.quorum)
@@ -803,24 +962,100 @@ const SELFTEST = [
   }],
   ['signing-status binds the QUORUM sign-off to the HOST (plain CLI, no cmd /c) when the key is host-resident (#414)', () => {
     const enrolled = readReviewerAllowlist()['reviewer@vi-tech.nl'];
-    const s = signingStatus({ reviewerId: 'reviewer@vi-tech.nl', reviewerKeyPath: '/home/rev/enrolled.pem', keyExists: true, station: STATIONS.HOST, enrolledPublicKey: enrolled });
+    const presentedPublicKey = enrolledReviewerPublicKeys(enrolled, { version: '1.2.0', purpose: 'quorum' })[0];
+    const s = signingStatus({ reviewerId: 'reviewer@vi-tech.nl', reviewerKeyPath: '/home/rev/enrolled.pem', keyExists: true, station: STATIONS.HOST, enrolledPublicKey: enrolled, presentedPublicKey, version: '1.2.0' });
     return s.ok && s.station === STATIONS.HOST && /^node reviewer-workstation\/sign-release-quorum\.mjs/.test(s.commands.quorum) && !/cmd \/c/.test(s.commands.quorum);
   }],
   ['signing-status fails closed on a missing key, an unenrolled reviewer, a public-key mismatch, and an unknown station (#414)', () => {
     const enrolled = readReviewerAllowlist()['reviewer@vi-tech.nl'];
-    const missing = signingStatus({ reviewerId: 'reviewer@vi-tech.nl', reviewerKeyPath: 'C:\\lba-review\\reviewer-vitech.pem', keyExists: false, station: STATIONS.VM, enrolledPublicKey: enrolled });
+    const missing = signingStatus({ reviewerId: 'reviewer@vi-tech.nl', reviewerKeyPath: 'C:\\lba-review\\reviewer-vitech.pem', keyExists: false, station: STATIONS.VM, enrolledPublicKey: enrolled, version: '1.2.0' });
     const unenrolled = signingStatus({ reviewerId: 'stranger@example.com', reviewerKeyPath: '/k.pem', keyExists: true, station: STATIONS.HOST, enrolledPublicKey: null });
-    const mismatch = signingStatus({ reviewerId: 'reviewer@vi-tech.nl', reviewerKeyPath: '/k.pem', keyExists: true, station: STATIONS.HOST, enrolledPublicKey: enrolled, presentedPublicKey: '-----BEGIN PUBLIC KEY-----\nDEADBEEF\n-----END PUBLIC KEY-----\n' });
+    const mismatch = signingStatus({ reviewerId: 'reviewer@vi-tech.nl', reviewerKeyPath: '/k.pem', keyExists: true, station: STATIONS.HOST, enrolledPublicKey: enrolled, presentedPublicKey: '-----BEGIN PUBLIC KEY-----\nDEADBEEF\n-----END PUBLIC KEY-----\n', version: '1.2.0' });
     const unknown = signingStatus({ station: STATIONS.UNKNOWN });
     return missing.ok === false && /not found/.test(missing.problems.join())
-      && unenrolled.ok === false && /not enrolled/.test(unenrolled.problems.join())
+      && unenrolled.ok === false && /no quorum key enrolled/.test(unenrolled.problems.join())
       && mismatch.ok === false && mismatch.keyMatch === 'mismatch'
       && unknown.ok === false && /could not locate the signing station/.test(unknown.problems.join());
   }],
   ['signing-status confirms a public-key MATCH clears + reports enrolled (#414)', () => {
     const enrolled = readReviewerAllowlist()['reviewer@vi-tech.nl'];
-    const s = signingStatus({ reviewerId: 'reviewer@vi-tech.nl', reviewerKeyPath: '/k.pem', keyExists: true, station: STATIONS.HOST, enrolledPublicKey: enrolled, presentedPublicKey: enrolled });
+    const selected = Array.isArray(enrolled) ? enrolled.at(-1) : enrolled;
+    const presented = typeof selected === 'string' ? selected : selected.publicKeyPem;
+    const selectedVersion = typeof selected === 'string' ? '1.2.0' : selected.validFrom;
+    const s = signingStatus({ reviewerId: 'reviewer@vi-tech.nl', reviewerKeyPath: '/k.pem', keyExists: true, station: STATIONS.HOST, enrolledPublicKey: enrolled, presentedPublicKey: presented, version: selectedVersion });
     return s.ok && s.enrolled === true && s.keyMatch === 'match';
+  }],
+  ['signing-status selects only the requested version quorum key and rejects a visual key (#414)', () => {
+    const quorum = '-----BEGIN PUBLIC KEY-----\nQUORUM\n-----END PUBLIC KEY-----\n';
+    const visual = '-----BEGIN PUBLIC KEY-----\nVISUAL\n-----END PUBLIC KEY-----\n';
+    const enrolled = [
+      { publicKeyPem: visual, validFrom: '2.0.0', validThrough: '2.0.0', purposes: ['visual'] },
+      { publicKeyPem: quorum, validFrom: '2.0.0', validThrough: '2.0.0', purposes: ['quorum'] },
+    ];
+    const good = signingStatus({
+      reviewerId: 'reviewer@example.com', reviewerKeyPath: '/q.pem', keyExists: true,
+      station: STATIONS.HOST, enrolledPublicKey: enrolled, presentedPublicKey: quorum, version: '2.0.0',
+    });
+    const wrongPurpose = signingStatus({
+      reviewerId: 'reviewer@example.com', reviewerKeyPath: '/v.pem', keyExists: true,
+      station: STATIONS.HOST, enrolledPublicKey: enrolled, presentedPublicKey: visual, version: '2.0.0',
+    });
+    const outOfRange = signingStatus({
+      reviewerId: 'reviewer@example.com', reviewerKeyPath: '/q.pem', keyExists: true,
+      station: STATIONS.HOST, enrolledPublicKey: enrolled, presentedPublicKey: quorum, version: '2.0.1',
+    });
+    const unverified = signingStatus({
+      reviewerId: 'reviewer@example.com', reviewerKeyPath: '/q.pem', keyExists: true,
+      station: STATIONS.HOST, enrolledPublicKey: enrolled, version: '2.0.0',
+    });
+    return good.ok && good.keyMatch === 'match'
+      && !wrongPurpose.ok && wrongPurpose.keyMatch === 'mismatch'
+      && !outOfRange.ok && /no quorum key enrolled/.test(outOfRange.problems.join())
+      && !unverified.ok && /public identity/.test(unverified.problems.join());
+  }],
+  ['signing-station discovery derives the host key public identity without exposing private material (#414)', () => {
+    const root = join(repoRoot, '.lba', 'selftest-signing-key');
+    mkdirSync(root, { recursive: true });
+    const key = join(root, 'private.pem');
+    const { privateKey } = generateKeyPairSync('ed25519');
+    writeFileSync(key, privateKey.export({ type: 'pkcs8', format: 'pem' }));
+    try {
+      const discovered = discoverSigningStation({
+        env: { LBA_REVIEWER_ID: 'reviewer@example.com', LBA_REVIEWER_KEY: key },
+      });
+      return discovered.station === STATIONS.HOST
+        && discovered.keyExists
+        && /BEGIN PUBLIC KEY/.test(discovered.presentedPublicKey)
+        && !/PRIVATE KEY/.test(discovered.presentedPublicKey);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  }],
+  ['signing-station discovery derives the VM key public identity through the guest runtime (#414)', () => {
+    const publicKey = '-----BEGIN PUBLIC KEY-----\nVM-PUBLIC\n-----END PUBLIC KEY-----\n';
+    const discovered = discoverSigningStation({
+      env: { LBA_VM_PASS: 'test', LBA_VM_NAME: 'actor', LBA_VM_USER: 'vagrant' },
+      run: (_file, args) => {
+        const command = String(args.at(-1));
+        if (command.includes('ELECTRON_RUN_AS_NODE')) {
+          if (!command.includes('if ($null -ne $LASTEXITCODE -and $LASTEXITCODE -ne 0)')) {
+            throw new Error('guest derivation must tolerate an unset GUI-process LASTEXITCODE');
+          }
+          return publicKey;
+        }
+        if (command.includes('Get-Content -LiteralPath')) {
+          return JSON.stringify({
+            'labviewBenchmarkActor.reviewerId': 'reviewer@example.com',
+            'labviewBenchmarkActor.reviewerKeyPath': 'C:\\lba-review\\reviewer.pem',
+          });
+        }
+        if (command.includes('Test-Path -LiteralPath')) return 'YES';
+        throw new Error(`unexpected guest command: ${command}`);
+      },
+    });
+    return discovered.station === STATIONS.VM
+      && discovered.keyExists
+      && discovered.presentedPublicKey === publicKey.trim();
   }],
   ['capacity-weighted partition splits a task set disjointly, covers it, and honours weight', () => {
     // rg-free (CI runners have no ripgrep): a synthetic task set exercises the pure partitioner.
@@ -886,5 +1121,5 @@ if (invokedDirectly) {
   }
   const c = COMMANDS[cmd];
   if (!c) { console.error(`unknown subcommand: ${cmd} (try: lba help)`); process.exit(2); }
-  c.run(args);
+  await c.run(args);
 }

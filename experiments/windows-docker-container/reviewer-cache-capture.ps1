@@ -210,7 +210,11 @@ try {
     '--vagrant-cwd', $metadata.vagrant.cwd,
     '--vagrant-machine', 'default'
   ) $logPath -AllowFailure
-  $summary = Get-Content -LiteralPath (Join-Path $captureRoot 'capture-summary.json') -Raw | ConvertFrom-Json
+  $summaryPath = Join-Path $captureRoot 'capture-summary.json'
+  if (-not (Test-Path -LiteralPath $summaryPath)) {
+    throw "Reviewer capture exited $($capture.ExitCode) without creating capture-summary.json. See '$logPath'."
+  }
+  $summary = Get-Content -LiteralPath $summaryPath -Raw | ConvertFrom-Json
   if ($capture.ExitCode -eq 0 -and $summary.outcome -eq 'passed' -and $summary.visibility.passed) {
     $capturePassed = $true
   } elseif (

@@ -100,5 +100,9 @@
 | LBA-REQ-091 | Run-bound mesh ingestion (bind a live dispatch + the actors' returned receipts) | Proven | §3.2 Deployment | ADR-0074 | T-091 | 5 |
 | LBA-REQ-092 | Run-bound cross-plane corroborate + compare (the ingested collection) | Proven | §3.2 Deployment | ADR-0075 | T-092 | 6 |
 | LBA-REQ-093 | The Node-version-pinned reproducible package (reviewed Node equals shipped Node) | Proven | §3.1 Packaging / boundary | ADR-0076 | T-093 | 7 |
+| LBA-REQ-094 | Extension-contributed compound human tasks | Proven | — | ADR-0077 | T-094 | 7 |
+| LBA-REQ-095 | System-level SemVer, task chronology, and canonical distribution | Proven | — | ADR-0078 | T-095 | 24 |
+| LBA-REQ-096 | Standards scorecard release-risk overlay | Proven | — | ADR-0079 | T-096 | 9 |
+| LBA-REQ-097 | Experiment lifecycle and local continuous KPI | Proven | — | ADR-0080 | T-097 | 16 |
 
-_Generated for 93 requirements._
+_Generated for 97 requirements._

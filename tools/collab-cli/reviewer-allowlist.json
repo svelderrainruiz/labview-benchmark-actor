@@ -1,4 +1,83 @@
 {
-  "_comment": "Enrolled reviewer visual-verdict signing keys (reviewer id -> Ed25519 SPKI public key PEM). Add entries with reviewer-workstation/enroll-reviewer.mjs (the private key stays LOCAL to the reviewer, never committed). The verify-visual-review gate + the extension-release workflow verify a release's signed reviewer verdict against these keys (LBA-REQ-057, ADR-0037).",
-  "reviewer@vi-tech.nl": "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEAWRnlX++0MkQq+vtVEEMnBDON+cQEjNi49qFY07DwV2g=\n-----END PUBLIC KEY-----\n"
+  "_comment": "Enrolled reviewer signing keys. Production entries retain rotated Ed25519 public keys with inclusive validFrom/validThrough SemVer bounds and explicit visual/quorum purposes. Never remove a key that authenticates historical release evidence; never extend a retired key into a newer release range. Private keys stay LOCAL to the reviewer and are never committed.",
+  "reviewer@vi-tech.nl": [
+    {
+      "publicKeyPem": "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEAWRnlX++0MkQq+vtVEEMnBDON+cQEjNi49qFY07DwV2g=\n-----END PUBLIC KEY-----\n",
+      "validFrom": "1.2.0",
+      "validThrough": "1.3.0",
+      "purposes": ["visual", "quorum"]
+    },
+    {
+      "publicKeyPem": "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEA48x43N+/xB6wzHzEVbPBrEs71/hVNa5k3VQ5LdlvsAg=\n-----END PUBLIC KEY-----\n",
+      "validFrom": "1.4.0",
+      "validThrough": "1.4.0",
+      "purposes": ["visual"]
+    },
+    {
+      "publicKeyPem": "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEAWAFKcRM63zi4l4FR5do2zekHiCGUKyMwWaKiJpoLI9k=\n-----END PUBLIC KEY-----\n",
+      "validFrom": "1.4.0",
+      "validThrough": "1.4.0",
+      "purposes": ["quorum"]
+    },
+    {
+      "publicKeyPem": "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEAAEznE1nN9EsYaOL407jsGvdf+C1e/i8zN/djTbTx69Y=\n-----END PUBLIC KEY-----\n",
+      "validFrom": "1.4.1",
+      "validThrough": "1.4.1",
+      "purposes": ["visual"]
+    },
+    {
+      "publicKeyPem": "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEAX3ohkf35nakHXoAcVyMYNHSBjsvF6dlcgcLtgIBdRsU=\n-----END PUBLIC KEY-----\n",
+      "validFrom": "1.4.1",
+      "validThrough": "1.4.1",
+      "purposes": ["quorum"]
+    },
+    {
+      "publicKeyPem": "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEAoK954rhACvTtU3++eU/EfBwvn1gVUiUusOfGlmmiMro=\n-----END PUBLIC KEY-----\n",
+      "validFrom": "1.4.3",
+      "validThrough": "1.4.3",
+      "purposes": ["visual"]
+    },
+    {
+      "publicKeyPem": "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEAsA0IwU+GrddDmYc0mCJX2BDKSfHxSGbsEMtbXXN40Vg=\n-----END PUBLIC KEY-----\n",
+      "validFrom": "1.4.3",
+      "validThrough": "1.4.3",
+      "purposes": ["quorum"]
+    },
+    {
+      "publicKeyPem": "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEAc3SQQdG04c0gv/TgTMdm2cOuL8jZwtl8rSHe8npoa44=\n-----END PUBLIC KEY-----\n",
+      "validFrom": "1.4.4",
+      "validThrough": "1.4.4",
+      "purposes": ["visual"]
+    },
+    {
+      "publicKeyPem": "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEA12IQT5AF9+Qet9+c6TXy3Yh4HWsonYe4jhtLDfBj290=\n-----END PUBLIC KEY-----\n",
+      "validFrom": "1.4.4",
+      "validThrough": "1.4.4",
+      "purposes": ["quorum"]
+    },
+    {
+      "publicKeyPem": "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEAcuGum4hppckDIVQcEgsVfk1oHmVdt75z9QxhdrZKWgE=\n-----END PUBLIC KEY-----\n",
+      "validFrom": "1.4.5",
+      "validThrough": "1.4.5",
+      "purposes": ["visual"]
+    },
+    {
+      "publicKeyPem": "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEADhrmiF33qRyKVruYXCxE5WGTrF6k5mnrmJPqK0IqJWg=\n-----END PUBLIC KEY-----\n",
+      "validFrom": "1.4.5",
+      "validThrough": "1.4.5",
+      "purposes": ["quorum"]
+    },
+    {
+      "publicKeyPem": "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEAp1eaifgDEd1NuoimEUq3RsZPr/SkT7A8/sKWPMmV2Hw=\n-----END PUBLIC KEY-----\n",
+      "validFrom": "1.4.8",
+      "validThrough": "1.4.8",
+      "purposes": ["visual"]
+    },
+    {
+      "publicKeyPem": "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEAjoblu4aKIrkfDMxTD5fmexR5TwJn4EPdBlCXXpsVAMg=\n-----END PUBLIC KEY-----\n",
+      "validFrom": "1.4.8",
+      "validThrough": "1.4.8",
+      "purposes": ["quorum"]
+    }
+  ]
 }

@@ -6,6 +6,145 @@ follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project
 
 ## [Unreleased]
 
+## [1.4.8] - 2026-08-08
+
+### Fixed
+
+- **Reviewer-VM key identity derivation handles the real VS Code launcher.** The Windows GUI launcher can leave
+  PowerShell's `$LASTEXITCODE` unset even after producing the derived public key. Signing readiness now distinguishes
+  an unset status from a nonzero failure and still fails closed if the public-key artifact cannot be read.
+
+## [1.4.7] - 2026-08-08
+
+### Fixed
+
+- **Windows compound tasks execute command shims correctly.** `.cmd` invocations route through `cmd.exe` without
+  shell interpolation, with a real Windows shim regression test.
+- **Signing readiness binds the configured key itself.** Host and reviewer-VM discovery derive only the public key
+  from the configured private key, then require a match to the requested version's quorum-purpose enrollment.
+- **Visual verdicts are strictly candidate-bound.** Both verdict validation and the standalone visual gate require
+  a 40-hex Git commit and a 64-hex VSIX SHA-256.
+
+## [1.4.6] - 2026-08-08
+
+### Fixed
+
+- **Hosted Linux checks use a true Windows path model.** The injected-platform `lbabus` resolver now uses
+  `path.win32`, so Linux CI deterministically validates the Windows `%LOCALAPPDATA%\lba\lbabus.exe` fallback
+  instead of mixing host separators.
+- **Reviewer task and signing readiness are platform/purpose aware.** Windows compound tasks launch `npm.cmd`,
+  and signing status selects only keys valid for the requested version and `quorum` purpose before printing a
+  quorum command.
+- **Visual acceptance requires a complete candidate identity.** Reviewer verdict validation and the standalone
+  visual gate reject anything without a 40-hex Git commit and 64-hex VSIX SHA-256.
+- **Clean-checkout governance matches local governance.** The generated agent-last-gate receipt directory now has
+  a tracked contract, first-introduction component fallback includes experiment-governance versioning, null frame
+  titles remain empty, and MCP environment documentation reflects the always-present resolved lbabus path.
+
+## [1.4.5] - 2026-08-08
+
+### Fixed
+
+- **Reviewer candidate provenance is explicit.** Full local-CI receipts now bind the exact clean Git commit,
+  branch, VSIX SHA-256/size, duplicate package hashes, coverage counters, local-gate count, and correspondence
+  count. Reviewer staging can retain the physical VSIX beside that receipt instead of asking a human to infer
+  commit-to-artifact identity.
+- **Reviewer preflight is provisioned, not aspirational.** An on-demand privileged Vagrant provisioner installs
+  and verifies Git, ripgrep, GitHub CLI, GitLab CLI, and .NET SDK 8, while `lbabus` resolves their stable Windows
+  install paths and requires `selfcheck: PASS`.
+- **Human visual review is separated from final release authorization.** Generated AGENTS now states that pending
+  downstream hosted, cross-plane, canonical-release, lineage, and Marketplace proofs keep publication blocked but
+  do not independently require REQUEST CHANGES after candidate identity, behavior, and architecture pass.
+
+## [1.4.4] - 2026-08-08
+
+### Fixed
+
+- **Reviewer `lbabus` survives stale Windows PATH inheritance.** The extension command host, contributed MCP
+  server, and compound human tasks resolve the staged `C:\lba-tools\lbabus\lbabus.exe` explicitly (with an
+  optional `LBA_LBABUS_PATH` override and normal PATH fallback). This remediates the signed 1.4.3 FAIL where the
+  exact 0.15.2 binary was installed and verified but VS Code's inherited Explorer environment still reported
+  `Tool error: the 'lbabus' coordination CLI is not on PATH`.
+
+## [1.4.3] - 2026-08-08
+
+### Fixed
+- **Rotated reviewer keys are release- and purpose-scoped.** Production reviewer enrollment now
+  assigns each retained Ed25519 public key an inclusive SemVer validity range and explicit
+  `visual`/`quorum` purposes. Historical signatures remain verifiable, while an old, visual-only,
+  out-of-range, or versionless scoped key fails closed instead of authorizing a newer release.
+- **Host capabilities remain useful without `lbabus`.** The VS Code command falls back to a built-in
+  read-only probe instead of surfacing raw `spawn lbabus ENOENT`, and reports Docker, Vagrant,
+  VirtualBox, VMware, LabVIEW 32/64-bit, and LabVIEWCLI availability with detected versions.
+- **Reviewer workstations join the mesh immediately.** Local reviewer staging publishes the repository
+  `lbabus` Windows apphost, installs and version-checks it in a stable user-PATH location, and requires
+  that proof alongside the exact VSIX; a full VS Code restart picks up the new PATH.
+- **Icon Editor prerequisites are explicit.** Shipped agent guidance now requires installed/activated
+  VI Package Manager and applying `icon-editor-developer.vipc` to each intended LabVIEW 2026 Q3
+  bitness before treating `ni/labview-icon-editor` as provisioned.
+- **Generated agent instructions pin the next-agent toolchain.** AGENTS.md 0.3.7 now specifies exact
+  `lbabus` and Node versions, .NET runtime/SDK roles, Git/GitHub/GitLab/ripgrep minimums, and the
+  validated Vagrant/VirtualBox/LabVIEW/TightVNC reviewer stack; tests fail if core pins disappear.
+- **Human task workflows and review evidence are versioned.** Compound task bundle 1.0.2 is shown in
+  generated AGENTS.md and task details, while a maintained collector captures indexed raw candidate,
+  command/task, agent-instruction, capability, reviewer-setting, VM, and screenshot evidence before teardown.
+- **Governed tasks produce deterministic noninteractive receipts.** Every task and child-output event carries
+  an index, UTC wall timestamp, monotonic nanoseconds, and the named `process.hrtime.bigint` clock source.
+  Dedicated task terminals suppress reuse prompts and receipts persist under extension global storage.
+- **Static PASS no longer hides release risk.** The exact repo-standards-review 0.2.19 commit/image is bound into
+  the system definition. Generated AGENTS preserves the raw 25/25 and six PASS baseline, interprets every `-`
+  Missing Proof cell conservatively, and exposes a transparent 12/28 release-evidence score with per-gate risks
+  and forward actions. Governance Review prints the same overlay into its indexed receipt.
+- **Experiments have an enforced lifecycle and local KPI.** Versioned experiment-governance/KPI bundle 1.0.0 uses
+  RTM references to govern active experiments; explicit
+  overrides classify every remainder and prohibit prototype/superseded/evidence-only production use. Quick local CI
+  verifies incremental CHANGELOG/system state; clean full local CI retains tests, gates, correspondence, and two-build
+  package reproducibility before a verdict.
+- **Branch coverage is enforced at 95%.** Deterministic defensive-path tests raise measured branches to 96.10%;
+  the cross-platform c8 gate now measures all source files and fails below 95% branches.
+- **Release components follow one SemVer contract.** `release-components.json` binds the extension, AGENTS,
+  `lbabus`, human-task, exact standards-review commit, and workbench-image digest. The repository precommit hook
+  rejects component changes without their component and extension version bumps, final staged package metadata,
+  and a matching CHANGELOG section.
+- **GitHub Release is canonical.** Marketplace delivery uses the prerelease channel and cannot silently
+  substitute a stable Marketplace publication for the reviewed, signed GitHub Release artifact. The secondary
+  dispatch runs from the release tag and publishes the downloaded canonical asset, avoiding drift if `main` advances.
+
+## [1.4.0] - 2026-08-08
+
+### Added
+- **Verified Windows-container TightVNC image acquisition.** The local experiment now retains and
+  independently verifies the PNG decoded from the exact run-owned container's authenticated RFB
+  stream, binds its container/network/relay provenance into a deterministic MPRR transport replay,
+  and executes the repository's `lbabus` capability probe inside the pinned image. Verbose
+  timestamped host and container diagnostics expose each acquisition and cleanup stage. The live
+  proof remains fail-closed: the acquired `1024x768` image is uniformly black, is explicitly marked
+  unusable, and cannot be represented as an interactive desktop or visual LabVIEW benchmark.
+
+### Fixed
+- **Marketplace publication verification exits cleanly on a missing version or query failure.** The
+  asynchronous `release-verify-published` command now finishes its Marketplace query before setting
+  a failing exit code instead of forcing process termination while Node still owns network handles.
+- **Retained reviewer staging preserves the sealed candidate bytes.** The reviewer-cache wrapper now
+  stages the already-built pinned-Node VSIX without rebuilding it, rejects a mismatched expected
+  SHA-256 before VM mutation, and verifies the uploaded guest candidate hash before accepting the
+  interactive-profile installation.
+- **Reviewer cache artifacts survive later candidate builds.** New cache seals archive their exact
+  VSIX under the cache root instead of retaining a mutable worktree path. The historical cache has an
+  explicit recovery path that verifies and binds an installed-extension archive and per-file manifest
+  to the powered-off source snapshot when the original timestamped VSIX was not retained.
+- **Activated LabVIEW capture accepts its real content window layout.** When LabVIEW exposes a
+  zero-sized titled frame plus a usable untitled child window, the launcher binds the largest usable
+  process-owned window to the same-process `LabVIEW` title evidence instead of failing the fresh
+  activation probe. DWM extended-frame bounds replace zero/client-only `GetWindowRect` values when
+  available. When LabVIEW's titled `LVFrame` still reports `0x0`, a recorded narrow expansion around
+  the same-process client bounds includes its visible title, menu, and frame without promoting the ROI
+  to a full-desktop claim. Missing capture summaries now surface the original capture failure directly.
+- **Reviewer key rotation preserves historical signatures.** Reviewer allowlist entries may retain an
+  ordered set of enrolled Ed25519 public keys, allowing a missing VM-local private key to be replaced
+  without invalidating prior release evidence. Signing-status discovery now invokes guest PowerShell
+  directly and recognizes rotated-key entries.
+
 ## [1.3.0] - 2026-08-06
 
 ### Added

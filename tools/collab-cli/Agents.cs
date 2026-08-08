@@ -129,7 +129,7 @@ internal static class AgentsCommand
     {
         try
         {
-            var psi = new ProcessStartInfo("git") { RedirectStandardOutput = true, RedirectStandardError = true, UseShellExecute = false };
+            var psi = new ProcessStartInfo(Preflight.ResolveCommand("git")) { RedirectStandardOutput = true, RedirectStandardError = true, UseShellExecute = false };
             psi.ArgumentList.Add("-C"); psi.ArgumentList.Add(repo);
             psi.ArgumentList.Add("log"); psi.ArgumentList.Add("-1"); psi.ArgumentList.Add("--format=%B"); psi.ArgumentList.Add(reference);
             using Process? p = Process.Start(psi);

@@ -1,13 +1,15 @@
 [CmdletBinding()]
 param(
   [Parameter(Mandatory = $true)]
-  [ValidateSet('Init', 'Status', 'Resume', 'Halt')]
+  [ValidateSet('Init', 'Status', 'RepairVsixProof', 'Resume', 'Halt')]
   [string]$Action,
   [string]$CacheRoot = 'D:\lba-vagrant-instances\actor-reviewer-local',
   [string]$VagrantHome = 'D:\vagrant-home',
   [string]$VmName = 'actor-reviewer-local',
   [string]$Hostname = 'actor-reviewer',
-  [string]$BoxName = 'actor/win11-labview2026'
+  [string]$BoxName = 'actor/win11-labview2026',
+  [string]$InstalledExtensionManifest,
+  [string]$InstalledExtensionArchive
 )
 
 $ErrorActionPreference = 'Stop'
@@ -272,6 +274,142 @@ $info = Assert-CacheOwnership $metadata
 $activeLock = if (Test-Path -LiteralPath $lockPath) { Assert-CacheLock $metadata } else { $null }
 if ($metadata.state -ne 'cache-ready' -and -not $activeLock) {
   throw 'An unsealed reviewer cache requires its lifecycle lock.'
+}
+
+if ($Action -eq 'RepairVsixProof') {
+  if ($metadata.state -ne 'cache-ready' -or $activeLock) {
+    throw 'VSIX proof repair requires a sealed cache with no active lock.'
+  }
+  if ((Get-MachineValue $info 'VMState') -ne 'poweroff') {
+    throw 'VSIX proof repair requires the retained source VM to remain powered off.'
+  }
+  if ((Get-MachineValue $info 'CurrentSnapshotUUID') -ne $metadata.snapshot.uuid) {
+    throw 'VSIX proof repair source snapshot contradicts cache metadata.'
+  }
+  if (-not $InstalledExtensionManifest -or -not $InstalledExtensionArchive) {
+    throw 'RepairVsixProof requires -InstalledExtensionManifest and -InstalledExtensionArchive.'
+  }
+  $manifestSource = (Resolve-Path -LiteralPath $InstalledExtensionManifest).Path
+  $archiveSource = (Resolve-Path -LiteralPath $InstalledExtensionArchive).Path
+  $manifest = Get-Content -LiteralPath $manifestSource -Raw | ConvertFrom-Json
+  if (
+    $manifest.schema -ne 'labview-benchmark-actor/reviewer-installed-extension-tree@1' -or
+    $manifest.extensionId -ne 'svelderrainruiz.labview-benchmark-actor' -or
+    $manifest.version -ne $metadata.vsix.version -or
+    @($manifest.entries).Count -lt 1
+  ) {
+    throw 'Installed extension manifest contradicts the cached VSIX identity.'
+  }
+
+  $extractRoot = Join-Path ([IO.Path]::GetTempPath()) "lba-reviewer-vsix-proof-$([Guid]::NewGuid().ToString('N'))"
+  try {
+    Expand-Archive -LiteralPath $archiveSource -DestinationPath $extractRoot
+    $archiveFiles = @(Get-ChildItem -LiteralPath $extractRoot -File -Recurse)
+    if ($archiveFiles.Count -ne @($manifest.entries).Count) {
+      throw 'Installed extension archive file count disagrees with its manifest.'
+    }
+    foreach ($entry in @($manifest.entries)) {
+      $entryPath = Join-Path $extractRoot ($entry.path -replace '/', '\')
+      if (-not (Test-Path -LiteralPath $entryPath)) {
+        throw "Installed extension archive is missing '$($entry.path)'."
+      }
+      if (
+        (Get-Item -LiteralPath $entryPath).Length -ne $entry.size -or
+        (Get-FileHash -LiteralPath $entryPath -Algorithm SHA256).Hash.ToLowerInvariant() -ne $entry.sha256
+      ) {
+        throw "Installed extension archive entry '$($entry.path)' failed identity verification."
+      }
+    }
+  } finally {
+    if (Test-Path -LiteralPath $extractRoot) { Remove-Item -LiteralPath $extractRoot -Recurse -Force }
+  }
+
+  $artifactRoot = Join-Path $CacheRoot 'artifacts'
+  New-Item -ItemType Directory -Path $artifactRoot -Force | Out-Null
+  $manifestHash = (Get-FileHash -LiteralPath $manifestSource -Algorithm SHA256).Hash.ToLowerInvariant()
+  $archiveHash = (Get-FileHash -LiteralPath $archiveSource -Algorithm SHA256).Hash.ToLowerInvariant()
+  $manifestTarget = Join-Path $artifactRoot "installed-extension-$($metadata.vsix.version)-$manifestHash.json"
+  $archiveTarget = Join-Path $artifactRoot "installed-extension-$($metadata.vsix.version)-$archiveHash.zip"
+  foreach ($copy in @(
+    [pscustomobject]@{ Source = $manifestSource; Target = $manifestTarget; Hash = $manifestHash },
+    [pscustomobject]@{ Source = $archiveSource; Target = $archiveTarget; Hash = $archiveHash }
+  )) {
+    if (-not (Test-Path -LiteralPath $copy.Target)) {
+      $temporary = "$($copy.Target).$PID.tmp"
+      Copy-Item -LiteralPath $copy.Source -Destination $temporary
+      if ((Get-FileHash -LiteralPath $temporary -Algorithm SHA256).Hash.ToLowerInvariant() -ne $copy.Hash) {
+        Remove-Item -LiteralPath $temporary -Force
+        throw "Recovered artifact '$($copy.Source)' failed copy verification."
+      }
+      Move-Item -LiteralPath $temporary -Destination $copy.Target
+    } elseif ((Get-FileHash -LiteralPath $copy.Target -Algorithm SHA256).Hash.ToLowerInvariant() -ne $copy.Hash) {
+      throw "Existing recovered artifact '$($copy.Target)' has an unexpected SHA-256."
+    }
+  }
+
+  $repairReceiptPath = Join-Path $artifactRoot "vsix-proof-repair-$([DateTime]::UtcNow.ToString('yyyyMMddTHHmmssfffZ')).json"
+  Write-AtomicJson $repairReceiptPath ([ordered]@{
+    schema = 'labview-benchmark-actor/windows-vagrant-reviewer-vsix-proof-repair@1'
+    wallTime = [DateTime]::UtcNow.ToString('o')
+    reason = 'Historical staging left the timestamped source VSIX at a mutable worktree path.'
+    sourceVm = [ordered]@{
+      name = $metadata.vm.name
+      uuid = $metadata.vm.uuid
+      snapshotName = $metadata.snapshot.name
+      snapshotUuid = $metadata.snapshot.uuid
+      remainedPoweredOff = $true
+    }
+    historicalVsix = [ordered]@{
+      path = $metadata.vsix.path
+      size = $metadata.vsix.size
+      sha256 = $metadata.vsix.sha256
+      version = $metadata.vsix.version
+      sourceArtifactRetained = $false
+    }
+    installedSnapshotProof = [ordered]@{
+      manifestPath = $manifestTarget
+      manifestSha256 = $manifestHash
+      archivePath = $archiveTarget
+      archiveSha256 = $archiveHash
+      entryCount = @($manifest.entries).Count
+    }
+  })
+
+  $originalMetadata = Get-Content -LiteralPath $metadataPath -Raw
+  $cacheReceipt = Join-Path $metadata.evidenceRoot 'reviewer-cache.json'
+  $temporaryReceipt = "$cacheReceipt.$PID.repair"
+  try {
+    $metadata.vsix | Add-Member -NotePropertyName sourceArtifactRetained -NotePropertyValue $false -Force
+    $metadata.vsix | Add-Member -NotePropertyName installedSnapshotManifestPath -NotePropertyValue $manifestTarget -Force
+    $metadata.vsix | Add-Member -NotePropertyName installedSnapshotArchivePath -NotePropertyValue $archiveTarget -Force
+    $metadata.vsix | Add-Member -NotePropertyName repairReceiptPath -NotePropertyValue $repairReceiptPath -Force
+    Write-AtomicJson $metadataPath $metadata
+    Invoke-Native 'node' @(
+      (Join-Path $experimentRoot 'build-reviewer-cache.mjs'),
+      $CacheRoot,
+      $temporaryReceipt
+    ) $cacheLog | Out-Null
+    Invoke-Native 'node' @(
+      (Join-Path $experimentRoot 'verify-reviewer-cache.mjs'),
+      $temporaryReceipt
+    ) $cacheLog | Out-Null
+    Move-Item -LiteralPath $temporaryReceipt -Destination $cacheReceipt -Force
+    Invoke-Native 'node' @(
+      (Join-Path $experimentRoot 'verify-reviewer-cache.mjs'),
+      $cacheReceipt
+    ) $cacheLog | Out-Null
+  } catch {
+    [IO.File]::WriteAllText($metadataPath, $originalMetadata, [Text.UTF8Encoding]::new($false))
+    if (Test-Path -LiteralPath $temporaryReceipt) { Remove-Item -LiteralPath $temporaryReceipt -Force }
+    throw
+  }
+  Write-Host (@{
+    state = 'cache-ready'
+    sourceArtifactRetained = $false
+    installedSnapshotManifest = $manifestTarget
+    installedSnapshotArchive = $archiveTarget
+  } | ConvertTo-Json -Compress)
+  return
 }
 
 if ($Action -eq 'Status') {

@@ -1,5 +1,10 @@
 [CmdletBinding()]
-param([string]$CacheRoot = 'D:\lba-vagrant-instances\actor-reviewer-local')
+param(
+  [string]$CacheRoot = 'D:\lba-vagrant-instances\actor-reviewer-local',
+  [string]$Vsix,
+  [ValidatePattern('^[a-fA-F0-9]{64}$')]
+  [string]$ExpectedVsixSha256
+)
 
 $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version Latest
@@ -36,6 +41,17 @@ function Get-JsonFromOutput([object[]]$Output, [string]$Label) {
 
 $experimentRoot = $PSScriptRoot
 $repoRoot = (Resolve-Path (Join-Path $experimentRoot '..\..')).Path
+$vsixPath = if ($Vsix) {
+  (Resolve-Path -LiteralPath $Vsix).Path
+} else {
+  Join-Path $repoRoot 'labview-benchmark-actor.vsix'
+}
+if (-not (Test-Path -LiteralPath $vsixPath)) { throw "Candidate VSIX is missing at '$vsixPath'." }
+if ((Get-Item -LiteralPath $vsixPath).Length -gt 5MB) { throw 'Candidate VSIX exceeds the publish size guard.' }
+$sourceVsixSha256 = (Get-FileHash -LiteralPath $vsixPath -Algorithm SHA256).Hash.ToLowerInvariant()
+if ($ExpectedVsixSha256 -and $sourceVsixSha256 -ne $ExpectedVsixSha256.ToLowerInvariant()) {
+  throw "Candidate VSIX SHA-256 '$sourceVsixSha256' does not match expected '$($ExpectedVsixSha256.ToLowerInvariant())'."
+}
 $metadataPath = Join-Path $CacheRoot 'reviewer-cache-session.json'
 $lockPath = Join-Path $CacheRoot '.reviewer-cache.lock'
 if (-not (Test-Path $metadataPath) -or -not (Test-Path $lockPath)) { throw 'Reviewer cache metadata/lock is missing.' }
@@ -55,7 +71,7 @@ $activeEvidenceRoot = if ($metadata.PSObject.Properties['activeResume']) {
 if ($lock.runId -ne $activeRunId -or $lock.vmName -ne $metadata.vm.name -or $lock.releasedWallTime) {
   throw 'Reviewer cache lock ownership mismatch.'
 }
-if ($metadata.state -ne 'activated-capture-passed') {
+if ($metadata.state -notin @('activated-capture-passed', 'vsix-installed')) {
   throw "Reviewer cache state '$($metadata.state)' is not ready for VSIX staging."
 }
 $env:VAGRANT_HOME = $metadata.vagrant.home
@@ -94,8 +110,21 @@ $stagePhase = if ($installedCount) { 'REVIEWER-VSIX-RESTAGE-START' } else { 'REV
 $installedPhase = if ($installedCount) { 'REVIEWER-VSIX-RESTAGED' } else { 'REVIEWER-VSIX-INSTALLED' }
 $worktreeStatus = Join-Path $activeEvidenceRoot "vsix-worktree-status-attempt-$attempt.txt"
 $worktreePatch = Join-Path $activeEvidenceRoot "vsix-worktree-attempt-$attempt.patch"
-git -C $repoRoot status --porcelain=v1 | Set-Content -LiteralPath $worktreeStatus -Encoding UTF8
-git -C $repoRoot diff --binary --full-index HEAD | Set-Content -LiteralPath $worktreePatch -Encoding UTF8
+$statusLines = @(& git -C $repoRoot status --porcelain=v1)
+if ($LASTEXITCODE) { throw 'Could not capture release worktree status before VSIX staging.' }
+$patchLines = @(& git -C $repoRoot diff --binary --full-index HEAD)
+if ($LASTEXITCODE) { throw 'Could not capture release worktree patch before VSIX staging.' }
+$utf8 = [Text.UTF8Encoding]::new($false)
+[IO.File]::WriteAllText(
+  $worktreeStatus,
+  $(if ($statusLines.Count) { "$($statusLines -join "`n")`n" } else { '' }),
+  $utf8
+)
+[IO.File]::WriteAllText(
+  $worktreePatch,
+  $(if ($patchLines.Count) { "$($patchLines -join "`n")`n" } else { '' }),
+  $utf8
+)
 $provenance = [ordered]@{
   schema = 'labview-benchmark-actor/local-vsix-worktree@1'
   wallTime = [DateTime]::UtcNow.ToString('o')
@@ -128,11 +157,13 @@ Invoke-Native 'node' @(
 
 Invoke-Native 'powershell.exe' @(
   '-NoLogo', '-NoProfile', '-ExecutionPolicy', 'Bypass',
-  '-File', (Join-Path $repoRoot 'reviewer-workstation\stage-local-vsix.ps1')
+  '-File', (Join-Path $repoRoot 'reviewer-workstation\stage-local-vsix.ps1'),
+  '-SkipBuild',
+  '-Vsix', $vsixPath
 ) $logPath | Out-Null
-$vsixPath = Join-Path $repoRoot 'labview-benchmark-actor.vsix'
-if (-not (Test-Path -LiteralPath $vsixPath)) { throw 'Local VSIX staging did not create the candidate package.' }
-if ((Get-Item $vsixPath).Length -gt 5MB) { throw 'Local VSIX exceeds the publish size guard.' }
+if ((Get-FileHash -LiteralPath $vsixPath -Algorithm SHA256).Hash.ToLowerInvariant() -ne $sourceVsixSha256) {
+  throw 'Candidate VSIX changed during staging.'
+}
 
 Invoke-Native 'vagrant' @(
   'upload',
@@ -148,6 +179,12 @@ $guestProof = Get-JsonFromOutput $proofResult.Output 'Guest VSIX proof'
 if (-not $guestProof.checklistPresent -or $guestProof.profile -ne 'interactive') {
   throw 'Guest VSIX/checklist proof did not target the interactive profile.'
 }
+if ($guestProof.candidateSha256 -ne $sourceVsixSha256) {
+  throw 'Guest-staged VSIX SHA-256 differs from the exact host candidate.'
+}
+if ($guestProof.lbabusVersion -ne '0.15.7') {
+  throw 'Guest reviewer did not prove the staged lbabus version.'
+}
 $packageVersion = (Get-Content (Join-Path $repoRoot 'package.json') -Raw | ConvertFrom-Json).version
 if ($guestProof.version -ne $packageVersion) { throw 'Installed extension version differs from package.json.' }
 $stageReceipt = [ordered]@{
@@ -157,11 +194,11 @@ $stageReceipt = [ordered]@{
   vsix = [ordered]@{
     path = $vsixPath
     size = (Get-Item $vsixPath).Length
-    sha256 = (Get-FileHash $vsixPath -Algorithm SHA256).Hash.ToLowerInvariant()
+    sha256 = $sourceVsixSha256
     version = $packageVersion
   }
   installProof = $guestProof
-  command = 'reviewer-workstation/stage-local-vsix.ps1'
+  command = 'reviewer-workstation/stage-local-vsix.ps1 -SkipBuild -Vsix <exact-candidate>'
 }
 $receiptPath = Join-Path $activeEvidenceRoot 'vsix-stage.json'
 Write-AtomicJson $receiptPath $stageReceipt

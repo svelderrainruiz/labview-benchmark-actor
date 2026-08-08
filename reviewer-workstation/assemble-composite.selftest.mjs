@@ -6,10 +6,12 @@
 // Run: `node reviewer-workstation/assemble-composite.selftest.mjs`.
 
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { spawnSync } from 'node:child_process';
+import { tmpdir } from 'node:os';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
-import { assembleComposite, computeBindingDiffs } from './assemble-composite.mjs';
+import { assembleComposite, computeBindingDiffs, DEFAULT_REVIEWER_ALLOWLIST_PATH } from './assemble-composite.mjs';
 import { validateReceipt } from './composite-release-decision.mjs';
 
 const here = dirname(fileURLToPath(import.meta.url));
@@ -43,7 +45,47 @@ ok('assembles a valid composite receipt from correctly-bound pieces', () => {
   assert.equal(res.receipt.candidate.version, committed.candidate.version);
 });
 
-// 2. FAIL-CLOSED (precise diff): the VISUAL verdict target names a different commit than the candidate.
+// 2. The CLI default must read the committed reviewer enrollment, not a nonexistent docs path.
+ok('uses the committed reviewer allowlist by default', () => {
+  assert.equal(DEFAULT_REVIEWER_ALLOWLIST_PATH, join(here, '..', 'tools', 'collab-cli', 'reviewer-allowlist.json'));
+  assert.doesNotThrow(() => JSON.parse(readFileSync(DEFAULT_REVIEWER_ALLOWLIST_PATH, 'utf8')));
+});
+
+// 3. The CLI default works end-to-end without a --reviewer-allowlist override.
+ok('assembles with the committed reviewer allowlist when the CLI option is omitted', () => {
+  const p = piecesFromCommitted();
+  const temp = mkdtempSync(join(tmpdir(), 'lba-assemble-'));
+  const writeJson = (name, value) => {
+    const path = join(temp, name);
+    writeFileSync(path, `${JSON.stringify(value)}\n`);
+    return path;
+  };
+  try {
+    const attestation = writeJson('attestation.json', { quorum: p.machine.quorumVerdict });
+    const quorumSignoff = writeJson('quorum-signoff.json', p.machine.signOffs[0]);
+    const visual = writeJson('visual.json', p.visual);
+    const staged = writeJson('staged.json', p.staged);
+    const out = join(temp, 'composite.json');
+    const r = spawnSync(process.execPath, [
+      join(here, 'assemble-composite.mjs'),
+      '--component', p.candidate.component,
+      '--version', p.candidate.version,
+      '--commit', p.candidate.commit,
+      '--vsix256', p.candidate.vsixSha256,
+      '--attestation', attestation,
+      '--quorum-signoff', quorumSignoff,
+      '--visual-verdict', visual,
+      '--staged-frame', staged,
+      '--out', out,
+    ], { encoding: 'utf8' });
+    assert.equal(r.status, 0, r.stderr || r.stdout);
+    assert.equal(JSON.parse(readFileSync(out, 'utf8')).verdict.compositeReleaseProven, true);
+  } finally {
+    rmSync(temp, { recursive: true, force: true });
+  }
+});
+
+// 4. FAIL-CLOSED (precise diff): the VISUAL verdict target names a different commit than the candidate.
 ok('rejects a visual target that names a different candidate, with a precise diff', () => {
   const p = piecesFromCommitted();
   p.visual.verdict.target.commit = 'f'.repeat(40);
@@ -56,7 +98,7 @@ ok('rejects a visual target that names a different candidate, with a precise dif
   assert.equal(d.got, 'f'.repeat(40));
 });
 
-// 3. FAIL-CLOSED (precise diff): the MACHINE quorum consensus names a different version than the candidate.
+// 5. FAIL-CLOSED (precise diff): the MACHINE quorum consensus names a different version than the candidate.
 ok('rejects a machine consensus that names a different candidate, with a precise diff', () => {
   const p = piecesFromCommitted();
   p.machine.quorumVerdict.consensus.version = '0.0.0';
@@ -68,7 +110,7 @@ ok('rejects a machine consensus that names a different candidate, with a precise
   assert.equal(d.got, '0.0.0');
 });
 
-// 4. FAIL-CLOSED (precise diff): the STAGED frame reports a different version than the candidate.
+// 6. FAIL-CLOSED (precise diff): the STAGED frame reports a different version than the candidate.
 ok('rejects a staged candidate that names a different version, with a precise diff', () => {
   const p = piecesFromCommitted();
   p.staged.candidate.version = '7.7.7';
@@ -79,13 +121,24 @@ ok('rejects a staged candidate that names a different version, with a precise di
   assert.equal(d.got, '7.7.7');
 });
 
-// 5. computeBindingDiffs is empty for the matched committed set (the binding invariant holds as committed).
+// 7. FAIL-CLOSED (precise diff): the STAGED frame reports a different commit and VSIX hash than the candidate.
+ok('rejects staged commit and VSIX identity drift with precise diffs', () => {
+  const p = piecesFromCommitted();
+  p.staged.candidate.commit = 'f'.repeat(40);
+  p.staged.candidate.vsixSha256 = 'a'.repeat(64);
+  const res = assembleComposite(p);
+  assert.equal(res.ok, false);
+  assert.ok(res.diffs.some((x) => x.source === 'staged.candidate' && x.field === 'commit'), 'staged commit diff reported');
+  assert.ok(res.diffs.some((x) => x.source === 'staged.candidate' && x.field === 'vsixSha256'), 'staged VSIX diff reported');
+});
+
+// 8. computeBindingDiffs is empty for the matched committed set (the binding invariant holds as committed).
 ok('computeBindingDiffs is empty for the matched committed set', () => {
   const diffs = computeBindingDiffs(piecesFromCommitted());
   assert.equal(diffs.length, 0, `committed set should have no binding diffs, got: ${JSON.stringify(diffs)}`);
 });
 
-// 6. FAIL-CLOSED: even with a perfect candidate binding, a tampered visual sign-off fails the composite gate
+// 9. FAIL-CLOSED: even with a perfect candidate binding, a tampered visual sign-off fails the composite gate
 //    (the assembler defers the cryptographic gate to the composite verifier -- it does not paper over it).
 ok('a bound-but-forged visual sign-off still fails the composite gate', () => {
   const p = piecesFromCommitted();
@@ -96,7 +149,7 @@ ok('a bound-but-forged visual sign-off still fails the composite gate', () => {
   assert.ok(res.findings.some((f) => /human visual gate would not publish/.test(f)), 'expected the composite gate finding');
 });
 
-// 7. FAIL-CLOSED: multiple pieces drift at once -> every mismatch is reported (not just the first).
+// 10. FAIL-CLOSED: multiple pieces drift at once -> every mismatch is reported (not just the first).
 ok('reports every binding mismatch when multiple pieces drift', () => {
   const p = piecesFromCommitted();
   p.visual.verdict.target.vsixSha256 = 'a'.repeat(64);

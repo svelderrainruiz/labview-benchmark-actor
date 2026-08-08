@@ -21,6 +21,8 @@ public sealed class LbaWindowInfo {
   public bool minimized { get; set; }
   public string desktop { get; set; }
   public LbaRect bounds { get; set; }
+  public bool extendedFrameBoundsAvailable { get; set; }
+  public LbaRect extendedFrameBounds { get; set; }
 }
 
 public sealed class LbaDesktopContext {
@@ -207,6 +209,8 @@ public static class LbaDesktop {
   [DllImport("user32.dll", CharSet = CharSet.Unicode)] static extern int GetClassName(IntPtr hwnd, StringBuilder value, int length);
   [DllImport("user32.dll")] static extern uint GetWindowThreadProcessId(IntPtr hwnd, out uint processId);
   [DllImport("user32.dll")] static extern bool GetWindowRect(IntPtr hwnd, out RECT rect);
+  [DllImport("dwmapi.dll")] static extern int DwmGetWindowAttribute(
+    IntPtr hwnd, int attribute, out RECT value, int valueSize);
   [DllImport("user32.dll")] static extern int GetSystemMetrics(int index);
   [DllImport("user32.dll", SetLastError = true)] static extern IntPtr GetDC(IntPtr hwnd);
   [DllImport("user32.dll")] static extern int ReleaseDC(IntPtr hwnd, IntPtr hdc);
@@ -297,17 +301,39 @@ public static class LbaDesktop {
       var title = new StringBuilder(1024);
       var className = new StringBuilder(512);
       RECT rect;
+      RECT extendedRect;
       GetWindowText(hwnd, title, title.Capacity);
       GetClassName(hwnd, className, className.Capacity);
       GetWindowRect(hwnd, out rect);
+      bool extendedFrameBoundsAvailable = TryGetExtendedFrameBounds(hwnd, out extendedRect);
       result.Add(new LbaWindowInfo {
         handle = hwnd.ToInt64(), processId = processId, title = title.ToString(), className = className.ToString(),
         visible = IsWindowVisible(hwnd), minimized = IsIconic(hwnd), desktop = context.qualifiedDesktop,
-        bounds = new LbaRect { left = rect.Left, top = rect.Top, right = rect.Right, bottom = rect.Bottom }
+        bounds = new LbaRect { left = rect.Left, top = rect.Top, right = rect.Right, bottom = rect.Bottom },
+        extendedFrameBoundsAvailable = extendedFrameBoundsAvailable,
+        extendedFrameBounds = extendedFrameBoundsAvailable
+          ? new LbaRect {
+              left = extendedRect.Left, top = extendedRect.Top,
+              right = extendedRect.Right, bottom = extendedRect.Bottom
+            }
+          : null
       });
       return true;
     }, IntPtr.Zero)) throw new InvalidOperationException("EnumDesktopWindows failed: " + Marshal.GetLastWin32Error());
     return result.ToArray();
+  }
+
+  static bool TryGetExtendedFrameBounds(IntPtr hwnd, out RECT rect) {
+    rect = new RECT();
+    try {
+      return DwmGetWindowAttribute(hwnd, 9, out rect, Marshal.SizeOf(typeof(RECT))) == 0;
+    } catch (DllNotFoundException) {
+      return false;
+    } catch (EntryPointNotFoundException) {
+      return false;
+    } catch (BadImageFormatException) {
+      return false;
+    }
   }
 
   public static LbaDisplayDiagnostics DiagnoseDisplay(int processId, int sessionId) {

@@ -6,60 +6,74 @@
   "capability": null,
   "candidate": {
     "component": "extension",
-    "version": "1.3.0",
-    "commit": "a4a917027dde07b43838518ad609682f62483c53",
-    "vsixSha256": "a1e2c4bb49768ea7de874796a41a3d9b91cd133ec8c4dc5e40d0ffebabf2350b"
+    "version": "1.4.8",
+    "commit": "c3ece57892fe628f3f0de5692f10c6c77d02eeae",
+    "vsixSha256": "dfa5ace0ce263f8876f51dcf0612713753e7a4e2f990555675fca771f198b799"
   },
   "staged": {
-    "drive": "release/1.3.0 WIN-plane staging (local shared-folder path, offline-signed): reviewer VM staged the ext 1.3.0 candidate a4a9170 -- the node-24 vsix a1e2c4bb -- via lba-vm-share; FFmpeg package-store discovery verified by human capture; enrolled reviewer signed PASS on WINDOWS_VM.",
-    "vm": "reviewer-workstation-vmware",
+    "drive": "await-agent-reply",
+    "vm": "reviewer-vm",
     "matched": true,
     "candidate": {
       "component": "extension",
-      "version": "1.3.0"
+      "version": "1.4.8",
+      "commit": "c3ece57892fe628f3f0de5692f10c6c77d02eeae",
+      "vsixSha256": "dfa5ace0ce263f8876f51dcf0612713753e7a4e2f990555675fca771f198b799"
     },
     "frame": {
-      "type": "DONE",
-      "task": "rev-1.3.0-net",
+      "transport": "TCP",
+      "remote": "127.0.0.1:55680",
+      "ts": "2026-08-08T21:19:41.966Z",
       "senderId": "WIN",
-      "payload": "ext 1.3.0 staged + human PASS on WIN reviewer VM (commit a4a9170, node-24 vsix a1e2c4bb): local dual-plane attestation + FFmpeg WinGet package-store discovery fix validated; review PASS"
+      "seq": "1786223981",
+      "type": "DONE",
+      "task": "stage-1.4.8-c3ece578-2118",
+      "ackOf": null,
+      "payload": "{\"schema\":\"labview-benchmark-actor/release-stage@1\",\"candidate\":{\"component\":\"extension\",\"version\":\"1.4.8\",\"commit\":\"c3ece57892fe628f3f0de5692f10c6c77d02eeae\",\"vsixSha256\":\"dfa5ace0ce263f8876f51dcf0612713753e7a4e2f990555675fca771f198b799\"}}"
     }
   },
   "machine": {
     "quorumVerdict": {
       "schema": "labview-benchmark-actor/acg-quorum-verdict-v2",
       "verdict": "pass",
-      "confidence": 1,
+      "confidence": 0.9444444444444444,
       "threshold": 0.5,
-      "witnesses": 2,
-      "concurring": 2,
+      "witnesses": 4,
+      "concurring": 4,
       "majority": true,
       "crossPlane": true,
       "consensusVerdict": "pass",
       "consensus": {
-        "version": "1.3.0",
-        "sourceCommit": "a4a917027dde07b43838518ad609682f62483c53",
+        "version": "1.4.8",
+        "sourceCommit": "c3ece57892fe628f3f0de5692f10c6c77d02eeae",
         "verdict": "pass",
         "seriesHash": "7ad1c75d08244013d339c3f256fd14220a2df7cea56d5be5b38af2d82d68efaa",
         "pngSha256": null,
-        "ubuntu": "bookworm"
+        "ubuntu": "jammy"
       },
-      "divergences": []
+      "divergences": [
+        {
+          "witness": "ACTIONS-ubuntu-24.04",
+          "anchor": "ubuntu",
+          "got": "noble",
+          "consensus": "jammy"
+        }
+      ]
     },
     "signOffs": [
       {
         "schema": "labview-benchmark-actor/acg-human-signoff-v1",
         "subject": {
-          "verdictDigest": "275effbda59118821bdcf438f0a0da0c0b9d5ff59644e6b867cf22f75c64ba96",
+          "verdictDigest": "d8f8a6655b817fb716c082f0d71b49bc668f1d30781cadf9e352a8da4ac6c1c4",
           "consensusVerdict": "pass"
         },
         "reviewer": "reviewer@vi-tech.nl",
         "decision": "approve",
         "station": "WINDOWS_VM",
         "algorithm": "ed25519",
-        "publicKeyPem": "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEAWRnlX++0MkQq+vtVEEMnBDON+cQEjNi49qFY07DwV2g=\n-----END PUBLIC KEY-----\n",
-        "signedAt": "2026-08-06T16:48:42.613Z",
-        "signature": "DxdKCAztDD3+FkicWV0A3coKi7KLj1ymdnJeBWo/lTM67cpnINFidG78zjfZya7jJw8q+Z/jP4JqHnUxNz2qBQ=="
+        "publicKeyPem": "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEAjoblu4aKIrkfDMxTD5fmexR5TwJn4EPdBlCXXpsVAMg=\n-----END PUBLIC KEY-----\n",
+        "signedAt": "2026-08-08T21:25:02.332Z",
+        "signature": "rL47T3tvb6AAmxJbVQO25yu5/NURDG69acNOey9vJ0/pQQhsdtlhJe4bC77M7QKJ6NvvvbdmoGaPhnKed+wfDQ=="
       }
     ]
   },
@@ -68,54 +82,164 @@
       "schema": "labview-benchmark-actor/reviewer-verdict@1",
       "target": {
         "component": "extension",
-        "version": "1.3.0",
-        "commit": "a4a917027dde07b43838518ad609682f62483c53",
-        "vsixSha256": "a1e2c4bb49768ea7de874796a41a3d9b91cd133ec8c4dc5e40d0ffebabf2350b"
+        "version": "1.4.8",
+        "commit": "c3ece57892fe628f3f0de5692f10c6c77d02eeae",
+        "vsixSha256": "dfa5ace0ce263f8876f51dcf0612713753e7a4e2f990555675fca771f198b799"
       },
       "verdict": "pass",
       "reviewer": "reviewer@vi-tech.nl",
       "station": "WINDOWS_VM",
-      "notes": "",
+      "notes": "PASS for LabVIEW Benchmark Actor 1.4.8, commit c3ece57892fe628f3f0de5692f10c6c77d02eeae, VSIX SHA-256 dfa5ace0ce263f8876f51dcf0612713753e7a4e2f990555675fca771f198b799, 147924 bytes. Verified full KPI PASS, AGENTS 0.3.12 integrity, Windows command-shim behavior, signing identity binding, launcher fail-closed behavior, strict visual target binding, installed command/MCP surfaces, 18/18 hosted checks, and ADR-0078 through ADR-0080. Interactive panels and the full compound Release Candidate task were NOT RUN because this host lacks VM/Docker capability. This PASS is not publication authorization; release remains BLOCKED pending quorum/composite, canonical release, lineage, and Marketplace closeout.",
       "evidence": [
         {
-          "kind": "attestation",
-          "ref": "C:\\lba-review\\attestation-1.3.0.json"
+          "kind": "candidate-receipt",
+          "ref": "full KPI bound to commit/hash/size, 96.02% branches, 203/203 gates, 179/179 correspondences"
         },
         {
-          "kind": "note",
-          "ref": "local dual-plane witnesses LOCAL-windows + LOCAL-linux; no GitHub Actions"
+          "kind": "hosted-ci",
+          "ref": "all 18/18 PR #15 hosted checks PASS for the exact commit"
         },
         {
-          "kind": "note",
-          "ref": "FFmpeg discovery fix: WinGet package-store Gyan.FFmpeg_* fallback"
+          "kind": "cross-plane",
+          "ref": "Linux/Windows VSIX byte identity and four-substrate corroboration PASS"
+        },
+        {
+          "kind": "signing-readiness",
+          "ref": "live reviewer-VM quorum-key derivation and exact public-key enrollment match PASS"
         }
       ],
-      "renderedAt": "2026-08-06T16:46:39.519Z"
+      "renderedAt": "2026-08-08T21:12:12.036Z"
     },
     "signOff": {
       "schema": "labview-benchmark-actor/acg-human-signoff-v1",
       "subject": {
-        "verdictDigest": "e1dd8fac78d715853850b427d82a476d38bdc1493436da65578a64c2f3aa9260",
+        "verdictDigest": "fde3f93cbf7b049f34512493f3b45b3c52da3f3405495ad41cb9b4e7846a79fd",
         "consensusVerdict": "pass",
         "target": {
           "component": "extension",
-          "version": "1.3.0",
-          "commit": "a4a917027dde07b43838518ad609682f62483c53",
-          "vsixSha256": "a1e2c4bb49768ea7de874796a41a3d9b91cd133ec8c4dc5e40d0ffebabf2350b"
+          "version": "1.4.8",
+          "commit": "c3ece57892fe628f3f0de5692f10c6c77d02eeae",
+          "vsixSha256": "dfa5ace0ce263f8876f51dcf0612713753e7a4e2f990555675fca771f198b799"
         }
       },
       "reviewer": "reviewer@vi-tech.nl",
       "decision": "approve",
       "station": "WINDOWS_VM",
       "algorithm": "ed25519",
-      "publicKeyPem": "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEAWRnlX++0MkQq+vtVEEMnBDON+cQEjNi49qFY07DwV2g=\n-----END PUBLIC KEY-----\n",
-      "signedAt": "2026-08-06T16:46:39.525Z",
-      "signature": "th3UJETDYYv3+vsBiZnPxateFbjCQwFo+jisoGmzaIUI/LJL8Ie+ymDtPosQdslnGYroBLaR1tUpGgfdAYwrCQ=="
+      "publicKeyPem": "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEAp1eaifgDEd1NuoimEUq3RsZPr/SkT7A8/sKWPMmV2Hw=\n-----END PUBLIC KEY-----\n",
+      "signedAt": "2026-08-08T21:12:12.037Z",
+      "signature": "BjkyYQLjZOA7peVIazdRsDZGcnFnrVp81kM/h9u98IKc3G83x7e7oBxxJwpDWesrRnGzkqcOIfVSAf4K2V6JCg=="
     }
   },
   "reviewerAllowlist": {
-    "_comment": "Enrolled reviewer visual-verdict signing keys (reviewer id -> Ed25519 SPKI public key PEM). Add entries with reviewer-workstation/enroll-reviewer.mjs (the private key stays LOCAL to the reviewer, never committed). The verify-visual-review gate + the extension-release workflow verify a release's signed reviewer verdict against these keys (LBA-REQ-057, ADR-0037).",
-    "reviewer@vi-tech.nl": "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEAWRnlX++0MkQq+vtVEEMnBDON+cQEjNi49qFY07DwV2g=\n-----END PUBLIC KEY-----\n"
+    "_comment": "Enrolled reviewer signing keys. Production entries retain rotated Ed25519 public keys with inclusive validFrom/validThrough SemVer bounds and explicit visual/quorum purposes. Never remove a key that authenticates historical release evidence; never extend a retired key into a newer release range. Private keys stay LOCAL to the reviewer and are never committed.",
+    "reviewer@vi-tech.nl": [
+      {
+        "publicKeyPem": "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEAWRnlX++0MkQq+vtVEEMnBDON+cQEjNi49qFY07DwV2g=\n-----END PUBLIC KEY-----\n",
+        "validFrom": "1.2.0",
+        "validThrough": "1.3.0",
+        "purposes": [
+          "visual",
+          "quorum"
+        ]
+      },
+      {
+        "publicKeyPem": "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEA48x43N+/xB6wzHzEVbPBrEs71/hVNa5k3VQ5LdlvsAg=\n-----END PUBLIC KEY-----\n",
+        "validFrom": "1.4.0",
+        "validThrough": "1.4.0",
+        "purposes": [
+          "visual"
+        ]
+      },
+      {
+        "publicKeyPem": "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEAWAFKcRM63zi4l4FR5do2zekHiCGUKyMwWaKiJpoLI9k=\n-----END PUBLIC KEY-----\n",
+        "validFrom": "1.4.0",
+        "validThrough": "1.4.0",
+        "purposes": [
+          "quorum"
+        ]
+      },
+      {
+        "publicKeyPem": "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEAAEznE1nN9EsYaOL407jsGvdf+C1e/i8zN/djTbTx69Y=\n-----END PUBLIC KEY-----\n",
+        "validFrom": "1.4.1",
+        "validThrough": "1.4.1",
+        "purposes": [
+          "visual"
+        ]
+      },
+      {
+        "publicKeyPem": "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEAX3ohkf35nakHXoAcVyMYNHSBjsvF6dlcgcLtgIBdRsU=\n-----END PUBLIC KEY-----\n",
+        "validFrom": "1.4.1",
+        "validThrough": "1.4.1",
+        "purposes": [
+          "quorum"
+        ]
+      },
+      {
+        "publicKeyPem": "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEAoK954rhACvTtU3++eU/EfBwvn1gVUiUusOfGlmmiMro=\n-----END PUBLIC KEY-----\n",
+        "validFrom": "1.4.3",
+        "validThrough": "1.4.3",
+        "purposes": [
+          "visual"
+        ]
+      },
+      {
+        "publicKeyPem": "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEAsA0IwU+GrddDmYc0mCJX2BDKSfHxSGbsEMtbXXN40Vg=\n-----END PUBLIC KEY-----\n",
+        "validFrom": "1.4.3",
+        "validThrough": "1.4.3",
+        "purposes": [
+          "quorum"
+        ]
+      },
+      {
+        "publicKeyPem": "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEAc3SQQdG04c0gv/TgTMdm2cOuL8jZwtl8rSHe8npoa44=\n-----END PUBLIC KEY-----\n",
+        "validFrom": "1.4.4",
+        "validThrough": "1.4.4",
+        "purposes": [
+          "visual"
+        ]
+      },
+      {
+        "publicKeyPem": "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEA12IQT5AF9+Qet9+c6TXy3Yh4HWsonYe4jhtLDfBj290=\n-----END PUBLIC KEY-----\n",
+        "validFrom": "1.4.4",
+        "validThrough": "1.4.4",
+        "purposes": [
+          "quorum"
+        ]
+      },
+      {
+        "publicKeyPem": "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEAcuGum4hppckDIVQcEgsVfk1oHmVdt75z9QxhdrZKWgE=\n-----END PUBLIC KEY-----\n",
+        "validFrom": "1.4.5",
+        "validThrough": "1.4.5",
+        "purposes": [
+          "visual"
+        ]
+      },
+      {
+        "publicKeyPem": "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEADhrmiF33qRyKVruYXCxE5WGTrF6k5mnrmJPqK0IqJWg=\n-----END PUBLIC KEY-----\n",
+        "validFrom": "1.4.5",
+        "validThrough": "1.4.5",
+        "purposes": [
+          "quorum"
+        ]
+      },
+      {
+        "publicKeyPem": "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEAp1eaifgDEd1NuoimEUq3RsZPr/SkT7A8/sKWPMmV2Hw=\n-----END PUBLIC KEY-----\n",
+        "validFrom": "1.4.8",
+        "validThrough": "1.4.8",
+        "purposes": [
+          "visual"
+        ]
+      },
+      {
+        "publicKeyPem": "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEAjoblu4aKIrkfDMxTD5fmexR5TwJn4EPdBlCXXpsVAMg=\n-----END PUBLIC KEY-----\n",
+        "validFrom": "1.4.8",
+        "validThrough": "1.4.8",
+        "purposes": [
+          "quorum"
+        ]
+      }
+    ]
   },
   "gate": {
     "minReviewers": 1,
@@ -138,7 +262,7 @@
   },
   "verdict": {
     "compositeReleaseProven": true,
-    "reason": "both gates publish for extension 1.3.0: machine quorum + enrolled sign-off (ADR-0018) AND human visual PASS (LBA-REQ-057), bound to the same net-staged candidate"
+    "reason": "both gates publish for extension 1.4.8: machine quorum + enrolled sign-off (ADR-0018) AND human visual PASS (LBA-REQ-057), bound to the same net-staged candidate"
   },
-  "digest": "30a4840f2b37ebff4d103f2a0b3314ad7043544cd950ea65ddaa702a455de678"
+  "digest": "0a6e11285ead914b36f1f12bee752c1e16f0f1f06adc263d4f5e712ecb2340aa"
 }

@@ -200,6 +200,27 @@ function normalizeVsix(receipt, provenance) {
   const vsix = receipt.vsix;
   const file = normalizeFileRef(vsix, 'vsix');
   const version = text(vsix.version, 'vsix.version');
+  const sourceArtifactRetained = vsix.sourceArtifactRetained === undefined
+    ? true
+    : bool(vsix.sourceArtifactRetained, 'vsix.sourceArtifactRetained');
+  const installedSnapshotProof = sourceArtifactRetained
+    ? null
+    : (() => {
+        const proof = isRecord(vsix.installedSnapshotProof)
+          ? vsix.installedSnapshotProof
+          : fail('vsix.installedSnapshotProof', 'is required when the source VSIX was not retained');
+        return {
+          sourceVmUuid: uuid(proof.sourceVmUuid, 'vsix.installedSnapshotProof.sourceVmUuid'),
+          sourceSnapshotUuid: uuid(
+            proof.sourceSnapshotUuid,
+            'vsix.installedSnapshotProof.sourceSnapshotUuid',
+          ),
+          extensionId: text(proof.extensionId, 'vsix.installedSnapshotProof.extensionId').toLowerCase(),
+          version: text(proof.version, 'vsix.installedSnapshotProof.version'),
+          manifest: normalizeFileRef(proof.manifest, 'vsix.installedSnapshotProof.manifest'),
+          archive: normalizeFileRef(proof.archive, 'vsix.installedSnapshotProof.archive'),
+        };
+      })();
   const worktree = isRecord(vsix.worktree) ? vsix.worktree : fail('vsix.worktree', 'is required');
   const installProof = isRecord(vsix.installProof) ? vsix.installProof : fail('vsix.installProof', 'is required');
 
@@ -214,6 +235,8 @@ function normalizeVsix(receipt, provenance) {
   return {
     ...file,
     version,
+    sourceArtifactRetained,
+    installedSnapshotProof,
     worktree: {
       path: worktreePath,
       commit: worktree.commit === undefined ? null : text(worktree.commit, 'vsix.worktree.commit'),
@@ -365,7 +388,11 @@ function normalizeIntentionalDestroy(receipt) {
 
 function collectEvidenceRefs(normalized, receipt) {
   const refs = [normalized.package, normalized.provenance.sourceBox, normalized.provenance.sourceVm.configFile];
-  if (normalized.vsix) refs.push(normalized.vsix);
+  if (normalized.vsix?.sourceArtifactRetained) {
+    refs.push(normalized.vsix);
+  } else if (normalized.vsix?.installedSnapshotProof) {
+    refs.push(normalized.vsix.installedSnapshotProof.manifest, normalized.vsix.installedSnapshotProof.archive);
+  }
   if (normalized.proof?.activation?.mprr?.evidence) refs.push(...normalized.proof.activation.mprr.evidence);
   if (Array.isArray(receipt.evidence)) refs.push(...normalizeEvidenceList(receipt.evidence, 'evidence'));
   const deduped = new Map();
@@ -513,6 +540,18 @@ function classifyReviewerCacheProof(normalized) {
     return { status: 'unverified', reason: 'wrong-worktree-provenance' };
   }
   if (!proof.lifecycle) return { status: 'unverified', reason: 'missing-lifecycle-proof' };
+  if (!normalized.vsix.sourceArtifactRetained) {
+    const snapshotProof = normalized.vsix.installedSnapshotProof;
+    if (
+      !snapshotProof
+      || snapshotProof.sourceVmUuid !== normalized.registration.providerVm.uuid
+      || snapshotProof.sourceSnapshotUuid !== proof.lifecycle.snapshotUuid
+      || snapshotProof.version !== normalized.vsix.version
+      || snapshotProof.extensionId !== 'svelderrainruiz.labview-benchmark-actor'
+    ) {
+      return { status: 'unverified', reason: 'invalid-installed-snapshot-proof' };
+    }
+  }
   if (proof.lifecycle.snapshotUuid !== normalized.provenance.sourceVm.snapshotUuid) {
     return { status: 'unverified', reason: 'snapshot-mismatch' };
   }

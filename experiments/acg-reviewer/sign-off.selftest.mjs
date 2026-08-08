@@ -24,7 +24,30 @@ ok('a sign-off signs and verifies (either station)', () => {
     const s = sign(alice, 'reviewer:alice', { station });
     assert.equal(s.station, station);
     assert.equal(verifyReleaseSignOff(passVerdict, s, { reviewerAllowlist: allow }).ok, true);
+    assert.equal(verifyReleaseSignOff(passVerdict, s, {
+      reviewerAllowlist: { 'reviewer:alice': [bob.publicKeyPem, alice.publicKeyPem] },
+    }).ok, true);
   }
+});
+
+ok('scoped quorum keys enforce release version and purpose', () => {
+  const versioned = {
+    ...passVerdict,
+    consensus: { ...passVerdict.consensus, version: '1.4.0' },
+  };
+  const signed = sign(alice, 'reviewer:alice', { verdict: versioned });
+  const scoped = (validFrom, validThrough, purposes = ['quorum']) => ({
+    'reviewer:alice': [{ publicKeyPem: alice.publicKeyPem, validFrom, validThrough, purposes }],
+  });
+  assert.equal(verifyReleaseSignOff(versioned, signed, {
+    reviewerAllowlist: scoped('1.4.0', '1.4.0'),
+  }).ok, true);
+  assert.equal(verifyReleaseSignOff(versioned, signed, {
+    reviewerAllowlist: scoped('1.3.0', '1.3.9'),
+  }).ok, false);
+  assert.equal(verifyReleaseSignOff(versioned, signed, {
+    reviewerAllowlist: scoped('1.4.0', '1.4.0', ['visual']),
+  }).ok, false);
 });
 
 // 2. publish only when the quorum passes AND an enrolled approve sign-off accompanies it.

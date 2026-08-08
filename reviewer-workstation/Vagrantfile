@@ -113,4 +113,10 @@ Vagrant.configure("2") do |config|
     } else { Write-Host "  extension dir NOT FOUND under the reviewer profile" }
     Write-Host "[smoke] DONE"
   PS1
+
+  # On-demand, privileged reviewer-toolchain installation. The human-task preflight requires these tools, but
+  # winget packages such as Git prompt for elevation from an ordinary WinRM command. Vagrant's privileged shell
+  # provisioner runs the maintained installer under the interactive reviewer's elevated token.
+  config.vm.provision "reviewer-toolchain", type: "shell", run: "never", privileged: true,
+    path: "bin/guest-install-reviewer-toolchain.ps1"
 end

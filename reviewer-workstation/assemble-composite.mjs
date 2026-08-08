@@ -25,6 +25,8 @@ import { dirname, join } from 'node:path';
 import { buildReceipt as buildComposite, validateReceipt as validateComposite } from './composite-release-decision.mjs';
 import { buildReceipt as buildAttestation } from '../experiments/acg-quorum/cross-plane-attestation.mjs';
 
+export const DEFAULT_REVIEWER_ALLOWLIST_PATH = join(dirname(fileURLToPath(import.meta.url)), '..', 'tools', 'collab-cli', 'reviewer-allowlist.json');
+
 // The four candidate-identity fields every piece must agree on.
 const CANDIDATE_FIELDS = ['component', 'version', 'commit', 'vsixSha256'];
 
@@ -52,9 +54,9 @@ export function computeBindingDiffs({ candidate, machine, visual, staged }) {
     diffs.push({ source: 'machine.quorumVerdict.consensus', field: 'sourceCommit', expected: c.commit ?? null, got: consensus.sourceCommit ?? null });
   }
 
-  // staged candidate -- component + version (what the WIN VM reported it staged over net).
+  // staged candidate -- all four fields from the structured WIN release-stage@1 frame.
   const stagedCandidate = staged?.candidate ?? {};
-  for (const f of ['component', 'version']) {
+  for (const f of CANDIDATE_FIELDS) {
     if (String(c[f]) !== String(stagedCandidate[f])) {
       diffs.push({ source: 'staged.candidate', field: f, expected: c[f] ?? null, got: stagedCandidate[f] ?? null });
     }
@@ -132,8 +134,7 @@ function main() {
   const visualBundle = JSON.parse(readFileSync(args['visual-verdict'], 'utf8'));
   const visual = (visualBundle.verdict && visualBundle.signOff) ? visualBundle : { verdict: visualBundle, signOff: visualBundle.signOff };
   const staged = JSON.parse(readFileSync(args['staged-frame'], 'utf8'));
-  const here = dirname(fileURLToPath(import.meta.url));
-  const allowlistPath = args['reviewer-allowlist'] ?? join(here, '..', 'docs', 'release', 'reviewer-allowlist.json');
+  const allowlistPath = args['reviewer-allowlist'] ?? DEFAULT_REVIEWER_ALLOWLIST_PATH;
   let reviewerAllowlist = {};
   try { reviewerAllowlist = JSON.parse(readFileSync(allowlistPath, 'utf8')); } catch { /* an empty allowlist fails the gate closed, as intended */ }
 

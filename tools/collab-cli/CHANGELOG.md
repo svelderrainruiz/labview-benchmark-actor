@@ -10,6 +10,53 @@ so the WIN and LINUX planes install the exact same pinned version and cannot dri
 
 ## [Unreleased]
 
+## [0.15.7] — 2026-08-08
+
+### Changed
+
+- Enroll fresh 1.4.8 purpose-scoped reviewer keys after the live signing-readiness probe invalidated candidate 1.4.7.
+
+## [0.15.6] — 2026-08-08
+
+### Changed
+
+- Enroll fresh 1.4.7 purpose-scoped keys after candidate-behavior remediation changed the reviewed bytes.
+
+## [0.15.5] — 2026-08-08
+
+### Changed
+
+- Enroll fresh 1.4.6 visual/quorum keys after the hosted-path candidate changed, preserving purpose-scoped signing.
+
+## [0.15.4] — 2026-08-08
+
+### Changed
+
+- Resolve pinned reviewer tools from their stable Windows/winget installation paths so `selfcheck` remains valid
+  when the reviewer process inherited PATH before privileged toolchain staging.
+
+## [0.15.3] — 2026-08-08
+
+### Changed
+
+- Enroll the scoped 1.4.4 reviewer keys and bind the stale-PATH reviewer remediation to the
+  system-versioned extension candidate.
+
+## [0.15.2] — 2026-08-08
+
+### Changed
+
+- Bind scoped 1.4.3 reviewer enrollment and the exact repo-standards-review 0.2.19
+  release-risk baseline into the governed extension system definition.
+
+## [0.15.1] — 2026-08-08
+
+### Changed
+
+- Host capability probes report Docker, Vagrant, VirtualBox, VMware, LabVIEW 32/64-bit, and
+  LabVIEWCLI versions with bounded process-tree cleanup, supporting the extension's reviewer
+  preflight and deterministic human-task receipts.
+
 ## [0.15.0] — 2026-08-03
 
 ### Removed
@@ -272,7 +319,14 @@ so the published release notes are self-complete.
 
 - Shared versioned .NET CLI (`lbabus`) for the WIN↔LINUX coordination bus (#6).
 
-[Unreleased]: https://github.com/LabVIEW-Community-CI-CD/labview-benchmark-actor/compare/collab-cli-v0.15.0...HEAD
+[Unreleased]: https://github.com/LabVIEW-Community-CI-CD/labview-benchmark-actor/compare/collab-cli-v0.15.7...HEAD
+[0.15.7]: https://github.com/LabVIEW-Community-CI-CD/labview-benchmark-actor/compare/collab-cli-v0.15.6...collab-cli-v0.15.7
+[0.15.6]: https://github.com/LabVIEW-Community-CI-CD/labview-benchmark-actor/compare/collab-cli-v0.15.5...collab-cli-v0.15.6
+[0.15.5]: https://github.com/LabVIEW-Community-CI-CD/labview-benchmark-actor/compare/collab-cli-v0.15.4...collab-cli-v0.15.5
+[0.15.4]: https://github.com/LabVIEW-Community-CI-CD/labview-benchmark-actor/compare/collab-cli-v0.15.3...collab-cli-v0.15.4
+[0.15.3]: https://github.com/LabVIEW-Community-CI-CD/labview-benchmark-actor/compare/collab-cli-v0.15.2...collab-cli-v0.15.3
+[0.15.2]: https://github.com/LabVIEW-Community-CI-CD/labview-benchmark-actor/compare/collab-cli-v0.15.1...collab-cli-v0.15.2
+[0.15.1]: https://github.com/LabVIEW-Community-CI-CD/labview-benchmark-actor/compare/collab-cli-v0.15.0...collab-cli-v0.15.1
 [0.15.0]: https://github.com/LabVIEW-Community-CI-CD/labview-benchmark-actor/compare/collab-cli-v0.14.0...collab-cli-v0.15.0
 [0.8.2]: https://github.com/LabVIEW-Community-CI-CD/labview-benchmark-actor/compare/collab-cli-v0.8.0...collab-cli-v0.8.2
 [0.8.1]: https://github.com/LabVIEW-Community-CI-CD/labview-benchmark-actor/pull/97

@@ -31,6 +31,7 @@ import { parseAsciiReport, parseSummary } from './vi-analyzer/parse-vi-analyzer-
 import { verifyManifest as verifyExtensionAgentsManifest, agentsSha256, readManifest as readExtensionAgentsManifest, AGENTS_MD as EXTENSION_AGENTS_MD } from '../scripts/agentsManifest.mjs';
 import { normalizeZipTimestamps } from '../scripts/normalize-vsix.mjs';
 import { verifyPublishedVsix, sha256File } from '../scripts/verify-published-vsix.mjs';
+import { loadExperimentGovernance } from './experiment-governance.mjs';
 import { RATE_PROFILES, runProfile } from './mprr-ring/mprrPacketHarness.mjs';
 import { sealBootBenchmark } from './mprr-boot-benchmark/seal-boot-benchmark.mjs';
 import { parseSerialLog, parseSerialMarkerLine } from './mprr-boot-benchmark/serial-marker.mjs';
@@ -1364,14 +1365,22 @@ check('release-lineage', () => {
 check('coverage-artifact-meets-floor', () => {
   const floor = readJson('coverage-thresholds.json').floor;
   const xml = readFileSync(join(pkgRoot, 'coverage', 'cobertura-coverage.xml'), 'utf8');
-  const m = xml.match(/line-rate="([0-9.]+)"/);
-  assert(m, 'coverage/cobertura-coverage.xml must carry a line-rate');
-  const linePct = Number(m[1]) * 100;
+  const lineMatch = xml.match(/line-rate="([0-9.]+)"/);
+  const branchMatch = xml.match(/branch-rate="([0-9.]+)"/);
+  assert(lineMatch, 'coverage/cobertura-coverage.xml must carry a line-rate');
+  assert(branchMatch, 'coverage/cobertura-coverage.xml must carry a branch-rate');
+  const linePct = Number(lineMatch[1]) * 100;
+  const branchPct = Number(branchMatch[1]) * 100;
   assert(linePct >= floor.lines, `coverage line-rate ${linePct.toFixed(2)}% must meet the parametrized floor ${floor.lines}%`);
+  assert(branchPct >= floor.branches, `coverage branch-rate ${branchPct.toFixed(2)}% must meet the parametrized floor ${floor.branches}%`);
   const wf = join(pkgRoot, '.github', 'workflows', 'coverage.yml');
   assert(existsSync(wf), 'the PR Coverage Gate workflow (.github/workflows/coverage.yml) must exist');
   assert(/name:\s*PR Coverage Gate/.test(readFileSync(wf, 'utf8')), 'workflow must publish the "PR Coverage Gate / coverage" context');
-  return { linePct: +linePct.toFixed(2), floor: floor.lines };
+  return {
+    linePct: +linePct.toFixed(2),
+    branchPct: +branchPct.toFixed(2),
+    floor: { lines: floor.lines, branches: floor.branches },
+  };
 });
 
 // 18. Viewer time-cursor logic receipt is green: pointer + keyboard map to an in-bounds sample and no
@@ -1430,6 +1439,230 @@ check('extension-manifest-boundary', () => {
     assert(typeof m.surface === 'string' && existsSync(join(pkgRoot, m.surface)), `moved-module surface ${m.surface} must exist`);
   }
   return { name: pkg.name, commands: commands.length, movedModules: manifest.modules.length };
+});
+
+check('human-task-shortcuts', () => {
+  const pkg = readJson('package.json');
+  const definitions = pkg.contributes?.taskDefinitions;
+  assert(Array.isArray(definitions) && definitions.length === 1, 'extension must contribute one task definition');
+  assert(definitions[0].type === 'labviewBenchmarkActor', 'human task type mismatch');
+  assert(
+    definitions[0].properties?.task?.enum?.join(',') ===
+      'agent-preflight,governance-review,reviewer-readiness,release-candidate',
+    'human task ids are incomplete or reordered',
+  );
+  const provider = readFileSync(join(pkgRoot, 'src', 'humanTasks.ts'), 'utf8');
+  const runner = readFileSync(join(pkgRoot, 'extension-tasks', 'human-task-runner.mjs'), 'utf8');
+  const stage = readFileSync(join(pkgRoot, 'scripts', 'stage-media.mjs'), 'utf8');
+  for (const label of [
+    'LBA: Agent Preflight',
+    'LBA: Governance Review',
+    'LBA: Reviewer Mesh Readiness (compound)',
+    'LBA: Release Candidate Check (compound)',
+  ]) assert(provider.includes(label), `task provider missing '${label}'`);
+  assert(provider.includes("ELECTRON_RUN_AS_NODE: '1'"), 'human tasks must use VS Code bundled Node');
+  assert(stage.includes("extension-tasks', 'human-task-runner.mjs"), 'human task runner is not staged into media');
+  assert(stage.includes("extension-tasks', 'release-risk.mjs"), 'release risk evaluator is not staged into media');
+  assert(runner.includes('REPO_STANDARDS_REVIEW'), 'governance task lacks local standards checkout override');
+  assert(runner.includes('STANDARDS_ROOT') && runner.includes('governance.standardsRootDefault'), 'governance task lacks local standards-corpus discovery');
+  assert(runner.includes("`${corpus}:/standards:ro`") && runner.includes("'STANDARDS_ROOT=/standards'"), 'governance task does not mount standards read-only');
+  assert(runner.includes('governance.standardsReviewCommit') && runner.includes('governance.workbenchDigest'), 'governance task does not pin its source commit and image digest');
+  assert(provider.includes("HUMAN_TASKS_VERSION = '1.0.6'"), 'task provider lacks bundle version 1.0.6');
+  assert(runner.includes("HUMAN_TASKS_VERSION = '1.0.6'"), 'task runner lacks bundle version 1.0.6');
+  const agents = readFileSync(join(pkgRoot, 'extension-agents', 'AGENTS.md'), 'utf8');
+  assert(agents.includes('Compound human tasks — bundle v1.0.6'), 'generated AGENTS lacks task bundle version');
+  assert(runner.includes("process.platform === 'win32' ? 'npm.cmd' : 'npm'"), 'human task runner does not use the Windows npm command shim');
+  assert(provider.includes('LBA_LBABUS_PATH: resolveLbabusExecutable()'), 'human tasks do not receive the resolved lbabus executable');
+  assert(runner.includes("process.env.LBA_LBABUS_PATH || ''"), 'human task runner ignores the resolved lbabus executable');
+  const lbabusPath = readFileSync(join(pkgRoot, 'src', 'lbabusPath.ts'), 'utf8');
+  const extension = readFileSync(join(pkgRoot, 'src', 'extension.ts'), 'utf8');
+  const mcpProvider = readFileSync(join(pkgRoot, 'src', 'mcp', 'benchmarkActorMcpServerProvider.ts'), 'utf8');
+  const mcpServer = readFileSync(join(pkgRoot, 'src', 'mcp', 'runBenchmarkActorMcpServer.ts'), 'utf8');
+  assert(lbabusPath.includes('C:\\\\lba-tools\\\\lbabus\\\\lbabus.exe'), 'lbabus resolver lacks the stable reviewer installation');
+  assert(extension.includes('const CLI = resolveLbabusExecutable()'), 'extension commands ignore the lbabus resolver');
+  assert(mcpProvider.includes('LBA_LBABUS_PATH: resolveLbabusExecutable()'), 'MCP provider does not pass the resolved lbabus executable');
+  assert(mcpServer.includes('process.env.LBA_LBABUS_PATH'), 'MCP server ignores the resolved lbabus executable');
+  const reviewerVagrant = readFileSync(join(pkgRoot, 'reviewer-workstation', 'Vagrantfile'), 'utf8');
+  const reviewerToolchain = readFileSync(join(pkgRoot, 'reviewer-workstation', 'bin', 'guest-install-reviewer-toolchain.ps1'), 'utf8');
+  const reviewerStage = readFileSync(join(pkgRoot, 'reviewer-workstation', 'stage-local-vsix.ps1'), 'utf8');
+  for (const packageId of ['Git.Git', 'BurntSushi.ripgrep.MSVC', 'GitHub.cli', 'GLab.GLab', 'Microsoft.DotNet.SDK.8']) {
+    assert(reviewerToolchain.includes(packageId), `reviewer toolchain omits ${packageId}`);
+  }
+  assert(reviewerVagrant.includes('"reviewer-toolchain"') && reviewerVagrant.includes('privileged: true'), 'reviewer toolchain is not a privileged on-demand provisioner');
+  assert(reviewerStage.includes('--provision-with reviewer-toolchain') && reviewerStage.includes('selfcheck: PASS'), 'reviewer staging does not require a green toolchain selfcheck');
+  for (const binding of [
+    "'.lba\\local-ci\\latest.json'",
+    'kpi.candidate.sourceCommit',
+    'kpi.candidate.vsixSha256',
+    'kpi.candidate.vsixSize',
+    'workspace/candidate.vsix',
+    'workspace/candidate-receipt.json',
+  ]) {
+    assert(reviewerStage.includes(binding), `reviewer staging lacks candidate binding '${binding}'`);
+  }
+  for (const receiptProof of [
+    'kpi.coverage.branches.percent',
+    'kpi.localGates.passed',
+    'kpi.correspondences.graphConformant',
+    'kpi.package.firstSha256',
+    'does NOT authorize Marketplace publication',
+  ]) {
+    assert(reviewerStage.includes(receiptProof), `reviewer staging lacks receipt/verdict guard '${receiptProof}'`);
+  }
+  const rawCollector = readFileSync(join(pkgRoot, 'reviewer-workstation', 'collect-review-raw.ps1'), 'utf8');
+  assert(
+    rawCollector.includes('candidate-receipt.json')
+      && rawCollector.includes('receiptSha256')
+      && rawCollector.includes('Guest candidate receipt does not bind'),
+    'raw reviewer evidence does not retain and verify the candidate receipt',
+  );
+  const dependencies = readFileSync(join(pkgRoot, 'tools', 'collab-cli', 'Dependencies.cs'), 'utf8');
+  for (const productSource of [
+    join('tools', 'collab-cli', 'AgentGuards.cs'),
+    join('tools', 'collab-cli', 'Agents.cs'),
+    join('tools', 'collab-cli', 'GitHubGraphQL.cs'),
+  ]) {
+    assert(readFileSync(join(pkgRoot, productSource), 'utf8').includes('Preflight.ResolveCommand'), `${productSource} bypasses the stable dependency resolver`);
+  }
+  assert(dependencies.includes('internal static string ResolveCommand'), 'stable dependency resolver is not class-level reusable code');
+  const collector = readFileSync(join(pkgRoot, 'reviewer-workstation', 'collect-review-raw.ps1'), 'utf8');
+  for (const proof of ['reviewTarget', 'candidate', 'commands', 'taskDefinitions', 'agents', 'capabilities', 'reviewerSettings', 'screenshotpng']) {
+    assert(collector.includes(proof), `raw review collector lacks ${proof} evidence`);
+  }
+  assert(runner.includes("dockerOs.trim() !== 'linux'"), 'governance task lacks Linux Docker guard');
+  assert(
+    runner.includes('governance.workbenchImage')
+      && runner.includes("'--profile', 'release-gate'"),
+    'governance task lacks the published release-gate workbench command',
+  );
+  assert(runner.includes("if (exitCode.code !== 0) throw"), 'human task runner must fail closed on child errors');
+  assert(provider.includes('showReuseMessage: false') && provider.includes('TaskPanelKind.Dedicated'), 'human tasks must use dedicated terminals without reuse prompts');
+  for (const proof of ['index: eventIndex', 'wallTime:', 'monotonicNs:', "clockSource: 'process.hrtime.bigint'", "stdio: ['ignore', 'pipe', 'pipe']", "readline.createInterface"]) {
+    assert(runner.includes(proof), `human task runner lacks deterministic ${proof} evidence`);
+  }
+  return { taskType: definitions[0].type, tasks: definitions[0].properties.task.enum.length };
+});
+
+check('release-component-versioning', () => {
+  const versions = readJson('release-components.json');
+  const pkg = readJson('package.json');
+  const lock = readJson('package-lock.json');
+  const agentsManifest = readJson(join('extension-agents', 'agents.manifest.json'));
+  const lbabus = readFileSync(join(pkgRoot, 'tools', 'collab-cli', 'LbaBus.csproj'), 'utf8');
+  const tasks = readFileSync(join(pkgRoot, 'src', 'humanTasks.ts'), 'utf8');
+  const hook = readFileSync(join(pkgRoot, '.githooks', 'pre-commit'), 'utf8');
+  const workflow = readFileSync(join(pkgRoot, '.github', 'workflows', 'extension-release.yml'), 'utf8');
+  const releaseCli = readFileSync(join(pkgRoot, 'scripts', 'lba.mjs'), 'utf8');
+  const releaseComponentsSource = readFileSync(join(pkgRoot, 'scripts', 'release-components.mjs'), 'utf8');
+  const riskBaseline = readJson('release-risk-baseline.json');
+  const riskCore = readFileSync(join(pkgRoot, 'extension-tasks', 'release-risk.mjs'), 'utf8');
+  const agents = readFileSync(join(pkgRoot, 'extension-agents', 'AGENTS.md'), 'utf8');
+  const experimentGovernance = readJson(join('experiments', 'governance-overrides.json'));
+  assert(versions.schema === 'labview-benchmark-actor/release-components@1', 'release component schema mismatch');
+  assert(pkg.version === versions.extension && lock.version === versions.extension && lock.packages[''].version === versions.extension, 'extension package versions drifted');
+  assert(agentsManifest.version === versions.agents, 'AGENTS version drifted');
+  assert(lbabus.includes(`<Version>${versions.lbabus}</Version>`), 'lbabus version drifted');
+  assert(tasks.includes(`HUMAN_TASKS_VERSION = '${versions.humanTasks}'`), 'human task version drifted');
+  assert(versions.canonicalDistribution === 'github-release' && versions.marketplaceChannel === 'prerelease', 'distribution policy drifted');
+  assert(/^[0-9a-f]{40}$/.test(versions.governance.standardsReviewCommit), 'standards-review commit is not pinned');
+  assert(/^sha256:[0-9a-f]{64}$/.test(versions.governance.workbenchDigest), 'governance workbench digest is not pinned');
+  assert(versions.governance.standardsReviewVersion === '0.2.19', 'standards-review version is not pinned');
+  assert(riskBaseline.releaseVersion === versions.extension, 'release-risk version drifted');
+  assert(riskBaseline.source.workbenchVersion === versions.governance.standardsReviewVersion, 'release-risk workbench version drifted');
+  assert(riskBaseline.source.standardsReviewCommit === versions.governance.standardsReviewCommit, 'release-risk source commit drifted');
+  assert(riskBaseline.source.workbenchDigest === versions.governance.workbenchDigest, 'release-risk image digest drifted');
+  assert(riskCore.includes("const GATES = ['coverage', 'cm', 'req', 'arch', 'doc', 'dod']"), 'release-risk evaluator lacks all scorecard gates');
+  assert(agents.includes('repo-standards-review 0.2.19') && agents.includes('12/28 (42.9%)') && agents.includes('Prioritize DoD blockers'), 'generated AGENTS lacks forward risk awareness');
+  assert(hook.includes('release-components.mjs --precommit'), 'precommit release-component gate missing');
+  assert(
+    workflow.includes('inputs.publish_marketplace')
+      && workflow.includes('gh release download')
+      && workflow.includes('vsce publish --pre-release --packagePath "$release_dir/'),
+    'GitHub-first Marketplace prerelease policy drifted',
+  );
+  assert(releaseCli.includes("'--target', 'main'"), 'GitHub release target-main control drifted');
+  assert(releaseComponentsSource.includes("fromHead('experiments/governance-overrides.json')"), 'first-introduction fallback omits experiment-governance version');
+  assert(releaseCli.includes("purpose: 'quorum'") && releaseCli.includes('no quorum key enrolled'), 'signing readiness is not version/quorum scoped');
+  assert(experimentGovernance.version === versions.experimentGovernance, 'experiment-governance version drifted');
+  return { extension: versions.extension, agents: versions.agents, lbabus: versions.lbabus, humanTasks: versions.humanTasks };
+});
+
+check('standards-release-risk-baseline', () => {
+  const baseline = readJson('release-risk-baseline.json');
+  const scoreBaseline = readJson('standards-score-baseline.json');
+  const gateNames = ['coverage', 'cm', 'req', 'arch', 'doc', 'dod'];
+  assert(baseline.schema === 'labview-benchmark-actor/release-risk-baseline@1', 'release-risk schema mismatch');
+  assert(baseline.source.workbenchVersion === '0.2.19' && baseline.source.scoreSchema === '1.2.0', 'workbench score identity drifted');
+  assert(scoreBaseline.source.workbenchVersion === baseline.source.workbenchVersion, 'retained score workbench version drifted');
+  assert(scoreBaseline.source.standardsReviewCommit === baseline.source.standardsReviewCommit, 'retained score source commit drifted');
+  assert(scoreBaseline.source.workbenchDigest === baseline.source.workbenchDigest, 'retained score image digest drifted');
+  assert(scoreBaseline.source.rawScoreSha256 === baseline.source.rawScoreSha256, 'retained raw score hash drifted');
+  assert(Object.values(baseline.staticBaseline.maturity).length === 5 && Object.values(baseline.staticBaseline.maturity).every((score) => score === 5), 'raw maturity baseline is not 25/25');
+  assert(gateNames.every((gate) => (
+    baseline.staticBaseline.gates[gate].status === 'PASS'
+    && baseline.staticBaseline.gates[gate].rawMissingProof === '-'
+    && JSON.stringify(scoreBaseline.gates[gate]) === JSON.stringify(baseline.staticBaseline.gates[gate])
+  )), 'raw scorecard baseline did not preserve every PASS/dash cell');
+  assert(baseline.releaseEvidence.map((row) => row.gate).join(',') === gateNames.join(','), 'release-risk rows are incomplete or reordered');
+  const proofs = baseline.releaseEvidence.flatMap((row) => row.proofs);
+  const present = proofs.filter((proof) => proof.status === 'present').length;
+  assert(present === 12 && proofs.length === 28, 'release-risk baseline is not the governed 12/28 score');
+  assert(baseline.releaseEvidence.every((row) => row.risk && row.action && row.proofs.some((proof) => proof.status === 'missing')), 'release-risk row lacks risk/action/missing proof');
+  assert(proofs.filter((proof) => proof.status === 'present').every((proof) => proof.evidence && proof.artifacts?.every((artifact) => existsSync(join(pkgRoot, artifact)))), 'present release proof does not resolve to committed artifacts');
+  assert(proofs.filter((proof) => proof.status === 'missing').every((proof) => proof.evidence === null && proof.artifacts === undefined), 'missing release proof carries success-shaped evidence');
+  const runner = readFileSync(join(pkgRoot, 'extension-tasks', 'human-task-runner.mjs'), 'utf8');
+  assert(runner.includes("event(index === 0 ? 'release-risk-score' : 'release-risk-gate'"), 'Governance Review does not emit the risk overlay');
+  assert(runner.includes('verifyGovernedRisk(risk, governance.releaseRisk)'), 'runtime risk does not match the governed system tuple');
+  assert(runner.includes("if (risk.status !== 'READY')"), 'Release Candidate Check does not fail closed on blocked risk');
+  const agents = readFileSync(join(pkgRoot, 'extension-agents', 'AGENTS.md'), 'utf8');
+  for (const signal of ['repo-standards-review 0.2.19', '12/28 (42.9%)', 'Missing Proof cells are `-`', 'Do not publish', 'expected artifact']) {
+    assert(agents.includes(signal), `generated AGENTS lacks release-risk signal '${signal}'`);
+  }
+  return { workbenchMaturity: '25/25', staticGates: '6/6 PASS', releaseEvidence: `${present}/${proofs.length}`, status: 'BLOCKED' };
+});
+
+check('experiment-lifecycle-local-kpi', () => {
+  const result = loadExperimentGovernance();
+  assert(result.ok, `experiment governance failed: ${result.reasons.join('; ')}`);
+  assert(result.kpi.total === 62 && result.kpi.governed === 62 && result.kpi.ungoverned === 0, 'experiment governance KPI is not 62/62');
+  assert(result.kpi.forbiddenProductionReferences === 0, 'prohibited experiments reach production surfaces');
+  assert(result.kpi.prototypes === 1 && result.kpi.superseded === 2, 'prototype/superseded lifecycle baseline drifted');
+  assert(readJson(join('experiments', 'governance-overrides.json')).version === '1.0.1', 'experiment-governance/KPI version drifted');
+  const pkg = readJson('package.json');
+  assert(pkg.scripts?.['ci:local:quick'] === 'node scripts/local-continuous-kpi.mjs --quick', 'quick local KPI command missing');
+  assert(pkg.scripts?.['ci:local'] === 'node scripts/local-continuous-kpi.mjs', 'full local KPI command missing');
+  const kpi = readFileSync(join(pkgRoot, 'scripts', 'local-continuous-kpi.mjs'), 'utf8');
+  for (const proof of [
+    'release-components.mjs',
+    'experiment-governance.mjs',
+    "['run', 'test:coverage']",
+    'verify-local-gates.mjs',
+    'verify-correspondences.mjs',
+    "['run', 'package']",
+    'Repeated normalized VSIX builds differ',
+    'sourceCommit',
+    'coverageProof',
+    'localGateProof',
+    'correspondenceProof',
+    '.lba',
+    'local-ci',
+  ]) {
+    assert(kpi.includes(proof), `local continuous KPI lacks ${proof}`);
+  }
+  const agents = readFileSync(join(pkgRoot, 'extension-agents', 'AGENTS.md'), 'utf8');
+  for (const target of [
+    '62/62 governed',
+    '0 ungoverned',
+    '0 forbidden production references',
+    'npm run ci:local:quick',
+    'npm run ci:local',
+    '.lba/local-ci/latest.json',
+    'Human visual verdict boundary',
+    'does **not** authorize publication',
+  ]) {
+    assert(agents.includes(target), `generated AGENTS lacks KPI target '${target}'`);
+  }
+  return result.kpi;
 });
 
 // 21. A GitHub Codespace install route is defined via a PREBUILT dev container image: the recipe
@@ -2053,6 +2286,10 @@ check('mcp-server-surface-contract', () => {
   // behind the 14 GB leak -- MUST stay excluded from the .vsix, and this runs on both OS runners.
   for (const deny of ['reviewer-workstation/**', '**/.vagrant/**', 'node_modules/**', 'experiments/**', 'tools/**', 'docs/**', 'cleanroom/**', 'scripts/**']) {
     assert(ignore.includes(deny), `.vscodeignore must exclude ${deny} (#123 packaging-leak guard)`);
+  }
+  const lastGate = readFileSync(join(pkgRoot, 'scripts', 'agent-last-gate.mjs'), 'utf8');
+  for (const runtimeRoot of ['release-components', 'release-risk-baseline', 'standards-score-baseline']) {
+    assert(lastGate.includes(`^${runtimeRoot}\\.json$`), `agent-last-gate must allow packaged ${runtimeRoot}.json`);
   }
   // The dynamic protocol round-trip is wired into npm test.
   assert(/test\/mcp-server\.mjs/.test(pkg.scripts?.test ?? ''), 'npm test must run test/mcp-server.mjs');
@@ -2701,6 +2938,19 @@ check('handoff-verdict', () => {
   const { privateKeyPem, publicKeyPem } = generateReviewerKeypair();
   const reviewer = 'reviewer@example';
   const allow = { [reviewer]: publicKeyPem };
+  const committedReviewerAllowlist = readJson('tools/collab-cli/reviewer-allowlist.json');
+  const productionKeys = Object.entries(committedReviewerAllowlist)
+    .filter(([identity]) => identity !== '_comment')
+    .flatMap(([, keys]) => Array.isArray(keys) ? keys : [keys]);
+  assert(productionKeys.length > 0, 'committed reviewer allowlist has no keys');
+  assert(productionKeys.every((key) => (
+    key && typeof key === 'object' && !Array.isArray(key)
+    && typeof key.publicKeyPem === 'string' && key.publicKeyPem.includes('BEGIN PUBLIC KEY')
+    && /^\d+\.\d+\.\d+$/.test(key.validFrom)
+    && /^\d+\.\d+\.\d+$/.test(key.validThrough)
+    && Array.isArray(key.purposes) && key.purposes.length > 0
+    && key.purposes.every((purpose) => ['visual', 'quorum'].includes(purpose))
+  )), 'committed production reviewer keys must have SemVer validity bounds and explicit purposes');
   const verdict = buildReviewerVerdict({ target: { component: 'extension', version: '0.5.0', commit: 'c'.repeat(40), vsixSha256: 'd'.repeat(64) }, verdict: 'pass', reviewer, station: 'WINDOWS_VM', evidence: [{ kind: 'capture', ref: 'run-x' }], renderedAt: '2026-08-03T00:00:00Z' });
   const signed = signReviewerVerdict(verdict, { privateKeyPem, reviewer });
   assert(verifyReviewerVerdict(verdict, signed, { reviewerAllowlist: allow }).ok, 'the enrolled reviewer sign-off verifies');
@@ -2723,6 +2973,7 @@ check('handoff-verdict', () => {
 // RESOLVED/REFINE/BLOCKED net frame -- coordination rides TCP, not a GitHub Discussion.
 check('closed-loop-readback', () => {
   execFileSync(process.execPath, [join(here, '..', 'reviewer-workstation', 'await-agent-reply.selftest.mjs')], { stdio: 'pipe' });
+  execFileSync(process.execPath, [join(here, '..', 'reviewer-workstation', 'await-agent-reply.timeout.selftest.mjs')], { stdio: 'pipe' });
   const r = JSON.parse(readFileSync(join(here, '..', 'reviewer-workstation', 'closed-loop-readback-receipt.json'), 'utf8'));
   assert(r.schema === 'labview-benchmark-actor/closed-loop-readback-receipt@1' && r.requirement === 'LBA-REQ-059', 'committed closed-loop receipt shape');
   assert(r.loopbackProof.ok === true && r.loopbackProof.matchingTaskClosesLoop === true && r.loopbackProof.wrongTaskFailsClosed === true && r.loopbackProof.semanticVerdictTypeOverNet === true, 'loopback proof: loop closes, wrong task fails closed, semantic verdict type rides net');
@@ -2732,7 +2983,7 @@ check('closed-loop-readback', () => {
   const netSrc = readFileSync(join(here, '..', 'tools', 'collab-cli', 'Net.cs'), 'utf8');
   const typesLine = netSrc.split('\n').find((l) => l.includes('"CLAIM"') && l.includes('"HELLO"')) || '';
   for (const t of ['RESOLVED', 'REFINE', 'BLOCKED']) { assert(typesLine.includes(`"${t}"`), `net Types set includes ${t}`); }
-  return { selftest: 'await-agent-reply 7/7', loopback: r.loopbackProof.ok, liveDrives: r.liveDrives.length, netVerdictTypes: 'RESOLVED/REFINE/BLOCKED' };
+  return { selftest: 'await-agent-reply 9/9 + timeout 3/3', loopback: r.loopbackProof.ok, liveDrives: r.liveDrives.length, netVerdictTypes: 'RESOLVED/REFINE/BLOCKED' };
 });
 
 // LBA-REQ-068 / ADR-0049: net-only live VM-agent drive -- the host drives the reviewer VM's agent to run the
@@ -3290,6 +3541,14 @@ check('vsix-cross-plane-repro-workflow-wired', () => {
   const attrs = readFileSync(join(pkgRoot, '.gitattributes'), 'utf8').replace(/\r\n/g, '\n');
   assert(/^\*\.mjs text eol=lf$/m.test(attrs), '.gitattributes must LF-pin *.mjs (packaged media + bundled acg-mcp sources)');
   assert(/^\*\.ts text eol=lf$/m.test(attrs), '.gitattributes must LF-pin *.ts (so tsc string literals are LF on every plane)');
+  for (const file of ['release-components.json', 'release-risk-baseline.json', 'standards-score-baseline.json']) {
+    assert(
+      new RegExp(`^/${file.replace('.', '\\.')} text eol=lf$`, 'm').test(attrs),
+      `.gitattributes must LF-pin packaged root ${file}`,
+    );
+  }
+  const vscodeIgnore = readFileSync(join(pkgRoot, '.vscodeignore'), 'utf8').replace(/\r\n/g, '\n');
+  assert(/^\.lba\/\*\*$/m.test(vscodeIgnore), '.vscodeignore must exclude local KPI receipts from the VSIX');
   return { planes: ['linux', 'windows'], proof: 'npm run package on both -> identical sha256 (fail-closed)' };
 });
 
