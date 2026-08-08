@@ -90,7 +90,7 @@ try {
   vagrant upload (Join-Path $PSScriptRoot 'bin\guest-install-lbabus.ps1') 'C:/Windows/Temp/lba-guest-install-lbabus.ps1' $Machine | Out-Null
   $lbabusInstall = (vagrant winrm -c "powershell -NoProfile -ExecutionPolicy Bypass -File C:\Windows\Temp\lba-guest-install-lbabus.ps1 -PayloadZip C:\Windows\Temp\lbabus-win-x64.zip" 2>&1 | Out-String)
   $lbabusInstall -split "`n" | ForEach-Object { if ($_.Trim()) { Write-Host "    $($_.TrimEnd())" } }
-  if ($lbabusInstall -notmatch '"version":"0\.15\.0"') {
+  if ($lbabusInstall -notmatch '"version":"0\.15\.2"') {
     throw "Guest lbabus install/verify failed:`n$lbabusInstall"
   }
 
