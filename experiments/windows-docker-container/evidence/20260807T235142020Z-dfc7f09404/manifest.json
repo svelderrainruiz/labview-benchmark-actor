@@ -1,0 +1,274 @@
+{
+  "schema": "labview-benchmark-actor/windows-docker-evidence-manifest@1",
+  "runId": "20260807T235142020Z-dfc7f09404",
+  "outcome": "inconclusive",
+  "generatedWallTime": "2026-08-07T23:56:16.048Z",
+  "desktop": {
+    "target": "WinSta0",
+    "context": {
+      "mode": "WinSta0",
+      "windowStation": "WinSta0",
+      "desktop": "Default",
+      "qualifiedDesktop": "WinSta0\\Default",
+      "explicitStartupDesktop": "WinSta0\\Default",
+      "processWindowStationChanged": true,
+      "threadDesktopSet": false,
+      "threadDesktopError": 170
+    },
+    "monitorRectangles": [],
+    "localGdi": {
+      "path": null,
+      "sha256": null,
+      "analysis": {
+        "passed": false,
+        "reason": "capture-error"
+      },
+      "captureMethod": "GetDC(NULL)+BitBlt(SRCCOPY|CAPTUREBLT)+GetDIBits",
+      "error": "Exception calling \"CaptureScreen\" with \"1\" argument(s): \"BitBlt failed: 5\""
+    },
+    "desktopProbe": {
+      "processId": 28556,
+      "sessionId": 2,
+      "marker": "20260807T235142020Z-dfc7f09404",
+      "visible": true,
+      "exited": false,
+      "exitCode": null,
+      "window": {
+        "handle": 131172,
+        "processId": 28556,
+        "title": "LBA-VNC-DESKTOP-PROBE",
+        "className": "WindowsForms10.Window.8.app.0.34f5582_r7_ad1",
+        "visible": true,
+        "minimized": false,
+        "desktop": "WinSta0\\Default",
+        "bounds": {
+          "left": 80,
+          "top": 60,
+          "right": 880,
+          "bottom": 660
+        }
+      }
+    }
+  },
+  "tightVncDriver": {
+    "requested": "StandardGdi",
+    "actual": "StandardGdi",
+    "statements": [
+      "D3D driver usage is disallowed",
+      "Mirror driver usage is disallowed",
+      "Using the standart screen driver"
+    ]
+  },
+  "network": {
+    "containerId": "fe4c61e39e66a626e485fbe4239226f3cb03b269f01a1553e31fa34aa8bb69b2",
+    "networkName": "nat",
+    "networkId": "a2e0cc3906121020b3f96d9b1f588923c7500cd463bb89bf975d3c218c588cbf",
+    "endpointId": "9768d3e06c23ce20286e160e2229541d296350d8ce94577310850ed3af02629a",
+    "ipAddress": "172.21.14.68",
+    "ipPrefixLength": 16,
+    "gateway": "172.21.0.1"
+  },
+  "relay": {
+    "processId": 9516,
+    "bound": {
+      "address": "127.0.0.1",
+      "family": "IPv4",
+      "port": 64681,
+      "requestedPort": 0
+    },
+    "upstream": {
+      "host": "172.21.14.68",
+      "port": 5900
+    },
+    "stats": {
+      "acceptedConnections": 1,
+      "successfulUpstreamConnections": 1,
+      "upstreamConnectionFailures": 0,
+      "downstreamErrors": 0,
+      "downstreamToUpstreamBytes": 102,
+      "upstreamToDownstreamBytes": 6291575,
+      "serverErrors": 0,
+      "lastUpstreamError": null,
+      "lastServerError": null,
+      "activeConnections": 0
+    },
+    "cleanup": {
+      "closed": true,
+      "listenerReachable": false,
+      "elapsedMs": 1.0411,
+      "activeConnections": 1,
+      "listenerBindingsAfterClose": [],
+      "closedWallTime": "2026-08-07T23:54:08.081Z"
+    }
+  },
+  "files": [
+    {
+      "path": "bootstrap-ready.json",
+      "size": 16325,
+      "sha256": "8852f3b2f9b3d3d7b57ddfd9c2f8f935b4908167979d5c8e1e215e9afb139a0d",
+      "modifiedWallTime": "2026-08-07T23:54:02.656Z",
+      "frameIndex": null,
+      "role": null
+    },
+    {
+      "path": "bootstrap-stopped.json",
+      "size": 213,
+      "sha256": "6a44b39edc7295ed27a04e9ae461b64129f4c097739cc9c73a08548309a68dea",
+      "modifiedWallTime": "2026-08-07T23:54:11.439Z",
+      "frameIndex": null,
+      "role": null
+    },
+    {
+      "path": "capture-summary.json",
+      "size": 17232,
+      "sha256": "b36b04ea29aa76beafeb9493adbbbc83f032dfd9936ff6e4aa746647d608237a",
+      "modifiedWallTime": "2026-08-07T23:54:05.924Z",
+      "frameIndex": null,
+      "role": null
+    },
+    {
+      "path": "cleanup-verification.json",
+      "size": 498,
+      "sha256": "83b115cf76855d3b1f9036de1f028298ac70bb006108c4001bba8142182feb47",
+      "modifiedWallTime": "2026-08-07T23:56:15.982Z",
+      "frameIndex": null,
+      "role": null
+    },
+    {
+      "path": "container-debug.log",
+      "size": 4217,
+      "sha256": "c490f0d8dbd564925835c6e966c87eed20d8d1783b1a9f2651bde50fd88a8dd4",
+      "modifiedWallTime": "2026-08-07T23:54:11.444Z",
+      "frameIndex": null,
+      "role": null
+    },
+    {
+      "path": "container-inspect-pre-relay.json",
+      "size": 15408,
+      "sha256": "02473b21ead61b96e4edefbd2bcf413b02a2a45379f50d96c399687da311d4b1",
+      "modifiedWallTime": "2026-08-07T23:54:03.013Z",
+      "frameIndex": null,
+      "role": null
+    },
+    {
+      "path": "container-inspect.json",
+      "size": 11216,
+      "sha256": "5e662a9cef9a76e214ae94ac2ae8edca61d85faada87fca340454969f782da6b",
+      "modifiedWallTime": "2026-08-07T23:54:08.553Z",
+      "frameIndex": null,
+      "role": null
+    },
+    {
+      "path": "container.log",
+      "size": 4727,
+      "sha256": "62a7853eebd8dbe0b5fe48241a6e9ac0641f883a1a8faacd23e2246473ea0345",
+      "modifiedWallTime": "2026-08-07T23:54:08.706Z",
+      "frameIndex": null,
+      "role": null
+    },
+    {
+      "path": "display-diagnostics.json",
+      "size": 6092,
+      "sha256": "0698c10e9439dbf1f097b20f26a45419d3f50af115a6218f7251e432776271af",
+      "modifiedWallTime": "2026-08-07T23:53:59.074Z",
+      "frameIndex": null,
+      "role": null
+    },
+    {
+      "path": "docker-info.json",
+      "size": 5415,
+      "sha256": "9caf1dac05fd6fb15838f9c9ce7987504bf88d03435403b341be120b6a7c054d",
+      "modifiedWallTime": "2026-08-07T23:51:42.402Z",
+      "frameIndex": null,
+      "role": null
+    },
+    {
+      "path": "environment.json",
+      "size": 14535,
+      "sha256": "e1c514a1b8ca04d52cae91d9a5649c60b7e76e8b9bbde088d9cded229859f451",
+      "modifiedWallTime": "2026-08-07T23:54:03.432Z",
+      "frameIndex": null,
+      "role": null
+    },
+    {
+      "path": "failure-receipt.json",
+      "size": 17232,
+      "sha256": "b36b04ea29aa76beafeb9493adbbbc83f032dfd9936ff6e4aa746647d608237a",
+      "modifiedWallTime": "2026-08-07T23:54:05.923Z",
+      "frameIndex": null,
+      "role": null
+    },
+    {
+      "path": "frames/transport-baseline-rfb.png",
+      "size": 4981,
+      "sha256": "6ec227dca4c2663c781fed4748f9f10fedf7290bf7a8fffe2d4e05f81790e4cd",
+      "modifiedWallTime": "2026-08-07T23:54:04.379Z",
+      "frameIndex": null,
+      "role": null
+    },
+    {
+      "path": "host-orchestration.log",
+      "size": 18889,
+      "sha256": "c12d192b21e24d00e04f74f147b16efb2e88023b8d1db36ae87ccfd132cc4ad3",
+      "modifiedWallTime": "2026-08-07T23:56:15.992Z",
+      "frameIndex": null,
+      "role": null
+    },
+    {
+      "path": "image-inspect.json",
+      "size": 4698,
+      "sha256": "17cebe606d1f0a79f94f57c54077ed2e7bb0218b5d305df996585a1135cdab45",
+      "modifiedWallTime": "2026-08-07T23:51:42.587Z",
+      "frameIndex": null,
+      "role": null
+    },
+    {
+      "path": "lbabus-container.json",
+      "size": 1860,
+      "sha256": "f9d092c42fe1ffc94b6dd641678c3245ee60c19c29826de4208128cb23cd0ef1",
+      "modifiedWallTime": "2026-08-07T23:53:58.103Z",
+      "frameIndex": null,
+      "role": null
+    },
+    {
+      "path": "lbabus-host-stage.json",
+      "size": 361,
+      "sha256": "ce13b17f94d28b08c7d4e7e53946c4f421db62d589dcc58ce33ee40d881ddcd7",
+      "modifiedWallTime": "2026-08-07T23:53:51.980Z",
+      "frameIndex": null,
+      "role": null
+    },
+    {
+      "path": "network-preflight.json",
+      "size": 868,
+      "sha256": "320fde39fbd969452aabca128b47fa237f826635283174fc4845869c453a2bfc",
+      "modifiedWallTime": "2026-08-07T23:54:03.246Z",
+      "frameIndex": null,
+      "role": null
+    },
+    {
+      "path": "network-relay.json",
+      "size": 1787,
+      "sha256": "7a482323efe1fd39d28c42118127db2cd5fe3c4138361ad139282102d1aca992",
+      "modifiedWallTime": "2026-08-07T23:54:08.082Z",
+      "frameIndex": null,
+      "role": null
+    },
+    {
+      "path": "stop.signal",
+      "size": 28,
+      "sha256": "4c13bcc0737aa32636cc8ef7d78c1b9be058228461f1b9f27916c5cfdb76b30a",
+      "modifiedWallTime": "2026-08-07T23:54:09.393Z",
+      "frameIndex": null,
+      "role": null
+    },
+    {
+      "path": "tvnserver.log",
+      "size": 91816,
+      "sha256": "be46c06c318f3efcfa2a535ca9b156dc144e775dfe1ff8eb9ba70e97066e3695",
+      "modifiedWallTime": "2026-08-07T23:54:09.918Z",
+      "frameIndex": null,
+      "role": null
+    }
+  ]
+}

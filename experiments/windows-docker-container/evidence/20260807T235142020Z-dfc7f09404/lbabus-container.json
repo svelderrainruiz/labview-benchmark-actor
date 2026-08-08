@@ -1,0 +1,31 @@
+{
+    "schema":  "labview-benchmark-actor/windows-container-lbabus@1",
+    "wallTime":  "2026-08-07T23:53:57.9442393Z",
+    "status":  "passed",
+    "version":  "0.15.0",
+    "payloadPath":  "C:\\run-secrets\\lbabus\\lbabus.dll",
+    "payloadSha256":  "5d0f8b2e97e4dc2cc07dcab6acf8cf272a4bc015212cb89aa15e12b75c3d81a5",
+    "dotnetPath":  "C:\\Program Files\\dotnet\\dotnet.exe",
+    "dotnetRuntimes":  [
+                           "Microsoft.AspNetCore.App 8.0.28 [C:\\Program Files\\dotnet\\shared\\Microsoft.AspNetCore.App]",
+                           "Microsoft.NETCore.App 8.0.28 [C:\\Program Files\\dotnet\\shared\\Microsoft.NETCore.App]",
+                           "Microsoft.WindowsDesktop.App 8.0.28 [C:\\Program Files\\dotnet\\shared\\Microsoft.WindowsDesktop.App]"
+                       ],
+    "capabilitiesExitCode":  0,
+    "capabilities":  [
+                         "lbabus v0.15.0 - WIN plane on Microsoft Windows 10.0.20348 / X64",
+                         "",
+                         "pinned toolchain:",
+                         "  [MISS] rg      v-         (pin \u003e= v13.0.0)",
+                         "  [MISS] git     v-         (pin \u003e= v2.30.0)",
+                         "  [MISS] gh      v-         (pin \u003e= v2.20.0)",
+                         "  [MISS] glab    v-         (pin \u003e= v1.25.0)",
+                         "  [MISS] dotnet  vThe command could not be loaded, possibly because: (pin \u003e= v8.0.0)",
+                         "",
+                         "host capabilities:",
+                         "  [ no] docker       not installed",
+                         "  [ no] vagrant      not installed",
+                         "  [ no] vmware       vmrun not found",
+                         "  [yes] labview-cli  LabVIEWCLI on PATH (host-native)"
+                     ]
+}
