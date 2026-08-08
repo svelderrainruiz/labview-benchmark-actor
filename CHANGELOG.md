@@ -21,6 +21,10 @@ follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project
 - **Marketplace publication verification exits cleanly on a missing version or query failure.** The
   asynchronous `release-verify-published` command now finishes its Marketplace query before setting
   a failing exit code instead of forcing process termination while Node still owns network handles.
+- **Retained reviewer staging preserves the sealed candidate bytes.** The reviewer-cache wrapper now
+  stages the already-built pinned-Node VSIX without rebuilding it, rejects a mismatched expected
+  SHA-256 before VM mutation, and verifies the uploaded guest candidate hash before accepting the
+  interactive-profile installation.
 
 ## [1.3.0] - 2026-08-06
 
