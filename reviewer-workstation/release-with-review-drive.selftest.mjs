@@ -25,7 +25,7 @@ function freshRound() {
   const signOff = signReviewerVerdict(verdict, { privateKeyPem, reviewer });
   return buildReceipt({
     candidate,
-    staged: { drive: 'stage', vm: 'actor', matched: true, candidate: { component: 'extension', version: '9.9.9' }, frame: { type: 'DONE', task: 'rev-x', senderId: 'WIN', payload: 'ext 9.9.9 staged; review OK' } },
+    staged: { drive: 'stage', vm: 'actor', matched: true, candidate, frame: { type: 'DONE', task: 'rev-x', senderId: 'WIN', payload: JSON.stringify({ schema: 'labview-benchmark-actor/release-stage@1', candidate }) } },
     review: { verdict, signOff },
     reviewerAllowlist: { [reviewer]: publicKeyPem },
     minVisualReviewers: 1,
@@ -90,6 +90,30 @@ ok('rejects a tampered digest', () => {
   const v = validateReceipt(r);
   assert.equal(v.ok, false);
   assert.ok(v.findings.some((f) => /digest/.test(f)), 'expected a digest finding');
+});
+
+// 8. FAIL-CLOSED: staging cannot be satisfied by an in-progress or non-terminal net frame.
+ok('rejects a non-DONE staging frame', () => {
+  const r = clone(committed); r.staged.frame.type = 'PROGRESS'; reseal(r);
+  const v = validateReceipt(r);
+  assert.equal(v.ok, false);
+  assert.ok(v.findings.some((f) => /staged over net/.test(f)), 'expected a terminal staging finding');
+});
+
+// 9. FAIL-CLOSED: a structured WIN stage payload that names a stale commit cannot stage the requested candidate.
+ok('rejects a stage payload with a stale commit', () => {
+  const r = clone(committed); r.staged.frame.payload = JSON.stringify({ schema: 'labview-benchmark-actor/release-stage@1', candidate: { ...r.candidate, commit: 'f'.repeat(40) } }); reseal(r);
+  const v = validateReceipt(r);
+  assert.equal(v.ok, false);
+  assert.ok(v.findings.some((f) => /staged over net/.test(f)), 'expected a full candidate staging finding');
+});
+
+// 10. FAIL-CLOSED: a structured WIN stage payload that names a stale VSIX hash cannot stage the requested candidate.
+ok('rejects a stage payload with a stale VSIX hash', () => {
+  const r = clone(committed); r.staged.frame.payload = JSON.stringify({ schema: 'labview-benchmark-actor/release-stage@1', candidate: { ...r.candidate, vsixSha256: 'a'.repeat(64) } }); reseal(r);
+  const v = validateReceipt(r);
+  assert.equal(v.ok, false);
+  assert.ok(v.findings.some((f) => /staged over net/.test(f)), 'expected a full candidate staging finding');
 });
 
 let n = 0;
