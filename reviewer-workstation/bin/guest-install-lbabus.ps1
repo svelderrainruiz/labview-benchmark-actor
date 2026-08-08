@@ -3,7 +3,7 @@
 param(
   [Parameter(Mandatory)][string]$PayloadZip,
   [string]$InstallRoot = 'C:\lba-tools\lbabus',
-  [string]$ExpectedVersion = '0.15.6'
+  [string]$ExpectedVersion = '0.15.7'
 )
 
 $ErrorActionPreference = 'Stop'

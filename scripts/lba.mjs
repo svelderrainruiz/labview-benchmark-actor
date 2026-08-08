@@ -552,7 +552,7 @@ export function discoverSigningStation({ env = process.env, run } = {}) {
             presentedPublicKey = ps(
               `$env:ELECTRON_RUN_AS_NODE='1'; $out=${psLiteral(publicOut)}; `
               + `& 'C:\\Program Files\\Microsoft VS Code\\Code.exe' -e ${psLiteral(nodeScript)} ${psLiteral(reviewerKeyPath)} $out; `
-              + `if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }; `
+              + `if ($null -ne $LASTEXITCODE -and $LASTEXITCODE -ne 0) { exit $LASTEXITCODE }; `
               + `$pem=Get-Content -LiteralPath $out -Raw; Remove-Item -LiteralPath $out -Force; $pem`,
             ).trim() || null;
           } catch { presentedPublicKey = null; }
@@ -1037,7 +1037,12 @@ const SELFTEST = [
       env: { LBA_VM_PASS: 'test', LBA_VM_NAME: 'actor', LBA_VM_USER: 'vagrant' },
       run: (_file, args) => {
         const command = String(args.at(-1));
-        if (command.includes('ELECTRON_RUN_AS_NODE')) return publicKey;
+        if (command.includes('ELECTRON_RUN_AS_NODE')) {
+          if (!command.includes('if ($null -ne $LASTEXITCODE -and $LASTEXITCODE -ne 0)')) {
+            throw new Error('guest derivation must tolerate an unset GUI-process LASTEXITCODE');
+          }
+          return publicKey;
+        }
         if (command.includes('Get-Content -LiteralPath')) {
           return JSON.stringify({
             'labviewBenchmarkActor.reviewerId': 'reviewer@example.com',

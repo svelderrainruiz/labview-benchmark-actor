@@ -6,6 +6,14 @@ follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project
 
 ## [Unreleased]
 
+## [1.4.8] - 2026-08-08
+
+### Fixed
+
+- **Reviewer-VM key identity derivation handles the real VS Code launcher.** The Windows GUI launcher can leave
+  PowerShell's `$LASTEXITCODE` unset even after producing the derived public key. Signing readiness now distinguishes
+  an unset status from a nonzero failure and still fails closed if the public-key artifact cannot be read.
+
 ## [1.4.7] - 2026-08-08
 
 ### Fixed

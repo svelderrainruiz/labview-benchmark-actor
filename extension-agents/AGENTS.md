@@ -16,7 +16,7 @@ Treat this as an executable agent preflight, not optional human setup prose. Run
 | Tool | Required/validated version | Agent action |
 | --- | --- | --- |
 | VS Code | `>=1.101.0` | Required for the extension and contributed MCP server. |
-| `lbabus` | **exactly `0.15.6` for this extension build** | Run `lbabus version`. Reviewer staging installs this version at `C:\lba-tools\lbabus\lbabus.exe`; extension commands, MCP, and human tasks resolve that path explicitly so a stale Explorer/VS Code PATH cannot hide it. Else install with `dotnet tool install --global LabVIEWBenchmarkActor.CollabBus --version 0.15.6`. |
+| `lbabus` | **exactly `0.15.7` for this extension build** | Run `lbabus version`. Reviewer staging installs this version at `C:\lba-tools\lbabus\lbabus.exe`; extension commands, MCP, and human tasks resolve that path explicitly so a stale Explorer/VS Code PATH cannot hide it. Else install with `dotnet tool install --global LabVIEWBenchmarkActor.CollabBus --version 0.15.7`. |
 | Node.js | **exactly `24.19.0` for source-checkout repository/release work** | Match the repository `.nvmrc`; packaging is Node-version-bound. Evidence-only reviewer workspaces use VS Code's bundled runtime and do not require a separate Node installation. |
 | .NET runtime | `>=8.0` | Required to execute the framework-dependent `lbabus` payload. |
 | .NET SDK | `>=8.0` when building/staging `lbabus` | Required for `dotnet build/publish`; runtime-only hosts can consume but not rebuild it. |
