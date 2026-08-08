@@ -116,9 +116,16 @@ internal static class Capabilities
                 return (null, string.Empty);
             }
 
-            string outText = p.StandardOutput.ReadToEnd();
-            string errText = p.StandardError.ReadToEnd();
-            p.WaitForExit(10_000);
+            Task<string> outTask = p.StandardOutput.ReadToEndAsync();
+            Task<string> errTask = p.StandardError.ReadToEndAsync();
+            if (!p.WaitForExit(10_000))
+            {
+                p.Kill(entireProcessTree: true);
+                p.WaitForExit();
+                return (-1, "probe timed out after 10 seconds");
+            }
+            string outText = outTask.GetAwaiter().GetResult();
+            string errText = errTask.GetAwaiter().GetResult();
             string combined = string.IsNullOrWhiteSpace(outText) ? errText : outText;
             return (p.ExitCode, combined.Replace("\r", string.Empty).Trim());
         }

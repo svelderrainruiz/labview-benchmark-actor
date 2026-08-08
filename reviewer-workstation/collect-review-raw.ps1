@@ -19,6 +19,19 @@ $agentsPath = Join-Path $extensionRoot.FullName 'media\AGENTS.md'
 $agents = Get-Content $agentsPath -Raw
 $settings = Get-Content 'C:\Users\vagrant\AppData\Roaming\Code\User\settings.json' -Raw | ConvertFrom-Json
 $lbabus = 'C:\lba-tools\lbabus\lbabus.exe'
+$capabilitiesOut = 'C:\Windows\Temp\lba-capabilities.out'
+$capabilitiesErr = 'C:\Windows\Temp\lba-capabilities.err'
+Remove-Item $capabilitiesOut, $capabilitiesErr -Force -ErrorAction SilentlyContinue
+$capabilitiesProcess = Start-Process $lbabus -ArgumentList 'capabilities' -PassThru `
+  -RedirectStandardOutput $capabilitiesOut -RedirectStandardError $capabilitiesErr
+$capabilitiesTimedOut = -not $capabilitiesProcess.WaitForExit(30000)
+if ($capabilitiesTimedOut) {
+  Stop-Process -Id $capabilitiesProcess.Id -Force -ErrorAction SilentlyContinue
+  $capabilitiesProcess.WaitForExit()
+}
+$capabilities = @()
+if (Test-Path $capabilitiesOut) { $capabilities += Get-Content $capabilitiesOut }
+if (Test-Path $capabilitiesErr) { $capabilities += Get-Content $capabilitiesErr }
 [ordered]@{
   schema = 'labview-benchmark-actor/reviewer-raw-evidence@1'
   wallTime = [DateTime]::UtcNow.ToString('o')
@@ -42,7 +55,9 @@ $lbabus = 'C:\lba-tools\lbabus\lbabus.exe'
   lbabus = [ordered]@{
     path = $lbabus
     version = (& $lbabus version)
-    capabilities = @(& $lbabus capabilities 2>&1)
+    capabilitiesTimedOut = $capabilitiesTimedOut
+    capabilitiesExitCode = if ($capabilitiesTimedOut) { $null } else { $capabilitiesProcess.ExitCode }
+    capabilities = $capabilities
   }
   reviewerSettings = [ordered]@{
     reviewerId = $settings.'labviewBenchmarkActor.reviewerId'
