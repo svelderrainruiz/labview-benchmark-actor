@@ -54,17 +54,17 @@ internal static class Capabilities
             return new HostCapability("vmware", false, "vmrun not found");
         }
 
-        private static HostCapability ProbeVirtualBox()
-        {
-            (int? code, string outText) = Run("VBoxManage", "--version");
-            return code == 0 && outText.Length > 0
-                ? new HostCapability("virtualbox", true, $"VirtualBox {outText.Trim()}")
-                : new HostCapability("virtualbox", false, "VBoxManage not found");
-        }
-
         (int? code, string outText) = Run(vmrun, "list");
         string running = code == 0 && outText.Length > 0 ? outText.Split('\n')[0].Trim() : "vmrun present";
         return new HostCapability("vmware", true, $"{vmrun} — {running}");
+    }
+
+    private static HostCapability ProbeVirtualBox()
+    {
+        (int? code, string outText) = Run("VBoxManage", "--version");
+        return code == 0 && outText.Length > 0
+            ? new HostCapability("virtualbox", true, $"VirtualBox {outText.Trim()}")
+            : new HostCapability("virtualbox", false, "VBoxManage not found");
     }
 
     private static HostCapability ProbeLabViewCli()
