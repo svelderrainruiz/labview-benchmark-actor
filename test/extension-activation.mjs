@@ -248,6 +248,14 @@ try {
     'labviewBenchmarkActor.showAgents',
     'labviewBenchmarkActor.checkAgents',
   ];
+  const contributedCommands = JSON.parse(readFileSync(join(repoRoot, 'package.json'), 'utf8')).contributes.commands;
+  const generatedAgents = readFileSync(join(repoRoot, 'media', 'AGENTS.md'), 'utf8');
+  for (const contribution of contributedCommands) {
+    assert(
+      generatedAgents.includes(`| \`${contribution.title}\` |`),
+      `generated AGENTS.md documents contributed command: ${contribution.title}`,
+    );
+  }
   const ids = registered.map((r) => r.id);
   for (const cmd of expected) {
     assert(ids.includes(cmd), `activate() registers command ${cmd}`);

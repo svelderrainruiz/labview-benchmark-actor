@@ -25,14 +25,32 @@ Code:
 
 | Command | When to use |
 | --- | --- |
-| `LabVIEW Benchmark Actor: Open Benchmark Viewer` | Show the rendered mprr benchmark series. |
-| `LabVIEW Benchmark Actor: Capture LabVIEW Launch` | Record a real Windows LabVIEW launch with FFmpeg plus CPU/RAM/disk samples. |
-| `LabVIEW Benchmark Actor: Capture LabVIEW Launch (mprr, cross-platform VM)` | Capture a VM LabVIEW launch through the mprr visual ring. |
 | `LabVIEW Benchmark Actor: Show Host Capabilities` | Learn the host's real runtime before proposing benchmark work. |
 | `LabVIEW Benchmark Actor: Poll Coordination Bus` | Read the latest cross-plane coordination messages. |
 | `LabVIEW Benchmark Actor: Post Coordination Note` | Post a coordination note to the bus. |
+| `LabVIEW Benchmark Actor: Open Benchmark Viewer` | Show the rendered mprr benchmark series. |
+| `LabVIEW Benchmark Actor: Open Benchmark Run` | Inspect the bundled launch-capture run. |
+| `LabVIEW Benchmark Actor: Open Benchmark Trend` | Compare the bundled launch trend across iterations. |
+| `LabVIEW Benchmark Actor: Open Benchmark Frame Correlator` | Correlate visual frames with timing and milestone data. |
+| `LabVIEW Benchmark Actor: Open Cross-Plane Benchmark Trend` | Inspect Linux/Windows benchmark agreement. |
+| `LabVIEW Benchmark Actor: Open Benchmark Resource Profile` | Inspect CPU, RAM, and disk correlation for a run. |
+| `LabVIEW Benchmark Actor: Open Cross-Plane Resource Agreement` | Inspect resource-metric agreement across planes. |
+| `LabVIEW Benchmark Actor: Open Mesh-Stress Calibration` | Review calibrated throughput/stress limits. |
+| `LabVIEW Benchmark Actor: Open Concurrent Mesh Board` | Inspect concurrent actor status and results. |
+| `LabVIEW Benchmark Actor: Capture LabVIEW Launch` | Record a real Windows LabVIEW launch with FFmpeg plus CPU/RAM/disk samples. |
+| `LabVIEW Benchmark Actor: Capture LabVIEW Launch (mprr, cross-platform VM)` | Capture a VM LabVIEW launch through the mprr visual ring. |
+| `LabVIEW Benchmark Actor: Stop LabVIEW Capture` | Stop the active launch capture and finalize available evidence. |
+| `LabVIEW Benchmark Actor: Mark Handoff Step Done` | Complete the active human-assisted handoff step. |
+| `LabVIEW Benchmark Actor: Skip Handoff Step` | Explicitly skip the active handoff step with recorded intent. |
+| `LabVIEW Benchmark Actor: Render Reviewer Verdict` | Render and sign PASS/CHANGES/FAIL for the bound release candidate. |
 | `LabVIEW Benchmark Actor: Write Agent Instructions` | Materialize this AGENTS.md into the workspace. |
+| `LabVIEW Benchmark Actor: Show Agent Instructions` | Open the shipped canonical AGENTS.md read-only. |
 | `LabVIEW Benchmark Actor: Check Agent Instructions` | Verify a workspace copy matches the shipped canonical. |
+| `LabVIEW Benchmark Actor: Create Cleanroom Worker VM` | Create the supported cleanroom worker from a POSIX host. |
+| `LabVIEW Benchmark Actor: Bootstrap LabVIEW Authoring Lane (Windows)` | Bootstrap the Windows ActiveX authoring lane and prerequisites. |
+| `LabVIEW Benchmark Actor: Run Corroboration Grid` | Run the multi-plane corroboration grid for the current candidate. |
+| `LabVIEW Benchmark Actor: Verify Release Provenance` | Verify release inclusion, signatures, and candidate provenance before use. |
+| `LabVIEW Benchmark Actor: Run Throughput-to-Disk Ladder` | Measure sustained throughput-to-disk across the governed ladder. |
 
 ## How to work with the extension
 
