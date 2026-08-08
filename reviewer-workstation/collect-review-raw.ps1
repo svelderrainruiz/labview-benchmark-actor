@@ -39,12 +39,14 @@ if ($target.component -ne 'extension' -or $target.version -notmatch '^\d+\.\d+\.
 
 $extensionRoot = "C:\Users\vagrant\.vscode\extensions\svelderrainruiz.labview-benchmark-actor-$($target.version)"
 $candidatePath = Join-Path $OutDir 'candidate.vsix'
+$candidateReceiptPath = Join-Path $OutDir 'candidate-receipt.json'
 $packagePath = Join-Path $OutDir 'extension-package.json'
 $agentsPath = Join-Path $OutDir 'AGENTS.md'
 $agentsManifestPath = Join-Path $OutDir 'agents.manifest.json'
 $settingsPath = Join-Path $OutDir 'settings.json'
 $verdictPath = Join-Path $OutDir 'signed-verdict.json'
 Copy-GuestFile 'C:\lba-review\candidate.vsix' $candidatePath | Out-Null
+Copy-GuestFile 'C:\lba-review\workspace\candidate-receipt.json' $candidateReceiptPath | Out-Null
 Copy-GuestFile "$extensionRoot\package.json" $packagePath | Out-Null
 Copy-GuestFile "$extensionRoot\media\AGENTS.md" $agentsPath | Out-Null
 Copy-GuestFile "$extensionRoot\media\agents.manifest.json" $agentsManifestPath | Out-Null
@@ -99,7 +101,22 @@ $vmInfoPath = Join-Path $OutDir 'vm-info.txt'
 )
 
 $package = Get-Content $packagePath -Raw | ConvertFrom-Json
+$candidateReceipt = Get-Content $candidateReceiptPath -Raw | ConvertFrom-Json
 $agentsManifest = Get-Content $agentsManifestPath -Raw | ConvertFrom-Json
+$candidateHash = (Get-FileHash $candidatePath -Algorithm SHA256).Hash.ToLowerInvariant()
+if (
+  $candidateReceipt.mode -ne 'full' -or
+  $candidateReceipt.outcome -ne 'PASS' -or
+  $candidateReceipt.version -ne $target.version -or
+  $candidateReceipt.kpi.candidate.sourceCommit -ne $target.commit -or
+  $candidateReceipt.kpi.candidate.vsixSha256 -ne $candidateHash -or
+  $candidateReceipt.kpi.candidate.vsixSize -ne (Get-Item $candidatePath).Length -or
+  -not $candidateReceipt.kpi.package.identical -or
+  $candidateReceipt.kpi.package.firstSha256 -ne $candidateHash -or
+  $candidateReceipt.kpi.package.secondSha256 -ne $candidateHash
+) {
+  throw 'Guest candidate receipt does not bind the exact review target and physical VSIX.'
+}
 $raw = [ordered]@{
   schema = 'labview-benchmark-actor/reviewer-raw-evidence@1'
   wallTime = [DateTime]::UtcNow.ToString('o')
@@ -107,7 +124,13 @@ $raw = [ordered]@{
   reviewTarget = $target
   candidate = [ordered]@{
     size = (Get-Item $candidatePath).Length
-    sha256 = (Get-FileHash $candidatePath -Algorithm SHA256).Hash.ToLowerInvariant()
+    sha256 = $candidateHash
+    receiptSha256 = (Get-FileHash $candidateReceiptPath -Algorithm SHA256).Hash.ToLowerInvariant()
+    sourceCommit = $candidateReceipt.kpi.candidate.sourceCommit
+    coverage = $candidateReceipt.kpi.coverage
+    localGates = $candidateReceipt.kpi.localGates
+    correspondences = $candidateReceipt.kpi.correspondences
+    reproduciblePackage = $candidateReceipt.kpi.package
   }
   extension = [ordered]@{
     id = 'svelderrainruiz.labview-benchmark-actor'
@@ -120,7 +143,7 @@ $raw = [ordered]@{
     sha256 = (Get-FileHash $agentsPath -Algorithm SHA256).Hash.ToLowerInvariant()
   }
   lbabus = [ordered]@{
-    version = '0.15.3'
+    version = '0.15.4'
     capabilitiesTimedOut = $capabilitiesTimedOut
     capabilitiesExitCode = if ($capabilitiesTimedOut) { $null } else { $capabilitiesProcess.ExitCode }
     capabilitiesFile = $capabilitiesOut

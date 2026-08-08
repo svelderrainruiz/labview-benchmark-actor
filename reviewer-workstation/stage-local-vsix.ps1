@@ -44,21 +44,53 @@ try {
     Step 'npm test (compile + activation + viewer render)'
     npm test
     if ($LASTEXITCODE -ne 0) { throw "npm test failed ($LASTEXITCODE) -- fix before staging a publish candidate." }
-    Step 'vsce package'
-    npx vsce package --out labview-benchmark-actor.vsix
-    if ($LASTEXITCODE -ne 0) { throw "vsce package failed ($LASTEXITCODE)." }
+    Step 'normalized VSIX package'
+    npm run package
+    if ($LASTEXITCODE -ne 0) { throw "npm run package failed ($LASTEXITCODE)." }
     $Vsix = Join-Path $repoRoot 'labview-benchmark-actor.vsix'
   }
   if (-not $Vsix) { $Vsix = Join-Path $repoRoot 'labview-benchmark-actor.vsix' }
   if (-not (Test-Path $Vsix)) { throw "No .vsix at '$Vsix'. Build it (omit -SkipBuild) or pass -Vsix <path>." }
 
   $sizeBytes = (Get-Item $Vsix).Length
+  $vsixSha256 = (Get-FileHash $Vsix -Algorithm SHA256).Hash.ToLowerInvariant()
   Step ("candidate: {0} ({1:N1} KB)" -f $Vsix, ($sizeBytes / 1KB))
   # Publish guard: a real extension .vsix is tiny. A multi-MB one means .vscodeignore leaked non-runtime
   # content (VM disk under reviewer-workstation/.vagrant, node_modules, experiments, ...). Fail closed --
   # this is exactly the class of defect the last gate must catch before Marketplace.
   if ($sizeBytes -gt 5MB) {
     throw ("VSIX is {0:N1} MB -- too large to publish; audit .vscodeignore (VM disk / node_modules leak) then rebuild." -f ($sizeBytes / 1MB))
+  }
+  $candidateReceiptPath = Join-Path $repoRoot '.lba\local-ci\latest.json'
+  if (-not (Test-Path $candidateReceiptPath)) {
+    throw 'Missing .lba/local-ci/latest.json. Run the clean-worktree `npm run ci:local` before reviewer staging.'
+  }
+  $candidateReceipt = Get-Content $candidateReceiptPath -Raw | ConvertFrom-Json
+  $sourceCommit = (git -C $repoRoot rev-parse HEAD).Trim()
+  $worktreeStatus = (git -C $repoRoot status --short | Out-String).Trim()
+  if (
+    $candidateReceipt.mode -ne 'full' -or
+    $candidateReceipt.outcome -ne 'PASS' -or
+    $candidateReceipt.kpi.candidate.sourceCommit -ne $sourceCommit -or
+    $candidateReceipt.kpi.candidate.vsixSha256 -ne $vsixSha256 -or
+    $candidateReceipt.kpi.candidate.vsixSize -ne $sizeBytes -or
+    -not $candidateReceipt.kpi.candidate.worktreeCleanBefore -or
+    -not $candidateReceipt.kpi.candidate.worktreeCleanAfter -or
+    $candidateReceipt.kpi.coverage.branches.percent -lt 95 -or
+    $candidateReceipt.kpi.coverage.lines.percent -lt 95 -or
+    $candidateReceipt.kpi.coverage.statements.percent -lt 95 -or
+    $candidateReceipt.kpi.coverage.functions.percent -lt 96 -or
+    $candidateReceipt.kpi.localGates.passed -ne $candidateReceipt.kpi.localGates.total -or
+    $candidateReceipt.kpi.localGates.total -le 0 -or
+    $candidateReceipt.kpi.correspondences.passed -ne $candidateReceipt.kpi.correspondences.total -or
+    $candidateReceipt.kpi.correspondences.total -le 0 -or
+    -not $candidateReceipt.kpi.correspondences.graphConformant -or
+    -not $candidateReceipt.kpi.package.identical -or
+    $candidateReceipt.kpi.package.firstSha256 -ne $vsixSha256 -or
+    $candidateReceipt.kpi.package.secondSha256 -ne $vsixSha256 -or
+    $worktreeStatus
+  ) {
+    throw 'The full local-KPI receipt does not bind this clean commit and exact VSIX. Re-run `npm run ci:local`.'
   }
 
   $env:VAGRANT_CWD = $PSScriptRoot
@@ -73,6 +105,12 @@ try {
   Step "vagrant upload -> $GuestVsixPath"
   vagrant upload $Vsix $GuestVsixPath $Machine
   if ($LASTEXITCODE -ne 0) { throw "vagrant upload failed ($LASTEXITCODE)." }
+  vagrant winrm -c "powershell -NoProfile -Command `"New-Item -ItemType Directory -Path C:\lba-review\workspace -Force | Out-Null`"" $Machine | Out-Null
+  if ($LASTEXITCODE -ne 0) { throw "Could not create the guest review workspace ($LASTEXITCODE)." }
+  vagrant upload $Vsix 'C:/lba-review/workspace/candidate.vsix' $Machine | Out-Null
+  if ($LASTEXITCODE -ne 0) { throw "Could not upload the workspace candidate VSIX ($LASTEXITCODE)." }
+  vagrant upload $candidateReceiptPath 'C:/lba-review/workspace/candidate-receipt.json' $Machine | Out-Null
+  if ($LASTEXITCODE -ne 0) { throw "Could not upload the candidate KPI receipt ($LASTEXITCODE)." }
 
   # The reviewer is a real mesh actor, not just a visual shell. Publish a framework-dependent Windows apphost
   # from this exact repository and install it into a stable user-PATH location before exercising capabilities.
@@ -90,8 +128,20 @@ try {
   vagrant upload (Join-Path $PSScriptRoot 'bin\guest-install-lbabus.ps1') 'C:/Windows/Temp/lba-guest-install-lbabus.ps1' $Machine | Out-Null
   $lbabusInstall = (vagrant winrm -c "powershell -NoProfile -ExecutionPolicy Bypass -File C:\Windows\Temp\lba-guest-install-lbabus.ps1 -PayloadZip C:\Windows\Temp\lbabus-win-x64.zip" 2>&1 | Out-String)
   $lbabusInstall -split "`n" | ForEach-Object { if ($_.Trim()) { Write-Host "    $($_.TrimEnd())" } }
-  if ($lbabusInstall -notmatch '"version":"0\.15\.3"') {
+  if ($lbabusInstall -notmatch '"version":"0\.15\.4"') {
     throw "Guest lbabus install/verify failed:`n$lbabusInstall"
+  }
+
+  Step 'install and verify reviewer prerequisite toolchain'
+  $toolchainInstall = (vagrant provision $Machine --provision-with reviewer-toolchain 2>&1 | Out-String)
+  $toolchainInstall -split "`n" | ForEach-Object { if ($_.Trim()) { Write-Host "    $($_.TrimEnd())" } }
+  if ($toolchainInstall -notmatch '"ok":true') {
+    throw "Guest reviewer-toolchain install/verify failed:`n$toolchainInstall"
+  }
+  $selfcheck = (vagrant winrm -c "powershell -NoProfile -Command `"& 'C:\lba-tools\lbabus\lbabus.exe' selfcheck`"" 2>&1 | Out-String)
+  $selfcheck -split "`n" | ForEach-Object { if ($_.Trim()) { Write-Host "    $($_.TrimEnd())" } }
+  if ($selfcheck -notmatch 'selfcheck: PASS') {
+    throw "Guest lbabus selfcheck failed after toolchain staging:`n$selfcheck"
   }
 
   # 4) Install into the INTERACTIVE reviewer's profile (issue #121) + verify by outcome. A guest-side
@@ -142,15 +192,16 @@ B. Command surface (Ctrl+Shift+P -> "LabVIEW Benchmark Actor:")
    - Show Agent Instructions      -> the embedded AGENTS.md opens.
    - Write Agent Instructions     -> materializes AGENTS.md into the open folder.
    - Check Agent Instructions     -> reports match/drift vs the embedded canonical.
-   - Show Host Capabilities / Poll Bus / Post Note -> reviewer staging installs `lbabus`; restart VS Code so
-     the extension host inherits its updated user PATH. Configure a bus peer before Poll/Post.
+   - Show Host Capabilities / Poll Bus / Post Note -> reviewer staging installs and resolves `lbabus` explicitly.
+     Configure a bus peer before Poll/Post.
 
 C. Documentation
    - README (above) is the shipped doc surface. Deeper specs (SRS/ADRs/user guide) are in
      the repo under docs/ if you want to cross-check wording.
 
-Verdict: if A + B look publish-ready, this candidate is cleared for the Marketplace.
-Report issues back to the agent; nothing is published until you approve.
+Verdict: if A + B and the exact candidate receipt pass, a visual PASS approves this candidate for later release
+gates. It does NOT authorize Marketplace publication. Hosted, cross-plane, provenance, canonical-release, lineage,
+and Marketplace proofs remain mandatory and publication stays blocked until those later gates pass.
 '@
   # Cross-platform host temp dir: $env:TEMP is null when this script runs under pwsh on the LINUX
   # (VirtualBox) lane -- use [IO.Path]::GetTempPath() (returns %TEMP% on Windows, /tmp on Linux).

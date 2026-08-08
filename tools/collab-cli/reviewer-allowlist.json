@@ -54,6 +54,18 @@
       "validFrom": "1.4.4",
       "validThrough": "1.4.4",
       "purposes": ["quorum"]
+    },
+    {
+      "publicKeyPem": "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEAcuGum4hppckDIVQcEgsVfk1oHmVdt75z9QxhdrZKWgE=\n-----END PUBLIC KEY-----\n",
+      "validFrom": "1.4.5",
+      "validThrough": "1.4.5",
+      "purposes": ["visual"]
+    },
+    {
+      "publicKeyPem": "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEADhrmiF33qRyKVruYXCxE5WGTrF6k5mnrmJPqK0IqJWg=\n-----END PUBLIC KEY-----\n",
+      "validFrom": "1.4.5",
+      "validThrough": "1.4.5",
+      "purposes": ["quorum"]
     }
   ]
 }

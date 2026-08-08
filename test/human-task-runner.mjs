@@ -14,7 +14,7 @@ try {
     env: {
       ...process.env,
       LBA_TASK_EVIDENCE_ROOT: root,
-      LBA_EXTENSION_VERSION: '1.4.4',
+      LBA_EXTENSION_VERSION: '1.4.5',
     },
     input: '',
   });
@@ -27,8 +27,8 @@ try {
   assert.equal(files.length, 1);
   const receipt = JSON.parse(readFileSync(path.join(root, files[0]), 'utf8'));
   assert.equal(receipt.schema, 'labview-benchmark-actor/human-task-receipt@1');
-  assert.equal(receipt.taskBundleVersion, '1.0.3');
-  assert.equal(receipt.extensionVersion, '1.4.4');
+  assert.equal(receipt.taskBundleVersion, '1.0.4');
+  assert.equal(receipt.extensionVersion, '1.4.5');
   assert.equal(receipt.monotonicClockSource, 'process.hrtime.bigint');
   assert.equal(receipt.outcome, 'FAIL');
   assert.deepEqual(receipt.events.map((event) => event.index), [1, 2, 3]);

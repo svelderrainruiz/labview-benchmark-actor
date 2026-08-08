@@ -1,6 +1,6 @@
 {
   "schema": "labview-benchmark-actor/experiment-governance-overrides@1",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "overrides": {
     "agent-last-gate": {
       "status": "active",

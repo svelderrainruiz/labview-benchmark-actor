@@ -9,11 +9,11 @@ const standardsScoreBaseline = JSON.parse(readFileSync(new URL('../standards-sco
 const base = {
   components: {
     schema: 'labview-benchmark-actor/release-components@1',
-    extension: '1.4.4',
-    agents: '0.3.8',
-    lbabus: '0.15.3',
-    humanTasks: '1.0.3',
-    experimentGovernance: '1.0.0',
+    extension: '1.4.5',
+    agents: '0.3.9',
+    lbabus: '0.15.4',
+    humanTasks: '1.0.4',
+    experimentGovernance: '1.0.1',
     canonicalDistribution: 'github-release',
     marketplaceChannel: 'prerelease',
     governance: {
@@ -25,21 +25,21 @@ const base = {
       releaseRisk: { present: 12, total: 28, status: 'BLOCKED' },
     },
   },
-  packageJson: { version: '1.4.4' },
-  packageLock: { version: '1.4.4', packages: { '': { version: '1.4.4' } } },
-  agentsManifest: { version: '0.3.8' },
-  agentsText: 'exactly `0.15.3` for this extension build\nbundle v1.0.3',
-  lbabusProject: '<Version>0.15.3</Version>',
-  humanTasksSource: "HUMAN_TASKS_VERSION = '1.0.3'",
-  humanTaskRunner: "HUMAN_TASKS_VERSION = '1.0.3'",
-  changelog: '## [1.4.4]',
+  packageJson: { version: '1.4.5' },
+  packageLock: { version: '1.4.5', packages: { '': { version: '1.4.5' } } },
+  agentsManifest: { version: '0.3.9' },
+  agentsText: 'exactly `0.15.4` for this extension build\nbundle v1.0.4',
+  lbabusProject: '<Version>0.15.4</Version>',
+  humanTasksSource: "HUMAN_TASKS_VERSION = '1.0.4'",
+  humanTaskRunner: "HUMAN_TASKS_VERSION = '1.0.4'",
+  changelog: '## [1.4.5]',
   releaseWorkflow: 'vsce publish --pre-release',
   releaseCli: "['--target', 'main']",
   releaseRiskBaseline,
   standardsScoreBaseline,
   artifactExists: () => true,
-  experimentGovernanceManifest: { version: '1.0.0' },
-  experimentGovernanceSource: "EXPERIMENT_GOVERNANCE_VERSION = '1.0.0'",
+  experimentGovernanceManifest: { version: '1.0.1' },
+  experimentGovernanceSource: "EXPERIMENT_GOVERNANCE_VERSION = '1.0.1'",
 };
 
 assert.equal(verifyReleaseComponents(base).ok, true);
@@ -96,7 +96,7 @@ assert.equal(verifyStagedReleaseMetadata({
 assert.equal(verifyStagedReleaseMetadata({
   staged,
   unstaged: [],
-  previous: { extension: '1.4.4', agents: '0.3.8', lbabus: '0.15.3', humanTasks: '1.0.3' },
+  previous: { extension: '1.4.5', agents: '0.3.9', lbabus: '0.15.4', humanTasks: '1.0.4', experimentGovernance: '1.0.1' },
   current: base.components,
 }).ok, false);
 

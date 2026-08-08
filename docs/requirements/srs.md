@@ -2941,6 +2941,8 @@ progressively.
    UTC wall time, monotonic nanoseconds, and the `process.hrtime.bigint` clock-source name.
   - Extension commands, MCP, and human tasks resolve the stable reviewer `lbabus` installation even when the running
    VS Code/Explorer process inherited PATH before staging.
+  - Reviewer staging provisions the pinned Git/ripgrep/GitHub CLI/GitLab CLI/.NET toolchain and requires a green
+   `lbabus selfcheck` before presenting the candidate.
   - `release-cut-github` explicitly targets `main`.
   - Marketplace publication is opt-in after the canonical GitHub Release exists, verifies the release VSIX hash
    equals the staged VSIX hash, runs from the release tag, and uses `vsce publish --pre-release` on the downloaded
@@ -2986,7 +2988,8 @@ progressively.
   - Quick local CI checks CHANGELOG/system version, experiment lifecycle, release-risk, traceability, and report
     currency during incremental work.
   - Full local CI requires a clean worktree, runs tests/gates/correspondence, packages twice byte-identically, and
-    retains a KPI receipt before verdict.
+    retains a KPI receipt before verdict. That receipt binds the exact source commit and VSIX hash/size and carries
+    explicit coverage, gate, and correspondence counters.
   - Generated AGENTS states numeric targets and distinguishes local KPI PASS from release readiness.
 
 ## Traceability (requirement → architecture view / test)

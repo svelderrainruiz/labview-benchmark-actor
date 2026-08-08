@@ -19,7 +19,7 @@ internal static class Ripgrep
         version = string.Empty;
         try
         {
-            var psi = new ProcessStartInfo(Exe, "--version")
+            var psi = new ProcessStartInfo(Preflight.ResolveCommand(Exe), "--version")
             {
                 RedirectStandardOutput = true,
                 RedirectStandardError = true,
@@ -52,7 +52,7 @@ internal static class Ripgrep
     {
         try
         {
-            var psi = new ProcessStartInfo(Exe) { UseShellExecute = false };
+            var psi = new ProcessStartInfo(Preflight.ResolveCommand(Exe)) { UseShellExecute = false };
             foreach (string a in DeterministicArgs(args))
             {
                 psi.ArgumentList.Add(a);

@@ -58,7 +58,7 @@ public sealed class GitHubGraphQL : IDisposable
         // Fall back to the gh CLI's stored credential.
         try
         {
-            var psi = new ProcessStartInfo("gh", "auth token")
+            var psi = new ProcessStartInfo(Preflight.ResolveCommand("gh"), "auth token")
             {
                 RedirectStandardOutput = true,
                 RedirectStandardError = true,

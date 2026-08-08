@@ -182,7 +182,7 @@ if (-not $guestProof.checklistPresent -or $guestProof.profile -ne 'interactive')
 if ($guestProof.candidateSha256 -ne $sourceVsixSha256) {
   throw 'Guest-staged VSIX SHA-256 differs from the exact host candidate.'
 }
-if ($guestProof.lbabusVersion -ne '0.15.3') {
+if ($guestProof.lbabusVersion -ne '0.15.4') {
   throw 'Guest reviewer did not prove the staged lbabus version.'
 }
 $packageVersion = (Get-Content (Join-Path $repoRoot 'package.json') -Raw | ConvertFrom-Json).version

@@ -16,8 +16,8 @@ Treat this as an executable agent preflight, not optional human setup prose. Run
 | Tool | Required/validated version | Agent action |
 | --- | --- | --- |
 | VS Code | `>=1.101.0` | Required for the extension and contributed MCP server. |
-| `lbabus` | **exactly `0.15.3` for this extension build** | Run `lbabus version`. Reviewer staging installs this version at `C:\lba-tools\lbabus\lbabus.exe`; extension commands, MCP, and human tasks resolve that path explicitly so a stale Explorer/VS Code PATH cannot hide it. Else install with `dotnet tool install --global LabVIEWBenchmarkActor.CollabBus --version 0.15.3`. |
-| Node.js | **exactly `24.19.0` for repository/release work** | Match the repository `.nvmrc`; packaging is Node-version-bound. |
+| `lbabus` | **exactly `0.15.4` for this extension build** | Run `lbabus version`. Reviewer staging installs this version at `C:\lba-tools\lbabus\lbabus.exe`; extension commands, MCP, and human tasks resolve that path explicitly so a stale Explorer/VS Code PATH cannot hide it. Else install with `dotnet tool install --global LabVIEWBenchmarkActor.CollabBus --version 0.15.4`. |
+| Node.js | **exactly `24.19.0` for source-checkout repository/release work** | Match the repository `.nvmrc`; packaging is Node-version-bound. Evidence-only reviewer workspaces use VS Code's bundled runtime and do not require a separate Node installation. |
 | .NET runtime | `>=8.0` | Required to execute the framework-dependent `lbabus` payload. |
 | .NET SDK | `>=8.0` when building/staging `lbabus` | Required for `dotnet build/publish`; runtime-only hosts can consume but not rebuild it. |
 | Git / Git for Windows | `>=2.30` | Required for provenance, worktrees, release lineage, and patch evidence. |
@@ -31,7 +31,7 @@ Optional substrate versions used by this release's validated Windows reviewer la
 2.8.81**. Docker, Vagrant, VirtualBox, VMware, LabVIEW, FFmpeg, and VIPM are workload-specific: their absence
 must be reported explicitly by capabilities, never silently treated as available.
 
-## Compound human tasks — bundle v1.0.3
+## Compound human tasks — bundle v1.0.4
 
 Open **Terminal: Run Task**. These tasks are contributed by the installed extension, so downloaded Marketplace
 users receive them without a repository `.vscode/tasks.json`:
@@ -73,9 +73,23 @@ Agent rule: read `release-risk-baseline.json` before release work. Report an ord
 with its expected artifact and blocker. Never convert `missing` to `present` from inference, a static PASS, or prose;
 require evidence for this exact version/candidate. Prioritize DoD blockers, then CM/coverage, then doc/req/arch risks.
 
+### Human visual verdict boundary
+
+A signed visual **PASS** means the exact commit/VSIX receipt, installed behavior, generated AGENTS workflow, and
+reviewed architecture are acceptable. It does **not** authorize publication and does not require downstream hosted,
+cross-plane, canonical-release, lineage, or Marketplace proofs to exist yet. Those proofs must remain `missing` and
+the final release must remain BLOCKED until later phases produce them. Request changes only for a candidate defect,
+an unbound candidate/KPI receipt, a failed reviewer preflight, or unusable reviewer/agent behavior—not merely because
+correctly ordered downstream release proofs are still pending.
+
+Reviewer staging places `candidate.vsix` and `candidate-receipt.json` in the evidence workspace. The receipt must be
+full-mode PASS, name the exact Git commit, carry the same VSIX hash/size, show clean-before/clean-after, expose
+coverage/local-gate/correspondence counters, and prove two package hashes identical. Hash the physical VSIX and compare
+it to the receipt before recommending the visual verdict.
+
 ### Experiment lifecycle and local continuous KPI
 
-Experiment-governance/KPI bundle **v1.0.0** applies to this extension build.
+Experiment-governance/KPI bundle **v1.0.1** applies to this extension build.
 Every immediate `experiments/` directory must be referenced by the RTM or listed in
 `experiments/governance-overrides.json` as active, prototype, superseded, or retired. Prototype/superseded/retired
 experiments are prohibited from production surfaces; superseded entries name a resolvable active replacement.
@@ -95,11 +109,11 @@ npm run ci:local
 The full KPI is acceptable only when system version + CHANGELOG PASS, experiments are **62/62 governed** with
 **0 ungoverned** and **0 forbidden production references**, line/statement coverage is at least **95%**, function
 coverage is at least **96%**, branch coverage is at least **95%**, and **203/203** local gates pass,
-**177/177** correspondences pass, and two normalized VSIX hashes match. Its receipt is
+**178/178** correspondences pass, and two normalized VSIX hashes match. Its receipt is
 `.lba/local-ci/latest.json`; collect it with the pre-verdict evidence. Release evidence may still be BLOCKED, in which
 case follow the detailed missing-proof actions above rather than treating local CI as a release verdict.
 
-Task bundle **v1.0.3** is noninteractive, fails on the first nonzero child command, prefixes every command/output
+Task bundle **v1.0.4** is noninteractive, fails on the first nonzero child command, prefixes every command/output
 event with a stable index, UTC wall timestamp, monotonic nanoseconds, and clock source, and writes a machine-readable
 receipt under extension global storage. Before deleting a disposable human-review VM,
 the operator must run the maintained raw-data collector so the next agent receives the target, candidate hash,

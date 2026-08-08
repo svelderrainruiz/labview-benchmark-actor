@@ -6,6 +6,21 @@ follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project
 
 ## [Unreleased]
 
+## [1.4.5] - 2026-08-08
+
+### Fixed
+
+- **Reviewer candidate provenance is explicit.** Full local-CI receipts now bind the exact clean Git commit,
+  branch, VSIX SHA-256/size, duplicate package hashes, coverage counters, local-gate count, and correspondence
+  count. Reviewer staging can retain the physical VSIX beside that receipt instead of asking a human to infer
+  commit-to-artifact identity.
+- **Reviewer preflight is provisioned, not aspirational.** An on-demand privileged Vagrant provisioner installs
+  and verifies Git, ripgrep, GitHub CLI, GitLab CLI, and .NET SDK 8, while `lbabus` resolves their stable Windows
+  install paths and requires `selfcheck: PASS`.
+- **Human visual review is separated from final release authorization.** Generated AGENTS now states that pending
+  downstream hosted, cross-plane, canonical-release, lineage, and Marketplace proofs keep publication blocked but
+  do not independently require REQUEST CHANGES after candidate identity, behavior, and architecture pass.
+
 ## [1.4.4] - 2026-08-08
 
 ### Fixed

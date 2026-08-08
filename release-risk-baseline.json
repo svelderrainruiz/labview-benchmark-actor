@@ -1,6 +1,6 @@
 {
   "schema": "labview-benchmark-actor/release-risk-baseline@1",
-  "releaseVersion": "1.4.4",
+  "releaseVersion": "1.4.5",
   "assessedAt": "2026-08-08T13:40:00.000Z",
   "source": {
     "workbenchVersion": "0.2.19",

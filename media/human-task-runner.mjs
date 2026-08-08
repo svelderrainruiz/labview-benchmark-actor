@@ -8,7 +8,7 @@ import { assessReleaseRisk, riskSummaryLines, verifyGovernedRisk } from './relea
 
 const mode = process.argv[2];
 const workspace = process.cwd();
-const HUMAN_TASKS_VERSION = '1.0.3';
+const HUMAN_TASKS_VERSION = '1.0.4';
 const startedNs = process.hrtime.bigint();
 const startedWallTime = new Date().toISOString();
 const events = [];

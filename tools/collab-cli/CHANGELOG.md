@@ -10,6 +10,13 @@ so the WIN and LINUX planes install the exact same pinned version and cannot dri
 
 ## [Unreleased]
 
+## [0.15.4] — 2026-08-08
+
+### Changed
+
+- Resolve pinned reviewer tools from their stable Windows/winget installation paths so `selfcheck` remains valid
+  when the reviewer process inherited PATH before privileged toolchain staging.
+
 ## [0.15.3] — 2026-08-08
 
 ### Changed
@@ -294,7 +301,8 @@ so the published release notes are self-complete.
 
 - Shared versioned .NET CLI (`lbabus`) for the WIN↔LINUX coordination bus (#6).
 
-[Unreleased]: https://github.com/LabVIEW-Community-CI-CD/labview-benchmark-actor/compare/collab-cli-v0.15.3...HEAD
+[Unreleased]: https://github.com/LabVIEW-Community-CI-CD/labview-benchmark-actor/compare/collab-cli-v0.15.4...HEAD
+[0.15.4]: https://github.com/LabVIEW-Community-CI-CD/labview-benchmark-actor/compare/collab-cli-v0.15.3...collab-cli-v0.15.4
 [0.15.3]: https://github.com/LabVIEW-Community-CI-CD/labview-benchmark-actor/compare/collab-cli-v0.15.2...collab-cli-v0.15.3
 [0.15.2]: https://github.com/LabVIEW-Community-CI-CD/labview-benchmark-actor/compare/collab-cli-v0.15.1...collab-cli-v0.15.2
 [0.15.1]: https://github.com/LabVIEW-Community-CI-CD/labview-benchmark-actor/compare/collab-cli-v0.15.0...collab-cli-v0.15.1

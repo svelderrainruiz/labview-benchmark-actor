@@ -1467,10 +1467,10 @@ check('human-task-shortcuts', () => {
   assert(runner.includes('STANDARDS_ROOT') && runner.includes('governance.standardsRootDefault'), 'governance task lacks local standards-corpus discovery');
   assert(runner.includes("`${corpus}:/standards:ro`") && runner.includes("'STANDARDS_ROOT=/standards'"), 'governance task does not mount standards read-only');
   assert(runner.includes('governance.standardsReviewCommit') && runner.includes('governance.workbenchDigest'), 'governance task does not pin its source commit and image digest');
-  assert(provider.includes("HUMAN_TASKS_VERSION = '1.0.3'"), 'task provider lacks bundle version 1.0.3');
-  assert(runner.includes("HUMAN_TASKS_VERSION = '1.0.3'"), 'task runner lacks bundle version 1.0.3');
+  assert(provider.includes("HUMAN_TASKS_VERSION = '1.0.4'"), 'task provider lacks bundle version 1.0.4');
+  assert(runner.includes("HUMAN_TASKS_VERSION = '1.0.4'"), 'task runner lacks bundle version 1.0.4');
   const agents = readFileSync(join(pkgRoot, 'extension-agents', 'AGENTS.md'), 'utf8');
-  assert(agents.includes('Compound human tasks — bundle v1.0.3'), 'generated AGENTS lacks task bundle version');
+  assert(agents.includes('Compound human tasks — bundle v1.0.4'), 'generated AGENTS lacks task bundle version');
   assert(provider.includes('LBA_LBABUS_PATH: resolveLbabusExecutable()'), 'human tasks do not receive the resolved lbabus executable');
   assert(runner.includes("process.env.LBA_LBABUS_PATH || ''"), 'human task runner ignores the resolved lbabus executable');
   const lbabusPath = readFileSync(join(pkgRoot, 'src', 'lbabusPath.ts'), 'utf8');
@@ -1481,6 +1481,49 @@ check('human-task-shortcuts', () => {
   assert(extension.includes('const CLI = resolveLbabusExecutable()'), 'extension commands ignore the lbabus resolver');
   assert(mcpProvider.includes('LBA_LBABUS_PATH: resolveLbabusExecutable()'), 'MCP provider does not pass the resolved lbabus executable');
   assert(mcpServer.includes('process.env.LBA_LBABUS_PATH'), 'MCP server ignores the resolved lbabus executable');
+  const reviewerVagrant = readFileSync(join(pkgRoot, 'reviewer-workstation', 'Vagrantfile'), 'utf8');
+  const reviewerToolchain = readFileSync(join(pkgRoot, 'reviewer-workstation', 'bin', 'guest-install-reviewer-toolchain.ps1'), 'utf8');
+  const reviewerStage = readFileSync(join(pkgRoot, 'reviewer-workstation', 'stage-local-vsix.ps1'), 'utf8');
+  for (const packageId of ['Git.Git', 'BurntSushi.ripgrep.MSVC', 'GitHub.cli', 'GLab.GLab', 'Microsoft.DotNet.SDK.8']) {
+    assert(reviewerToolchain.includes(packageId), `reviewer toolchain omits ${packageId}`);
+  }
+  assert(reviewerVagrant.includes('"reviewer-toolchain"') && reviewerVagrant.includes('privileged: true'), 'reviewer toolchain is not a privileged on-demand provisioner');
+  assert(reviewerStage.includes('--provision-with reviewer-toolchain') && reviewerStage.includes('selfcheck: PASS'), 'reviewer staging does not require a green toolchain selfcheck');
+  for (const binding of [
+    "'.lba\\local-ci\\latest.json'",
+    'kpi.candidate.sourceCommit',
+    'kpi.candidate.vsixSha256',
+    'kpi.candidate.vsixSize',
+    'workspace/candidate.vsix',
+    'workspace/candidate-receipt.json',
+  ]) {
+    assert(reviewerStage.includes(binding), `reviewer staging lacks candidate binding '${binding}'`);
+  }
+  for (const receiptProof of [
+    'kpi.coverage.branches.percent',
+    'kpi.localGates.passed',
+    'kpi.correspondences.graphConformant',
+    'kpi.package.firstSha256',
+    'does NOT authorize Marketplace publication',
+  ]) {
+    assert(reviewerStage.includes(receiptProof), `reviewer staging lacks receipt/verdict guard '${receiptProof}'`);
+  }
+  const rawCollector = readFileSync(join(pkgRoot, 'reviewer-workstation', 'collect-review-raw.ps1'), 'utf8');
+  assert(
+    rawCollector.includes('candidate-receipt.json')
+      && rawCollector.includes('receiptSha256')
+      && rawCollector.includes('Guest candidate receipt does not bind'),
+    'raw reviewer evidence does not retain and verify the candidate receipt',
+  );
+  const dependencies = readFileSync(join(pkgRoot, 'tools', 'collab-cli', 'Dependencies.cs'), 'utf8');
+  for (const productSource of [
+    join('tools', 'collab-cli', 'AgentGuards.cs'),
+    join('tools', 'collab-cli', 'Agents.cs'),
+    join('tools', 'collab-cli', 'GitHubGraphQL.cs'),
+  ]) {
+    assert(readFileSync(join(pkgRoot, productSource), 'utf8').includes('Preflight.ResolveCommand'), `${productSource} bypasses the stable dependency resolver`);
+  }
+  assert(dependencies.includes('internal static string ResolveCommand'), 'stable dependency resolver is not class-level reusable code');
   const collector = readFileSync(join(pkgRoot, 'reviewer-workstation', 'collect-review-raw.ps1'), 'utf8');
   for (const proof of ['reviewTarget', 'candidate', 'commands', 'taskDefinitions', 'agents', 'capabilities', 'reviewerSettings', 'screenshotpng']) {
     assert(collector.includes(proof), `raw review collector lacks ${proof} evidence`);
@@ -1580,16 +1623,39 @@ check('experiment-lifecycle-local-kpi', () => {
   assert(result.kpi.total === 62 && result.kpi.governed === 62 && result.kpi.ungoverned === 0, 'experiment governance KPI is not 62/62');
   assert(result.kpi.forbiddenProductionReferences === 0, 'prohibited experiments reach production surfaces');
   assert(result.kpi.prototypes === 1 && result.kpi.superseded === 2, 'prototype/superseded lifecycle baseline drifted');
-  assert(readJson(join('experiments', 'governance-overrides.json')).version === '1.0.0', 'experiment-governance/KPI version drifted');
+  assert(readJson(join('experiments', 'governance-overrides.json')).version === '1.0.1', 'experiment-governance/KPI version drifted');
   const pkg = readJson('package.json');
   assert(pkg.scripts?.['ci:local:quick'] === 'node scripts/local-continuous-kpi.mjs --quick', 'quick local KPI command missing');
   assert(pkg.scripts?.['ci:local'] === 'node scripts/local-continuous-kpi.mjs', 'full local KPI command missing');
   const kpi = readFileSync(join(pkgRoot, 'scripts', 'local-continuous-kpi.mjs'), 'utf8');
-  for (const proof of ['release-components.mjs', 'experiment-governance.mjs', "['run', 'test:coverage']", 'verify-local-gates.mjs', 'verify-correspondences.mjs', "['run', 'package']", 'Repeated normalized VSIX builds differ', '.lba', 'local-ci']) {
+  for (const proof of [
+    'release-components.mjs',
+    'experiment-governance.mjs',
+    "['run', 'test:coverage']",
+    'verify-local-gates.mjs',
+    'verify-correspondences.mjs',
+    "['run', 'package']",
+    'Repeated normalized VSIX builds differ',
+    'sourceCommit',
+    'coverageProof',
+    'localGateProof',
+    'correspondenceProof',
+    '.lba',
+    'local-ci',
+  ]) {
     assert(kpi.includes(proof), `local continuous KPI lacks ${proof}`);
   }
   const agents = readFileSync(join(pkgRoot, 'extension-agents', 'AGENTS.md'), 'utf8');
-  for (const target of ['62/62 governed', '0 ungoverned', '0 forbidden production references', 'npm run ci:local:quick', 'npm run ci:local', '.lba/local-ci/latest.json']) {
+  for (const target of [
+    '62/62 governed',
+    '0 ungoverned',
+    '0 forbidden production references',
+    'npm run ci:local:quick',
+    'npm run ci:local',
+    '.lba/local-ci/latest.json',
+    'Human visual verdict boundary',
+    'does **not** authorize publication',
+  ]) {
     assert(agents.includes(target), `generated AGENTS lacks KPI target '${target}'`);
   }
   return result.kpi;

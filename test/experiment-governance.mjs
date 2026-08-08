@@ -8,7 +8,7 @@ const base = {
   rtmText: 'LBA-REQ-001,experiments/active/file.mjs\nLBA-REQ-097',
   overrides: {
     schema: 'labview-benchmark-actor/experiment-governance-overrides@1',
-    version: '1.0.0',
+    version: '1.0.1',
     overrides: {
       prototype: {
         status: 'prototype',

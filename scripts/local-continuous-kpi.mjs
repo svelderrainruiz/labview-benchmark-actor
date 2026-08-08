@@ -7,6 +7,12 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { assessReleaseRisk, verifyGovernedRisk } from '../extension-tasks/release-risk.mjs';
 import { loadExperimentGovernance } from '../experiments/experiment-governance.mjs';
+import {
+  buildCandidateProof,
+  parseCorrespondenceSummary,
+  parseCoverageSummary,
+  parseLocalGateSummary,
+} from './local-kpi-core.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const quick = process.argv.includes('--quick');
@@ -17,7 +23,15 @@ const events = [];
 function run(name, command, args) {
   const before = process.hrtime.bigint();
   console.log(`\n[KPI ${events.length + 1}] ${name}: ${command} ${args.join(' ')}`);
-  const result = spawnSync(command, args, { cwd: root, stdio: 'inherit', shell: false, env: process.env });
+  const result = spawnSync(command, args, {
+    cwd: root,
+    encoding: 'utf8',
+    maxBuffer: 16 * 1024 * 1024,
+    shell: false,
+    env: process.env,
+  });
+  if (result.stdout) process.stdout.write(result.stdout);
+  if (result.stderr) process.stderr.write(result.stderr);
   const event = {
     index: events.length + 1,
     name,
@@ -27,15 +41,16 @@ function run(name, command, args) {
   events.push(event);
   if (result.error) throw result.error;
   if (result.status !== 0) throw new Error(`${name} exited ${result.status}`);
+  return `${result.stdout || ''}\n${result.stderr || ''}`;
 }
 
 function node(name, relative, args = []) {
-  run(name, process.execPath, [relative, ...args]);
+  return run(name, process.execPath, [relative, ...args]);
 }
 
 function npm(name, args) {
   if (!process.env.npm_execpath) throw new Error('Run the KPI through npm so npm_execpath is pinned.');
-  run(name, process.execPath, [process.env.npm_execpath, ...args]);
+  return run(name, process.execPath, [process.env.npm_execpath, ...args]);
 }
 
 function sha256(file) {
@@ -52,6 +67,10 @@ function capture(command, args) {
 let outcome = 'PASS';
 let failure = null;
 let packageProof = null;
+let candidateProof = null;
+let coverageProof = null;
+let localGateProof = null;
+let correspondenceProof = null;
 try {
   const expectedNode = readFileSync(path.join(root, '.nvmrc'), 'utf8').trim();
   if (process.version !== `v${expectedNode}`) {
@@ -67,19 +86,33 @@ try {
   if (!quick) {
     const status = capture('git', ['status', '--short']);
     if (status) throw new Error('Full local CI requires a clean worktree; run --quick while editing.');
-    npm('coverage', ['run', 'test:coverage']);
-    node('local-gates', 'experiments/verify-local-gates.mjs');
-    node('correspondence', 'experiments/reqs-coverage/verify-correspondences.mjs');
+    const sourceCommit = capture('git', ['rev-parse', 'HEAD']);
+    const branch = capture('git', ['branch', '--show-current']);
+    const coverageOutput = npm('coverage', ['run', 'test:coverage']);
+    coverageProof = parseCoverageSummary(coverageOutput);
+    const gatesOutput = node('local-gates', 'experiments/verify-local-gates.mjs');
+    localGateProof = parseLocalGateSummary(gatesOutput);
+    const correspondenceOutput = node('correspondence', 'experiments/reqs-coverage/verify-correspondences.mjs');
+    correspondenceProof = parseCorrespondenceSummary(correspondenceOutput);
     npm('package-first', ['run', 'package']);
-    const first = sha256(path.join(root, 'labview-benchmark-actor.vsix'));
+    const vsix = path.join(root, 'labview-benchmark-actor.vsix');
+    const first = sha256(vsix);
     npm('package-second', ['run', 'package']);
-    const second = sha256(path.join(root, 'labview-benchmark-actor.vsix'));
+    const second = sha256(vsix);
     if (first !== second) throw new Error('Repeated normalized VSIX builds differ.');
     packageProof = { firstSha256: first, secondSha256: second, identical: true };
     const finalStatus = capture('git', ['status', '--short']);
     if (finalStatus) {
       throw new Error(`Full local CI changed the candidate worktree:\n${finalStatus}`);
     }
+    candidateProof = buildCandidateProof({
+      sourceCommit,
+      branch,
+      vsixSha256: second,
+      vsixSize: readFileSync(vsix).length,
+      cleanBefore: true,
+      cleanAfter: true,
+    });
   }
 } catch (error) {
   outcome = 'FAIL';
@@ -119,6 +152,10 @@ const receipt = {
       status: risk.status,
       governed: governedRisk.ok,
     },
+    candidate: candidateProof,
+    coverage: coverageProof,
+    localGates: localGateProof,
+    correspondences: correspondenceProof,
     package: packageProof,
   },
   events,
