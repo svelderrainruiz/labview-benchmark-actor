@@ -9,10 +9,11 @@
 //                     (get_benchmark_series is deterministic and needs no CLI) over newline-delimited JSON-RPC.
 // Run after `npm run compile`. Usage: node test/mcp-server.mjs
 import Module, { createRequire } from 'node:module';
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
+import { tmpdir } from 'node:os';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const require = createRequire(import.meta.url);
@@ -106,6 +107,8 @@ const cancelled = await core.handleBenchmarkActorMcpMessage({ method: 'notificat
 assert(cancelled === null, 'notifications/cancelled gets no response');
 const noName = await core.handleBenchmarkActorMcpMessage({ id: 8, method: 'tools/call', params: { name: 123 } }, deps);
 assert(noName.error && noName.error.code === -32602, 'tools/call with a non-string name -> -32602');
+const noParams = await core.handleBenchmarkActorMcpMessage({ id: 81, method: 'tools/call' }, deps);
+assert(noParams.error && noParams.error.code === -32602, 'tools/call without params -> -32602');
 const pollDefault = await core.handleBenchmarkActorMcpMessage(
   { id: 9, method: 'tools/call', params: { name: 'poll_coordination_bus' } },
   deps
@@ -163,10 +166,22 @@ const extraList = await core.handleBenchmarkActorMcpMessage({ id: 20, method: 't
 assert(extraList.result.tools.length === 5 && extraList.result.tools.some((t) => t.name === 'demo_grid_tool'), 'tools/list folds injected extra tools alongside the 4 core tools');
 const extraCall = await core.handleBenchmarkActorMcpMessage({ id: 21, method: 'tools/call', params: { name: 'demo_grid_tool', arguments: { x: 1 } } }, extraDeps);
 assert(JSON.parse(extraCall.result.content[0].text).ok === true, 'tools/call routes a folded tool to dispatchExtraTool and wraps its plain result');
+const alreadyWrappedDeps = {
+  ...extraDeps,
+  dispatchExtraTool: () => ({ content: [{ type: 'text', text: 'already wrapped' }] }),
+};
+const alreadyWrapped = await core.handleBenchmarkActorMcpMessage({ id: 211, method: 'tools/call', params: { name: 'demo_grid_tool' } }, alreadyWrappedDeps);
+assert(alreadyWrapped.result.content[0].text === 'already wrapped', 'folded tools preserve an existing MCP result envelope');
 const extraBad = await core.handleBenchmarkActorMcpMessage({ id: 22, method: 'tools/call', params: { name: 'demo_grid_tool', arguments: { bad: true } } }, extraDeps);
 assert(extraBad.error && extraBad.error.code === -32602, 'a folded-tool argument error -> -32602');
 const extraBoom = await core.handleBenchmarkActorMcpMessage({ id: 23, method: 'tools/call', params: { name: 'demo_grid_tool', arguments: { boom: true } } }, extraDeps);
 assert(extraBoom.result && extraBoom.result.isError === true, 'a folded-tool execution failure rides isError in the result envelope');
+const extraStringBoom = await core.handleBenchmarkActorMcpMessage({
+  id: 231,
+  method: 'tools/call',
+  params: { name: 'demo_grid_tool' },
+}, { ...extraDeps, dispatchExtraTool: () => { throw 'string failure'; } });
+assert(extraStringBoom.result.isError === true && /string failure/.test(extraStringBoom.result.content[0].text), 'non-Error folded-tool failures remain agent-readable');
 
 // loadAcgGridTools folds the REAL bundled grid tools (out/acg-mcp-bundle/) into a deps object, and degrades
 // quietly when the bundle is absent -- exercised in-process for determinism + coverage of the runtime loader.
@@ -186,6 +201,14 @@ assert(gridBad.error && gridBad.error.code === -32602, "a folded grid tool's arg
 const degradeDeps = { ...deps };
 await runner.loadAcgGridTools(degradeDeps, join(root, 'no-such-acg-bundle-root-xyz'));
 assert(degradeDeps.extraTools === undefined, 'loadAcgGridTools degrades quietly (no extra tools) when the bundle is absent');
+const malformedGridRoot = join(tmpdir(), 'lba-malformed-grid-xyz');
+rmSync(malformedGridRoot, { recursive: true, force: true });
+mkdirSync(join(malformedGridRoot, 'out', 'acg-mcp-bundle', 'acg-mcp'), { recursive: true });
+writeFileSync(join(malformedGridRoot, 'out', 'acg-mcp-bundle', 'acg-mcp', 'grid-tools.mjs'), 'export const ACG_GRID_TOOLS = {}; export const dispatchGridTool = null;');
+const malformedDeps = { ...deps };
+await runner.loadAcgGridTools(malformedDeps, malformedGridRoot);
+assert(malformedDeps.extraTools === undefined, 'loadAcgGridTools ignores a malformed bundle surface');
+rmSync(malformedGridRoot, { recursive: true, force: true });
 console.log('mcp-core: PASS -- protocol dispatch + 4 tools + folded extra-tool routing + -32601/-32602 error codes');
 
 // ---- 2. ACTIVATION: the extension registers the MCP provider (manifest id == runtime id) ----
@@ -238,9 +261,14 @@ ext.activate({
   extensionUri: { path: '/ext', fsPath: '/ext' },
   extension: { packageJSON: { version: '0.1.1' } },
 });
+ext.activate({
+  subscriptions: [],
+  extensionUri: { path: '/uri-only', fsPath: '/uri-only' },
+  extension: { packageJSON: {} },
+});
 Module._load = originalLoad;
 
-assert(captured.length === 1, 'activate() registers exactly one MCP server definition provider');
+assert(captured.length === 2, 'activate() registers one MCP server definition provider per activation context');
 const manifest = JSON.parse(readFileSync(join(root, 'package.json'), 'utf8'));
 const manifestId = manifest.contributes.mcpServerDefinitionProviders[0].id;
 assert(
@@ -254,6 +282,8 @@ assert(
   /out[\\/]+mcp[\\/]+runBenchmarkActorMcpServer\.js$/.test(defs[0].args[0]),
   'the server arg is the bundled stdio entrypoint (out/mcp/runBenchmarkActorMcpServer.js)'
 );
+const uriOnlyDefs = captured[1].provider.provideMcpServerDefinitions();
+assert(uriOnlyDefs[0].args[0].includes('uri-only'), 'provider falls back to extensionUri when extensionPath is absent');
 
 // provider field-builder + registration fallback branches (module is cached with the mock vscode binding).
 const providerMod = require(join(root, 'out', 'mcp', 'benchmarkActorMcpServerProvider.js'));
@@ -261,9 +291,18 @@ const fExplicit = providerMod.buildBenchmarkActorMcpServerDefinitionFields({ ext
 assert(fExplicit.args[0] === '/explicit/server.js' && fExplicit.version === undefined, 'buildFields honors an explicit scriptPath and an absent version');
 // LBA-REQ-066 (off-Discussions step 7, net-only): busEnvFromConfig maps only the net bus config to the MCP server's env.
 const envNet = providerMod.busEnvFromConfig({ netHosts: '10.0.2.2', netLog: '/tmp/bus.jsonl' });
-assert(envNet.VIHS_COLLAB_NET_HOSTS === '10.0.2.2' && envNet.VIHS_COLLAB_NET_LOG === '/tmp/bus.jsonl' && !('VIHS_COLLAB_TRANSPORT' in envNet), 'busEnvFromConfig maps net hosts + log to env (net-only, no transport env)');
+assert(
+  envNet.VIHS_COLLAB_NET_HOSTS === '10.0.2.2'
+    && envNet.VIHS_COLLAB_NET_LOG === '/tmp/bus.jsonl'
+    && typeof envNet.LBA_LBABUS_PATH === 'string'
+    && !('VIHS_COLLAB_TRANSPORT' in envNet),
+  'busEnvFromConfig maps net hosts + log + resolved lbabus to env (net-only, no transport env)',
+);
 const envNone = providerMod.busEnvFromConfig({ netHosts: '', netLog: '' });
-assert(Object.keys(envNone).length === 0, 'busEnvFromConfig yields no env when the net bus is unconfigured (graceful no-op)');
+assert(
+  Object.keys(envNone).length === 1 && typeof envNone.LBA_LBABUS_PATH === 'string',
+  'busEnvFromConfig still passes the resolved lbabus path when the net bus is unconfigured',
+);
 const fDefault = providerMod.buildBenchmarkActorMcpServerDefinitionFields({ extensionPath: '/x', execPath: '/node', version: '1.2.3' });
 assert(fDefault.args[0] === providerMod.resolveBenchmarkActorMcpServerScriptPath('/x') && fDefault.version === '1.2.3', 'buildFields resolves the default script path + carries the version');
 const capturedDirect = [];
@@ -427,6 +466,12 @@ assert(
   'readServerVersion falls back to "unknown" when package.json is unreadable'
 );
 assert(server.readServerVersion().length > 0, 'readServerVersion reads the real bundled version by default');
+const versionRoot = join(tmpdir(), 'lba-version-unknown-xyz');
+rmSync(versionRoot, { recursive: true, force: true });
+mkdirSync(versionRoot, { recursive: true });
+writeFileSync(join(versionRoot, 'package.json'), JSON.stringify({ version: 3 }));
+assert(server.readServerVersion(versionRoot) === 'unknown', 'readServerVersion rejects a non-string package version');
+rmSync(versionRoot, { recursive: true, force: true });
 const seriesFault = await server.getBenchmarkSeries('/nonexistent-lba-root');
 assert(
   seriesFault.isError === true && /unavailable/i.test(seriesFault.content[0].text),
@@ -436,6 +481,14 @@ const seriesOk = await server.getBenchmarkSeries();
 assert(!seriesOk.isError && /benchmark-series@v1/.test(seriesOk.content[0].text), 'getBenchmarkSeries reads the real bundled series by default');
 assert(server.errorText('a bare string') === 'a bare string', 'errorText passes a non-Error throwable through as a string');
 assert(server.errorText(new Error('boom')) === 'boom', 'errorText unwraps an Error to its message');
+const savedNetHosts = process.env.VIHS_COLLAB_NET_HOSTS;
+const savedNetLog = process.env.VIHS_COLLAB_NET_LOG;
+process.env.VIHS_COLLAB_NET_HOSTS = ' 127.0.0.1:7420 ';
+process.env.VIHS_COLLAB_NET_LOG = ' C:\\logs\\bus.jsonl ';
+assert(server.pollBusArgs(4).includes('--log'), 'pollBusArgs includes a configured receive log');
+assert(server.postNoteArgs('hello').includes('--hosts'), 'postNoteArgs includes configured peers');
+if (savedNetHosts === undefined) delete process.env.VIHS_COLLAB_NET_HOSTS; else process.env.VIHS_COLLAB_NET_HOSTS = savedNetHosts;
+if (savedNetLog === undefined) delete process.env.VIHS_COLLAB_NET_LOG; else process.env.VIHS_COLLAB_NET_LOG = savedNetLog;
 console.log('mcp-stdio-corrupt: PASS -- version=unknown fallback + soft series isError + errorText folding (graceful)');
 
 // ---- 4. STDIO with lbabus ABSENT (broken PATH): get_host_capabilities degrades to a SOFT ENOENT isError,

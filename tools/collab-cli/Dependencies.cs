@@ -84,7 +84,7 @@ internal static class Preflight
     {
         try
         {
-            var psi = new ProcessStartInfo(dep.Command)
+            var psi = new ProcessStartInfo(ResolveCommand(dep.Command))
             {
                 RedirectStandardOutput = true,
                 RedirectStandardError = true,
@@ -115,6 +115,58 @@ internal static class Preflight
         catch
         {
             return null;
+        }
+    }
+
+    internal static string ResolveCommand(string command)
+    {
+        if (!OperatingSystem.IsWindows())
+        {
+            return command;
+        }
+
+        string programFiles = Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles);
+        string localAppData = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
+        string? direct = command switch
+        {
+            "git" => Path.Combine(programFiles, "Git", "cmd", "git.exe"),
+            "gh" => Path.Combine(programFiles, "GitHub CLI", "gh.exe"),
+            "glab" => Path.Combine(localAppData, "Programs", "glab", "glab.exe"),
+            "dotnet" => Path.Combine(programFiles, "dotnet", "dotnet.exe"),
+            _ => null,
+        };
+        if (direct is not null && File.Exists(direct))
+        {
+            return direct;
+        }
+
+        (string Prefix, string FileName)? winget = command switch
+        {
+            "rg" => ("BurntSushi.ripgrep.MSVC_", "rg.exe"),
+            _ => null,
+        };
+        if (winget is null)
+        {
+            return command;
+        }
+
+        string packagesRoot = Path.Combine(localAppData, "Microsoft", "WinGet", "Packages");
+        if (!Directory.Exists(packagesRoot))
+        {
+            return command;
+        }
+        try
+        {
+            string? package = Directory.EnumerateDirectories(packagesRoot, $"{winget.Value.Prefix}*")
+                .OrderByDescending(Directory.GetLastWriteTimeUtc)
+                .FirstOrDefault();
+            return package is null
+                ? command
+                : Directory.EnumerateFiles(package, winget.Value.FileName, SearchOption.AllDirectories).FirstOrDefault() ?? command;
+        }
+        catch
+        {
+            return command;
         }
     }
 

@@ -35,8 +35,9 @@
 //   signing-status               discover + report the enrolled reviewer key location + where each sign-off runs
 //   selftest                     self-check this tool (run by the `agent-tooling-selftest` gate)
 
-import { mkdirSync, readFileSync, writeFileSync, existsSync, readdirSync } from 'node:fs';
+import { mkdirSync, readFileSync, writeFileSync, existsSync, readdirSync, rmSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
+import { createPrivateKey, createPublicKey, generateKeyPairSync } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import { dirname, join, resolve } from 'node:path';
 import { capacityWeightedPartition } from '../experiments/parallel/parallelWorkload.mjs';
@@ -46,6 +47,7 @@ import { corroborateRun } from '../experiments/mesh-fulfillment/meshCorroborate.
 import { assembleLiveN2 } from '../experiments/mesh-fulfillment/driveLiveN2.mjs';
 import { stagedOk } from '../reviewer-workstation/release-with-review-drive.mjs';
 import { buildReleaseStage } from '../reviewer-workstation/record-release-stage.mjs';
+import { enrolledReviewerPublicKeys } from '../experiments/handoff-beacon/reviewerVerdict.mjs';
 
 export const ITERATION = 18; // bump when you refine this tool (see the banner above)
 
@@ -423,12 +425,18 @@ export function readReviewerAllowlist() {
   try {
     const raw = JSON.parse(read('tools/collab-cli/reviewer-allowlist.json') || '{}');
     const out = {};
+    const validKey = (key) => typeof key === 'string'
+      ? key.trim() !== ''
+      : key && typeof key === 'object' && !Array.isArray(key)
+        && typeof key.publicKeyPem === 'string' && key.publicKeyPem.trim() !== ''
+        && typeof key.validFrom === 'string' && typeof key.validThrough === 'string'
+        && Array.isArray(key.purposes) && key.purposes.length > 0;
     for (const [k, v] of Object.entries(raw)) {
       if (
         k !== '_comment'
         && (
-          typeof v === 'string'
-          || (Array.isArray(v) && v.length > 0 && v.every((key) => typeof key === 'string' && key.trim()))
+          validKey(v)
+          || (Array.isArray(v) && v.length > 0 && v.every(validKey))
         )
       ) out[k] = v;
     }
@@ -461,7 +469,7 @@ export function signingStatus({ reviewerId, reviewerKeyPath, keyExists, station,
   const problems = [];
   const id = String(reviewerId || '').trim();
   const st = station || STATIONS.UNKNOWN;
-  const enrolledKeys = (Array.isArray(enrolledPublicKey) ? enrolledPublicKey : [enrolledPublicKey])
+  const enrolledKeys = enrolledReviewerPublicKeys(enrolledPublicKey, { version, purpose: 'quorum' })
     .filter((key) => typeof key === 'string' && key.trim());
   const enrolled = enrolledKeys.length > 0;
   const norm = (k) => String(k || '').replace(/-----(BEGIN|END) PUBLIC KEY-----/g, '').replace(/\s+/g, '');
@@ -473,7 +481,8 @@ export function signingStatus({ reviewerId, reviewerKeyPath, keyExists, station,
   if (!id) problems.push('no reviewerId configured (set labviewBenchmarkActor.reviewerId in the reviewer VM)');
   if (st === STATIONS.UNKNOWN) problems.push('could not locate the signing station or the enrolled key (VM not reachable and no host key configured)');
   else if (keyExists === false) problems.push(`enrolled key not found at ${reviewerKeyPath || '<unset>'} on ${st}`);
-  if (id && !enrolled) problems.push(`reviewer ${id} is not enrolled in tools/collab-cli/reviewer-allowlist.json`);
+  if (id && !enrolled) problems.push(`reviewer ${id} has no quorum key enrolled for version ${version || '<missing>'}`);
+  if (enrolled && keyExists === true && presentedPublicKey == null) problems.push('configured key public identity could not be verified');
   if (keyMatch === 'mismatch') problems.push(`the presented public key does not match the enrolled allowlist entry for ${id}`);
 
   const commands = signingCommands({ station: st, reviewerId: id, reviewerKeyPath, version });
@@ -502,7 +511,17 @@ export function discoverSigningStation({ env = process.env, run } = {}) {
   const hostId = String(env.LBA_REVIEWER_ID || '').trim();
   const hostKey = String(env.LBA_REVIEWER_KEY || '').trim();
   if (hostId && hostKey) {
-    return { reviewerId: hostId, reviewerKeyPath: hostKey, keyExists: existsSync(hostKey), station: STATIONS.HOST, source: 'host env (LBA_REVIEWER_ID + LBA_REVIEWER_KEY)' };
+    const keyExists = existsSync(hostKey);
+    let presentedPublicKey = null;
+    if (keyExists) {
+      try {
+        presentedPublicKey = createPublicKey(createPrivateKey(readFileSync(hostKey))).export({
+          type: 'spki',
+          format: 'pem',
+        });
+      } catch { /* fail closed in signingStatus */ }
+    }
+    return { reviewerId: hostId, reviewerKeyPath: hostKey, keyExists, presentedPublicKey, station: STATIONS.HOST, source: 'host env (LBA_REVIEWER_ID + LBA_REVIEWER_KEY)' };
   }
   // 2) the reviewer VM: read its VS Code settings.json for reviewerId + reviewerKeyPath, then probe the key.
   if (pass) {
@@ -519,14 +538,27 @@ export function discoverSigningStation({ env = process.env, run } = {}) {
       const reviewerId = String(cfg['labviewBenchmarkActor.reviewerId'] || '').trim();
       const reviewerKeyPath = String(cfg['labviewBenchmarkActor.reviewerKeyPath'] || '').trim();
       let keyExists = null;
+      let presentedPublicKey = null;
       if (reviewerKeyPath) {
         try {
           keyExists = /(^|\s)YES(\s|$)/.test(ps(
             `if (Test-Path -LiteralPath ${psLiteral(reviewerKeyPath)}) { 'YES' } else { 'NO' }`,
           ));
         } catch { keyExists = null; }
+        if (keyExists) {
+          try {
+            const publicOut = 'C:\\Windows\\Temp\\lba-reviewer-public.pem';
+            const nodeScript = "const fs=require('fs'),c=require('crypto');fs.writeFileSync(process.argv[2],c.createPublicKey(c.createPrivateKey(fs.readFileSync(process.argv[1]))).export({type:'spki',format:'pem'}))";
+            presentedPublicKey = ps(
+              `$env:ELECTRON_RUN_AS_NODE='1'; $out=${psLiteral(publicOut)}; `
+              + `& 'C:\\Program Files\\Microsoft VS Code\\Code.exe' -e ${psLiteral(nodeScript)} ${psLiteral(reviewerKeyPath)} $out; `
+              + `if ($null -ne $LASTEXITCODE -and $LASTEXITCODE -ne 0) { exit $LASTEXITCODE }; `
+              + `$pem=Get-Content -LiteralPath $out -Raw; Remove-Item -LiteralPath $out -Force; $pem`,
+            ).trim() || null;
+          } catch { presentedPublicKey = null; }
+        }
       }
-      return { reviewerId, reviewerKeyPath: reviewerKeyPath || null, keyExists, station: STATIONS.VM, source: `reviewer VM "${vm}" VS Code settings.json` };
+      return { reviewerId, reviewerKeyPath: reviewerKeyPath || null, keyExists, presentedPublicKey, station: STATIONS.VM, source: `reviewer VM "${vm}" VS Code settings.json` };
     } catch { /* VM not reachable / VBoxManage absent -> fall through to UNKNOWN */ }
   }
   return { reviewerId: '', reviewerKeyPath: null, keyExists: null, station: STATIONS.UNKNOWN, source: 'none (set LBA_VM_PASS for the VM, or LBA_REVIEWER_ID + LBA_REVIEWER_KEY for a host key)' };
@@ -698,10 +730,10 @@ export const COMMANDS = {
       const quoted = assets.map((a) => `'${a}'`).join(' ');
       if (!args.includes('--create')) {
         console.log(`\u2713 artifact verified for ${r.tag} (vsix ${String(r.vsix)}). DRY-RUN -- re-run with --create (needs your authorized bypass token) to cut it:`);
-        console.log(`  gh release create ${r.tag} ${quoted} --title '${r.tag}' --notes 'Immutable release ${version}.'`);
+        console.log(`  gh release create ${r.tag} ${quoted} --target main --title '${r.tag}' --notes 'Immutable release ${version}.'`);
         return;
       }
-      execFileSync('gh', ['release', 'create', r.tag, ...assets, '--title', r.tag, '--notes', `Immutable release ${version}.`], { stdio: 'inherit' });
+      execFileSync('gh', ['release', 'create', r.tag, ...assets, '--target', 'main', '--title', r.tag, '--notes', `Immutable release ${version}.`], { stdio: 'inherit' });
       console.log(`\u2713 cut ${r.tag} with ${assets.length} asset(s).`);
     },
   },
@@ -921,7 +953,8 @@ const SELFTEST = [
   }],
   ['signing-status binds the QUORUM sign-off to the VM when the enrolled key lives there (#414), key never read', () => {
     const enrolled = readReviewerAllowlist()['reviewer@vi-tech.nl'];
-    const s = signingStatus({ reviewerId: 'reviewer@vi-tech.nl', reviewerKeyPath: 'C:\\lba-review\\reviewer-vitech.pem', keyExists: true, station: STATIONS.VM, enrolledPublicKey: enrolled, version: '1.2.0' });
+    const presentedPublicKey = enrolledReviewerPublicKeys(enrolled, { version: '1.2.0', purpose: 'quorum' })[0];
+    const s = signingStatus({ reviewerId: 'reviewer@vi-tech.nl', reviewerKeyPath: 'C:\\lba-review\\reviewer-vitech.pem', keyExists: true, station: STATIONS.VM, enrolledPublicKey: enrolled, presentedPublicKey, version: '1.2.0' });
     // ok, quorum command runs IN the VM (cmd /c from the repo clone), visual uses render-verdict.sh, and the
     // committed private-key PATH is echoed but never its material.
     return s.ok && s.station === STATIONS.VM && /cmd \/c .*sign-release-quorum\.mjs/.test(s.commands.quorum)
@@ -929,25 +962,100 @@ const SELFTEST = [
   }],
   ['signing-status binds the QUORUM sign-off to the HOST (plain CLI, no cmd /c) when the key is host-resident (#414)', () => {
     const enrolled = readReviewerAllowlist()['reviewer@vi-tech.nl'];
-    const s = signingStatus({ reviewerId: 'reviewer@vi-tech.nl', reviewerKeyPath: '/home/rev/enrolled.pem', keyExists: true, station: STATIONS.HOST, enrolledPublicKey: enrolled });
+    const presentedPublicKey = enrolledReviewerPublicKeys(enrolled, { version: '1.2.0', purpose: 'quorum' })[0];
+    const s = signingStatus({ reviewerId: 'reviewer@vi-tech.nl', reviewerKeyPath: '/home/rev/enrolled.pem', keyExists: true, station: STATIONS.HOST, enrolledPublicKey: enrolled, presentedPublicKey, version: '1.2.0' });
     return s.ok && s.station === STATIONS.HOST && /^node reviewer-workstation\/sign-release-quorum\.mjs/.test(s.commands.quorum) && !/cmd \/c/.test(s.commands.quorum);
   }],
   ['signing-status fails closed on a missing key, an unenrolled reviewer, a public-key mismatch, and an unknown station (#414)', () => {
     const enrolled = readReviewerAllowlist()['reviewer@vi-tech.nl'];
-    const missing = signingStatus({ reviewerId: 'reviewer@vi-tech.nl', reviewerKeyPath: 'C:\\lba-review\\reviewer-vitech.pem', keyExists: false, station: STATIONS.VM, enrolledPublicKey: enrolled });
+    const missing = signingStatus({ reviewerId: 'reviewer@vi-tech.nl', reviewerKeyPath: 'C:\\lba-review\\reviewer-vitech.pem', keyExists: false, station: STATIONS.VM, enrolledPublicKey: enrolled, version: '1.2.0' });
     const unenrolled = signingStatus({ reviewerId: 'stranger@example.com', reviewerKeyPath: '/k.pem', keyExists: true, station: STATIONS.HOST, enrolledPublicKey: null });
-    const mismatch = signingStatus({ reviewerId: 'reviewer@vi-tech.nl', reviewerKeyPath: '/k.pem', keyExists: true, station: STATIONS.HOST, enrolledPublicKey: enrolled, presentedPublicKey: '-----BEGIN PUBLIC KEY-----\nDEADBEEF\n-----END PUBLIC KEY-----\n' });
+    const mismatch = signingStatus({ reviewerId: 'reviewer@vi-tech.nl', reviewerKeyPath: '/k.pem', keyExists: true, station: STATIONS.HOST, enrolledPublicKey: enrolled, presentedPublicKey: '-----BEGIN PUBLIC KEY-----\nDEADBEEF\n-----END PUBLIC KEY-----\n', version: '1.2.0' });
     const unknown = signingStatus({ station: STATIONS.UNKNOWN });
     return missing.ok === false && /not found/.test(missing.problems.join())
-      && unenrolled.ok === false && /not enrolled/.test(unenrolled.problems.join())
+      && unenrolled.ok === false && /no quorum key enrolled/.test(unenrolled.problems.join())
       && mismatch.ok === false && mismatch.keyMatch === 'mismatch'
       && unknown.ok === false && /could not locate the signing station/.test(unknown.problems.join());
   }],
   ['signing-status confirms a public-key MATCH clears + reports enrolled (#414)', () => {
     const enrolled = readReviewerAllowlist()['reviewer@vi-tech.nl'];
-    const presented = Array.isArray(enrolled) ? enrolled.at(-1) : enrolled;
-    const s = signingStatus({ reviewerId: 'reviewer@vi-tech.nl', reviewerKeyPath: '/k.pem', keyExists: true, station: STATIONS.HOST, enrolledPublicKey: enrolled, presentedPublicKey: presented });
+    const selected = Array.isArray(enrolled) ? enrolled.at(-1) : enrolled;
+    const presented = typeof selected === 'string' ? selected : selected.publicKeyPem;
+    const selectedVersion = typeof selected === 'string' ? '1.2.0' : selected.validFrom;
+    const s = signingStatus({ reviewerId: 'reviewer@vi-tech.nl', reviewerKeyPath: '/k.pem', keyExists: true, station: STATIONS.HOST, enrolledPublicKey: enrolled, presentedPublicKey: presented, version: selectedVersion });
     return s.ok && s.enrolled === true && s.keyMatch === 'match';
+  }],
+  ['signing-status selects only the requested version quorum key and rejects a visual key (#414)', () => {
+    const quorum = '-----BEGIN PUBLIC KEY-----\nQUORUM\n-----END PUBLIC KEY-----\n';
+    const visual = '-----BEGIN PUBLIC KEY-----\nVISUAL\n-----END PUBLIC KEY-----\n';
+    const enrolled = [
+      { publicKeyPem: visual, validFrom: '2.0.0', validThrough: '2.0.0', purposes: ['visual'] },
+      { publicKeyPem: quorum, validFrom: '2.0.0', validThrough: '2.0.0', purposes: ['quorum'] },
+    ];
+    const good = signingStatus({
+      reviewerId: 'reviewer@example.com', reviewerKeyPath: '/q.pem', keyExists: true,
+      station: STATIONS.HOST, enrolledPublicKey: enrolled, presentedPublicKey: quorum, version: '2.0.0',
+    });
+    const wrongPurpose = signingStatus({
+      reviewerId: 'reviewer@example.com', reviewerKeyPath: '/v.pem', keyExists: true,
+      station: STATIONS.HOST, enrolledPublicKey: enrolled, presentedPublicKey: visual, version: '2.0.0',
+    });
+    const outOfRange = signingStatus({
+      reviewerId: 'reviewer@example.com', reviewerKeyPath: '/q.pem', keyExists: true,
+      station: STATIONS.HOST, enrolledPublicKey: enrolled, presentedPublicKey: quorum, version: '2.0.1',
+    });
+    const unverified = signingStatus({
+      reviewerId: 'reviewer@example.com', reviewerKeyPath: '/q.pem', keyExists: true,
+      station: STATIONS.HOST, enrolledPublicKey: enrolled, version: '2.0.0',
+    });
+    return good.ok && good.keyMatch === 'match'
+      && !wrongPurpose.ok && wrongPurpose.keyMatch === 'mismatch'
+      && !outOfRange.ok && /no quorum key enrolled/.test(outOfRange.problems.join())
+      && !unverified.ok && /public identity/.test(unverified.problems.join());
+  }],
+  ['signing-station discovery derives the host key public identity without exposing private material (#414)', () => {
+    const root = join(repoRoot, '.lba', 'selftest-signing-key');
+    mkdirSync(root, { recursive: true });
+    const key = join(root, 'private.pem');
+    const { privateKey } = generateKeyPairSync('ed25519');
+    writeFileSync(key, privateKey.export({ type: 'pkcs8', format: 'pem' }));
+    try {
+      const discovered = discoverSigningStation({
+        env: { LBA_REVIEWER_ID: 'reviewer@example.com', LBA_REVIEWER_KEY: key },
+      });
+      return discovered.station === STATIONS.HOST
+        && discovered.keyExists
+        && /BEGIN PUBLIC KEY/.test(discovered.presentedPublicKey)
+        && !/PRIVATE KEY/.test(discovered.presentedPublicKey);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  }],
+  ['signing-station discovery derives the VM key public identity through the guest runtime (#414)', () => {
+    const publicKey = '-----BEGIN PUBLIC KEY-----\nVM-PUBLIC\n-----END PUBLIC KEY-----\n';
+    const discovered = discoverSigningStation({
+      env: { LBA_VM_PASS: 'test', LBA_VM_NAME: 'actor', LBA_VM_USER: 'vagrant' },
+      run: (_file, args) => {
+        const command = String(args.at(-1));
+        if (command.includes('ELECTRON_RUN_AS_NODE')) {
+          if (!command.includes('if ($null -ne $LASTEXITCODE -and $LASTEXITCODE -ne 0)')) {
+            throw new Error('guest derivation must tolerate an unset GUI-process LASTEXITCODE');
+          }
+          return publicKey;
+        }
+        if (command.includes('Get-Content -LiteralPath')) {
+          return JSON.stringify({
+            'labviewBenchmarkActor.reviewerId': 'reviewer@example.com',
+            'labviewBenchmarkActor.reviewerKeyPath': 'C:\\lba-review\\reviewer.pem',
+          });
+        }
+        if (command.includes('Test-Path -LiteralPath')) return 'YES';
+        throw new Error(`unexpected guest command: ${command}`);
+      },
+    });
+    return discovered.station === STATIONS.VM
+      && discovered.keyExists
+      && discovered.presentedPublicKey === publicKey.trim();
   }],
   ['capacity-weighted partition splits a task set disjointly, covers it, and honours weight', () => {
     // rg-free (CI runners have no ripgrep): a synthetic task set exercises the pure partitioner.

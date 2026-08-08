@@ -28,8 +28,9 @@
 
 1. Cut `release/X.Y.Z` from `develop` (GitFlow; only release/hotfix heads may target
    `main`).
-2. Bump `version` in `package.json` to `X.Y.Z` and stamp the `## [X.Y.Z]` section in
-   `CHANGELOG.md`.
+2. Bump changed component versions and the extension in `release-components.json`, synchronize
+   package/component sources, and stamp `## [X.Y.Z]` in `CHANGELOG.md`. The repository precommit
+   hook requires these release metadata files to be staged in their final state.
 3. On the pinned node, build the normalized artifact: `npm run package`. Capture the
    candidate `commit` and the packaged `vsixSha256`.
 4. **Re-`npm run package` after every later seal/back-merge commit and assert the sha is
@@ -162,17 +163,22 @@ key material). Then:
 ## 7. Publish
 
 1. Dispatch `.github/workflows/extension-release.yml` (`workflow_dispatch`,
-   `-f version=X.Y.Z`, `--ref main`). The `agreement` job runs
+   `-f version=X.Y.Z -f publish_marketplace=false`, `--ref main`). The `agreement` job runs
    `tools/collab-cli/verify-composite-release.mjs --component extension X.Y.Z` and blocks
    the publish unless the committed composite decision proves both gates for the tagged
-   candidate. Watch until it reports `Published … vX.Y.Z` (the `VSCE_PAT` secret authorizes
-   the Marketplace push).
+   candidate. This first dispatch stages signed assets and does not publish to Marketplace.
 2. Confirm reviewed == shipped: `scripts/verify-published-vsix.mjs` asserts the CI-built
    `.vsix` sha256 equals the reviewed `vsixSha256`.
-3. Cut the immutable GitHub Release from the signed artifact: download the
+3. Cut the canonical immutable GitHub Release from the signed artifact: download the
    `ext-vsix-signed-X.Y.Z` build artifact, then
    `gh release create ext-vX.Y.Z <assets> --notes-file <changelog section> --target main`
    (an authorized bypass token is needed to push the protected `ext-v*` tag).
+4. Dispatch the workflow again with
+   `-f version=X.Y.Z -f publish_marketplace=true --ref ext-vX.Y.Z`. The job is pinned to the
+   release tag, downloads the canonical
+   release VSIX, requires its SHA-256 to equal the staged VSIX, then publishes it with
+   `vsce publish --pre-release` directly from the downloaded release asset. There is no stable
+   Marketplace path.
 
 ## 8. Close out
 

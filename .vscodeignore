@@ -1,5 +1,6 @@
 .vscode/**
 .github/**
+.githooks/**
 src/**
 test/**
 tsconfig.json
@@ -14,6 +15,7 @@ reviewer-workstation/**
 cleanroom/**
 scripts/**
 extension-agents/**
+extension-tasks/**
 node_modules/**
 .devcontainer/**
 .dockerignore
@@ -28,5 +30,6 @@ package-lock.json
 AGENT-TOOLING-SNAGS.md
 playwright/**
 coverage/**
+.lba/**
 .c8rc.json
 coverage-thresholds.json

@@ -133,11 +133,33 @@
     }
   },
   "reviewerAllowlist": {
-    "_comment": "Enrolled reviewer visual-verdict signing keys (reviewer id -> one Ed25519 SPKI public key PEM or an array retaining rotated keys). Add entries with reviewer-workstation/enroll-reviewer.mjs (the private key stays LOCAL to the reviewer, never committed). Never remove a key that authenticates historical release evidence. The verify-visual-review gate + the extension-release workflow verify a release's signed reviewer verdict against these keys (LBA-REQ-057, ADR-0037).",
+    "_comment": "Enrolled reviewer signing keys. Production entries retain rotated Ed25519 public keys with inclusive validFrom/validThrough SemVer bounds and explicit visual/quorum purposes. Never remove a key that authenticates historical release evidence; never extend a retired key into a newer release range. Private keys stay LOCAL to the reviewer and are never committed.",
     "reviewer@vi-tech.nl": [
-      "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEAWRnlX++0MkQq+vtVEEMnBDON+cQEjNi49qFY07DwV2g=\n-----END PUBLIC KEY-----\n",
-      "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEA48x43N+/xB6wzHzEVbPBrEs71/hVNa5k3VQ5LdlvsAg=\n-----END PUBLIC KEY-----\n",
-      "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEAWAFKcRM63zi4l4FR5do2zekHiCGUKyMwWaKiJpoLI9k=\n-----END PUBLIC KEY-----\n"
+      {
+        "publicKeyPem": "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEAWRnlX++0MkQq+vtVEEMnBDON+cQEjNi49qFY07DwV2g=\n-----END PUBLIC KEY-----\n",
+        "validFrom": "1.2.0",
+        "validThrough": "1.3.0",
+        "purposes": [
+          "visual",
+          "quorum"
+        ]
+      },
+      {
+        "publicKeyPem": "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEA48x43N+/xB6wzHzEVbPBrEs71/hVNa5k3VQ5LdlvsAg=\n-----END PUBLIC KEY-----\n",
+        "validFrom": "1.4.0",
+        "validThrough": "1.4.0",
+        "purposes": [
+          "visual"
+        ]
+      },
+      {
+        "publicKeyPem": "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEAWAFKcRM63zi4l4FR5do2zekHiCGUKyMwWaKiJpoLI9k=\n-----END PUBLIC KEY-----\n",
+        "validFrom": "1.4.0",
+        "validThrough": "1.4.0",
+        "purposes": [
+          "quorum"
+        ]
+      }
     ]
   },
   "gate": {
@@ -163,5 +185,5 @@
     "compositeReleaseProven": true,
     "reason": "both gates publish for extension 1.4.0: machine quorum + enrolled sign-off (ADR-0018) AND human visual PASS (LBA-REQ-057), bound to the same net-staged candidate"
   },
-  "digest": "fffb451e945c3957c0ed431c4ef00e7718af0e0b202b379f8edf90eb38194e8c"
+  "digest": "dd3b4195d3deb8ca21155be7dad4960d55ae81aec0d9be40586883eda452eee8"
 }

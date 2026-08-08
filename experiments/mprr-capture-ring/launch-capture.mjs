@@ -18,7 +18,7 @@ const MPRR_DUAL_PACKET_SCHEMA = 'labview-benchmark-actor/mprr-dual-packet@v1';
 
 /** Inlined twin of mprr-ring/mprrDualPacket.mjs correlateDualStream (drift-guarded). Short continuity is
  *  protected before long-packet completeness; fails closed if the shorts alone exceed capacity. */
-function correlateDualStream(frames, opts = {}) {
+export function correlateDualStream(frames, opts = {}) {
   if (!Array.isArray(frames) || frames.length === 0) {
     throw new Error('frames required (non-empty)');
   }
@@ -156,7 +156,7 @@ export function buildLaunchCapture(input) {
     fps,
     startMs: t0,
     frameCount: outFrames.length,
-    durationMs: outFrames.length ? outFrames[outFrames.length - 1].tMs : 0,
+    durationMs: outFrames[outFrames.length - 1].tMs,
     screen: meta.screenW && meta.screenH ? { width: meta.screenW, height: meta.screenH } : null,
     frames: outFrames,
     // per-metric arrays over the frame timeline (the correlator's three curves).

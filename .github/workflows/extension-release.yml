@@ -26,6 +26,11 @@ on:
         description: Extension version X.Y.Z to build, keyless-sign, and stage as a signed artifact (must match package.json). Leave blank for a tag push.
         required: false
         default: ''
+      publish_marketplace:
+        description: Publish the already-created canonical GitHub Release artifact to the Marketplace prerelease channel.
+        required: false
+        default: false
+        type: boolean
 
 permissions:
   contents: write
@@ -238,13 +243,25 @@ jobs:
         # The operator supplies the VSCE_PAT secret to actually publish -- AFTER the human reviewer-VM
         # last gate and the bidirectional WIN <-> LINUX agreement gate above. Publishes the EXACT staged
         # artifact already built, tested, and agreement-gated.
-        if: ${{ github.repository == 'LabVIEW-Community-CI-CD/labview-benchmark-actor' || github.repository == 'svelderrainruiz/labview-benchmark-actor' }}
+        if: ${{ (github.repository == 'LabVIEW-Community-CI-CD/labview-benchmark-actor' || github.repository == 'svelderrainruiz/labview-benchmark-actor') && github.event_name == 'workflow_dispatch' && inputs.publish_marketplace }}
         env:
           VSCE_PAT: ${{ secrets.VSCE_PAT }}
+          GH_TOKEN: ${{ github.token }}
         run: |
           set -eu
           if [ -z "${VSCE_PAT:-}" ]; then
             echo "VSCE_PAT secret not set -- skipping Marketplace publish (the GitHub Release was still created). Set VSCE_PAT to enable Marketplace publishing."
             exit 0
           fi
-          npx vsce publish --packagePath "staging/labview-benchmark-actor-${{ steps.ver.outputs.version }}.vsix" -p "$VSCE_PAT"
+          release_dir="$(mktemp -d)"
+          gh release download "ext-v${{ steps.ver.outputs.version }}" \
+            --repo "$GITHUB_REPOSITORY" \
+            --pattern "labview-benchmark-actor-${{ steps.ver.outputs.version }}.vsix" \
+            --dir "$release_dir"
+          release_sha="$(sha256sum "$release_dir/labview-benchmark-actor-${{ steps.ver.outputs.version }}.vsix" | cut -d' ' -f1)"
+          staged_sha="$(sha256sum "staging/labview-benchmark-actor-${{ steps.ver.outputs.version }}.vsix" | cut -d' ' -f1)"
+          if [ "$release_sha" != "$staged_sha" ]; then
+            echo "::error::Canonical GitHub Release VSIX differs from the staged Marketplace candidate." >&2
+            exit 1
+          fi
+          npx vsce publish --pre-release --packagePath "$release_dir/labview-benchmark-actor-${{ steps.ver.outputs.version }}.vsix" -p "$VSCE_PAT"

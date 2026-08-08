@@ -39,12 +39,18 @@ function readAllowlist(path) {
   try {
     const raw = JSON.parse(readFileSync(path, 'utf8'));
     const out = {};
+    const validKey = (key) => typeof key === 'string'
+      ? key.trim() !== ''
+      : key && typeof key === 'object' && !Array.isArray(key)
+        && typeof key.publicKeyPem === 'string' && key.publicKeyPem.trim() !== ''
+        && typeof key.validFrom === 'string' && typeof key.validThrough === 'string'
+        && Array.isArray(key.purposes) && key.purposes.length > 0;
     for (const [k, v] of Object.entries(raw)) {
       if (
         k !== '_comment'
         && (
-          typeof v === 'string'
-          || (Array.isArray(v) && v.length > 0 && v.every((key) => typeof key === 'string' && key.trim()))
+          validKey(v)
+          || (Array.isArray(v) && v.length > 0 && v.every(validKey))
         )
       ) out[k] = v;
     }

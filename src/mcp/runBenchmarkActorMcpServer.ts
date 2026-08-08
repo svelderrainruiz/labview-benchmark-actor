@@ -22,7 +22,7 @@ import {
 } from '../mcp/benchmarkActorMcpServer';
 
 const execFileAsync = promisify(execFile);
-const CLI = 'lbabus';
+const CLI = String(process.env.LBA_LBABUS_PATH ?? '').trim() || 'lbabus';
 
 // out/mcp/runBenchmarkActorMcpServer.js -> the extension install root is two levels up.
 const repoRoot = path.join(__dirname, '..', '..');

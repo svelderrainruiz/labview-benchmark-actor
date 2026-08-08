@@ -1,0 +1,109 @@
+{
+  "schema": "labview-benchmark-actor/release-risk-baseline@1",
+  "releaseVersion": "1.4.8",
+  "assessedAt": "2026-08-08T13:40:00.000Z",
+  "source": {
+    "workbenchVersion": "0.2.19",
+    "scoreSchema": "1.2.0",
+    "standardsReviewCommit": "d44f210ded557cda6d4598cdaffe938da51d873e",
+    "workbenchDigest": "sha256:0fbb71c193ab71dae4b37a2f012fd5369632ff80c47b807c09c86d7a2877cb94",
+    "scoreBaseline": "standards-score-baseline.json",
+    "rawScoreSha256": "326eea15075bc387508d0daa5fbaac875c980db8a7c45635935da08cefcfa6dd",
+    "profile": "release-gate",
+    "depth": "deep"
+  },
+  "staticBaseline": {
+    "maturity": {
+      "REQ": 5,
+      "ARCH": 5,
+      "TEST": 5,
+      "CM": 5,
+      "DOC": 5
+    },
+    "gates": {
+      "coverage": { "status": "PASS", "confidence": "High", "rawMissingProof": "-" },
+      "cm": { "status": "PASS", "confidence": "High", "rawMissingProof": "-" },
+      "req": { "status": "PASS", "confidence": "High", "rawMissingProof": "-" },
+      "arch": { "status": "PASS", "confidence": "High", "rawMissingProof": "-" },
+      "doc": { "status": "PASS", "confidence": "High", "rawMissingProof": "-" },
+      "dod": { "status": "PASS", "confidence": "Med", "rawMissingProof": "-" }
+    }
+  },
+  "policy": {
+    "dashInterpretation": "A dash means the static workbench rule found no missing repository artifact. It does not prove candidate-specific release readiness.",
+    "completionFormula": "Count present release proofs divided by all listed release proofs; no hidden weights.",
+    "agentRule": "Do not change missing to present without a resolvable artifact for this exact release version and candidate."
+  },
+  "releaseEvidence": [
+    {
+      "gate": "coverage",
+      "risk": "Local evidence does not prove the final candidate on hosted or cross-plane substrates.",
+      "action": "Run hosted CI and the Linux/Windows cross-plane reproducibility and corroboration workflows for the final commit.",
+      "proofs": [
+        { "id": "pinned-local-tests", "status": "present", "evidence": "Pinned test control and complete test command", "artifacts": [".nvmrc", "package.json", "test/release-risk.mjs"] },
+        { "id": "local-gates-correspondence", "status": "present", "evidence": "Generated gate inventory and correspondence graph", "artifacts": ["docs/testing/test-report.md", "docs/requirements/traceability-matrix.md"] },
+        { "id": "hosted-ci-final-commit", "status": "missing", "evidence": null },
+        { "id": "cross-plane-final-candidate", "status": "missing", "evidence": null }
+      ]
+    },
+    {
+      "gate": "cm",
+      "risk": "The candidate is local-only and has no immutable release, shared lineage, or closeout proof.",
+      "action": "After signed PASS, publish the branch, merge with preserved ancestry, create the target-main GitHub Release, and back-merge to develop.",
+      "proofs": [
+        { "id": "system-version-contract", "status": "present", "evidence": "Version authority and mandatory precommit gate", "artifacts": ["release-components.json", ".githooks/pre-commit", "scripts/release-components.mjs"] },
+        { "id": "local-candidate-commit", "status": "missing", "evidence": null },
+        { "id": "remote-reviewed-head", "status": "missing", "evidence": null },
+        { "id": "canonical-github-release", "status": "missing", "evidence": null },
+        { "id": "main-develop-shared-lineage", "status": "missing", "evidence": null }
+      ]
+    },
+    {
+      "gate": "req",
+      "risk": "Requirement correspondence is proven locally, but the new behavior has no signed human acceptance.",
+      "action": "Stage the exact VSIX on the disposable reviewer and retain a signed verdict that explicitly covers the risk scorecard and AGENTS guidance.",
+      "proofs": [
+        { "id": "governed-requirements", "status": "present", "evidence": "LBA-REQ-001 through LBA-REQ-096 with RTM", "artifacts": ["docs/requirements/srs.md", "docs/requirements/rtm.csv"] },
+        { "id": "requirements-workbench", "status": "present", "evidence": "Pinned req gate PASS/High baseline", "artifacts": ["standards-score-baseline.json"] },
+        { "id": "signed-human-acceptance", "status": "missing", "evidence": null }
+      ]
+    },
+    {
+      "gate": "arch",
+      "risk": "The decisions and correspondence graph are current, but the release architecture change is not human-accepted.",
+      "action": "Review ADR-0078/ADR-0079 in the exact candidate and bind approval or requested changes to the signed verdict.",
+      "proofs": [
+        { "id": "architecture-decisions", "status": "present", "evidence": "79 registered ADR baseline with current overview mapping", "artifacts": ["docs/architecture/adr/README.md", "docs/architecture/overview.md", "docs/architecture/adr/ADR-0079-standards-release-risk-overlay.md"] },
+        { "id": "architecture-workbench", "status": "present", "evidence": "Pinned arch gate PASS/High baseline", "artifacts": ["standards-score-baseline.json"] },
+        { "id": "signed-architecture-acceptance", "status": "missing", "evidence": null }
+      ]
+    },
+    {
+      "gate": "doc",
+      "risk": "Static documents are complete, but hosted links and human usability of generated AGENTS remain unproven.",
+      "action": "Run hosted link checking and have the human reviewer use the generated AGENTS risk actions without hidden setup.",
+      "proofs": [
+        { "id": "generated-agent-contract", "status": "present", "evidence": "Versioned AGENTS with pinned workbench and forward risk actions", "artifacts": ["extension-agents/AGENTS.md", "extension-agents/agents.manifest.json"] },
+        { "id": "documentation-workbench", "status": "present", "evidence": "Pinned doc gate PASS/High baseline", "artifacts": ["standards-score-baseline.json"] },
+        { "id": "hosted-link-check", "status": "missing", "evidence": null },
+        { "id": "human-agent-usability", "status": "missing", "evidence": null }
+      ]
+    },
+    {
+      "gate": "dod",
+      "risk": "Definition-of-done structure exists, but the candidate has not crossed the human, cross-plane, canonical-release, or Marketplace gates.",
+      "action": "Do not publish. Obtain signed PASS, cross-plane attestation/quorum/composite, canonical GitHub Release, then byte-identical Marketplace prerelease and closeout.",
+      "proofs": [
+        { "id": "reproducible-local-package", "status": "missing", "evidence": null },
+        { "id": "standards-governance", "status": "present", "evidence": "Digest-pinned release-gate scorecard baseline", "artifacts": ["standards-score-baseline.json", "release-components.json"] },
+        { "id": "raw-review-retention", "status": "present", "evidence": "Bounded pre/post-verdict raw collector", "artifacts": ["reviewer-workstation/collect-review-raw.ps1"] },
+        { "id": "experiment-lifecycle-governance", "status": "present", "evidence": "Every experiment is RTM-governed or has an explicit lifecycle and production boundary", "artifacts": ["experiments/governance-overrides.json", "experiments/experiment-governance.mjs", "test/experiment-governance.mjs"] },
+        { "id": "local-continuous-kpi-receipt", "status": "missing", "evidence": null },
+        { "id": "signed-human-pass", "status": "missing", "evidence": null },
+        { "id": "cross-plane-composite", "status": "missing", "evidence": null },
+        { "id": "canonical-release", "status": "missing", "evidence": null },
+        { "id": "marketplace-prerelease-closeout", "status": "missing", "evidence": null }
+      ]
+    }
+  ]
+}
