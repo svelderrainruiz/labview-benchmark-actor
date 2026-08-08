@@ -18,6 +18,18 @@
       "validFrom": "1.4.0",
       "validThrough": "1.4.0",
       "purposes": ["quorum"]
+    },
+    {
+      "publicKeyPem": "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEAXzqGio6pATrUHmYfZHSdzX6kSkPprXLJ1MPo1EWFg2U=\n-----END PUBLIC KEY-----\n",
+      "validFrom": "1.4.1",
+      "validThrough": "1.4.1",
+      "purposes": ["visual"]
+    },
+    {
+      "publicKeyPem": "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEAxOh0fh91eufLDsGCvadwSm7IutqlOZQcOif0i7ldBdY=\n-----END PUBLIC KEY-----\n",
+      "validFrom": "1.4.1",
+      "validThrough": "1.4.1",
+      "purposes": ["quorum"]
     }
   ]
 }
