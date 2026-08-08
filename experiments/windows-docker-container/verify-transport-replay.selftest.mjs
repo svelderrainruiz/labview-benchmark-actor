@@ -4,6 +4,8 @@ import { mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync }
 import os from 'node:os';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
+import { encodePng } from '../manual-procedure-record/capture-adapter.mjs';
+import { analyzePixels } from './experiment-core.mjs';
 import { deriveTransportReplay } from './transport-replay-core.mjs';
 
 const root = mkdtempSync(path.join(os.tmpdir(), 'lba-transport-replay-'));
@@ -32,9 +34,25 @@ const ref = (file, role) => {
 };
 
 try {
+  const rgba = new Uint8Array([
+    0, 0, 0, 255, 0, 0, 0, 255,
+    0, 0, 0, 255, 0, 0, 0, 255,
+  ]);
+  const imageFile = path.join(evidenceRoot, 'frames', 'transport-baseline-rfb.png');
+  mkdirSync(path.dirname(imageFile), { recursive: true });
+  writeFileSync(imageFile, encodePng(rgba, 2, 2));
+  const imageBytes = readFileSync(imageFile);
+  const imagePngSha256 = createHash('sha256').update(imageBytes).digest('hex');
+  const imageRgbaSha256 = createHash('sha256').update(rgba).digest('hex');
+  const imageAnalysis = analyzePixels(rgba, 2, 2);
   const manifest = {
     runId: 'selftest',
     outcome: 'inconclusive',
+    files: [{
+      path: 'frames/transport-baseline-rfb.png',
+      size: imageBytes.length,
+      sha256: imagePngSha256,
+    }],
     relay: {
       cleanup: {
         closed: true,
@@ -49,6 +67,8 @@ try {
     outcome: 'inconclusive',
     failedGate: 3,
     classification: 'black-or-uniform-framebuffer',
+    transportOnly: true,
+    labviewLaunchTriggered: false,
     wallTime: '2026-08-07T00:00:04.000Z',
     environment: {
       runId: 'selftest',
@@ -59,7 +79,17 @@ try {
         os: 'windows',
         architecture: 'amd64',
       },
-      container: { id: 'c1', isolation: 'process', dockerPublishedPorts: [] },
+      container: {
+        id: 'c1',
+        isolation: 'process',
+        transportOnly: true,
+        desktopTarget: 'WinSta0',
+        dockerPublishedPorts: [],
+      },
+      lbabus: {
+        hostStage: { payloadSha256: 'e'.repeat(64) },
+        containerProbe: { payloadSha256: 'e'.repeat(64) },
+      },
     },
     rfb: {
       width: 2,
@@ -76,6 +106,22 @@ try {
       blackFraction: 1,
       meaningfulLumaPopulations: 1,
       reason: 'single-color-or-single-luminance-population',
+    },
+    imageAcquisition: {
+      schema: 'labview-benchmark-actor/windows-container-rfb-image@1',
+      status: 'acquired-but-unusable',
+      usable: false,
+      visualClaim: false,
+      source: 'run-owned-container-tightvnc-rfb',
+      sourceContainerId: 'c1',
+      upstreamEndpoint: { host: '172.20.0.2', port: 5900 },
+      hostRelayEndpoint: { address: '127.0.0.1', port: 49152 },
+      rfb: { version: '3.8', securityType: 2, width: 2, height: 2, updateCountAtSample: 1 },
+      framePollCount: 1,
+      path: 'frames/transport-baseline-rfb.png',
+      size: imageBytes.length,
+      pngSha256: imagePngSha256,
+      rgbaSha256: imageRgbaSha256,
     },
   };
   const networkPreflight = {
@@ -111,13 +157,28 @@ try {
     vncPortClosed: true,
     secretDirectoryRemoved: true,
   };
+  const lbabusHostStage = {
+    schema: 'labview-benchmark-actor/windows-container-lbabus-stage@1',
+    version: '0.15.0',
+    payloadSha256: 'e'.repeat(64),
+  };
+  const lbabusContainer = {
+    schema: 'labview-benchmark-actor/windows-container-lbabus@1',
+    status: 'passed',
+    version: '0.15.0',
+    payloadSha256: 'e'.repeat(64),
+    capabilities: ['  [yes] labview-cli  LabVIEWCLI on PATH (host-native)'],
+  };
   const files = {
     manifest: writeJson('manifest.json', manifest),
     failureReceipt: writeJson('failure-receipt.json', failureReceipt),
     networkPreflight: writeJson('network-preflight.json', networkPreflight),
     networkRelay: writeJson('network-relay.json', networkRelay),
     cleanupVerification: writeJson('cleanup-verification.json', cleanupVerification),
+    lbabusHostStage: writeJson('lbabus-host-stage.json', lbabusHostStage),
+    lbabusContainer: writeJson('lbabus-container.json', lbabusContainer),
   };
+  files.rfbImage = imageFile;
   files.tightVncLog = path.join(evidenceRoot, 'tvnserver.log');
   writeFileSync(
     files.tightVncLog,
@@ -139,12 +200,21 @@ try {
     networkRelay,
     cleanupVerification,
     tightVncLog: 'The console desktop has 0 displays\nDesktop resize is disabled, sending blank screen\n',
+    rfbImage: {
+      width: 2,
+      height: 2,
+      rgbaSha256: imageRgbaSha256,
+      analysis: imageAnalysis,
+    },
+    lbabusHostStage,
+    lbabusContainer,
     sources,
   });
   const receipt = writeJson('transport-replay.json', record);
   let result = spawnSync(process.execPath, [verifier, receipt, '--repo-root', root], { encoding: 'utf8' });
   assert.equal(result.status, 0, result.stderr);
   assert.equal(JSON.parse(result.stdout).visualFramesEncoded, 0);
+  assert.equal(JSON.parse(result.stdout).diagnosticImageSha256, imagePngSha256);
 
   writeFileSync(files.cleanupVerification, '{}\n');
   result = spawnSync(process.execPath, [verifier, receipt, '--repo-root', root], { encoding: 'utf8' });

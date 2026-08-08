@@ -53,7 +53,8 @@ $createArgs = @(New-ExperimentContainerCreateArgs `
   -TightVncVersion '2.8.81' `
   -DesktopTarget 'Inherited' `
   -TightVncCaptureMode 'StandardGdi' `
-  -BootstrapInstaller 'C:\run-secrets\tightvnc.msi')
+  -BootstrapInstaller 'C:\run-secrets\tightvnc.msi' `
+  -LbaBusPath 'C:\run-secrets\lbabus\lbabus.dll')
 if ($createArgs[0] -ne 'create' -or $createArgs -contains '--publish' -or $createArgs -contains '-p') {
   throw 'Container create arguments must omit every Docker publish option.'
 }
@@ -62,6 +63,9 @@ if ($createArgs -notcontains '--mount' -or $createArgs -notcontains '--isolation
 }
 if ($createArgs -contains '--device' -or $createArgs -notcontains 'Inherited' -or $createArgs -notcontains 'StandardGdi') {
   throw 'Default container arguments must select inherited standard-GDI mode without a GPU device.'
+}
+if ($createArgs -notcontains '-LbaBusPath' -or $createArgs -notcontains 'C:\run-secrets\lbabus\lbabus.dll') {
+  throw 'Container arguments did not propagate the mounted lbabus payload.'
 }
 $transportArgs = @(New-ExperimentContainerCreateArgs `
   -ContainerName 'lba-transport-test' `

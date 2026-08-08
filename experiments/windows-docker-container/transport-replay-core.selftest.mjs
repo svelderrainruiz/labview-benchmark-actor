@@ -8,6 +8,9 @@ const sourceFiles = {
   networkRelay: 'network-relay.json',
   cleanupVerification: 'cleanup-verification.json',
   tightVncLog: 'tvnserver.log',
+  rfbImage: 'frames/transport-baseline-rfb.png',
+  lbabusHostStage: 'lbabus-host-stage.json',
+  lbabusContainer: 'lbabus-container.json',
 };
 const source = (role) => ({
   path: `experiments/windows-docker-container/evidence/run-1/${sourceFiles[role]}`,
@@ -19,6 +22,11 @@ const base = () => ({
   manifest: {
     runId: 'run-1',
     outcome: 'inconclusive',
+    files: [{
+      path: 'frames/transport-baseline-rfb.png',
+      size: source('rfbImage').size,
+      sha256: source('rfbImage').sha256,
+    }],
     relay: {
       cleanup: {
         closed: true,
@@ -33,6 +41,8 @@ const base = () => ({
     outcome: 'inconclusive',
     failedGate: 3,
     classification: 'black-or-uniform-framebuffer',
+    transportOnly: true,
+    labviewLaunchTriggered: false,
     wallTime: '2026-08-07T00:00:04.000Z',
     environment: {
       runId: 'run-1',
@@ -46,7 +56,13 @@ const base = () => ({
       container: {
         id: 'container-1',
         isolation: 'process',
+        transportOnly: true,
+        desktopTarget: 'WinSta0',
         dockerPublishedPorts: [],
+      },
+      lbabus: {
+        hostStage: { payloadSha256: 'e'.repeat(64) },
+        containerProbe: { payloadSha256: 'e'.repeat(64) },
       },
     },
     rfb: {
@@ -64,6 +80,22 @@ const base = () => ({
       blackFraction: 1,
       meaningfulLumaPopulations: 1,
       reason: 'single-color-or-single-luminance-population',
+    },
+    imageAcquisition: {
+      schema: 'labview-benchmark-actor/windows-container-rfb-image@1',
+      status: 'acquired-but-unusable',
+      usable: false,
+      visualClaim: false,
+      source: 'run-owned-container-tightvnc-rfb',
+      sourceContainerId: 'container-1',
+      upstreamEndpoint: { host: '172.20.0.2', port: 5900 },
+      hostRelayEndpoint: { address: '127.0.0.1', port: 49152 },
+      rfb: { version: '3.8', securityType: 2, width: 1024, height: 768, updateCountAtSample: 1 },
+      framePollCount: 18,
+      path: 'frames/transport-baseline-rfb.png',
+      size: source('rfbImage').size,
+      pngSha256: source('rfbImage').sha256,
+      rgbaSha256: 'f'.repeat(64),
     },
   },
   networkPreflight: {
@@ -104,6 +136,29 @@ const base = () => ({
     secretDirectoryRemoved: true,
   },
   tightVncLog: 'The console desktop has 0 displays\nDesktop resize is disabled, sending blank screen\n',
+  rfbImage: {
+    width: 1024,
+    height: 768,
+    rgbaSha256: 'f'.repeat(64),
+    analysis: {
+      passed: false,
+      blackFraction: 1,
+      meaningfulLumaPopulations: 1,
+      reason: 'single-color-or-single-luminance-population',
+    },
+  },
+  lbabusHostStage: {
+    schema: 'labview-benchmark-actor/windows-container-lbabus-stage@1',
+    version: '0.15.0',
+    payloadSha256: 'e'.repeat(64),
+  },
+  lbabusContainer: {
+    schema: 'labview-benchmark-actor/windows-container-lbabus@1',
+    status: 'passed',
+    version: '0.15.0',
+    payloadSha256: 'e'.repeat(64),
+    capabilities: ['  [yes] labview-cli  LabVIEWCLI on PATH (host-native)'],
+  },
   sources: {
     manifest: source('manifest'),
     failureReceipt: source('failureReceipt'),
@@ -111,6 +166,9 @@ const base = () => ({
     networkRelay: source('networkRelay'),
     cleanupVerification: source('cleanupVerification'),
     tightVncLog: source('tightVncLog'),
+    rfbImage: source('rfbImage'),
+    lbabusHostStage: source('lbabusHostStage'),
+    lbabusContainer: source('lbabusContainer'),
   },
 });
 
@@ -124,6 +182,9 @@ assert.equal(record.mprr.visualFramesEncoded, 0);
 assert.equal(record.transport.totalRelayBytes, 6291647);
 assert.equal(record.capabilities.labviewVisualLaunchBenchmark, 'unsupported-by-windows-container-platform');
 assert.equal(record.framebuffer.tightVncZeroDisplayMode, 'blank-screen');
+assert.equal(record.framebuffer.diagnosticImage.acquiredFromContainerRfb, true);
+assert.equal(record.framebuffer.diagnosticImage.usable, false);
+assert.equal(record.capabilities.lbabusInContainer, 'supported-and-proven');
 const desktopSizeInput = base();
 desktopSizeInput.tightVncLog =
   'The console desktop has 0 displays\nDesktop resize is enabled, sending NewFBSize 1024x768\nupdate requested\n';
@@ -138,6 +199,8 @@ for (const [mutate, pattern] of [
   [(value) => { value.networkRelay.stats.upstreamToDownstreamBytes = 0; }, /positive integer/],
   [(value) => { value.cleanupVerification.containerAbsent = false; }, /cleanup proof/],
   [(value) => { value.failureReceipt.initialAnalysis.blackFraction = 0; }, /black framebuffer/],
+  [(value) => { value.rfbImage.rgbaSha256 = '0'.repeat(64); }, /retained container RFB image/],
+  [(value) => { value.lbabusContainer.status = 'failed'; }, /lbabus capability proof/],
   [(value) => { value.tightVncLog = 'one display'; }, /zero-display log/],
   [(value) => { value.networkPreflight.dockerPublishedPorts = ['5900/tcp']; }, /publication/],
   [(value) => { value.sources.manifest.path = 'C:\\outside\\manifest.json'; }, /sources\.manifest\.path/],

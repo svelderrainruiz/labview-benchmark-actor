@@ -64,7 +64,8 @@ function New-ExperimentContainerCreateArgs {
     [Parameter(Mandatory = $true)][ValidateSet('StandardGdi', 'D3d')][string]$TightVncCaptureMode,
     [switch]$TransportOnly,
     [switch]$AssignGpuDevice,
-    [string]$BootstrapInstaller
+    [string]$BootstrapInstaller,
+    [string]$LbaBusPath
   )
   if ($Isolation -eq 'hyperv' -and $AssignGpuDevice) {
     throw 'Device assignment is unsupported for Hyper-V-isolated Windows containers.'
@@ -98,6 +99,7 @@ function New-ExperimentContainerCreateArgs {
     '-RunId', $RunId
   )
   if ($BootstrapInstaller) { $arguments += @('-InstallerPath', $BootstrapInstaller) }
+  if ($LbaBusPath) { $arguments += @('-LbaBusPath', $LbaBusPath) }
   if ($TransportOnly) { $arguments += '-TransportOnly' }
   $arguments += @('-TightVncVersion', $TightVncVersion)
   return $arguments

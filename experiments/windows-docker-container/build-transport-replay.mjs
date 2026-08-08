@@ -3,13 +3,15 @@
 import { createHash } from 'node:crypto';
 import { readFileSync, renameSync, statSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
+import { decodePng } from '../manual-procedure-record/capture-adapter.mjs';
 import { deriveTransportReplay, validateTransportReplay } from './transport-replay-core.mjs';
+import { analyzePixels } from './experiment-core.mjs';
 
 const repoRoot = path.resolve(import.meta.dirname, '..', '..');
 const defaultRunRoot = path.join(
   import.meta.dirname,
   'evidence',
-  '20260807T075339152Z-d5880932bd',
+  '20260807T235142020Z-dfc7f09404',
 );
 const defaultOutput = path.join(
   import.meta.dirname,
@@ -26,6 +28,9 @@ const sourceFiles = {
   networkRelay: 'network-relay.json',
   cleanupVerification: 'cleanup-verification.json',
   tightVncLog: 'tvnserver.log',
+  rfbImage: 'frames/transport-baseline-rfb.png',
+  lbabusHostStage: 'lbabus-host-stage.json',
+  lbabusContainer: 'lbabus-container.json',
 };
 
 function readJson(file) {
@@ -52,6 +57,7 @@ const tightLogBytes = readFileSync(absolute.tightVncLog);
 const tightVncLog = tightLogBytes.subarray(0, 2).equals(Buffer.from([0xff, 0xfe]))
   ? tightLogBytes.subarray(2).toString('utf16le')
   : tightLogBytes.toString('utf8');
+const rfbImageDecoded = decodePng(readFileSync(absolute.rfbImage));
 
 const record = deriveTransportReplay({
   manifest: readJson(absolute.manifest),
@@ -60,6 +66,14 @@ const record = deriveTransportReplay({
   networkRelay: readJson(absolute.networkRelay),
   cleanupVerification: readJson(absolute.cleanupVerification),
   tightVncLog,
+  rfbImage: {
+    width: rfbImageDecoded.width,
+    height: rfbImageDecoded.height,
+    rgbaSha256: createHash('sha256').update(rfbImageDecoded.rgba).digest('hex'),
+    analysis: analyzePixels(rfbImageDecoded.rgba, rfbImageDecoded.width, rfbImageDecoded.height),
+  },
+  lbabusHostStage: readJson(absolute.lbabusHostStage),
+  lbabusContainer: readJson(absolute.lbabusContainer),
   sources,
 });
 validateTransportReplay(record);
@@ -73,4 +87,5 @@ console.log(JSON.stringify({
   markers: record.mprr.markers.length,
   totalRelayBytes: record.transport.totalRelayBytes,
   visualFramesEncoded: record.mprr.visualFramesEncoded,
+  diagnosticImageSha256: record.framebuffer.diagnosticImage.pngSha256,
 }));

@@ -4,7 +4,9 @@ import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 import { readFileSync, statSync } from 'node:fs';
 import path from 'node:path';
+import { decodePng } from '../manual-procedure-record/capture-adapter.mjs';
 import { deriveTransportReplay, validateTransportReplay } from './transport-replay-core.mjs';
+import { analyzePixels } from './experiment-core.mjs';
 
 const file = process.argv[2];
 const repoRootOption = process.argv.indexOf('--repo-root');
@@ -37,6 +39,7 @@ if (!file) {
   const tightVncLog = logBytes.subarray(0, 2).equals(Buffer.from([0xff, 0xfe]))
     ? logBytes.subarray(2).toString('utf16le')
     : logBytes.toString('utf8');
+  const rfbImageDecoded = decodePng(bytesByRole.rfbImage);
   const derived = deriveTransportReplay({
     manifest: json('manifest'),
     failureReceipt: json('failureReceipt'),
@@ -44,6 +47,14 @@ if (!file) {
     networkRelay: json('networkRelay'),
     cleanupVerification: json('cleanupVerification'),
     tightVncLog,
+    rfbImage: {
+      width: rfbImageDecoded.width,
+      height: rfbImageDecoded.height,
+      rgbaSha256: createHash('sha256').update(rfbImageDecoded.rgba).digest('hex'),
+      analysis: analyzePixels(rfbImageDecoded.rgba, rfbImageDecoded.width, rfbImageDecoded.height),
+    },
+    lbabusHostStage: json('lbabusHostStage'),
+    lbabusContainer: json('lbabusContainer'),
     sources,
   });
   assert.deepEqual(record, derived, 'transport replay drifted from immutable evidence');
@@ -55,6 +66,7 @@ if (!file) {
     rfbUpdates: record.rfb.updateCount,
     framePolls: record.rfb.observedFramePollCount,
     visualFramesEncoded: record.mprr.visualFramesEncoded,
+    diagnosticImageSha256: record.framebuffer.diagnosticImage.pngSha256,
     interactiveDisplay: record.capabilities.interactiveWindowsContainerDisplay,
   }));
 }

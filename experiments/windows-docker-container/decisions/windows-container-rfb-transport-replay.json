@@ -1,7 +1,7 @@
 {
   "schema": "labview-benchmark-actor/windows-container-rfb-transport-replay@1",
-  "replayId": "20260807T075339152Z-d5880932bd-transport-replay",
-  "sourceRunId": "20260807T075339152Z-d5880932bd",
+  "replayId": "20260807T235142020Z-dfc7f09404-transport-replay",
+  "sourceRunId": "20260807T235142020Z-dfc7f09404",
   "sourceOutcome": "inconclusive",
   "benchmarkOutcome": "transport-supported-framebuffer-unavailable",
   "benchmarkScope": "windows-container-rfb-transport-only",
@@ -16,18 +16,18 @@
   },
   "transport": {
     "dockerPublishedPorts": 0,
-    "directEndpoint": "172.21.9.62:5900",
-    "directProbeMs": 1.4552,
+    "directEndpoint": "172.21.14.68:5900",
+    "directProbeMs": 1.4808,
     "relayBoundAddress": "127.0.0.1",
-    "relayHostPortAssigned": 54778,
-    "relayUpstream": "172.21.9.62:5900",
+    "relayHostPortAssigned": 64681,
+    "relayUpstream": "172.21.14.68:5900",
     "acceptedConnections": 1,
     "successfulUpstreamConnections": 1,
-    "downstreamToUpstreamBytes": 88,
-    "upstreamToDownstreamBytes": 6291559,
-    "totalRelayBytes": 6291647,
-    "upstreamDownstreamByteRatio": 71494.9886,
-    "relayCleanupMs": 1.409,
+    "downstreamToUpstreamBytes": 102,
+    "upstreamToDownstreamBytes": 6291575,
+    "totalRelayBytes": 6291677,
+    "upstreamDownstreamByteRatio": 61682.1078,
+    "relayCleanupMs": 1.0411,
     "relayClosed": true
   },
   "rfb": {
@@ -36,9 +36,10 @@
     "securityTypeName": "VNC Authentication",
     "width": 1024,
     "height": 768,
-    "updateCount": 2,
+    "updateCount": 3,
     "observedFramePollCount": 18,
     "retainedVisualFrameCount": 0,
+    "retainedDiagnosticFrameCount": 1,
     "authenticated": true,
     "traversedLoopbackRelay": true
   },
@@ -47,14 +48,25 @@
     "blackFraction": 1,
     "meaningfulLumaPopulations": 1,
     "classification": "uniform-black-zero-display-surface",
-    "tightVncZeroDisplayMode": "blank-screen",
+    "tightVncZeroDisplayMode": "desktop-size-then-black-update",
     "interactiveDisplayAvailable": false,
-    "screenshotBenchmarkAvailable": false
+    "screenshotBenchmarkAvailable": false,
+    "diagnosticImage": {
+      "acquiredFromContainerRfb": true,
+      "usable": false,
+      "visualClaim": false,
+      "path": "frames/transport-baseline-rfb.png",
+      "size": 4981,
+      "pngSha256": "6ec227dca4c2663c781fed4748f9f10fedf7290bf7a8fffe2d4e05f81790e4cd",
+      "rgbaSha256": "d2cdb07798b599560e35abad5e4f87f4205ee60e72e14d850b9590f801080978"
+    }
   },
   "capabilities": {
     "networkRelay": "supported-and-proven",
     "rfbProtocolAndAuthentication": "supported-and-proven",
     "framebufferPayloadTransport": "supported-and-proven",
+    "containerRfbImageAcquisition": "supported-but-unusable-black-frame",
+    "lbabusInContainer": "supported-and-proven",
     "interactiveWindowsContainerDisplay": "unsupported-by-windows-container-platform",
     "labviewVisualLaunchBenchmark": "unsupported-by-windows-container-platform"
   },
@@ -85,55 +97,55 @@
         "milestoneId": 6,
         "name": "RELAY-READY",
         "frameIndex": 1,
-        "wallOffsetMs": 2322,
-        "timingTicks64": "23220000",
+        "wallOffsetMs": 1215,
+        "timingTicks64": "12150000",
         "packetBytes": 24,
-        "packetHex": "204f62010000000001000000000000000000000006000100",
-        "packetSha256": "b078535b27b8b4db3f3405df08cacc43da77b973a56a9c5a5756a5f43c507a42",
+        "packetHex": "f064b9000000000001000000000000000000000006000100",
+        "packetSha256": "3b108c5c9f67cd75ca8210a8d5b54376a3a92b2879ca277476a1ed3505514f59",
         "visualFrame": false
       },
       {
         "milestoneId": 7,
         "name": "RFB-TRAVERSED",
         "frameIndex": 2,
-        "wallOffsetMs": 2408,
-        "timingTicks64": "24080000",
+        "wallOffsetMs": 1301,
+        "timingTicks64": "13010000",
         "packetBytes": 24,
-        "packetHex": "806e6f010000000002000000000000000000000007000100",
-        "packetSha256": "3aac6af9c77738b2f5f44d273260cddf77d6c9fec8e2817ed4daf434ded76151",
+        "packetHex": "5084c6000000000002000000000000000000000007000100",
+        "packetSha256": "c9b6b779b26093a296e0669ee0c490a0591c101976c5f6292c281075173c2b45",
         "visualFrame": false
       },
       {
         "milestoneId": 8,
         "name": "FRAMEBUFFER-CLASSIFIED",
         "frameIndex": 3,
-        "wallOffsetMs": 3884,
-        "timingTicks64": "38840000",
+        "wallOffsetMs": 2858,
+        "timingTicks64": "28580000",
         "packetBytes": 24,
-        "packetHex": "c0a650020000000003000000000000000000000008000100",
-        "packetSha256": "1305b9d38f20f6b26efd087d0aa06e1f3589043ada98bc9070396187483eab1f",
+        "packetHex": "a018b4010000000003000000000000000000000008000100",
+        "packetSha256": "7480e78003e442aa4dca232c1e73a96245e365b24cf87abefa54fc954d150bff",
         "visualFrame": false
       },
       {
         "milestoneId": 9,
         "name": "RELAY-CLOSED",
         "frameIndex": 4,
-        "wallOffsetMs": 6875,
-        "timingTicks64": "68750000",
+        "wallOffsetMs": 5018,
+        "timingTicks64": "50180000",
         "packetBytes": 24,
-        "packetHex": "b00a19040000000004000000000000000000000009000100",
-        "packetSha256": "2a13e2af3d91bd39f11dc4b9c41dbf574d3f73f3a9b1359a68e480033c458aba",
+        "packetHex": "a0affd020000000004000000000000000000000009000100",
+        "packetSha256": "78316309abccd1b6a1011bb1fc57ef71091c9b229863ff1f55bece0d38faf632",
         "visualFrame": false
       },
       {
         "milestoneId": 10,
         "name": "CLEANUP-PROVEN",
         "frameIndex": 5,
-        "wallOffsetMs": 134741,
-        "timingTicks64": "1347410000",
+        "wallOffsetMs": 132919,
+        "timingTicks64": "1329190000",
         "packetBytes": 24,
-        "packetHex": "50d84f50000000000500000000000000000000000a000100",
-        "packetSha256": "48de21fa30c9d0dbb5588831743d6422b62785f63ae75c2c582c9dcc70abd8b1",
+        "packetHex": "70d4394f000000000500000000000000000000000a000100",
+        "packetSha256": "d306671a503f559715d49e16e40b7d46535da30d2bcacbeadb8e21c62cdf6c7b",
         "visualFrame": false
       }
     ]
@@ -141,39 +153,57 @@
   "sources": [
     {
       "role": "manifest",
-      "path": "experiments/windows-docker-container/evidence/20260807T075339152Z-d5880932bd/manifest.json",
-      "size": 5488,
-      "sha256": "2a0981de810e881f77e064112b65e24b7ad964254ff7ff145ce7f5ab3cfd841a"
+      "path": "experiments/windows-docker-container/evidence/20260807T235142020Z-dfc7f09404/manifest.json",
+      "size": 8342,
+      "sha256": "66d9148b35628d9d57fe228c2345577e56e0f0af8dcf1b4aca53cc963addd8db"
     },
     {
       "role": "failureReceipt",
-      "path": "experiments/windows-docker-container/evidence/20260807T075339152Z-d5880932bd/failure-receipt.json",
-      "size": 5894,
-      "sha256": "24c8b4b5a4f712b17de895a79a0879e237433ed6cd43225566189656004a9556"
+      "path": "experiments/windows-docker-container/evidence/20260807T235142020Z-dfc7f09404/failure-receipt.json",
+      "size": 17232,
+      "sha256": "b36b04ea29aa76beafeb9493adbbbc83f032dfd9936ff6e4aa746647d608237a"
     },
     {
       "role": "networkPreflight",
-      "path": "experiments/windows-docker-container/evidence/20260807T075339152Z-d5880932bd/network-preflight.json",
-      "size": 866,
-      "sha256": "9689caa3623b08ad86e973236e147642103c1ab98cbe16f2623efcb52fd26739"
+      "path": "experiments/windows-docker-container/evidence/20260807T235142020Z-dfc7f09404/network-preflight.json",
+      "size": 868,
+      "sha256": "320fde39fbd969452aabca128b47fa237f826635283174fc4845869c453a2bfc"
     },
     {
       "role": "networkRelay",
-      "path": "experiments/windows-docker-container/evidence/20260807T075339152Z-d5880932bd/network-relay.json",
-      "size": 1784,
-      "sha256": "765068f452d25a11df0dc6d216dfb112b40f421252017a2d2ea715da3d5246ab"
+      "path": "experiments/windows-docker-container/evidence/20260807T235142020Z-dfc7f09404/network-relay.json",
+      "size": 1787,
+      "sha256": "7a482323efe1fd39d28c42118127db2cd5fe3c4138361ad139282102d1aca992"
     },
     {
       "role": "cleanupVerification",
-      "path": "experiments/windows-docker-container/evidence/20260807T075339152Z-d5880932bd/cleanup-verification.json",
-      "size": 415,
-      "sha256": "185027dc390177f0bdb7e5ae06665472f55b7b979045ef25b29da21cb33eca64"
+      "path": "experiments/windows-docker-container/evidence/20260807T235142020Z-dfc7f09404/cleanup-verification.json",
+      "size": 498,
+      "sha256": "83b115cf76855d3b1f9036de1f028298ac70bb006108c4001bba8142182feb47"
     },
     {
       "role": "tightVncLog",
-      "path": "experiments/windows-docker-container/evidence/20260807T075339152Z-d5880932bd/tvnserver.log",
-      "size": 89614,
-      "sha256": "db7d34e6d18caf83388f6802804467d7b0502f6735460f397a6a0e69bd5e1808"
+      "path": "experiments/windows-docker-container/evidence/20260807T235142020Z-dfc7f09404/tvnserver.log",
+      "size": 91816,
+      "sha256": "be46c06c318f3efcfa2a535ca9b156dc144e775dfe1ff8eb9ba70e97066e3695"
+    },
+    {
+      "role": "rfbImage",
+      "path": "experiments/windows-docker-container/evidence/20260807T235142020Z-dfc7f09404/frames/transport-baseline-rfb.png",
+      "size": 4981,
+      "sha256": "6ec227dca4c2663c781fed4748f9f10fedf7290bf7a8fffe2d4e05f81790e4cd"
+    },
+    {
+      "role": "lbabusHostStage",
+      "path": "experiments/windows-docker-container/evidence/20260807T235142020Z-dfc7f09404/lbabus-host-stage.json",
+      "size": 361,
+      "sha256": "ce13b17f94d28b08c7d4e7e53946c4f421db62d589dcc58ce33ee40d881ddcd7"
+    },
+    {
+      "role": "lbabusContainer",
+      "path": "experiments/windows-docker-container/evidence/20260807T235142020Z-dfc7f09404/lbabus-container.json",
+      "size": 1860,
+      "sha256": "f9d092c42fe1ffc94b6dd641678c3245ee60c19c29826de4208128cb23cd0ef1"
     }
   ]
 }

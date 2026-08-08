@@ -48,6 +48,8 @@ $hostFailureClassification = $null
 $failedGate = 1
 $outcome = 'inconclusive'
 $caughtError = $null
+$containerDebugLineCount = 0
+$lbabusStage = $null
 
 New-Item -ItemType Directory -Path $runDirectory -Force | Out-Null
 
@@ -65,6 +67,10 @@ function Write-AtomicJson([string]$Path, $Value) {
 }
 
 function Invoke-Docker([string[]]$Arguments, [switch]$AllowFailure) {
+  $renderedArguments = @($Arguments | ForEach-Object {
+    if ($_ -match '\s') { '"{0}"' -f $_ } else { $_ }
+  }) -join ' '
+  Write-RunLog "[docker] > docker $renderedArguments"
   $previousErrorAction = $ErrorActionPreference
   try {
     $ErrorActionPreference = 'Continue'
@@ -73,10 +79,50 @@ function Invoke-Docker([string[]]$Arguments, [switch]$AllowFailure) {
   } finally {
     $ErrorActionPreference = $previousErrorAction
   }
+  Write-RunLog "[docker] < exit=$code, outputLines=$(@($output).Count)"
   if ($code -ne 0 -and -not $AllowFailure) {
     throw "docker $($Arguments[0]) failed with exit code $code`: $($output -join [Environment]::NewLine)"
   }
   return [pscustomobject]@{ ExitCode = $code; Output = $output }
+}
+
+function Invoke-NativeLogged([string]$FilePath, [string[]]$Arguments, [string]$Prefix) {
+  Write-RunLog "[$Prefix] > $FilePath $($Arguments -join ' ')"
+  $previousErrorAction = $ErrorActionPreference
+  try {
+    $ErrorActionPreference = 'Continue'
+    $output = @(& $FilePath @Arguments 2>&1 | ForEach-Object { "$_" })
+    $code = $LASTEXITCODE
+  } finally {
+    $ErrorActionPreference = $previousErrorAction
+  }
+  foreach ($line in $output) { Write-RunLog "[$Prefix] $line" }
+  Write-RunLog "[$Prefix] < exit=$code, outputLines=$(@($output).Count)"
+  if ($code -ne 0) {
+    throw "$FilePath failed with exit code $code."
+  }
+  return [pscustomobject]@{ ExitCode = $code; Output = $output }
+}
+
+function Sync-ContainerDebugLog {
+  $debugPath = Join-Path $runDirectory 'container-debug.log'
+  if (-not (Test-Path -LiteralPath $debugPath)) { return }
+  try {
+    $lines = @([System.IO.File]::ReadAllLines($debugPath))
+  } catch [System.IO.IOException] {
+    Write-RunLog "[container-live] debug log read deferred: $($_.Exception.Message)"
+    return
+  }
+  if ($lines.Count -lt $script:containerDebugLineCount) {
+    Write-RunLog '[container-live] warning: append-only debug log was truncated; replaying its current contents.'
+    $script:containerDebugLineCount = 0
+  }
+  for ($index = $script:containerDebugLineCount; $index -lt $lines.Count; $index++) {
+    $line = "[container-live] $($lines[$index])"
+    Write-Host $line
+    Add-Content -LiteralPath $hostLog -Value $line -Encoding UTF8
+  }
+  $script:containerDebugLineCount = $lines.Count
 }
 
 function Test-TcpEndpoint([int]$Port, [int]$TimeoutMs = 1000) {
@@ -179,6 +225,37 @@ try {
   Write-RunLog 'Gate 1 passed: Docker is in Windows mode and the process-isolated smoke container exited successfully.'
 
   New-Item -ItemType Directory -Path $secretDirectory -Force | Out-Null
+  $dotnet = Get-Command dotnet -ErrorAction SilentlyContinue
+  if (-not $dotnet) { throw 'dotnet is required to stage the repository lbabus tool for the container probe.' }
+  $repoRoot = (Resolve-Path (Join-Path $PSScriptRoot '..\..')).Path
+  $lbabusProject = Join-Path $repoRoot 'tools\collab-cli\LbaBus.csproj'
+  $lbabusOutput = Join-Path $secretDirectory 'lbabus'
+  $lbabusArtifacts = Join-Path $secretDirectory 'lbabus-artifacts'
+  Write-RunLog 'Publishing the repository lbabus tool into the ephemeral read-only container mount.'
+  Invoke-NativeLogged $dotnet.Source @(
+    'publish', $lbabusProject,
+    '--configuration', 'Release',
+    '--output', $lbabusOutput,
+    '--artifacts-path', $lbabusArtifacts,
+    '--nologo',
+    '--verbosity', 'minimal'
+  ) 'lbabus-publish' | Out-Null
+  $lbabusDll = Join-Path $lbabusOutput 'lbabus.dll'
+  if (-not (Test-Path -LiteralPath $lbabusDll)) { throw "lbabus publish did not produce '$lbabusDll'." }
+  $lbabusVersionResult = Invoke-NativeLogged $dotnet.Source @($lbabusDll, 'version') 'lbabus-host-probe'
+  $lbabusVersion = @($lbabusVersionResult.Output | Where-Object { $_.Trim() } | Select-Object -Last 1)[0].Trim()
+  if ($lbabusVersion -notmatch '^\d+\.\d+\.\d+$') { throw "Published lbabus returned invalid version '$lbabusVersion'." }
+  $lbabusStage = [ordered]@{
+    schema = 'labview-benchmark-actor/windows-container-lbabus-stage@1'
+    wallTime = [DateTime]::UtcNow.ToString('o')
+    sourceProject = 'tools/collab-cli/LbaBus.csproj'
+    version = $lbabusVersion
+    payload = 'C:\run-secrets\lbabus\lbabus.dll'
+    payloadSha256 = (Get-FileHash -LiteralPath $lbabusDll -Algorithm SHA256).Hash.ToLowerInvariant()
+  }
+  Write-AtomicJson (Join-Path $runDirectory 'lbabus-host-stage.json') $lbabusStage
+  Write-RunLog "lbabus payload staged: version=$lbabusVersion, SHA-256=$($lbabusStage.payloadSha256)."
+
   if ($TightVncInstaller) {
     $resolvedInstaller = (Resolve-Path -LiteralPath $TightVncInstaller).Path
     $installerHash = (Get-FileHash -LiteralPath $resolvedInstaller -Algorithm SHA256).Hash.ToLowerInvariant()
@@ -209,6 +286,7 @@ try {
   $runRoot = (Resolve-Path -LiteralPath $runDirectory).Path
   $secretRoot = (Resolve-Path -LiteralPath $secretDirectory).Path
   $bootstrapInstaller = if (Test-Path (Join-Path $secretDirectory 'tightvnc.msi')) { 'C:\run-secrets\tightvnc.msi' } else { '' }
+  $bootstrapLbaBus = 'C:\run-secrets\lbabus\lbabus.dll'
   $createArgs = @(New-ExperimentContainerCreateArgs `
     -ContainerName $containerName `
     -RunId $runId `
@@ -223,7 +301,8 @@ try {
     -TightVncCaptureMode $TightVncCaptureMode `
     -TransportOnly:$TransportOnly `
     -AssignGpuDevice:$AssignGpuDevice `
-    -BootstrapInstaller $bootstrapInstaller)
+    -BootstrapInstaller $bootstrapInstaller `
+    -LbaBusPath $bootstrapLbaBus)
   $createResult = Invoke-Docker $createArgs
   $containerId = ($createResult.Output | Select-Object -Last 1).Trim()
   if ($containerId -notmatch '^[a-f0-9]{12,64}$') { throw "docker create did not return a container ID (got '$containerId')." }
@@ -234,6 +313,7 @@ try {
   $readyPath = Join-Path $runDirectory 'bootstrap-ready.json'
   $readyDeadline = [DateTime]::UtcNow.AddMinutes(4)
   while (-not (Test-Path -LiteralPath $readyPath)) {
+    Sync-ContainerDebugLog
     $state = Get-ContainerInspection $containerId
     if (-not $state.State.Running) {
       $earlyLogs = Invoke-Docker @('logs', $containerId) -AllowFailure
@@ -248,11 +328,25 @@ try {
     if ([DateTime]::UtcNow -ge $readyDeadline) { throw 'Timed out waiting for bootstrap-ready.json from the container.' }
     Start-Sleep -Milliseconds 500
   }
+  Sync-ContainerDebugLog
   $bootstrapReady = Get-Content -LiteralPath $readyPath -Raw | ConvertFrom-Json
   if ($bootstrapReady.status -ne 'ready' -or -not $bootstrapReady.vnc.processAlive -or -not $bootstrapReady.vnc.port5900Listening) {
     $hostFailureClassification = 'container-listener-unavailable'
     throw "Container bootstrap did not prove TightVNC readiness: $($bootstrapReady | ConvertTo-Json -Depth 10 -Compress)"
   }
+  $lbabusContainerEvidencePath = Join-Path $runDirectory 'lbabus-container.json'
+  if (-not (Test-Path -LiteralPath $lbabusContainerEvidencePath)) {
+    throw 'Container bootstrap did not produce lbabus capability evidence.'
+  }
+  $lbabusContainerEvidence = Get-Content -LiteralPath $lbabusContainerEvidencePath -Raw | ConvertFrom-Json
+  if (
+    $lbabusContainerEvidence.status -ne 'passed' -or
+    $lbabusContainerEvidence.version -ne $lbabusStage.version -or
+    $lbabusContainerEvidence.payloadSha256 -ne $lbabusStage.payloadSha256
+  ) {
+    throw 'Container lbabus capability evidence disagrees with the host-staged payload.'
+  }
+  Write-RunLog "Container lbabus probe passed: version=$($lbabusContainerEvidence.version), LabVIEWCLI capability output retained."
 
   $preRelayInspection = Get-ContainerInspection $containerId
   Assert-RunOwnedContainer -Labels $preRelayInspection.Config.Labels -RunId $runId
@@ -306,6 +400,10 @@ try {
       authentication = 'ephemeral VNC authentication'
       captureMode = $TightVncCaptureMode
     }
+    lbabus = [ordered]@{
+      hostStage = $lbabusStage
+      containerProbe = $lbabusContainerEvidence
+    }
   }
   $environmentPath = Join-Path $runDirectory 'environment.json'
   Write-AtomicJson $environmentPath $environment
@@ -357,6 +455,7 @@ try {
     Write-HostFailureReceipt -Gate $failedGate -Message $_.Exception.Message -FailureOutcome $outcome -Classification $hostFailureClassification
   }
 } finally {
+  Sync-ContainerDebugLog
   if ($containerCreated) {
     try {
       $inspection = Get-ContainerInspection $containerId -AllowMissing
@@ -396,6 +495,7 @@ try {
           if ($inspection -and $inspection.State.Running) {
             Invoke-Docker @('stop', '--time', '5', $containerId) -AllowFailure | Out-Null
           }
+          Sync-ContainerDebugLog
         }
         $inspection = Get-ContainerInspection $containerId -AllowMissing
         if ($inspection) {

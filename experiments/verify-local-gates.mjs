@@ -2382,7 +2382,7 @@ check('windows-container-rfb-transport-replay', () => {
   try {
     execFileSync(process.execPath, [
       join(here, 'windows-docker-container', 'build-transport-replay.mjs'),
-      join(here, 'windows-docker-container', 'evidence', '20260807T075339152Z-d5880932bd'),
+      join(here, 'windows-docker-container', 'evidence', '20260807T235142020Z-dfc7f09404'),
       generated,
     ], { stdio: 'pipe' });
     const committed = JSON.parse(readFileSync(

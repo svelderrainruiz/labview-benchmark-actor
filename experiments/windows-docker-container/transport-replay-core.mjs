@@ -20,6 +20,9 @@ const REQUIRED_SOURCE_ROLES = Object.freeze([
   'networkRelay',
   'cleanupVerification',
   'tightVncLog',
+  'rfbImage',
+  'lbabusHostStage',
+  'lbabusContainer',
 ]);
 const SOURCE_FILE_BY_ROLE = Object.freeze({
   manifest: 'manifest.json',
@@ -28,6 +31,9 @@ const SOURCE_FILE_BY_ROLE = Object.freeze({
   networkRelay: 'network-relay.json',
   cleanupVerification: 'cleanup-verification.json',
   tightVncLog: 'tvnserver.log',
+  rfbImage: 'frames/transport-baseline-rfb.png',
+  lbabusHostStage: 'lbabus-host-stage.json',
+  lbabusContainer: 'lbabus-container.json',
 });
 
 const round4 = (value) => Math.round(value * 10000) / 10000;
@@ -109,6 +115,9 @@ export function deriveTransportReplay({
   networkRelay,
   cleanupVerification,
   tightVncLog,
+  rfbImage,
+  lbabusHostStage,
+  lbabusContainer,
   sources,
 }) {
   requireObject(manifest, 'manifest');
@@ -116,6 +125,9 @@ export function deriveTransportReplay({
   requireObject(networkPreflight, 'networkPreflight');
   requireObject(networkRelay, 'networkRelay');
   requireObject(cleanupVerification, 'cleanupVerification');
+  requireObject(rfbImage, 'rfbImage');
+  requireObject(lbabusHostStage, 'lbabusHostStage');
+  requireObject(lbabusContainer, 'lbabusContainer');
   requireObject(sources, 'sources');
   if (typeof tightVncLog !== 'string' || tightVncLog.length === 0) {
     throw new Error('tightVncLog is required');
@@ -135,6 +147,9 @@ export function deriveTransportReplay({
   }
   if (failureReceipt.failedGate !== 3 || failureReceipt.classification !== 'black-or-uniform-framebuffer') {
     throw new Error('source must be the preserved Gate 3 black-frame result');
+  }
+  if (failureReceipt.transportOnly !== true || failureReceipt.labviewLaunchTriggered !== false) {
+    throw new Error('source must preserve the transport-only no-LabVIEW boundary');
   }
 
   const image = failureReceipt.environment?.image;
@@ -220,6 +235,54 @@ export function deriveTransportReplay({
     || analysis.meaningfulLumaPopulations !== 1
   ) {
     throw new Error('black framebuffer classification is missing or contradictory');
+  }
+  const acquisition = requireObject(failureReceipt.imageAcquisition, 'failureReceipt.imageAcquisition');
+  const imageSource = sources.rfbImage;
+  const imageManifest = manifest.files?.find((entry) => entry.path === acquisition.path);
+  if (
+    acquisition.schema !== 'labview-benchmark-actor/windows-container-rfb-image@1'
+    || acquisition.status !== 'acquired-but-unusable'
+    || acquisition.usable !== false
+    || acquisition.visualClaim !== false
+    || acquisition.source !== 'run-owned-container-tightvnc-rfb'
+    || acquisition.sourceContainerId !== failureReceipt.environment.container.id
+    || acquisition.upstreamEndpoint?.host !== networkPreflight.target.ipAddress
+    || acquisition.upstreamEndpoint?.port !== 5900
+    || acquisition.hostRelayEndpoint?.address !== '127.0.0.1'
+    || acquisition.hostRelayEndpoint?.port !== networkRelay.bound.port
+    || acquisition.rfb?.version !== rfb.rfbVersion
+    || acquisition.rfb.securityType !== rfb.securityType
+    || acquisition.rfb.width !== rfb.width
+    || acquisition.rfb.height !== rfb.height
+    || acquisition.rfb.updateCountAtSample < 1
+    || acquisition.rfb.updateCountAtSample > rfb.updateCount
+    || acquisition.framePollCount !== failureReceipt.frameCount
+    || acquisition.path !== SOURCE_FILE_BY_ROLE.rfbImage
+    || acquisition.size !== imageSource.size
+    || acquisition.pngSha256 !== imageSource.sha256
+    || imageManifest?.size !== imageSource.size
+    || imageManifest?.sha256 !== imageSource.sha256
+    || rfbImage.width !== rfb.width
+    || rfbImage.height !== rfb.height
+    || rfbImage.rgbaSha256 !== acquisition.rgbaSha256
+    || rfbImage.analysis?.passed !== false
+    || rfbImage.analysis.blackFraction !== 1
+    || rfbImage.analysis.meaningfulLumaPopulations !== 1
+    || rfbImage.analysis.reason !== 'single-color-or-single-luminance-population'
+  ) {
+    throw new Error('retained container RFB image proof is missing or contradictory');
+  }
+  if (
+    lbabusHostStage.schema !== 'labview-benchmark-actor/windows-container-lbabus-stage@1'
+    || lbabusContainer.schema !== 'labview-benchmark-actor/windows-container-lbabus@1'
+    || lbabusContainer.status !== 'passed'
+    || lbabusContainer.version !== lbabusHostStage.version
+    || lbabusContainer.payloadSha256 !== lbabusHostStage.payloadSha256
+    || failureReceipt.environment.lbabus?.hostStage?.payloadSha256 !== lbabusHostStage.payloadSha256
+    || failureReceipt.environment.lbabus?.containerProbe?.payloadSha256 !== lbabusContainer.payloadSha256
+    || !lbabusContainer.capabilities?.some((line) => /\[yes\]\s+labview-cli/i.test(line))
+  ) {
+    throw new Error('in-container lbabus capability proof is missing or contradictory');
   }
   if (!/console desktop has 0 displays/i.test(tightVncLog)) {
     throw new Error('TightVNC zero-display log proof is missing');
@@ -313,6 +376,7 @@ export function deriveTransportReplay({
       updateCount,
       observedFramePollCount: framePollCount,
       retainedVisualFrameCount: 0,
+      retainedDiagnosticFrameCount: 1,
       authenticated: true,
       traversedLoopbackRelay: true,
     },
@@ -324,11 +388,22 @@ export function deriveTransportReplay({
       tightVncZeroDisplayMode,
       interactiveDisplayAvailable: false,
       screenshotBenchmarkAvailable: false,
+      diagnosticImage: {
+        acquiredFromContainerRfb: true,
+        usable: false,
+        visualClaim: false,
+        path: acquisition.path,
+        size: acquisition.size,
+        pngSha256: acquisition.pngSha256,
+        rgbaSha256: acquisition.rgbaSha256,
+      },
     },
     capabilities: {
       networkRelay: 'supported-and-proven',
       rfbProtocolAndAuthentication: 'supported-and-proven',
       framebufferPayloadTransport: 'supported-and-proven',
+      containerRfbImageAcquisition: 'supported-but-unusable-black-frame',
+      lbabusInContainer: 'supported-and-proven',
       interactiveWindowsContainerDisplay: 'unsupported-by-windows-container-platform',
       labviewVisualLaunchBenchmark: 'unsupported-by-windows-container-platform',
     },
@@ -412,6 +487,12 @@ export function validateTransportReplay(record) {
     || !['blank-screen', 'desktop-size-then-black-update'].includes(
       record.framebuffer.tightVncZeroDisplayMode,
     )
+    || record.framebuffer.diagnosticImage?.acquiredFromContainerRfb !== true
+    || record.framebuffer.diagnosticImage.usable !== false
+    || record.framebuffer.diagnosticImage.visualClaim !== false
+    || record.rfb.retainedDiagnosticFrameCount !== 1
+    || record.capabilities?.containerRfbImageAcquisition !== 'supported-but-unusable-black-frame'
+    || record.capabilities?.lbabusInContainer !== 'supported-and-proven'
   ) {
     throw new Error('transport replay RFB/framebuffer boundary is invalid');
   }

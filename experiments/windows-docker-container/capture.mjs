@@ -29,6 +29,10 @@ import { createLoopbackTcpRelay } from './tcp-relay.mjs';
 
 const execFileAsync = promisify(execFile);
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+const log = (message, details) => {
+  const suffix = details === undefined ? '' : ` ${JSON.stringify(details)}`;
+  console.log(`${new Date().toISOString()} [host-capture] ${message}${suffix}`);
+};
 
 function parseArgs(argv) {
   const out = {};
@@ -193,6 +197,14 @@ async function main() {
   }
   const password = readFileSync(passwordFile, 'utf8').trim();
   if (!password) throw new Error('VNC password file is empty');
+  log('capture initialized', {
+    runId: environment.runId,
+    containerId,
+    transportOnly,
+    desktopTarget: environment.container.desktopTarget,
+    fps,
+    readinessTimeoutMs,
+  });
 
   const processOrigin = process.hrtime.bigint();
   const nowMs = () => Number(process.hrtime.bigint() - processOrigin) / 1e6;
@@ -253,6 +265,11 @@ async function main() {
       };
       relayCleanupCompleted = true;
       writeRelayEvidence();
+      log('loopback relay closed', {
+        bound: relayRecord.bound,
+        bytes: relayRecord.stats?.totalBytes,
+        listenerBindingsAfterClose,
+      });
     } catch (error) {
       relayRecord = {
         ...relayRecord,
@@ -323,6 +340,11 @@ async function main() {
           classification = 'desktop-has-zero-displays';
           // This is the explicit transport baseline: retain the failed display
           // evidence and continue only far enough to exercise authenticated RFB.
+          log('retaining failed display precondition for transport-only probe', {
+            qualifiedDesktop: display.api.context?.qualifiedDesktop,
+            monitorCount: 0,
+            localGdiReason: localGdiAnalysis?.reason,
+          });
         } else {
           classification = 'desktop-has-zero-displays';
           throw new Error('selected desktop has zero EnumDisplayMonitors rectangles');
@@ -357,6 +379,7 @@ async function main() {
         expectedContainerId: containerId,
         expectedTarget: networkPreflight.target,
       });
+      log('live container network target verified', selectedNetwork.target);
     } catch (error) {
       classification = 'container-network-target-changed';
       failedGate = 2;
@@ -383,6 +406,11 @@ async function main() {
         stats: relay.stats(),
       };
       writeRelayEvidence();
+      log('loopback relay ready', {
+        bound,
+        upstream: relayRecord.upstream,
+        listenerBindings,
+      });
     } catch (error) {
       classification = 'relay-bind-failure';
       failedGate = 2;
@@ -402,6 +430,7 @@ async function main() {
         readinessTimeoutMs,
         `RFB full framebuffer update timed out after ${readinessTimeoutMs} ms`,
       );
+      log('RFB framebuffer ready', connectionInfo);
     } catch (error) {
       const relayStats = relay.stats();
       ({ classification, failedGate } = classifyRfbStartFailure(error, relayStats));
@@ -427,6 +456,7 @@ async function main() {
       stats: relayStats,
     };
     writeRelayEvidence();
+    log('bidirectional RFB traffic proven', relayStats);
     if (connectionInfo.securityType !== 2) {
       classification = 'rfb-authentication-not-negotiated';
       failedGate = 3;
@@ -438,6 +468,7 @@ async function main() {
     let previousDhash = null;
     let previousCacheFile = null;
     let previousCacheFrameIndex = null;
+    let lastLoggedSecond = -1;
     sampler = startGovernedSampler({
       fps,
       nowMs,
@@ -475,6 +506,19 @@ async function main() {
           cacheFile,
           cacheFrameIndex,
         });
+        const elapsedSecond = Math.floor(ms / 1000);
+        if (frames.length === 1 || elapsedSecond > lastLoggedSecond || desc.dhash64 !== previousDhash) {
+          lastLoggedSecond = elapsedSecond;
+          log('RFB frame acquired from container endpoint', {
+            frameIndex: frames.length - 1,
+            width,
+            height,
+            rgbaBytes: snapshot.length,
+            dhashHex: desc.dhash64,
+            rfbUpdateCount: stream.updateCount(),
+            phaseErrorMs,
+          });
+        }
         previousDhash = desc.dhash64;
         previousCacheFile = cacheFile;
         previousCacheFrameIndex = cacheFrameIndex;
@@ -498,10 +542,60 @@ async function main() {
     const minimumBaselineFrames = Math.max(3, Math.ceil(fps));
     while ((frames.length < minimumBaselineFrames || resourceSamples.length < 1) && nowMs() < baselineDeadline) await sleep(25);
     if (frames.length < minimumBaselineFrames) throw new Error('capture did not produce the required pre-launch baseline frames');
+    log('pre-launch acquisition baseline complete', {
+      framePolls: frames.length,
+      rfbUpdates: stream.updateCount(),
+      resourceSamples: resourceSamples.length,
+    });
 
     const initialDecoded = decodePng(readFileSync(frames[0].cacheFile));
     const initialAnalysis = analyzePixels(initialDecoded.rgba, initialDecoded.width, initialDecoded.height);
     if (transportOnly) {
+      const relativeImagePath = 'frames/transport-baseline-rfb.png';
+      const retainedImagePath = path.join(evidenceDir, relativeImagePath);
+      copyFileSync(frames[0].cacheFile, retainedImagePath);
+      const retainedPng = readFileSync(retainedImagePath);
+      const retainedDecoded = decodePng(retainedPng);
+      const retainedAnalysis = analyzePixels(retainedDecoded.rgba, retainedDecoded.width, retainedDecoded.height);
+      const imageAcquisition = {
+        schema: 'labview-benchmark-actor/windows-container-rfb-image@1',
+        status: retainedAnalysis.passed ? 'acquired-nonuniform-but-not-interpreted' : 'acquired-but-unusable',
+        usable: false,
+        visualClaim: false,
+        source: 'run-owned-container-tightvnc-rfb',
+        sourceContainerId: containerId,
+        upstreamEndpoint: {
+          host: selectedNetwork.target.ipAddress,
+          port: 5900,
+          networkName: selectedNetwork.target.networkName,
+        },
+        hostRelayEndpoint: relayRecord.bound,
+        rfb: {
+          version: connectionInfo.rfbVersion,
+          securityType: connectionInfo.securityType,
+          width: retainedDecoded.width,
+          height: retainedDecoded.height,
+          updateCountAtSample: frames[0].rfbUpdateCount,
+        },
+        frameIndex: frames[0].index,
+        framePollCount: frames.length,
+        monotonicMs: frames[0].ms,
+        wallTime: frames[0].wallTime,
+        dhashHex: frames[0].dhashHex,
+        path: relativeImagePath,
+        size: statSync(retainedImagePath).size,
+        pngSha256: sha256(retainedImagePath),
+        rgbaSha256: createHash('sha256').update(retainedDecoded.rgba).digest('hex'),
+        analysis: retainedAnalysis,
+      };
+      log('retained container RFB image evidence', {
+        path: imageAcquisition.path,
+        size: imageAcquisition.size,
+        pngSha256: imageAcquisition.pngSha256,
+        dimensions: `${retainedDecoded.width}x${retainedDecoded.height}`,
+        blackFraction: retainedAnalysis.blackFraction,
+        usable: imageAcquisition.usable,
+      });
       classification = initialAnalysis.passed
         ? 'transport-only-nonuniform-framebuffer'
         : 'black-or-uniform-framebuffer';
@@ -513,8 +607,14 @@ async function main() {
       ), {
         initialAnalysis,
         localGdiAnalysis,
+        imageAcquisition,
         transportOnly: true,
         labviewLaunchTriggered: false,
+      });
+      log('transport-only boundary reached; LabVIEW launch suppressed', {
+        classification,
+        labviewLaunchTriggered: false,
+        imageStatus: imageAcquisition.status,
       });
       return 3;
     }

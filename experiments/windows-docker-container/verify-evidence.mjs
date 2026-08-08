@@ -13,6 +13,10 @@ function sha256(file) {
   return createHash('sha256').update(readFileSync(file)).digest('hex');
 }
 
+function sha256Bytes(bytes) {
+  return createHash('sha256').update(bytes).digest('hex');
+}
+
 function atomicJson(file, value) {
   const temp = `${file}.${process.pid}.tmp`;
   writeFileSync(temp, `${JSON.stringify(value, null, 2)}\n`, 'utf8');
@@ -167,6 +171,64 @@ function verify(root) {
         assert.equal(sha256(localPng), display.localGdi.sha256, 'local GDI PNG hash mismatch');
         assert.equal(analyzePixels(local.rgba, local.width, local.height).passed, display.localGdi.analysis.passed);
       }
+    }
+    if (failure.transportOnly === true) {
+      const acquisition = failure.imageAcquisition;
+      const lbabusStage = readJson(root, 'lbabus-host-stage.json');
+      const lbabusContainer = readJson(root, 'lbabus-container.json');
+      assert.equal(failure.environment?.container?.transportOnly, true, 'transport-only failure environment disagrees');
+      assert.equal(failure.environment?.container?.desktopTarget, 'WinSta0', 'transport-only image must come from WinSta0 baseline');
+      assert.equal(failure.labviewLaunchTriggered, false, 'transport-only image acquisition launched LabVIEW');
+      assert.ok(failure.frameCount > 0, 'transport-only image acquisition has no frame polls');
+      assert.equal(failure.rfb?.securityType, 2, 'transport-only image acquisition lacked VNC authentication');
+      assert.ok(failure.rfb?.updateCount > 0, 'transport-only image acquisition has no RFB updates');
+      assert.equal(acquisition?.schema, 'labview-benchmark-actor/windows-container-rfb-image@1');
+      assert.ok(
+        ['acquired-but-unusable', 'acquired-nonuniform-but-not-interpreted'].includes(acquisition.status),
+        'transport-only image acquisition status is invalid',
+      );
+      assert.equal(acquisition.usable, false, 'transport-only diagnostic image cannot be marked usable');
+      assert.equal(acquisition.visualClaim, false, 'transport-only diagnostic image cannot make a visual claim');
+      assert.equal(acquisition.source, 'run-owned-container-tightvnc-rfb');
+      assert.equal(acquisition.sourceContainerId, failure.environment.container.id, 'image source container identity mismatch');
+      assert.equal(acquisition.upstreamEndpoint.host, failure.network.target.ipAddress, 'image upstream host mismatch');
+      assert.equal(acquisition.upstreamEndpoint.port, 5900, 'image upstream port mismatch');
+      assert.equal(acquisition.hostRelayEndpoint.address, '127.0.0.1', 'image did not traverse the loopback relay');
+      assert.equal(acquisition.hostRelayEndpoint.port, failure.relay.bound.port, 'image relay port mismatch');
+      assert.equal(acquisition.rfb.version, failure.rfb.rfbVersion, 'image RFB protocol mismatch');
+      assert.equal(acquisition.rfb.version, '3.8', 'image RFB protocol is not 3.8');
+      assert.equal(acquisition.rfb.securityType, failure.rfb.securityType, 'image RFB security mismatch');
+      assert.ok(acquisition.rfb.updateCountAtSample > 0, 'retained image predates the first RFB update');
+      assert.equal(acquisition.path, 'frames/transport-baseline-rfb.png', 'unexpected transport image path');
+      const imagePath = path.join(root, acquisition.path);
+      const imageManifest = manifest.files.find((entry) => entry.path === acquisition.path);
+      assert.ok(imageManifest, 'transport image is absent from the evidence manifest');
+      assert.equal(statSync(imagePath).size, acquisition.size, 'transport image size mismatch');
+      assert.equal(sha256(imagePath), acquisition.pngSha256, 'transport image PNG hash mismatch');
+      assert.equal(imageManifest.sha256, acquisition.pngSha256, 'manifest transport image hash mismatch');
+      const decoded = decodePng(readFileSync(imagePath));
+      assert.equal(decoded.width, acquisition.rfb.width, 'transport image width mismatch');
+      assert.equal(decoded.height, acquisition.rfb.height, 'transport image height mismatch');
+      assert.equal(decoded.width, failure.rfb.width, 'transport image width disagrees with RFB negotiation');
+      assert.equal(decoded.height, failure.rfb.height, 'transport image height disagrees with RFB negotiation');
+      assert.equal(sha256Bytes(decoded.rgba), acquisition.rgbaSha256, 'transport image RGBA hash mismatch');
+      assert.deepEqual(
+        analyzePixels(decoded.rgba, decoded.width, decoded.height),
+        acquisition.analysis,
+        'transport image pixel analysis mismatch',
+      );
+      assert.equal(acquisition.analysis.passed, false, 'transport-only diagnostic image unexpectedly passed visual proof');
+      assert.equal(lbabusStage.schema, 'labview-benchmark-actor/windows-container-lbabus-stage@1');
+      assert.equal(lbabusContainer.schema, 'labview-benchmark-actor/windows-container-lbabus@1');
+      assert.equal(lbabusContainer.status, 'passed', 'container lbabus capability probe did not pass');
+      assert.equal(lbabusContainer.version, lbabusStage.version, 'container lbabus version mismatch');
+      assert.equal(lbabusContainer.payloadSha256, lbabusStage.payloadSha256, 'container lbabus payload hash mismatch');
+      assert.equal(failure.environment.lbabus.hostStage.payloadSha256, lbabusStage.payloadSha256);
+      assert.equal(failure.environment.lbabus.containerProbe.payloadSha256, lbabusContainer.payloadSha256);
+      assert.ok(
+        lbabusContainer.capabilities.some((line) => /\[yes\]\s+labview-cli/i.test(line)),
+        'container lbabus capability evidence did not detect LabVIEWCLI',
+      );
     }
     return { outcome: failure.outcome, failedGate: failure.failedGate, files: manifest.files.length };
   }
