@@ -16,6 +16,9 @@ pixels are written as `inconclusive` with a nonzero exit code.
 - The expected immutable image ID:
   `sha256:f45c639a201f51875465a0d02aa69e65a3630054e564c8724c105f2e1b5eee30`.
 - Node.js available as `node`.
+- .NET 8 SDK available as `dotnet`. The host publishes the repository's
+  `lbabus` project into the ephemeral read-only container mount; the pinned image
+  already contains the .NET 8 runtime.
 - Windows PowerShell 5.1 or PowerShell 7.
 - Enough free space for the disposable container and run evidence.
 - LabVIEW must already be installed in the image. This experiment does not
@@ -54,6 +57,12 @@ powershell.exe -NoLogo -NoProfile -ExecutionPolicy Bypass `
 Defaults are process isolation, the inherited container GUI context, TightVNC's
 standard GDI driver, 12 fps, a 60-second post-trigger capture, the existing
 settle window of 8 frames, and dHash Hamming tolerance 2.
+
+The console is intentionally verbose. Timestamped lines expose Docker command
+boundaries, `lbabus` publication and in-container capabilities, desktop/display
+diagnostics, TightVNC readiness, relay endpoints, RFB negotiation, sampled frame
+dimensions/update counts, retained image hashes, and cleanup. Secret values are
+never printed.
 
 Useful experiment controls:
 
@@ -158,6 +167,21 @@ An unsuccessful run contains `failure-receipt.json` with the failed gate,
 classification, diagnostics, image provenance, and cleanup receipt. Early
 platform failures may not have framebuffer or benchmark files.
 
+A transport-only run also retains:
+
+- `lbabus-host-stage.json` and `lbabus-container.json`, proving the exact
+  repository-built `lbabus` payload executed inside the container;
+- `container-debug.log`, the container-side verbose trace streamed into the
+  host console;
+- `frames/transport-baseline-rfb.png`, the PNG encoded from bytes received from
+  the run-owned container's TightVNC RFB endpoint.
+
+That diagnostic PNG is verified by size, PNG SHA-256, decoded-RGBA SHA-256,
+negotiated dimensions, update count, source container ID, private upstream
+endpoint, and loopback relay endpoint. If its pixels are black or uniform it is
+recorded as `usable=false` and `visualClaim=false`; retaining a valid PNG does
+not turn it into LabVIEW or interactive-desktop evidence.
+
 ## Validation
 
 Deterministic checks:
@@ -196,6 +220,9 @@ requires successful cleanup evidence.
 - VNC authentication remains enabled.
 - The eight-character VNC secret is generated per run, stored only in a
   restricted temporary mount, never printed, and removed during cleanup.
+- `lbabus` is used in-container only for version and capability evidence. No
+  bus listener is opened, no coordination message is sent, and image bytes
+  remain in the run evidence mount.
 - Application-mode password encoding and registry names are taken from the
   official TightVNC 2.8.81 GPL source (`VncPassCrypt.cpp`,
   `Configurator.cpp`, and `NamingDefs.cpp`).
@@ -399,6 +426,101 @@ new authoritative Microsoft or vendor documentation explicitly supports an
 interactive display path inside the container session. Do not install a
 speculative virtual-display driver, share an undocumented display GUID, enable
 test-signing, or change Secure Boot.
+
+## CI-safe TightVNC/RFB transport replay
+
+The platform-negative display result does not prevent deterministic CI
+benchmarking of the proven transport layer. The committed replay receipt is
+[decisions/windows-container-rfb-transport-replay.json](decisions/windows-container-rfb-transport-replay.json),
+schema `labview-benchmark-actor/windows-container-rfb-transport-replay@1`.
+
+Build and verify it without Docker, Windows, a VNC listener, or a secret:
+
+```powershell
+node .\experiments\windows-docker-container\build-transport-replay.mjs
+node .\experiments\windows-docker-container\verify-transport-replay.mjs `
+  .\experiments\windows-docker-container\decisions\windows-container-rfb-transport-replay.json
+```
+
+The replay hashes and re-derives the retained live transport-only evidence,
+including the source-bound diagnostic PNG and in-container `lbabus` records,
+then encodes six milestone-only MPRR capture-ring packets:
+
+1. direct container-network probe complete;
+2. loopback relay ready;
+3. authenticated RFB traversed;
+4. framebuffer classified;
+5. relay closed;
+6. cleanup proven.
+
+The MPRR packets carry `dhash64=0`, encode **zero visual frames**, and use the
+workload marker range (`milestoneId` 5–10). Their 100 ns ticks are reconstructed
+from relative UTC evidence ordering for deterministic replay; they are not a
+live monotonic performance authority. Only `directProbeMs` and
+`relayCleanupMs` retain their original host-monotonic timing authority.
+
+Current replay metrics:
+
+- direct private-network probe: `1.4808 ms`;
+- relay cleanup: `1.0411 ms`;
+- authenticated RFB `3.8`, VNC security type `2`;
+- relay bytes: `102` downstream-to-upstream and `6,291,575`
+  upstream-to-downstream (`6,291,677` total);
+- three RFB updates and 18 observed frame polls;
+- uniformly black framebuffer, `blackFraction=1`;
+- one retained, verified diagnostic RFB PNG with SHA-256
+  `6ec227dca4c2663c781fed4748f9f10fedf7290bf7a8fffe2d4e05f81790e4cd`;
+- retained MPRR visual frames, usable screenshots, fingerprints, `launchMs`,
+  and visual settle metrics: **none**.
+
+The benchmark outcome is
+`transport-supported-framebuffer-unavailable`. It proves the relay, RFB
+authentication, payload traversal, packet serialization, and cleanup. It
+cannot be used to claim an interactive Windows-container desktop or a visual
+LabVIEW benchmark.
+
+### Live transport-only demonstration
+
+`-TransportOnly` is an explicit `WinSta0` baseline mode. It bypasses only the
+already-proven local display precondition, starts TightVNC, authenticates RFB,
+captures enough baseline frames to classify the framebuffer, retains one
+source-bound PNG decoded from the RFB stream, and then exits Gate 3 **before any
+LabVIEW launch**:
+
+```powershell
+powershell.exe -NoLogo -NoProfile -ExecutionPolicy Bypass `
+  -File .\experiments\windows-docker-container\run-experiment.ps1 `
+  -Isolation process `
+  -DesktopTarget WinSta0 `
+  -TightVncCaptureMode StandardGdi `
+  -TransportOnly `
+  -TightVncInstaller D:\lba-vm-assets\tightvnc-2.8.81-gpl-setup-64bit.msi
+```
+
+The expected script exit is nonzero because the required visual proof remains
+unavailable. A valid transport demonstration has:
+
+- `failedGate=3`, `classification=black-or-uniform-framebuffer`;
+- authenticated RFB security type `2`;
+- positive traffic in both relay directions;
+- `transportOnly=true`, `labviewLaunchTriggered=false`;
+- `frames/transport-baseline-rfb.png` is present and hash-verified against the
+  exact source container/RFB/relay chain;
+- `imageAcquisition.usable=false`, `imageAcquisition.visualClaim=false`, and
+  `blackFraction=1` for the known zero-display baseline;
+- the staged `lbabus` payload executes inside the container and detects
+  `LabVIEWCLI`;
+- container, relay, VNC listener, installer, and secret cleanup proven.
+
+Live run `20260807T235142020Z-dfc7f09404` demonstrated this path on the exact
+image. It ran `lbabus` 0.15.0 inside the container, negotiated RFB `3.8`/VNC
+Authentication at `1024x768`, delivered `6,291,677` relay bytes, observed three
+RFB updates and 18 frame polls, retained the 4,981-byte diagnostic PNG, encoded
+zero replay visual frames, did not launch LabVIEW, and removed all run-owned
+state. The PNG's decoded RGBA SHA-256 is
+`d2cdb07798b599560e35abad5e4f87f4205ee60e72e14d850b9590f801080978`.
+The image-bound replay SHA-256 is
+`8737ce0f5e310d4952860d05452a0ccb355826925d9854edcea224b5450ea740`.
 
 ## Probe-only isolation evidence
 

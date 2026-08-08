@@ -8,6 +8,8 @@ param(
   [string]$OutputPath = 'C:\evidence\launch-diagnostics.json',
   [ValidateSet('Inherited', 'WinSta0')][string]$DesktopTarget = 'Inherited',
   [ValidateSet('StandardGdi', 'D3d')][string]$TightVncCaptureMode = 'StandardGdi',
+  [switch]$TransportOnly,
+  [string]$LbaBusPath,
   [ValidatePattern('^[A-Za-z0-9._-]+$')][string]$RunId = 'standalone',
   [ValidateRange(15, 300)][int]$WindowTimeoutSeconds = 45,
   [ValidateRange(5, 30)][int]$AliveHoldSeconds = 10
@@ -22,16 +24,102 @@ $LabViewExe = 'C:\Program Files\National Instruments\LabVIEW 2026\LabVIEW.exe'
 $RegistryPath = 'HKCU:\Software\TightVNC\Server'
 $ServiceOnlyRegistryPath = 'HKLM:\SOFTWARE\TightVNC\Server\ServiceOnly'
 $StopSignal = 'C:\evidence\stop.signal'
+if ($TransportOnly -and $DesktopTarget -ne 'WinSta0') {
+  throw 'TransportOnly is restricted to the explicit WinSta0 baseline.'
+}
 
 function Write-BootstrapLog([string]$Message) {
-  Write-Host ('{0} [container-bootstrap] {1}' -f [DateTime]::UtcNow.ToString('o'), $Message)
+  $line = '{0} [container-bootstrap] {1}' -f [DateTime]::UtcNow.ToString('o'), $Message
+  Write-Host $line
+  if (Test-Path -LiteralPath 'C:\evidence') {
+    try {
+      [System.IO.File]::AppendAllText(
+        'C:\evidence\container-debug.log',
+        "$line`r`n",
+        [System.Text.UTF8Encoding]::new($false)
+      )
+    } catch [System.IO.IOException] {
+      Write-Warning "Could not append the container debug log: $($_.Exception.Message)"
+    }
+  }
 }
 
 function Write-AtomicJson([string]$Path, $Value) {
   $temp = "$Path.$PID.tmp"
   $json = $Value | ConvertTo-Json -Depth 20
   [System.IO.File]::WriteAllText($temp, "$json`n", [System.Text.UTF8Encoding]::new($false))
-  Move-Item -LiteralPath $temp -Destination $Path -Force
+  try {
+    Move-Item -LiteralPath $temp -Destination $Path -Force
+  } catch [System.IO.DirectoryNotFoundException] {
+    # Windows Docker bind mounts can reject an otherwise same-directory rename.
+    # Preserve the temp-write discipline and use an overwrite copy for that
+    # mount-specific case rather than failing before evidence readiness.
+    [System.IO.File]::Copy($temp, $Path, $true)
+    Remove-Item -LiteralPath $temp -Force
+  }
+}
+
+function Invoke-NativeCapture([string]$FilePath, [string[]]$Arguments) {
+  $previousErrorAction = $ErrorActionPreference
+  try {
+    $ErrorActionPreference = 'Continue'
+    $output = @(& $FilePath @Arguments 2>&1 | ForEach-Object { "$_" })
+    $exitCode = $LASTEXITCODE
+  } finally {
+    $ErrorActionPreference = $previousErrorAction
+  }
+  return [pscustomobject]@{ ExitCode = $exitCode; Output = $output }
+}
+
+function Invoke-LbaBusProbe {
+  if (-not $LbaBusPath) {
+    Write-BootstrapLog 'lbabus container probe is not configured.'
+    return $null
+  }
+  if (-not (Test-Path -LiteralPath $LbaBusPath)) {
+    throw "Mounted lbabus payload is missing at '$LbaBusPath'."
+  }
+  $dotnet = Get-Command dotnet -ErrorAction SilentlyContinue
+  if (-not $dotnet) {
+    throw 'The pinned image does not contain the .NET runtime required by lbabus.'
+  }
+
+  Write-BootstrapLog "Running the mounted lbabus payload with '$($dotnet.Source)'."
+  $versionResult = Invoke-NativeCapture $dotnet.Source @($LbaBusPath, 'version')
+  foreach ($line in $versionResult.Output) { Write-BootstrapLog "[lbabus version] $line" }
+  if ($versionResult.ExitCode -ne 0) {
+    throw "lbabus version failed inside the container with exit code $($versionResult.ExitCode)."
+  }
+  $version = @($versionResult.Output | Where-Object { $_.Trim() } | Select-Object -Last 1)[0].Trim()
+  if ($version -notmatch '^\d+\.\d+\.\d+$') {
+    throw "lbabus returned an invalid version '$version' inside the container."
+  }
+
+  $capabilitiesResult = Invoke-NativeCapture $dotnet.Source @($LbaBusPath, 'capabilities')
+  foreach ($line in $capabilitiesResult.Output) { Write-BootstrapLog "[lbabus capabilities] $line" }
+  if ($capabilitiesResult.ExitCode -ne 0) {
+    throw "lbabus capabilities failed inside the container with exit code $($capabilitiesResult.ExitCode)."
+  }
+  $runtimeResult = Invoke-NativeCapture $dotnet.Source @('--list-runtimes')
+  if ($runtimeResult.ExitCode -ne 0) {
+    throw "dotnet --list-runtimes failed inside the container with exit code $($runtimeResult.ExitCode)."
+  }
+
+  $record = [ordered]@{
+    schema = 'labview-benchmark-actor/windows-container-lbabus@1'
+    wallTime = [DateTime]::UtcNow.ToString('o')
+    status = 'passed'
+    version = $version
+    payloadPath = $LbaBusPath
+    payloadSha256 = (Get-FileHash -LiteralPath $LbaBusPath -Algorithm SHA256).Hash.ToLowerInvariant()
+    dotnetPath = $dotnet.Source
+    dotnetRuntimes = @($runtimeResult.Output)
+    capabilitiesExitCode = $capabilitiesResult.ExitCode
+    capabilities = @($capabilitiesResult.Output)
+  }
+  Write-AtomicJson 'C:\evidence\lbabus-container.json' $record
+  Write-BootstrapLog "lbabus container capability evidence passed (version $version, payload SHA-256 $($record.payloadSha256))."
+  return $record
 }
 
 if ($Action -in @('Serve', 'DisplayProbe', 'LaunchLabVIEW')) {
@@ -239,13 +327,17 @@ function Invoke-Serve {
   $desktopProbe = $null
   $displayRecord = $null
   $desktopContext = $null
+  $lbabusRecord = $null
   $failureClassification = 'container-listener-unavailable'
   try {
+    Write-BootstrapLog "Serve action started: runId=$RunId, desktopTarget=$DesktopTarget, captureMode=$TightVncCaptureMode, transportOnly=$([bool]$TransportOnly)."
+    $lbabusRecord = Invoke-LbaBusProbe
     $desktopContext = [LbaDesktop]::Configure($DesktopTarget)
     $startupDesktop = if ($desktopContext.explicitStartupDesktop) { $desktopContext.explicitStartupDesktop } else { '<inherited>' }
     Write-BootstrapLog "Selected $DesktopTarget desktop '$($desktopContext.qualifiedDesktop)' (explicit startup desktop=$startupDesktop)."
     $displayRecord = Get-DisplayRecord
     Write-AtomicJson 'C:\evidence\display-diagnostics.json' $displayRecord
+    Write-BootstrapLog "Display diagnostics: getDcSucceeded=$($displayRecord.api.getDcSucceeded), monitors=$(@($displayRecord.api.monitorRectangles).Count), virtual=$($displayRecord.api.virtualWidth)x$($displayRecord.api.virtualHeight), primary=$($displayRecord.api.primaryWidth)x$($displayRecord.api.primaryHeight)."
     if (-not $displayRecord.api.getDcSucceeded) {
       $failureClassification = 'desktop-screen-dc-unavailable'
       throw "GetDC(NULL) failed with Win32 error $($displayRecord.api.getDcError) on '$($desktopContext.qualifiedDesktop)'."
@@ -260,10 +352,13 @@ function Invoke-Serve {
       exitCode = $desktopProbe.exitCode
       window = $desktopProbe.window
     }
+    Write-BootstrapLog "Desktop probe: pid=$($desktopProbe.process.Id), session=$($desktopProbe.process.SessionId), visible=$($desktopProbe.visible), exited=$($desktopProbe.exited)."
     $zeroDisplays = @($displayRecord.api.monitorRectangles).Count -eq 0
     $localGdiPath = 'C:\evidence\local-gdi-capture.png'
+    $localGdiCaptured = $false
     try {
       $localGdiAnalysis = [LbaDesktop]::CaptureScreen($localGdiPath)
+      $localGdiCaptured = $true
     } catch {
       $failureClassification = if ($zeroDisplays) { 'desktop-has-zero-displays' } else { 'desktop-local-gdi-capture-black' }
       $displayRecord.localGdi = [ordered]@{
@@ -273,17 +368,23 @@ function Invoke-Serve {
         captureMethod = 'GetDC(NULL)+BitBlt(SRCCOPY|CAPTUREBLT)+GetDIBits'
         error = $_.Exception.Message
       }
+      $localGdiAnalysis = $displayRecord.localGdi.analysis
       Write-AtomicJson 'C:\evidence\display-diagnostics.json' $displayRecord
-      throw
+      Write-BootstrapLog "Local GDI capture failed: zeroDisplays=$zeroDisplays, error=$($_.Exception.Message)"
+      if (-not ($TransportOnly -and $zeroDisplays)) { throw }
+      Write-BootstrapLog 'Transport-only mode retained the zero-display/local-GDI failure and will continue only to authenticated RFB image acquisition.'
     }
-    $displayRecord.localGdi = [ordered]@{
-      path = 'local-gdi-capture.png'
-      sha256 = (Get-FileHash -LiteralPath $localGdiPath -Algorithm SHA256).Hash.ToLowerInvariant()
-      analysis = $localGdiAnalysis
-      captureMethod = 'GetDC(NULL)+BitBlt(SRCCOPY|CAPTUREBLT)+GetDIBits'
+    if ($localGdiCaptured) {
+      $displayRecord.localGdi = [ordered]@{
+        path = 'local-gdi-capture.png'
+        sha256 = (Get-FileHash -LiteralPath $localGdiPath -Algorithm SHA256).Hash.ToLowerInvariant()
+        analysis = $localGdiAnalysis
+        captureMethod = 'GetDC(NULL)+BitBlt(SRCCOPY|CAPTUREBLT)+GetDIBits'
+      }
+      Write-BootstrapLog "Local GDI capture completed: passed=$($localGdiAnalysis.passed), reason=$($localGdiAnalysis.reason), SHA-256=$($displayRecord.localGdi.sha256)."
     }
     Write-AtomicJson 'C:\evidence\display-diagnostics.json' $displayRecord
-    if ($zeroDisplays) {
+    if ($zeroDisplays -and -not $TransportOnly) {
       $failureClassification = 'desktop-has-zero-displays'
       throw "EnumDisplayMonitors found zero displays on '$($desktopContext.qualifiedDesktop)'."
     }
@@ -294,11 +395,11 @@ function Invoke-Serve {
       $failureClassification = 'desktop-has-zero-displays'
       throw "Display metrics are degenerate on '$($desktopContext.qualifiedDesktop)'."
     }
-    if (-not $desktopProbe.visible -or $desktopProbe.exited) {
+    if ((-not $desktopProbe.visible -or $desktopProbe.exited) -and -not $TransportOnly) {
       $failureClassification = 'desktop-probe-window-unavailable'
       throw "The deterministic probe did not produce a visible window on '$($desktopContext.qualifiedDesktop)'."
     }
-    if (-not $localGdiAnalysis.passed) {
+    if (-not $localGdiAnalysis.passed -and -not $TransportOnly) {
       $failureClassification = 'desktop-local-gdi-capture-black'
       throw "Local GDI capture failed pixel proof: $($localGdiAnalysis.reason)."
     }
@@ -316,6 +417,7 @@ function Invoke-Serve {
       if ($actualHash -ne $ExpectedInstallerSha256.ToLowerInvariant()) {
         throw "TightVNC installer SHA-256 mismatch: expected '$ExpectedInstallerSha256', got '$actualHash'."
       }
+      Write-BootstrapLog "TightVNC installer identity passed: version=$TightVncVersion, SHA-256=$actualHash."
       Write-BootstrapLog 'Installing only the TightVNC Server feature (no service and no firewall exception).'
       $install = Start-Process -FilePath 'msiexec.exe' -ArgumentList @(
         '/i', "`"$installer`"", '/quiet', '/norestart',
@@ -328,6 +430,7 @@ function Invoke-Serve {
     if ($installedVersion -notmatch "^$([regex]::Escape($TightVncVersion))(\.|$)") {
       throw "Unexpected TightVNC product version '$installedVersion' (expected $TightVncVersion)."
     }
+    Write-BootstrapLog "TightVNC executable identity passed: path='$TightVncExe', productVersion=$installedVersion."
     if (Get-Service -Name 'tvnserver' -ErrorAction SilentlyContinue) {
       throw 'TightVNC unexpectedly registered a Windows service; application mode is required for this gate.'
     }
@@ -363,9 +466,11 @@ function Invoke-Serve {
       New-ItemProperty -Path $RegistryPath -Name $entry.Key -Value $entry.Value -PropertyType DWord -Force | Out-Null
     }
     Remove-ItemProperty -Path $RegistryPath -Name 'PasswordViewOnly' -ErrorAction SilentlyContinue
+    Write-BootstrapLog "TightVNC application settings written: RfbPort=5900, VNCAuth=1, HTTP=0, fileTransfers=0, UseD3D=$($settings.UseD3D), mirrorDriver=0, LogLevel=9."
 
     $vncProcessId = [LbaDesktop]::StartOnSelectedDesktop($TightVncExe, '-run', (Split-Path -Parent $TightVncExe))
     $vncProcess = Get-Process -Id $vncProcessId
+    Write-BootstrapLog "TightVNC process created: pid=$vncProcessId, session=$($vncProcess.SessionId), desktop='$($desktopContext.qualifiedDesktop)'; waiting for port 5900."
     $bootstrapSessionId = (Get-Process -Id $PID).SessionId
     if ($vncProcess.SessionId -ne $bootstrapSessionId) {
       throw "TightVNC session $($vncProcess.SessionId) does not match bootstrap session $bootstrapSessionId."
@@ -391,6 +496,8 @@ function Invoke-Serve {
         desktopContext = $desktopContext
       }
       display = $displayRecord
+      lbabus = $lbabusRecord
+      transportOnly = [bool]$TransportOnly
       vnc = [ordered]@{
         processId = $vncProcess.Id
         sessionId = $vncProcess.SessionId
@@ -418,11 +525,13 @@ function Invoke-Serve {
     }
     Write-BootstrapLog 'Graceful stop signal received.'
   } catch {
+    Write-BootstrapLog "Serve action failed: classification=$failureClassification, error=$($_.Exception.Message)"
     if (-not (Test-Path -LiteralPath 'C:\evidence\bootstrap-failure.json')) {
       Write-BootstrapFailure $failureClassification $_.Exception.Message $vncProcess $displayRecord
     }
     throw
   } finally {
+    Write-BootstrapLog 'Serve cleanup started.'
     if ($desktopProbe -and $desktopProbe.process -and -not $desktopProbe.process.HasExited) {
       Stop-Process -Id $desktopProbe.process.Id -Force -ErrorAction SilentlyContinue
     }
@@ -449,6 +558,7 @@ function Invoke-Serve {
       probeProcessStopped = -not $desktopProbe -or $desktopProbe.process.HasExited
       probeExecutableRemoved = -not $desktopProbe -or -not (Test-Path -LiteralPath $desktopProbe.executable)
     })
+    Write-BootstrapLog "Serve cleanup completed: probeStopped=$(-not $desktopProbe -or $desktopProbe.process.HasExited), probeExecutableRemoved=$(-not $desktopProbe -or -not (Test-Path -LiteralPath $desktopProbe.executable)), downloadedInstallerRemoved=$(-not ($downloadedInstaller -and (Test-Path -LiteralPath $downloadedInstaller)))."
   }
 }
 

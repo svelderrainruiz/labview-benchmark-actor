@@ -1,0 +1,8 @@
+{
+    "schema":  "labview-benchmark-actor/windows-container-lbabus-stage@1",
+    "wallTime":  "2026-08-07T23:53:51.9517458Z",
+    "sourceProject":  "tools/collab-cli/LbaBus.csproj",
+    "version":  "0.15.0",
+    "payload":  "C:\\run-secrets\\lbabus\\lbabus.dll",
+    "payloadSha256":  "5d0f8b2e97e4dc2cc07dcab6acf8cf272a4bc015212cb89aa15e12b75c3d81a5"
+}
