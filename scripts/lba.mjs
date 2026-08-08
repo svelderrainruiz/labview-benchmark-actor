@@ -423,7 +423,15 @@ export function readReviewerAllowlist() {
   try {
     const raw = JSON.parse(read('tools/collab-cli/reviewer-allowlist.json') || '{}');
     const out = {};
-    for (const [k, v] of Object.entries(raw)) if (k !== '_comment' && typeof v === 'string') out[k] = v;
+    for (const [k, v] of Object.entries(raw)) {
+      if (
+        k !== '_comment'
+        && (
+          typeof v === 'string'
+          || (Array.isArray(v) && v.length > 0 && v.every((key) => typeof key === 'string' && key.trim()))
+        )
+      ) out[k] = v;
+    }
     return out;
   } catch { return {}; }
 }
@@ -453,10 +461,14 @@ export function signingStatus({ reviewerId, reviewerKeyPath, keyExists, station,
   const problems = [];
   const id = String(reviewerId || '').trim();
   const st = station || STATIONS.UNKNOWN;
-  const enrolled = enrolledPublicKey != null && String(enrolledPublicKey).trim() !== '';
+  const enrolledKeys = (Array.isArray(enrolledPublicKey) ? enrolledPublicKey : [enrolledPublicKey])
+    .filter((key) => typeof key === 'string' && key.trim());
+  const enrolled = enrolledKeys.length > 0;
   const norm = (k) => String(k || '').replace(/-----(BEGIN|END) PUBLIC KEY-----/g, '').replace(/\s+/g, '');
   let keyMatch = 'unknown';
-  if (presentedPublicKey != null && enrolled) keyMatch = norm(presentedPublicKey) === norm(enrolledPublicKey) ? 'match' : 'mismatch';
+  if (presentedPublicKey != null && enrolled) {
+    keyMatch = enrolledKeys.some((key) => norm(presentedPublicKey) === norm(key)) ? 'match' : 'mismatch';
+  }
 
   if (!id) problems.push('no reviewerId configured (set labviewBenchmarkActor.reviewerId in the reviewer VM)');
   if (st === STATIONS.UNKNOWN) problems.push('could not locate the signing station or the enrolled key (VM not reachable and no host key configured)');
@@ -496,13 +508,23 @@ export function discoverSigningStation({ env = process.env, run } = {}) {
   if (pass) {
     try {
       const settings = `C:\\Users\\${user}\\AppData\\Roaming\\Code\\User\\settings.json`;
-      const gc = (inner) => exec('VBoxManage', ['guestcontrol', vm, '--username', user, '--password', pass, 'run', '--exe', 'C:\\Windows\\System32\\cmd.exe', '--wait-stdout', '--', 'cmd', '/c', inner]);
-      const cfg = JSON.parse(gc(`type "${settings}"`));
+      const ps = (inner) => exec('VBoxManage', [
+        'guestcontrol', vm, '--username', user, '--password', pass,
+        'run', '--exe', 'C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe',
+        '--wait-stdout', '--wait-stderr', '--',
+        '-NoLogo', '-NoProfile', '-NonInteractive', '-Command', inner,
+      ]);
+      const psLiteral = (value) => `'${String(value).replaceAll("'", "''")}'`;
+      const cfg = JSON.parse(ps(`Get-Content -LiteralPath ${psLiteral(settings)} -Raw`));
       const reviewerId = String(cfg['labviewBenchmarkActor.reviewerId'] || '').trim();
       const reviewerKeyPath = String(cfg['labviewBenchmarkActor.reviewerKeyPath'] || '').trim();
       let keyExists = null;
       if (reviewerKeyPath) {
-        try { keyExists = /(^|\s)YES(\s|$)/.test(gc(`if exist "${reviewerKeyPath}" (echo YES) else (echo NO)`)); } catch { keyExists = null; }
+        try {
+          keyExists = /(^|\s)YES(\s|$)/.test(ps(
+            `if (Test-Path -LiteralPath ${psLiteral(reviewerKeyPath)}) { 'YES' } else { 'NO' }`,
+          ));
+        } catch { keyExists = null; }
       }
       return { reviewerId, reviewerKeyPath: reviewerKeyPath || null, keyExists, station: STATIONS.VM, source: `reviewer VM "${vm}" VS Code settings.json` };
     } catch { /* VM not reachable / VBoxManage absent -> fall through to UNKNOWN */ }
@@ -634,16 +656,27 @@ export const COMMANDS = {
       try {
         const q = await queryMarketplaceExtension({ publisher, name });
         const r = assertPublished(q, { publisher, name, version });
-        if (!r.ok) { console.error(`\u2717 ${extId} ${version} NOT confirmed live: ${r.reason}`); process.exit(1); }
+        if (!r.ok) {
+          console.error(`\u2717 ${extId} ${version} NOT confirmed live: ${r.reason}`);
+          process.exitCode = 1;
+          return;
+        }
         const share = process.env.LBA_VM_SHARE || (process.env.HOME ? join(process.env.HOME, 'lba-vm-share') : '');
-        if (!share) { console.error('\u2717 Marketplace verification succeeded but no local share is configured; set HOME or LBA_VM_SHARE to persist resumable evidence'); process.exit(1); }
+        if (!share) {
+          console.error('\u2717 Marketplace verification succeeded but no local share is configured; set HOME or LBA_VM_SHARE to persist resumable evidence');
+          process.exitCode = 1;
+          return;
+        }
         const receiptPath = marketplaceVerificationPath(share, version);
         const receipt = buildMarketplaceVerificationReceipt({ extension: extId, version, result: r });
         mkdirSync(share, { recursive: true });
         writeFileSync(receiptPath, `${JSON.stringify(receipt, null, 2)}\n`);
         console.log(`\u2713 ${extId} ${version} is LIVE on the Marketplace (latest ${r.latest}; recent: ${r.versions.slice(0, 5).join(', ')})`);
         console.log(`  recorded resumable Marketplace verification: ${receiptPath}`);
-      } catch (e) { console.error(`\u2717 Marketplace query error: ${e.message}`); process.exit(1); }
+      } catch (e) {
+        console.error(`\u2717 Marketplace query error: ${e.message}`);
+        process.exitCode = 1;
+      }
     },
   },
   'release-cut-github': {
@@ -912,7 +945,8 @@ const SELFTEST = [
   }],
   ['signing-status confirms a public-key MATCH clears + reports enrolled (#414)', () => {
     const enrolled = readReviewerAllowlist()['reviewer@vi-tech.nl'];
-    const s = signingStatus({ reviewerId: 'reviewer@vi-tech.nl', reviewerKeyPath: '/k.pem', keyExists: true, station: STATIONS.HOST, enrolledPublicKey: enrolled, presentedPublicKey: enrolled });
+    const presented = Array.isArray(enrolled) ? enrolled.at(-1) : enrolled;
+    const s = signingStatus({ reviewerId: 'reviewer@vi-tech.nl', reviewerKeyPath: '/k.pem', keyExists: true, station: STATIONS.HOST, enrolledPublicKey: enrolled, presentedPublicKey: presented });
     return s.ok && s.enrolled === true && s.keyMatch === 'match';
   }],
   ['capacity-weighted partition splits a task set disjointly, covers it, and honours weight', () => {
@@ -979,5 +1013,5 @@ if (invokedDirectly) {
   }
   const c = COMMANDS[cmd];
   if (!c) { console.error(`unknown subcommand: ${cmd} (try: lba help)`); process.exit(2); }
-  c.run(args);
+  await c.run(args);
 }

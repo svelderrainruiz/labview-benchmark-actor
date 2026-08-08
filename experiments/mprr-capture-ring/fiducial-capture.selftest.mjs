@@ -75,6 +75,7 @@ const authServer = await createFiducialServer({ password: 'lbavnc0' });
 const authStream = createStreamingFramebuffer({ host: authServer.host, port: authServer.port, password: 'lbavnc0', connect: ({ host, port }) => net.connect({ host, port }) });
 const ad = await authStream.ready;
 assert.equal(ad.width, FIDUCIAL_W);
+assert.equal(ad.securityType, 2); assert.equal(ad.securityTypeName, 'VNC Authentication');
 assert.equal(dhashNow(authStream), fiducialDhash(0), 'VNC-auth client reproduces the fiducial ground truth over a real socket');
 authStream.close();
 await authServer.close();

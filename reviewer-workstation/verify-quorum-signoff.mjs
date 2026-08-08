@@ -34,12 +34,20 @@ export function verifyQuorumSignOff({ attestationDoc, signOff, reviewerAllowlist
   };
 }
 
-// Read a reviewer allowlist (reviewer id -> Ed25519 SPKI public-key PEM), dropping the _comment + non-string keys.
+// Read a reviewer allowlist (reviewer id -> one PEM or a retained key-rotation array), dropping invalid entries.
 function readAllowlist(path) {
   try {
     const raw = JSON.parse(readFileSync(path, 'utf8'));
     const out = {};
-    for (const [k, v] of Object.entries(raw)) if (k !== '_comment' && typeof v === 'string') out[k] = v;
+    for (const [k, v] of Object.entries(raw)) {
+      if (
+        k !== '_comment'
+        && (
+          typeof v === 'string'
+          || (Array.isArray(v) && v.length > 0 && v.every((key) => typeof key === 'string' && key.trim()))
+        )
+      ) out[k] = v;
+    }
     return out;
   } catch { return {}; }
 }

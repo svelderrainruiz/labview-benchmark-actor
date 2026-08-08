@@ -1,0 +1,132 @@
+{
+  "schema": "labview-benchmark-actor/windows-docker-evidence-manifest@1",
+  "runId": "20260807T085910357Z-5b3fd61a35",
+  "outcome": "inconclusive",
+  "generatedWallTime": "2026-08-07T09:03:38.966Z",
+  "desktop": {
+    "target": "Inherited",
+    "context": {
+      "mode": "Inherited",
+      "windowStation": "Service-0x0-5bbfc69$",
+      "desktop": "Default",
+      "qualifiedDesktop": "Service-0x0-5bbfc69$\\Default",
+      "explicitStartupDesktop": null,
+      "processWindowStationChanged": false,
+      "threadDesktopSet": false,
+      "threadDesktopError": 0
+    },
+    "monitorRectangles": [],
+    "localGdi": {
+      "path": null,
+      "sha256": null,
+      "analysis": {
+        "passed": false,
+        "reason": "capture-error"
+      },
+      "captureMethod": "GetDC(NULL)+BitBlt(SRCCOPY|CAPTUREBLT)+GetDIBits",
+      "error": "Exception calling \"CaptureScreen\" with \"1\" argument(s): \"BitBlt failed: 5\""
+    },
+    "desktopProbe": {
+      "processId": 24156,
+      "sessionId": 2,
+      "marker": "20260807T085910357Z-5b3fd61a35",
+      "visible": false,
+      "exited": false,
+      "exitCode": null,
+      "window": {}
+    }
+  },
+  "tightVncDriver": null,
+  "network": null,
+  "relay": null,
+  "files": [
+    {
+      "path": "bootstrap-failure.json",
+      "size": 9557,
+      "sha256": "749bf5190036b21d6d3741e0eb591364a8a509cf765c3a55ded9ed5850c18e36",
+      "modifiedWallTime": "2026-08-07T09:01:34.139Z",
+      "frameIndex": null,
+      "role": null
+    },
+    {
+      "path": "bootstrap-stopped.json",
+      "size": 213,
+      "sha256": "e67b6dd35ade9a8faeafa6593ab72be982618f524bae214355b38c0b9f44d638",
+      "modifiedWallTime": "2026-08-07T09:01:34.206Z",
+      "frameIndex": null,
+      "role": null
+    },
+    {
+      "path": "capture-summary.json",
+      "size": 1761,
+      "sha256": "a7440665b39ac234a35239bf9d3dcd9a7891463f43d7501d3181b8e8fc853008",
+      "modifiedWallTime": "2026-08-07T09:03:37.873Z",
+      "frameIndex": null,
+      "role": null
+    },
+    {
+      "path": "cleanup-verification.json",
+      "size": 497,
+      "sha256": "21a7893e4409d79dfa115dea1f955142ab1016d1f81ec803c37d2a6db48bb21e",
+      "modifiedWallTime": "2026-08-07T09:03:38.900Z",
+      "frameIndex": null,
+      "role": null
+    },
+    {
+      "path": "container-inspect.json",
+      "size": 10763,
+      "sha256": "77f174c12fb0ea6ad9e79a0886db4dcf79084fe043a48d2b023de3d1b63e74a7",
+      "modifiedWallTime": "2026-08-07T09:03:38.299Z",
+      "frameIndex": null,
+      "role": null
+    },
+    {
+      "path": "container.log",
+      "size": 856,
+      "sha256": "49cf43553dfeb65e0bea02c6313e1161728e721066645cf15cf99c99b15448bb",
+      "modifiedWallTime": "2026-08-07T09:03:38.453Z",
+      "frameIndex": null,
+      "role": null
+    },
+    {
+      "path": "display-diagnostics.json",
+      "size": 5226,
+      "sha256": "04cc73050280a249e101a2809406b92ad75edfa2e36674740f14e2efbcc40614",
+      "modifiedWallTime": "2026-08-07T09:01:34.109Z",
+      "frameIndex": null,
+      "role": null
+    },
+    {
+      "path": "docker-info.json",
+      "size": 5415,
+      "sha256": "cbd6582a42d635e42ff9709054347d2389d36033121eefed2a78224365b35a76",
+      "modifiedWallTime": "2026-08-07T08:59:10.783Z",
+      "frameIndex": null,
+      "role": null
+    },
+    {
+      "path": "failure-receipt.json",
+      "size": 1761,
+      "sha256": "a7440665b39ac234a35239bf9d3dcd9a7891463f43d7501d3181b8e8fc853008",
+      "modifiedWallTime": "2026-08-07T09:03:37.871Z",
+      "frameIndex": null,
+      "role": null
+    },
+    {
+      "path": "host-orchestration.log",
+      "size": 1694,
+      "sha256": "cb976cd15b53f172f65211059c25fb9d7e5fa42fe3a1de471b890b77ffa36dae",
+      "modifiedWallTime": "2026-08-07T09:03:38.908Z",
+      "frameIndex": null,
+      "role": null
+    },
+    {
+      "path": "image-inspect.json",
+      "size": 4698,
+      "sha256": "17cebe606d1f0a79f94f57c54077ed2e7bb0218b5d305df996585a1135cdab45",
+      "modifiedWallTime": "2026-08-07T08:59:10.973Z",
+      "frameIndex": null,
+      "role": null
+    }
+  ]
+}

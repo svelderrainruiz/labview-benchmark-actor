@@ -13,7 +13,9 @@
 # Box per provider (both are maintainer-held Win+LabVIEW boxes; no public LabVIEW box by design):
 #   virtualbox     -> actor/win11-labview2026  (labview-benchmark-actor golden box; override VIHS_REVIEWER_BOX)
 #   vmware_desktop -> vihs/labview-cleanroom   (labview-benchmark-actor cleanroom box; override VIHS_REVIEWER_BOX_VMWARE)
-# Reviewers without a box build one per the docs (BYO), including their OWN licensed LabVIEW for TC-09.
+# Reviewers without a box build one per the docs (BYO). LabVIEW is installed in the VirtualBox box, but NI
+# activation is per imported VM hardware identity; each reviewer must activate that disposable instance through
+# an NI-supported mechanism before TC-09. Never treat source-VM activation as portable box evidence.
 
 Vagrant.configure("2") do |config|
   # Runtime-configurable VM identity (#108 follow-up): a future agent can launch

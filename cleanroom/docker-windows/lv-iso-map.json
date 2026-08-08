@@ -17,6 +17,24 @@
         "cli_package": "ni-labview-command-line-interface-x86",
         "vi_analyzer_package": "ni-labview-vi-analyzer-toolkit-lic"
       }
+    },
+    "2026q3": {
+      "windows": {
+        "x64": "https://download.ni.com/support/softlib/labview/labview_development_system/2026_Q3/ni-labview-2026-community_26.3.0_offline.iso",
+        "x86": "https://download.ni.com/support/softlib/labview/labview_development_system/2026_Q3/ni-labview-2026-community-x86_26.3.0_offline.iso",
+        "packages": {
+          "x64": "ni-labview-2026-community",
+          "x86": "ni-labview-2026-community-x86"
+        },
+        "feed_subdirs": {
+          "x64": "feeds/ni-labview-2026-community",
+          "x86": "feeds/ni-labview-2026-community-x86"
+        },
+        "vi_analyzer_package": "ni-labview-vi-analyzer-toolkit-lic",
+        "verified_x64_package": "ni-labview-2026-community",
+        "verified_x64_version": "26.3.0.49795-0+f643",
+        "verified_x64_iso_sha256": "735f0185182d51d2a91dc7181a9ff34514be41c516ebf7070dff73c1562b24c5"
+      }
     }
   }
 }

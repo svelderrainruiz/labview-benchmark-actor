@@ -8,8 +8,8 @@
 | Requirement | Title | Status | Architecture view | Decisions | Test | Code refs |
 | --- | --- | --- | --- | --- | --- | --- |
 | LBA-REQ-001 | Standalone extraction of hooking and agentic infrastructure | Proven | §3.1 Packaging / boundary | — | T-001 | 6 |
-| LBA-REQ-002 | Install on Codespace or Vagrant golden VM | Proven | §3.2 Deployment | — | T-002 | 5 |
-| LBA-REQ-003 | Agentic infrastructure drives benchmark runs | Proven | §3.3 Actor / run-result | ADR-0001, ADR-0005, ADR-0007, ADR-0009 | T-003 | 18 |
+| LBA-REQ-002 | Install on Codespace or Vagrant golden VM | Proven | §3.2 Deployment | — | T-002 | 13 |
+| LBA-REQ-003 | Agentic infrastructure drives benchmark runs | Proven | §3.3 Actor / run-result | ADR-0001, ADR-0005, ADR-0007, ADR-0009 | T-003 | 29 |
 | LBA-REQ-004 | Benchmark time-cursor (draggable vertical line) | Proven | §3.4 Viewer | ADR-0002 | T-004 | 11 |
 | LBA-REQ-005 | Time-indexed picture shown below the benchmark | Proven | §3.4 Viewer | ADR-0002, ADR-0005, ADR-0007, ADR-0009 | T-005 | 3 |
 | LBA-REQ-006 | Multi-VM Vagrant benchmarking topology | Proven | §3.2 Deployment | ADR-0004 | T-006 | 2 |
@@ -33,7 +33,7 @@
 | LBA-REQ-024 | Corroboration quorum + graded confidence | Proven | §3.9 Corroboration-grid | ADR-0015 | T-024 | 10 |
 | LBA-REQ-025 | Corroboration provenance + attestation | Proven | §3.9 Corroboration-grid | ADR-0016 | T-025 | 14 |
 | LBA-REQ-026 | Witness independence | Proven | §3.9 Corroboration-grid | ADR-0017, ADR-0068 | T-026 | 7 |
-| LBA-REQ-027 | Reviewer station + human sign-off | Proven | §3.9 Corroboration-grid | ADR-0018 | T-027 | 6 |
+| LBA-REQ-027 | Reviewer station + human sign-off | Proven | §3.9 Corroboration-grid | ADR-0018 | T-027 | 8 |
 | LBA-REQ-028 | Mesh verdict beacon | Proven | §3.9 Corroboration-grid | ADR-0019 | T-028 | 6 |
 | LBA-REQ-029 | MCP orchestration surface | Proven | §3.9 Corroboration-grid | ADR-0020 | T-029 | 11 |
 | LBA-REQ-030 | Pull requests target develop | Proven | §3.8 Configuration-management & assurance | ADR-0021 | T-030 | 5 |
@@ -44,7 +44,7 @@
 | LBA-REQ-035 | Generated test report and configuration status accounting | Proven | §3.8 Configuration-management & assurance | ADR-0025 | T-035 | 4 |
 | LBA-REQ-036 | Resolvable, invariant-complete release procedure | Proven | §3.8 Configuration-management & assurance | ADR-0026 | T-036 | 4 |
 | LBA-REQ-037 | Continuous five-lens compliance self-audit | Proven | §3.8 Configuration-management & assurance | ADR-0027 | T-037 | 4 |
-| LBA-REQ-038 | LabVIEW activation confirmation via a headless known-answer probe | Proven | §3.2 Deployment | ADR-0023 | T-038 | 6 |
+| LBA-REQ-038 | LabVIEW activation confirmation via a headless known-answer probe | Proven | §3.2 Deployment | ADR-0023 | T-038 | 9 |
 | LBA-REQ-039 | Mesh-actor registration gated on activation | Proven | §3.2 Deployment | ADR-0023 | T-039 | 4 |
 | LBA-REQ-040 | Distributed capacity-weighted parallel workload | Proven | §3.2 Deployment | ADR-0028 | T-040 | 5 |
 | LBA-REQ-041 | Capability-aware distributed task routing | Proven | §3.2 Deployment | ADR-0029 | T-041 | 5 |

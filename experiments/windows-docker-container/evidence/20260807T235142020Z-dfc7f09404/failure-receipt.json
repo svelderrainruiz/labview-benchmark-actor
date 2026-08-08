@@ -1,0 +1,546 @@
+{
+  "schema": "labview-benchmark-actor/windows-docker-tightvnc-failure@1",
+  "outcome": "inconclusive",
+  "failedGate": 3,
+  "classification": "black-or-uniform-framebuffer",
+  "error": "initial framebuffer failed pixel proof: single-color-or-single-luminance-population",
+  "wallTime": "2026-08-07T23:54:05.921Z",
+  "environment": {
+    "schema": "labview-benchmark-actor/windows-docker-environment@1",
+    "runId": "20260807T235142020Z-dfc7f09404",
+    "wallTime": "2026-08-07T23:54:03.4318370Z",
+    "hostOs": {
+      "Caption": "Microsoft Windows 11 Pro",
+      "Version": "10.0.26200",
+      "BuildNumber": "26200",
+      "OSArchitecture": "64-bit"
+    },
+    "docker": {
+      "serverVersion": "29.4.3",
+      "osType": "windows"
+    },
+    "image": {
+      "reference": "nationalinstruments/labview:2026q3-windows",
+      "id": "sha256:f45c639a201f51875465a0d02aa69e65a3630054e564c8724c105f2e1b5eee30",
+      "expectedId": "sha256:f45c639a201f51875465a0d02aa69e65a3630054e564c8724c105f2e1b5eee30",
+      "unexpectedIdOverride": false,
+      "os": "windows",
+      "architecture": "amd64"
+    },
+    "container": {
+      "id": "fe4c61e39e66a626e485fbe4239226f3cb03b269f01a1553e31fa34aa8bb69b2",
+      "name": "lba-win-vnc-dfc7f09404",
+      "isolation": "process",
+      "desktopTarget": "WinSta0",
+      "transportOnly": true,
+      "gpuDeviceAssigned": false,
+      "network": {
+        "containerId": "fe4c61e39e66a626e485fbe4239226f3cb03b269f01a1553e31fa34aa8bb69b2",
+        "networkName": "nat",
+        "networkId": "a2e0cc3906121020b3f96d9b1f588923c7500cd463bb89bf975d3c218c588cbf",
+        "endpointId": "9768d3e06c23ce20286e160e2229541d296350d8ce94577310850ed3af02629a",
+        "ipAddress": "172.21.14.68",
+        "ipPrefixLength": 16,
+        "gateway": "172.21.0.1"
+      },
+      "dockerPublishedPorts": []
+    },
+    "containerOs": {
+      "Caption": "Microsoft Windows Server 2022 Datacenter",
+      "Version": "10.0.20348",
+      "BuildNumber": "20348",
+      "OSArchitecture": "64-bit"
+    },
+    "display": {
+      "schema": "labview-benchmark-actor/windows-container-display@1",
+      "wallTime": "2026-08-07T23:53:58.1573740Z",
+      "desktopTarget": "WinSta0",
+      "tightVncCaptureMode": "StandardGdi",
+      "processId": 24840,
+      "sessionId": 2,
+      "api": {
+        "processId": 24840,
+        "sessionId": 2,
+        "context": {
+          "mode": "WinSta0",
+          "windowStation": "WinSta0",
+          "desktop": "Default",
+          "qualifiedDesktop": "WinSta0\\Default",
+          "explicitStartupDesktop": "WinSta0\\Default",
+          "processWindowStationChanged": true,
+          "threadDesktopSet": false,
+          "threadDesktopError": 170
+        },
+        "smCmonitors": 1,
+        "primaryWidth": 1024,
+        "primaryHeight": 768,
+        "virtualLeft": 0,
+        "virtualTop": 0,
+        "virtualWidth": 1024,
+        "virtualHeight": 768,
+        "getDcSucceeded": true,
+        "getDcError": 0,
+        "enumDisplayMonitorsError": 0,
+        "monitorRectangles": [],
+        "screenBitsPixel": 32,
+        "screenPlanes": 1,
+        "screenColorDepth": 32,
+        "screenHorzRes": 1024,
+        "screenVertRes": 768,
+        "displayDevices": [],
+        "queryDisplayConfigBufferResult": 0,
+        "queryDisplayConfigResult": 5,
+        "activePathCount": 0,
+        "activeModeCount": 0
+      },
+      "videoControllers": [
+        {
+          "Name": "Intel(R) Graphics",
+          "PNPDeviceID": "PCI\\VEN_8086&DEV_7D67&SUBSYS_234717AA&REV_06\\3&11583659&0&10",
+          "DriverVersion": "32.0.101.8724",
+          "VideoModeDescription": null,
+          "CurrentHorizontalResolution": null,
+          "CurrentVerticalResolution": null,
+          "CurrentBitsPerPixel": null,
+          "AdapterCompatibility": "Intel Corporation",
+          "Status": "OK"
+        },
+        {
+          "Name": "NVIDIA RTX PRO 1000 Blackwell Generation Laptop GPU",
+          "PNPDeviceID": "PCI\\VEN_10DE&DEV_2DB8&SUBSYS_234717AA&REV_A1\\7A097376FB2DB04800",
+          "DriverVersion": "32.0.15.9571",
+          "VideoModeDescription": null,
+          "CurrentHorizontalResolution": null,
+          "CurrentVerticalResolution": null,
+          "CurrentBitsPerPixel": null,
+          "AdapterCompatibility": "NVIDIA",
+          "Status": "OK"
+        }
+      ],
+      "desktopMonitors": [
+        {
+          "Name": "Wide viewing angle & High density FlexView Display 1920x1200",
+          "PNPDeviceID": "DISPLAY\\LEN41B5\\4&318A8933&0&UID8388688",
+          "ScreenWidth": null,
+          "ScreenHeight": null,
+          "Status": "OK"
+        },
+        {
+          "Name": "Default Monitor",
+          "PNPDeviceID": null,
+          "ScreenWidth": null,
+          "ScreenHeight": null,
+          "Status": "OK"
+        }
+      ],
+      "desktopProbe": {
+        "processId": 28556,
+        "sessionId": 2,
+        "marker": "20260807T235142020Z-dfc7f09404",
+        "visible": true,
+        "exited": false,
+        "exitCode": null,
+        "window": {
+          "handle": 131172,
+          "processId": 28556,
+          "title": "LBA-VNC-DESKTOP-PROBE",
+          "className": "WindowsForms10.Window.8.app.0.34f5582_r7_ad1",
+          "visible": true,
+          "minimized": false,
+          "desktop": "WinSta0\\Default",
+          "bounds": {
+            "left": 80,
+            "top": 60,
+            "right": 880,
+            "bottom": 660
+          }
+        }
+      },
+      "localGdi": {
+        "path": null,
+        "sha256": null,
+        "analysis": {
+          "passed": false,
+          "reason": "capture-error"
+        },
+        "captureMethod": "GetDC(NULL)+BitBlt(SRCCOPY|CAPTUREBLT)+GetDIBits",
+        "error": "Exception calling \"CaptureScreen\" with \"1\" argument(s): \"BitBlt failed: 5\""
+      }
+    },
+    "tightVnc": {
+      "version": "2.8.81",
+      "installerSha256": "0d6402e530a563c90040d7c07b98ab68670d3669e4cc573ad24056ff960c9dcb",
+      "installerSource": "local-cache",
+      "authentication": "ephemeral VNC authentication",
+      "captureMode": "StandardGdi"
+    },
+    "lbabus": {
+      "hostStage": {
+        "schema": "labview-benchmark-actor/windows-container-lbabus-stage@1",
+        "wallTime": "2026-08-07T23:53:51.9517458Z",
+        "sourceProject": "tools/collab-cli/LbaBus.csproj",
+        "version": "0.15.0",
+        "payload": "C:\\run-secrets\\lbabus\\lbabus.dll",
+        "payloadSha256": "5d0f8b2e97e4dc2cc07dcab6acf8cf272a4bc015212cb89aa15e12b75c3d81a5"
+      },
+      "containerProbe": {
+        "schema": "labview-benchmark-actor/windows-container-lbabus@1",
+        "wallTime": "2026-08-07T23:53:57.9442393Z",
+        "status": "passed",
+        "version": "0.15.0",
+        "payloadPath": "C:\\run-secrets\\lbabus\\lbabus.dll",
+        "payloadSha256": "5d0f8b2e97e4dc2cc07dcab6acf8cf272a4bc015212cb89aa15e12b75c3d81a5",
+        "dotnetPath": "C:\\Program Files\\dotnet\\dotnet.exe",
+        "dotnetRuntimes": [
+          "Microsoft.AspNetCore.App 8.0.28 [C:\\Program Files\\dotnet\\shared\\Microsoft.AspNetCore.App]",
+          "Microsoft.NETCore.App 8.0.28 [C:\\Program Files\\dotnet\\shared\\Microsoft.NETCore.App]",
+          "Microsoft.WindowsDesktop.App 8.0.28 [C:\\Program Files\\dotnet\\shared\\Microsoft.WindowsDesktop.App]"
+        ],
+        "capabilitiesExitCode": 0,
+        "capabilities": [
+          "lbabus v0.15.0 - WIN plane on Microsoft Windows 10.0.20348 / X64",
+          "",
+          "pinned toolchain:",
+          "  [MISS] rg      v-         (pin >= v13.0.0)",
+          "  [MISS] git     v-         (pin >= v2.30.0)",
+          "  [MISS] gh      v-         (pin >= v2.20.0)",
+          "  [MISS] glab    v-         (pin >= v1.25.0)",
+          "  [MISS] dotnet  vThe command could not be loaded, possibly because: (pin >= v8.0.0)",
+          "",
+          "host capabilities:",
+          "  [ no] docker       not installed",
+          "  [ no] vagrant      not installed",
+          "  [ no] vmware       vmrun not found",
+          "  [yes] labview-cli  LabVIEWCLI on PATH (host-native)"
+        ]
+      }
+    }
+  },
+  "rfb": {
+    "width": 1024,
+    "height": 768,
+    "rfbVersion": "3.8",
+    "securityType": 2,
+    "securityTypeName": "VNC Authentication",
+    "serverName": "fe4c61e39e66",
+    "resizeCount": 1,
+    "updateCount": 3
+  },
+  "network": {
+    "schema": "labview-benchmark-actor/windows-docker-network-preflight@1",
+    "status": "passed",
+    "containerId": "fe4c61e39e66a626e485fbe4239226f3cb03b269f01a1553e31fa34aa8bb69b2",
+    "wallTime": "2026-08-07T23:54:03.063Z",
+    "classification": null,
+    "target": {
+      "containerId": "fe4c61e39e66a626e485fbe4239226f3cb03b269f01a1553e31fa34aa8bb69b2",
+      "networkName": "nat",
+      "networkId": "a2e0cc3906121020b3f96d9b1f588923c7500cd463bb89bf975d3c218c588cbf",
+      "endpointId": "9768d3e06c23ce20286e160e2229541d296350d8ce94577310850ed3af02629a",
+      "ipAddress": "172.21.14.68",
+      "ipPrefixLength": 16,
+      "gateway": "172.21.0.1"
+    },
+    "dockerPublishedPorts": [],
+    "dockerPortOutput": [],
+    "directProbe": {
+      "connected": true,
+      "elapsedMs": 1.4808,
+      "error": null,
+      "endpoint": "172.21.14.68:5900",
+      "clock": "host process.hrtime.bigint"
+    }
+  },
+  "relay": {
+    "schema": "labview-benchmark-actor/windows-docker-loopback-relay@1",
+    "status": "rfb-traversed",
+    "processId": 9516,
+    "containerId": "fe4c61e39e66a626e485fbe4239226f3cb03b269f01a1553e31fa34aa8bb69b2",
+    "network": {
+      "containerId": "fe4c61e39e66a626e485fbe4239226f3cb03b269f01a1553e31fa34aa8bb69b2",
+      "networkName": "nat",
+      "networkId": "a2e0cc3906121020b3f96d9b1f588923c7500cd463bb89bf975d3c218c588cbf",
+      "endpointId": "9768d3e06c23ce20286e160e2229541d296350d8ce94577310850ed3af02629a",
+      "ipAddress": "172.21.14.68",
+      "ipPrefixLength": 16,
+      "gateway": "172.21.0.1"
+    },
+    "directProbe": {
+      "connected": true,
+      "elapsedMs": 1.4808,
+      "error": null,
+      "endpoint": "172.21.14.68:5900",
+      "clock": "host process.hrtime.bigint"
+    },
+    "dockerPublishedPorts": [],
+    "dockerPortOutput": [],
+    "bound": {
+      "address": "127.0.0.1",
+      "family": "IPv4",
+      "port": 64681,
+      "requestedPort": 0
+    },
+    "upstream": {
+      "host": "172.21.14.68",
+      "port": 5900
+    },
+    "listenerBindings": [
+      {
+        "localAddress": "127.0.0.1",
+        "localPort": 64681,
+        "owningProcess": 9516
+      }
+    ],
+    "stats": {
+      "acceptedConnections": 1,
+      "successfulUpstreamConnections": 1,
+      "upstreamConnectionFailures": 0,
+      "downstreamErrors": 0,
+      "downstreamToUpstreamBytes": 102,
+      "upstreamToDownstreamBytes": 6291575,
+      "serverErrors": 0,
+      "lastUpstreamError": null,
+      "lastServerError": null,
+      "activeConnections": 1
+    },
+    "cleanup": {
+      "closed": false,
+      "listenerBindingsAfterClose": null
+    },
+    "readyWallTime": "2026-08-07T23:54:04.278Z",
+    "rfbTraversedWallTime": "2026-08-07T23:54:04.364Z"
+  },
+  "display": {
+    "schema": "labview-benchmark-actor/windows-container-display@1",
+    "wallTime": "2026-08-07T23:53:58.1573740Z",
+    "desktopTarget": "WinSta0",
+    "tightVncCaptureMode": "StandardGdi",
+    "processId": 24840,
+    "sessionId": 2,
+    "api": {
+      "processId": 24840,
+      "sessionId": 2,
+      "context": {
+        "mode": "WinSta0",
+        "windowStation": "WinSta0",
+        "desktop": "Default",
+        "qualifiedDesktop": "WinSta0\\Default",
+        "explicitStartupDesktop": "WinSta0\\Default",
+        "processWindowStationChanged": true,
+        "threadDesktopSet": false,
+        "threadDesktopError": 170
+      },
+      "smCmonitors": 1,
+      "primaryWidth": 1024,
+      "primaryHeight": 768,
+      "virtualLeft": 0,
+      "virtualTop": 0,
+      "virtualWidth": 1024,
+      "virtualHeight": 768,
+      "getDcSucceeded": true,
+      "getDcError": 0,
+      "enumDisplayMonitorsError": 0,
+      "monitorRectangles": [],
+      "screenBitsPixel": 32,
+      "screenPlanes": 1,
+      "screenColorDepth": 32,
+      "screenHorzRes": 1024,
+      "screenVertRes": 768,
+      "displayDevices": [],
+      "queryDisplayConfigBufferResult": 0,
+      "queryDisplayConfigResult": 5,
+      "activePathCount": 0,
+      "activeModeCount": 0
+    },
+    "videoControllers": [
+      {
+        "Name": "Intel(R) Graphics",
+        "PNPDeviceID": "PCI\\VEN_8086&DEV_7D67&SUBSYS_234717AA&REV_06\\3&11583659&0&10",
+        "DriverVersion": "32.0.101.8724",
+        "VideoModeDescription": null,
+        "CurrentHorizontalResolution": null,
+        "CurrentVerticalResolution": null,
+        "CurrentBitsPerPixel": null,
+        "AdapterCompatibility": "Intel Corporation",
+        "Status": "OK"
+      },
+      {
+        "Name": "NVIDIA RTX PRO 1000 Blackwell Generation Laptop GPU",
+        "PNPDeviceID": "PCI\\VEN_10DE&DEV_2DB8&SUBSYS_234717AA&REV_A1\\7A097376FB2DB04800",
+        "DriverVersion": "32.0.15.9571",
+        "VideoModeDescription": null,
+        "CurrentHorizontalResolution": null,
+        "CurrentVerticalResolution": null,
+        "CurrentBitsPerPixel": null,
+        "AdapterCompatibility": "NVIDIA",
+        "Status": "OK"
+      }
+    ],
+    "desktopMonitors": [
+      {
+        "Name": "Wide viewing angle & High density FlexView Display 1920x1200",
+        "PNPDeviceID": "DISPLAY\\LEN41B5\\4&318A8933&0&UID8388688",
+        "ScreenWidth": null,
+        "ScreenHeight": null,
+        "Status": "OK"
+      },
+      {
+        "Name": "Default Monitor",
+        "PNPDeviceID": null,
+        "ScreenWidth": null,
+        "ScreenHeight": null,
+        "Status": "OK"
+      }
+    ],
+    "desktopProbe": {
+      "processId": 28556,
+      "sessionId": 2,
+      "marker": "20260807T235142020Z-dfc7f09404",
+      "visible": true,
+      "exited": false,
+      "exitCode": null,
+      "window": {
+        "handle": 131172,
+        "processId": 28556,
+        "title": "LBA-VNC-DESKTOP-PROBE",
+        "className": "WindowsForms10.Window.8.app.0.34f5582_r7_ad1",
+        "visible": true,
+        "minimized": false,
+        "desktop": "WinSta0\\Default",
+        "bounds": {
+          "left": 80,
+          "top": 60,
+          "right": 880,
+          "bottom": 660
+        }
+      }
+    },
+    "localGdi": {
+      "path": null,
+      "sha256": null,
+      "analysis": {
+        "passed": false,
+        "reason": "capture-error"
+      },
+      "captureMethod": "GetDC(NULL)+BitBlt(SRCCOPY|CAPTUREBLT)+GetDIBits",
+      "error": "Exception calling \"CaptureScreen\" with \"1\" argument(s): \"BitBlt failed: 5\""
+    }
+  },
+  "probeMatch": null,
+  "probeStop": null,
+  "frameCount": 18,
+  "resourceSampleCount": 1,
+  "resourceErrors": [],
+  "recommendedNextHypothesis": "Test an explicitly interactive container desktop; do not substitute host-desktop capture.",
+  "clockSources": {
+    "capture": "host process.hrtime.bigint",
+    "wall": "host Date.toISOString"
+  },
+  "initialAnalysis": {
+    "passed": false,
+    "pixels": 786432,
+    "roi": {
+      "x": 0,
+      "y": 0,
+      "width": 1024,
+      "height": 768
+    },
+    "meaningfulThreshold": 787,
+    "meaningfulLumaPopulations": 1,
+    "blackFraction": 1,
+    "transparentFraction": 0,
+    "lumaBins": [
+      786432,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0
+    ],
+    "reason": "single-color-or-single-luminance-population"
+  },
+  "localGdiAnalysis": {
+    "passed": false,
+    "reason": "capture-error"
+  },
+  "imageAcquisition": {
+    "schema": "labview-benchmark-actor/windows-container-rfb-image@1",
+    "status": "acquired-but-unusable",
+    "usable": false,
+    "visualClaim": false,
+    "source": "run-owned-container-tightvnc-rfb",
+    "sourceContainerId": "fe4c61e39e66a626e485fbe4239226f3cb03b269f01a1553e31fa34aa8bb69b2",
+    "upstreamEndpoint": {
+      "host": "172.21.14.68",
+      "port": 5900,
+      "networkName": "nat"
+    },
+    "hostRelayEndpoint": {
+      "address": "127.0.0.1",
+      "family": "IPv4",
+      "port": 64681,
+      "requestedPort": 0
+    },
+    "rfb": {
+      "version": "3.8",
+      "securityType": 2,
+      "width": 1024,
+      "height": 768,
+      "updateCountAtSample": 2
+    },
+    "frameIndex": 0,
+    "framePollCount": 18,
+    "monotonicMs": 854.9238,
+    "wallTime": "2026-08-07T23:54:04.378Z",
+    "dhashHex": "0000000000000000",
+    "path": "frames/transport-baseline-rfb.png",
+    "size": 4981,
+    "pngSha256": "6ec227dca4c2663c781fed4748f9f10fedf7290bf7a8fffe2d4e05f81790e4cd",
+    "rgbaSha256": "d2cdb07798b599560e35abad5e4f87f4205ee60e72e14d850b9590f801080978",
+    "analysis": {
+      "passed": false,
+      "pixels": 786432,
+      "roi": {
+        "x": 0,
+        "y": 0,
+        "width": 1024,
+        "height": 768
+      },
+      "meaningfulThreshold": 787,
+      "meaningfulLumaPopulations": 1,
+      "blackFraction": 1,
+      "transparentFraction": 0,
+      "lumaBins": [
+        786432,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "reason": "single-color-or-single-luminance-population"
+    }
+  },
+  "transportOnly": true,
+  "labviewLaunchTriggered": false
+}

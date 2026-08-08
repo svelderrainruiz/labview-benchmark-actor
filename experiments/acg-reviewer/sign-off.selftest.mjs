@@ -24,6 +24,9 @@ ok('a sign-off signs and verifies (either station)', () => {
     const s = sign(alice, 'reviewer:alice', { station });
     assert.equal(s.station, station);
     assert.equal(verifyReleaseSignOff(passVerdict, s, { reviewerAllowlist: allow }).ok, true);
+    assert.equal(verifyReleaseSignOff(passVerdict, s, {
+      reviewerAllowlist: { 'reviewer:alice': [bob.publicKeyPem, alice.publicKeyPem] },
+    }).ok, true);
   }
 });
 

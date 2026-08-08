@@ -1,0 +1,260 @@
+{
+    "Id":  "3c51e041fa8f5492a6c1fa04de9622a2a5ea1b15447d7ced10a61252c8a428a1",
+    "Created":  "2026-08-07T09:24:59.9588424Z",
+    "Path":  "powershell.exe",
+    "Args":  [
+                 "-NoLogo",
+                 "-NoProfile",
+                 "-NonInteractive",
+                 "-ExecutionPolicy",
+                 "Bypass",
+                 "-File",
+                 "C:\\experiment\\container-bootstrap.ps1",
+                 "-Action",
+                 "DisplayProbe",
+                 "-DesktopTarget",
+                 "Inherited",
+                 "-RunId",
+                 "display-probe-20260807T092446162Z-738004c0c7"
+             ],
+    "State":  {
+                  "Status":  "exited",
+                  "Running":  false,
+                  "Paused":  false,
+                  "Restarting":  false,
+                  "OOMKilled":  false,
+                  "Dead":  false,
+                  "Pid":  0,
+                  "ExitCode":  3,
+                  "Error":  "",
+                  "StartedAt":  "2026-08-07T09:25:03.1082831Z",
+                  "FinishedAt":  "2026-08-07T11:25:16.7150922+02:00"
+              },
+    "Image":  "sha256:f45c639a201f51875465a0d02aa69e65a3630054e564c8724c105f2e1b5eee30",
+    "ResolvConfPath":  "",
+    "HostnamePath":  "",
+    "HostsPath":  "",
+    "LogPath":  "C:\\ProgramData\\Docker\\containers\\3c51e041fa8f5492a6c1fa04de9622a2a5ea1b15447d7ced10a61252c8a428a1\\3c51e041fa8f5492a6c1fa04de9622a2a5ea1b15447d7ced10a61252c8a428a1-json.log",
+    "Name":  "/lba-display-probe-738004c0c7",
+    "RestartCount":  0,
+    "Driver":  "windowsfilter",
+    "Platform":  "windows",
+    "MountLabel":  "",
+    "ProcessLabel":  "",
+    "AppArmorProfile":  "",
+    "ExecIDs":  null,
+    "HostConfig":  {
+                       "Binds":  null,
+                       "ContainerIDFile":  "",
+                       "LogConfig":  {
+                                         "Type":  "json-file",
+                                         "Config":  {
+
+                                                    }
+                                     },
+                       "NetworkMode":  "nat",
+                       "PortBindings":  {
+
+                                        },
+                       "RestartPolicy":  {
+                                             "Name":  "no",
+                                             "MaximumRetryCount":  0
+                                         },
+                       "AutoRemove":  false,
+                       "VolumeDriver":  "",
+                       "VolumesFrom":  null,
+                       "ConsoleSize":  [
+                                           0,
+                                           0
+                                       ],
+                       "CapAdd":  null,
+                       "CapDrop":  null,
+                       "CgroupnsMode":  "",
+                       "Dns":  null,
+                       "DnsOptions":  [
+
+                                      ],
+                       "DnsSearch":  [
+
+                                     ],
+                       "ExtraHosts":  null,
+                       "GroupAdd":  null,
+                       "IpcMode":  "",
+                       "Cgroup":  "",
+                       "Links":  null,
+                       "OomScoreAdj":  0,
+                       "PidMode":  "",
+                       "Privileged":  false,
+                       "PublishAllPorts":  false,
+                       "ReadonlyRootfs":  false,
+                       "SecurityOpt":  null,
+                       "UTSMode":  "",
+                       "UsernsMode":  "",
+                       "ShmSize":  0,
+                       "Runtime":  "io.containerd.runhcs.v1",
+                       "Isolation":  "hyperv",
+                       "CpuShares":  0,
+                       "Memory":  0,
+                       "NanoCpus":  0,
+                       "CgroupParent":  "",
+                       "BlkioWeight":  0,
+                       "BlkioWeightDevice":  [
+
+                                             ],
+                       "BlkioDeviceReadBps":  [
+
+                                              ],
+                       "BlkioDeviceWriteBps":  [
+
+                                               ],
+                       "BlkioDeviceReadIOps":  [
+
+                                               ],
+                       "BlkioDeviceWriteIOps":  [
+
+                                                ],
+                       "CpuPeriod":  0,
+                       "CpuQuota":  0,
+                       "CpuRealtimePeriod":  0,
+                       "CpuRealtimeRuntime":  0,
+                       "CpusetCpus":  "",
+                       "CpusetMems":  "",
+                       "Devices":  [
+
+                                   ],
+                       "DeviceCgroupRules":  null,
+                       "DeviceRequests":  null,
+                       "MemoryReservation":  0,
+                       "MemorySwap":  0,
+                       "MemorySwappiness":  null,
+                       "OomKillDisable":  false,
+                       "PidsLimit":  null,
+                       "Ulimits":  [
+
+                                   ],
+                       "CpuCount":  0,
+                       "CpuPercent":  0,
+                       "IOMaximumIOps":  0,
+                       "IOMaximumBandwidth":  0,
+                       "Mounts":  [
+                                      {
+                                          "Type":  "bind",
+                                          "Source":  "C:\\dev\\gh\\labview-benchmark-actor.worktrees\\windows-docker-tightvnc-labview-experiment\\experiments\\windows-docker-container",
+                                          "Target":  "C:\\experiment",
+                                          "ReadOnly":  true
+                                      },
+                                      {
+                                          "Type":  "bind",
+                                          "Source":  "C:\\dev\\gh\\labview-benchmark-actor.worktrees\\windows-docker-tightvnc-labview-experiment\\experiments\\windows-docker-container\\evidence\\display-probe-20260807T092446162Z-738004c0c7",
+                                          "Target":  "C:\\evidence"
+                                      }
+                                  ],
+                       "MaskedPaths":  null,
+                       "ReadonlyPaths":  null
+                   },
+    "GraphDriver":  {
+                        "Data":  {
+                                     "ID":  "3c51e041fa8f5492a6c1fa04de9622a2a5ea1b15447d7ced10a61252c8a428a1",
+                                     "dir":  "C:\\ProgramData\\Docker\\windowsfilter\\3c51e041fa8f5492a6c1fa04de9622a2a5ea1b15447d7ced10a61252c8a428a1"
+                                 },
+                        "Name":  "windowsfilter"
+                    },
+    "Mounts":  [
+                   {
+                       "Type":  "bind",
+                       "Source":  "C:\\dev\\gh\\labview-benchmark-actor.worktrees\\windows-docker-tightvnc-labview-experiment\\experiments\\windows-docker-container",
+                       "Destination":  "C:\\experiment",
+                       "Mode":  "",
+                       "RW":  false,
+                       "Propagation":  ""
+                   },
+                   {
+                       "Type":  "bind",
+                       "Source":  "C:\\dev\\gh\\labview-benchmark-actor.worktrees\\windows-docker-tightvnc-labview-experiment\\experiments\\windows-docker-container\\evidence\\display-probe-20260807T092446162Z-738004c0c7",
+                       "Destination":  "C:\\evidence",
+                       "Mode":  "",
+                       "RW":  true,
+                       "Propagation":  ""
+                   }
+               ],
+    "Config":  {
+                   "Hostname":  "3c51e041fa8f",
+                   "Domainname":  "",
+                   "User":  "",
+                   "AttachStdin":  false,
+                   "AttachStdout":  true,
+                   "AttachStderr":  true,
+                   "Tty":  false,
+                   "OpenStdin":  false,
+                   "StdinOnce":  false,
+                   "Env":  [
+                               "LV_YEAR=2026",
+                               "LV_FEED_LOCATION=http://argohttp.natinst.com/ni/nipkg/feeds/ni-l/ni-labview-2026/26.3.0/26.3.0.49795-0+f643/offline"
+                           ],
+                   "Cmd":  [
+                               "powershell.exe",
+                               "-NoLogo",
+                               "-NoProfile",
+                               "-NonInteractive",
+                               "-ExecutionPolicy",
+                               "Bypass",
+                               "-File",
+                               "C:\\experiment\\container-bootstrap.ps1",
+                               "-Action",
+                               "DisplayProbe",
+                               "-DesktopTarget",
+                               "Inherited",
+                               "-RunId",
+                               "display-probe-20260807T092446162Z-738004c0c7"
+                           ],
+                   "Image":  "nationalinstruments/labview:2026q3-windows",
+                   "Volumes":  null,
+                   "WorkingDir":  "",
+                   "Entrypoint":  null,
+                   "Labels":  {
+                                  "com.azure.dev.image.build.buildnumber":  "build-labview-windows-docker-image_26.3.0f643",
+                                  "com.azure.dev.image.build.builduri":  "vstfs:///Build/Build/20455058",
+                                  "com.azure.dev.image.build.definitionname":  "build-labview-windows-docker-image",
+                                  "com.azure.dev.image.build.repository.name":  "labview",
+                                  "com.azure.dev.image.build.repository.uri":  "https://ni@dev.azure.com/ni/DevCentral/_git/labview",
+                                  "com.azure.dev.image.build.sourcebranchname":  "26C2",
+                                  "com.azure.dev.image.build.sourceversion":  "805ea9a457307188252525a990fd2369aaab1d1e",
+                                  "com.azure.dev.image.system.teamfoundationcollectionuri":  "https://dev.azure.com/ni/",
+                                  "com.azure.dev.image.system.teamproject":  "DevCentral",
+                                  "image.base.digest":  "sha256:cb330037cc8e00785a8fe1066ea701e8fa0f370263dcc5d179118d75e0f568e8",
+                                  "image.base.ref.name":  "mcr.microsoft.com/windows/server:ltsc2022",
+                                  "org.labview-benchmark-actor.experiment":  "windows-docker-display-probe",
+                                  "org.labview-benchmark-actor.windows-docker-run":  "display-probe-20260807T092446162Z-738004c0c7"
+                              },
+                   "StopTimeout":  1
+               },
+    "NetworkSettings":  {
+                            "SandboxID":  "",
+                            "SandboxKey":  "",
+                            "Ports":  {
+
+                                      },
+                            "Networks":  {
+                                             "nat":  {
+                                                         "IPAMConfig":  null,
+                                                         "Links":  null,
+                                                         "Aliases":  null,
+                                                         "DriverOpts":  null,
+                                                         "GwPriority":  0,
+                                                         "NetworkID":  "a2e0cc3906121020b3f96d9b1f588923c7500cd463bb89bf975d3c218c588cbf",
+                                                         "EndpointID":  "",
+                                                         "Gateway":  "",
+                                                         "IPAddress":  "",
+                                                         "MacAddress":  "",
+                                                         "IPPrefixLen":  0,
+                                                         "IPv6Gateway":  "",
+                                                         "GlobalIPv6Address":  "",
+                                                         "GlobalIPv6PrefixLen":  0,
+                                                         "DNSNames":  [
+                                                                          "lba-display-probe-738004c0c7",
+                                                                          "3c51e041fa8f"
+                                                                      ]
+                                                     }
+                                         }
+                        }
+}

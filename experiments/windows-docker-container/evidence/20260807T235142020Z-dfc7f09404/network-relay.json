@@ -1,0 +1,63 @@
+{
+  "schema": "labview-benchmark-actor/windows-docker-loopback-relay@1",
+  "status": "rfb-traversed",
+  "processId": 9516,
+  "containerId": "fe4c61e39e66a626e485fbe4239226f3cb03b269f01a1553e31fa34aa8bb69b2",
+  "network": {
+    "containerId": "fe4c61e39e66a626e485fbe4239226f3cb03b269f01a1553e31fa34aa8bb69b2",
+    "networkName": "nat",
+    "networkId": "a2e0cc3906121020b3f96d9b1f588923c7500cd463bb89bf975d3c218c588cbf",
+    "endpointId": "9768d3e06c23ce20286e160e2229541d296350d8ce94577310850ed3af02629a",
+    "ipAddress": "172.21.14.68",
+    "ipPrefixLength": 16,
+    "gateway": "172.21.0.1"
+  },
+  "directProbe": {
+    "connected": true,
+    "elapsedMs": 1.4808,
+    "error": null,
+    "endpoint": "172.21.14.68:5900",
+    "clock": "host process.hrtime.bigint"
+  },
+  "dockerPublishedPorts": [],
+  "dockerPortOutput": [],
+  "bound": {
+    "address": "127.0.0.1",
+    "family": "IPv4",
+    "port": 64681,
+    "requestedPort": 0
+  },
+  "upstream": {
+    "host": "172.21.14.68",
+    "port": 5900
+  },
+  "listenerBindings": [
+    {
+      "localAddress": "127.0.0.1",
+      "localPort": 64681,
+      "owningProcess": 9516
+    }
+  ],
+  "stats": {
+    "acceptedConnections": 1,
+    "successfulUpstreamConnections": 1,
+    "upstreamConnectionFailures": 0,
+    "downstreamErrors": 0,
+    "downstreamToUpstreamBytes": 102,
+    "upstreamToDownstreamBytes": 6291575,
+    "serverErrors": 0,
+    "lastUpstreamError": null,
+    "lastServerError": null,
+    "activeConnections": 0
+  },
+  "cleanup": {
+    "closed": true,
+    "listenerReachable": false,
+    "elapsedMs": 1.0411,
+    "activeConnections": 1,
+    "listenerBindingsAfterClose": [],
+    "closedWallTime": "2026-08-07T23:54:08.081Z"
+  },
+  "readyWallTime": "2026-08-07T23:54:04.278Z",
+  "rfbTraversedWallTime": "2026-08-07T23:54:04.364Z"
+}

@@ -1,0 +1,21 @@
+{
+    "schema":  "labview-benchmark-actor/windows-docker-tightvnc-failure@1",
+    "outcome":  "inconclusive",
+    "failedGate":  3,
+    "classification":  "desktop-has-zero-displays",
+    "error":  "Container exited before TightVNC readiness. Logs:\n2026-08-07T08:46:17.3280618Z [container-bootstrap] Selected Inherited desktop \u0027Service-0x0-548d070$\\Default\u0027 (explicit startup desktop=\u003cinherited\u003e).\r\nEnumDisplayMonitors found zero displays on \u0027Service-0x0-548d070$\\Default\u0027.\r\nAt C:\\experiment\\container-bootstrap.ps1:255 char:7\r\n+       throw \"EnumDisplayMonitors found zero displays on \u0027$($desktopCo ...\r\n+       ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\r\n    + CategoryInfo          : OperationStopped: (EnumDisplayMoni...d070$\\Defau \r\n   lt\u0027.:String) [], RuntimeException\r\n    + FullyQualifiedErrorId : EnumDisplayMonitors found zero displays on \u0027Serv \r\n   ice-0x0-548d070$\\Default\u0027.\r\n ",
+    "wallTime":  "2026-08-07T08:48:20.9095935Z",
+    "runId":  "20260807T084403463Z-8bb9b4643f",
+    "image":  {
+                  "reference":  "nationalinstruments/labview:2026q3-windows",
+                  "expectedId":  "sha256:f45c639a201f51875465a0d02aa69e65a3630054e564c8724c105f2e1b5eee30",
+                  "resolvedId":  "sha256:f45c639a201f51875465a0d02aa69e65a3630054e564c8724c105f2e1b5eee30"
+              },
+    "containerId":  "8ca4eff7551d2243327437cf5bd0fcad391a75b6d8755bc2521965a8c9d388af",
+    "isolation":  "process",
+    "desktopTarget":  "Inherited",
+    "tightVncCaptureMode":  "StandardGdi",
+    "gpuDeviceAssigned":  true,
+    "tightVncInstallerSha256":  "0d6402e530a563c90040d7c07b98ab68670d3669e4cc573ad24056ff960c9dcb",
+    "recommendedNextHypothesis":  "Inspect the preserved container and RFB diagnostics for the failed proof gate."
+}

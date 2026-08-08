@@ -857,10 +857,35 @@ try {
 
       const n0 = errorMessages.length;
       const s0 = sentCommands.length;
+      const i0 = infoMessages.length;
       errorResponseQueue.push('Install ffmpeg (winget)');
       await cap();
       assert(errorMessages.slice(n0).some((m) => /ffmpeg is required/i.test(m)), 'captureLaunch prompts when ffmpeg is missing');
       assert(sentCommands.slice(s0).some((c) => /winget install/i.test(c)), 'the Install button runs winget');
+      assert(
+        infoMessages.slice(i0).some((m) => /fully close every VS Code window/i.test(m)),
+        'the Install button explains the required full VS Code restart',
+      );
+      const restartErrorCount = errorMessages.length;
+      const restartCommandCount = sentCommands.length;
+      await cap();
+      assert(
+        errorMessages.slice(restartErrorCount).some((m) => /do not reinstall ffmpeg/i.test(m)),
+        'a second capture in the same extension session requires restart instead of offering reinstall',
+      );
+      assert(
+        sentCommands.length === restartCommandCount,
+        'the restart-required guard does not launch a duplicate winget install',
+      );
+      const retryExternalCount = openedExternal.length;
+      errorResponseQueue.push('Retry ffmpeg setup\u2026');
+      errorResponseQueue.push('Download ffmpeg\u2026');
+      await cap();
+      assert(
+        openedExternal.slice(retryExternalCount).some((u) => /ffmpeg/i.test(u)),
+        'a failed or cancelled winget install can reopen the ffmpeg setup choices',
+      );
+      ext.resetFfmpegInstallPendingForTest();
 
       const e0 = openedExternal.length;
       errorResponseQueue.push('Download ffmpeg\u2026');

@@ -16,8 +16,8 @@
 // Exit: 0 = the visual review passes (cleared to publish); 1 = fail-closed; 2 = usage.
 
 import { readFileSync } from 'node:fs';
-import { fileURLToPath } from 'node:url';
-import { dirname, join } from 'node:path';
+import { fileURLToPath, pathToFileURL } from 'node:url';
+import { dirname, join, resolve } from 'node:path';
 import { gateVisualReview } from '../../experiments/handoff-beacon/reviewerVerdict.mjs';
 
 /**
@@ -30,7 +30,7 @@ export function verifyVisualReview({ record, reviewerAllowlist = {}, minReviewer
   return gateVisualReview({ verdict: r.verdict, signOffs, reviewerAllowlist, minReviewers });
 }
 
-if (import.meta.url === `file://${process.argv[1]}`) {
+if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1])).href) {
   const argv = process.argv.slice(2);
   const opt = {};
   let versionArg = '';

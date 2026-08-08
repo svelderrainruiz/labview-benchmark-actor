@@ -1,0 +1,192 @@
+{
+  "schema": "labview-benchmark-actor/windows-docker-tightvnc-failure@1",
+  "outcome": "inconclusive",
+  "failedGate": 3,
+  "classification": "black-or-uniform-framebuffer",
+  "error": "initial framebuffer failed pixel proof: single-color-or-single-luminance-population",
+  "wallTime": "2026-08-07T07:56:01.349Z",
+  "environment": {
+    "schema": "labview-benchmark-actor/windows-docker-environment@1",
+    "runId": "20260807T075339152Z-d5880932bd",
+    "wallTime": "2026-08-07T07:55:57.9255884Z",
+    "hostOs": {
+      "Caption": "Microsoft Windows 11 Pro",
+      "Version": "10.0.26200",
+      "BuildNumber": "26200",
+      "OSArchitecture": "64-bit"
+    },
+    "docker": {
+      "serverVersion": "29.4.3",
+      "osType": "windows"
+    },
+    "image": {
+      "reference": "nationalinstruments/labview:2026q3-windows",
+      "id": "sha256:f45c639a201f51875465a0d02aa69e65a3630054e564c8724c105f2e1b5eee30",
+      "expectedId": "sha256:f45c639a201f51875465a0d02aa69e65a3630054e564c8724c105f2e1b5eee30",
+      "unexpectedIdOverride": false,
+      "os": "windows",
+      "architecture": "amd64"
+    },
+    "container": {
+      "id": "b5e78ac9cc31423de78ba45e22ebb0eddbe0608a4a11be868a7773c2a91f690e",
+      "name": "lba-win-vnc-d5880932bd",
+      "isolation": "process",
+      "network": {
+        "containerId": "b5e78ac9cc31423de78ba45e22ebb0eddbe0608a4a11be868a7773c2a91f690e",
+        "networkName": "nat",
+        "networkId": "a2e0cc3906121020b3f96d9b1f588923c7500cd463bb89bf975d3c218c588cbf",
+        "endpointId": "304a2af9d0ab8bdb4c57dcaa0a249707fed6fe331b8f61103704cd612e2cc1ac",
+        "ipAddress": "172.21.9.62",
+        "ipPrefixLength": 16,
+        "gateway": "172.21.0.1"
+      },
+      "dockerPublishedPorts": []
+    },
+    "containerOs": {
+      "Caption": "Microsoft Windows Server 2022 Datacenter",
+      "Version": "10.0.20348",
+      "BuildNumber": "20348",
+      "OSArchitecture": "64-bit"
+    },
+    "tightVnc": {
+      "version": "2.8.81",
+      "installerSha256": "0d6402e530a563c90040d7c07b98ab68670d3669e4cc573ad24056ff960c9dcb",
+      "installerSource": "local-cache",
+      "authentication": "ephemeral VNC authentication"
+    }
+  },
+  "rfb": {
+    "width": 1024,
+    "height": 768,
+    "rfbVersion": "3.8",
+    "securityType": 2,
+    "securityTypeName": "VNC Authentication",
+    "serverName": "b5e78ac9cc31",
+    "updateCount": 2
+  },
+  "network": {
+    "schema": "labview-benchmark-actor/windows-docker-network-preflight@1",
+    "status": "passed",
+    "containerId": "b5e78ac9cc31423de78ba45e22ebb0eddbe0608a4a11be868a7773c2a91f690e",
+    "wallTime": "2026-08-07T07:55:57.465Z",
+    "classification": null,
+    "target": {
+      "containerId": "b5e78ac9cc31423de78ba45e22ebb0eddbe0608a4a11be868a7773c2a91f690e",
+      "networkName": "nat",
+      "networkId": "a2e0cc3906121020b3f96d9b1f588923c7500cd463bb89bf975d3c218c588cbf",
+      "endpointId": "304a2af9d0ab8bdb4c57dcaa0a249707fed6fe331b8f61103704cd612e2cc1ac",
+      "ipAddress": "172.21.9.62",
+      "ipPrefixLength": 16,
+      "gateway": "172.21.0.1"
+    },
+    "dockerPublishedPorts": [],
+    "dockerPortOutput": [],
+    "directProbe": {
+      "connected": true,
+      "elapsedMs": 1.4552,
+      "error": null,
+      "endpoint": "172.21.9.62:5900",
+      "clock": "host process.hrtime.bigint"
+    }
+  },
+  "relay": {
+    "schema": "labview-benchmark-actor/windows-docker-loopback-relay@1",
+    "status": "rfb-traversed",
+    "processId": 23976,
+    "containerId": "b5e78ac9cc31423de78ba45e22ebb0eddbe0608a4a11be868a7773c2a91f690e",
+    "network": {
+      "containerId": "b5e78ac9cc31423de78ba45e22ebb0eddbe0608a4a11be868a7773c2a91f690e",
+      "networkName": "nat",
+      "networkId": "a2e0cc3906121020b3f96d9b1f588923c7500cd463bb89bf975d3c218c588cbf",
+      "endpointId": "304a2af9d0ab8bdb4c57dcaa0a249707fed6fe331b8f61103704cd612e2cc1ac",
+      "ipAddress": "172.21.9.62",
+      "ipPrefixLength": 16,
+      "gateway": "172.21.0.1"
+    },
+    "directProbe": {
+      "connected": true,
+      "elapsedMs": 1.4552,
+      "error": null,
+      "endpoint": "172.21.9.62:5900",
+      "clock": "host process.hrtime.bigint"
+    },
+    "dockerPublishedPorts": [],
+    "dockerPortOutput": [],
+    "bound": {
+      "address": "127.0.0.1",
+      "family": "IPv4",
+      "port": 54778,
+      "requestedPort": 0
+    },
+    "upstream": {
+      "host": "172.21.9.62",
+      "port": 5900
+    },
+    "listenerBindings": [
+      {
+        "localAddress": "127.0.0.1",
+        "localPort": 54778,
+        "owningProcess": 23976
+      }
+    ],
+    "stats": {
+      "acceptedConnections": 1,
+      "successfulUpstreamConnections": 1,
+      "upstreamConnectionFailures": 0,
+      "downstreamErrors": 0,
+      "downstreamToUpstreamBytes": 88,
+      "upstreamToDownstreamBytes": 6291559,
+      "serverErrors": 0,
+      "lastUpstreamError": null,
+      "lastServerError": null,
+      "activeConnections": 1
+    },
+    "cleanup": {
+      "closed": false,
+      "listenerBindingsAfterClose": null
+    },
+    "readyWallTime": "2026-08-07T07:55:59.787Z",
+    "rfbTraversedWallTime": "2026-08-07T07:55:59.873Z"
+  },
+  "frameCount": 18,
+  "resourceSampleCount": 1,
+  "resourceErrors": [],
+  "recommendedNextHypothesis": "Test an explicitly interactive container desktop; do not substitute host-desktop capture.",
+  "clockSources": {
+    "capture": "host process.hrtime.bigint",
+    "wall": "host Date.toISOString"
+  },
+  "initialAnalysis": {
+    "passed": false,
+    "pixels": 786432,
+    "roi": {
+      "x": 0,
+      "y": 0,
+      "width": 1024,
+      "height": 768
+    },
+    "meaningfulThreshold": 787,
+    "meaningfulLumaPopulations": 1,
+    "blackFraction": 1,
+    "transparentFraction": 0,
+    "lumaBins": [
+      786432,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0
+    ],
+    "reason": "single-color-or-single-luminance-population"
+  }
+}

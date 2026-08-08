@@ -6,6 +6,41 @@ follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project
 
 ## [Unreleased]
 
+## [1.4.0] - 2026-08-08
+
+### Added
+- **Verified Windows-container TightVNC image acquisition.** The local experiment now retains and
+  independently verifies the PNG decoded from the exact run-owned container's authenticated RFB
+  stream, binds its container/network/relay provenance into a deterministic MPRR transport replay,
+  and executes the repository's `lbabus` capability probe inside the pinned image. Verbose
+  timestamped host and container diagnostics expose each acquisition and cleanup stage. The live
+  proof remains fail-closed: the acquired `1024x768` image is uniformly black, is explicitly marked
+  unusable, and cannot be represented as an interactive desktop or visual LabVIEW benchmark.
+
+### Fixed
+- **Marketplace publication verification exits cleanly on a missing version or query failure.** The
+  asynchronous `release-verify-published` command now finishes its Marketplace query before setting
+  a failing exit code instead of forcing process termination while Node still owns network handles.
+- **Retained reviewer staging preserves the sealed candidate bytes.** The reviewer-cache wrapper now
+  stages the already-built pinned-Node VSIX without rebuilding it, rejects a mismatched expected
+  SHA-256 before VM mutation, and verifies the uploaded guest candidate hash before accepting the
+  interactive-profile installation.
+- **Reviewer cache artifacts survive later candidate builds.** New cache seals archive their exact
+  VSIX under the cache root instead of retaining a mutable worktree path. The historical cache has an
+  explicit recovery path that verifies and binds an installed-extension archive and per-file manifest
+  to the powered-off source snapshot when the original timestamped VSIX was not retained.
+- **Activated LabVIEW capture accepts its real content window layout.** When LabVIEW exposes a
+  zero-sized titled frame plus a usable untitled child window, the launcher binds the largest usable
+  process-owned window to the same-process `LabVIEW` title evidence instead of failing the fresh
+  activation probe. DWM extended-frame bounds replace zero/client-only `GetWindowRect` values when
+  available. When LabVIEW's titled `LVFrame` still reports `0x0`, a recorded narrow expansion around
+  the same-process client bounds includes its visible title, menu, and frame without promoting the ROI
+  to a full-desktop claim. Missing capture summaries now surface the original capture failure directly.
+- **Reviewer key rotation preserves historical signatures.** Reviewer allowlist entries may retain an
+  ordered set of enrolled Ed25519 public keys, allowing a missing VM-local private key to be replaced
+  without invalidating prior release evidence. Signing-status discovery now invokes guest PowerShell
+  directly and recognizes rotated-key entries.
+
 ## [1.3.0] - 2026-08-06
 
 ### Added

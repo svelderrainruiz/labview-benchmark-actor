@@ -1,0 +1,43 @@
+{
+    "schema":  "labview-benchmark-actor/windows-container-display-probe-environment@1",
+    "runId":  "display-probe-20260807T092446162Z-738004c0c7",
+    "wallTime":  "2026-08-07T09:25:00.6117672Z",
+    "isolation":  "hyperv",
+    "desktopTarget":  "Inherited",
+    "deviceAssignment":  "none",
+    "image":  {
+                  "reference":  "nationalinstruments/labview:2026q3-windows",
+                  "id":  "sha256:f45c639a201f51875465a0d02aa69e65a3630054e564c8724c105f2e1b5eee30",
+                  "expectedId":  "sha256:f45c639a201f51875465a0d02aa69e65a3630054e564c8724c105f2e1b5eee30"
+              },
+    "containerId":  "3c51e041fa8f5492a6c1fa04de9622a2a5ea1b15447d7ced10a61252c8a428a1",
+    "dockerCreateArguments":  [
+                                  "create",
+                                  "--name",
+                                  "lba-display-probe-738004c0c7",
+                                  "--label",
+                                  "org.labview-benchmark-actor.windows-docker-run=display-probe-20260807T092446162Z-738004c0c7",
+                                  "--label",
+                                  "org.labview-benchmark-actor.experiment=windows-docker-display-probe",
+                                  "--isolation=hyperv",
+                                  "--mount",
+                                  "type=bind,source=C:\\dev\\gh\\labview-benchmark-actor.worktrees\\windows-docker-tightvnc-labview-experiment\\experiments\\windows-docker-container,target=C:\\experiment,readonly",
+                                  "--mount",
+                                  "type=bind,source=C:\\dev\\gh\\labview-benchmark-actor.worktrees\\windows-docker-tightvnc-labview-experiment\\experiments\\windows-docker-container\\evidence\\display-probe-20260807T092446162Z-738004c0c7,target=C:\\evidence",
+                                  "nationalinstruments/labview:2026q3-windows",
+                                  "powershell.exe",
+                                  "-NoLogo",
+                                  "-NoProfile",
+                                  "-NonInteractive",
+                                  "-ExecutionPolicy",
+                                  "Bypass",
+                                  "-File",
+                                  "C:\\experiment\\container-bootstrap.ps1",
+                                  "-Action",
+                                  "DisplayProbe",
+                                  "-DesktopTarget",
+                                  "Inherited",
+                                  "-RunId",
+                                  "display-probe-20260807T092446162Z-738004c0c7"
+                              ]
+}

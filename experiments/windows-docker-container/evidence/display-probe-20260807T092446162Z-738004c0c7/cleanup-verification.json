@@ -1,0 +1,9 @@
+{
+    "wallTime":  "2026-08-07T09:25:25.1442189Z",
+    "containerId":  "3c51e041fa8f5492a6c1fa04de9622a2a5ea1b15447d7ced10a61252c8a428a1",
+    "containerAbsent":  true,
+    "noRelayListener":  true,
+    "noVncListener":  true,
+    "secretNeverCreated":  true,
+    "probeTemporaryStateRemoved":  true
+}

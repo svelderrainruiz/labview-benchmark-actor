@@ -21,7 +21,7 @@
 // object embedded as releases.<version>.visualReview). Exit: 0 = recorded + both gates pass; 1 = fail-closed; 2 = usage.
 
 import { readFileSync, writeFileSync } from 'node:fs';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 import { dirname, join, resolve } from 'node:path';
 import { verifyReleaseAgreement } from './verify-release-agreement.mjs';
 import { verifyVisualReview } from './verify-visual-review.mjs';
@@ -174,7 +174,7 @@ export function recordReleaseAgreement({
   return report;
 }
 
-if (import.meta.url === `file://${process.argv[1]}`) {
+if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1])).href) {
   const argv = process.argv.slice(2);
   const opt = {};
   for (let i = 0; i < argv.length; i += 1) {

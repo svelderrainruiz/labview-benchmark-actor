@@ -21,6 +21,8 @@
 import { dhash64FromRgba } from '../manual-procedure-record/fingerprint.mjs';
 
 const TICKS_PER_MS = 10_000; // 100ns ticks per millisecond (mprr timing unit)
+const ENCODING_RAW = 0;
+const ENCODING_DESKTOP_SIZE = -223;
 
 // --- RFB VNC authentication (security type 2): a self-contained DES so the shared core needs NO OpenSSL legacy
 //     provider (Node 22 / OpenSSL 3 moved des-ecb out of the default provider -> ERR_OSSL_EVP_UNSUPPORTED).
@@ -152,7 +154,7 @@ function makeReader(sock) {
   });
 }
 
-/** RFB handshake (None or VNC auth, force 32bpp true-colour [R,G,B,pad], Raw encoding). Returns {width,height}. */
+/** RFB handshake (None or VNC auth, force 32bpp true-colour [R,G,B,pad], Raw encoding). */
 async function rfbHandshake(read, write, password) {
   // 1) ProtocolVersion.
   const pv = await read(12);
@@ -160,6 +162,7 @@ async function rfbHandshake(read, write, password) {
   if (!m) throw new Error(`RFB: bad ProtocolVersion ${JSON.stringify(pv.toString('latin1'))}`);
   const major = Number(m[1]);
   const minor = Math.min(Number(m[2]), 8);
+  const rfbVersion = `${major}.${minor}`;
   write(Buffer.from(`RFB ${String(major).padStart(3, '0')}.${String(minor).padStart(3, '0')}\n`, 'latin1'));
 
   // 2) Security. Prefer None(1). If the server only offers VNC auth(2) — e.g. VirtualBox's VNC VRDE, which
@@ -172,14 +175,17 @@ async function rfbHandshake(read, write, password) {
     const result = (await read(4)).readUInt32BE(0);
     if (result !== 0) throw new Error('RFB: VNC authentication failed (check the VNC password)');
   };
+  let securityType;
   if (minor >= 7) {
     const count = (await read(1))[0];
     if (count === 0) { const rlen = (await read(4)).readUInt32BE(0); throw new Error(`RFB: server refused: ${(await read(rlen)).toString('utf8')}`); }
     const types = await read(count);
     if (types.includes(1)) {
+      securityType = 1;
       write(Buffer.from([1])); // None
       if (minor >= 8) { const result = (await read(4)).readUInt32BE(0); if (result !== 0) throw new Error('RFB: None SecurityResult failed'); }
     } else if (types.includes(2)) {
+      securityType = 2;
       write(Buffer.from([2])); // VNC authentication
       await doVncAuth();
     } else {
@@ -188,8 +194,10 @@ async function rfbHandshake(read, write, password) {
   } else {
     const type = (await read(4)).readUInt32BE(0);
     if (type === 1) {
+      securityType = 1;
       // None — RFB 3.3 sends no SecurityResult.
     } else if (type === 2) {
+      securityType = 2;
       await doVncAuth();
     } else {
       throw new Error(`RFB: unsupported 3.3 security type ${type}`);
@@ -202,7 +210,7 @@ async function rfbHandshake(read, write, password) {
   const width = si.readUInt16BE(0);
   const height = si.readUInt16BE(2);
   const nameLen = si.readUInt32BE(20);
-  if (nameLen) await read(nameLen);
+  const serverName = nameLen ? (await read(nameLen)).toString('utf8') : '';
   if (!width || !height) throw new Error(`RFB: degenerate framebuffer ${width}x${height}`);
 
   // 4) SetPixelFormat -> 32bpp true-colour, LE, bytes [R,G,B,pad].
@@ -212,16 +220,27 @@ async function rfbHandshake(read, write, password) {
   spf[14] = 0; spf[15] = 8; spf[16] = 16;
   write(spf);
 
-  // 5) SetEncodings -> Raw(0) only.
-  const enc = Buffer.alloc(8);
-  enc[0] = 2; enc.writeUInt16BE(1, 2); enc.writeUInt32BE(0, 4);
+  // 5) SetEncodings -> Raw(0) + standard DesktopSize(-223). TightVNC sends a blank frame when the dimensions
+  //    differ unless the client advertises resize support. DesktopSize carries no payload; after receiving it,
+  //    the streaming pump reallocates the framebuffer and requests a new full Raw update.
+  const enc = Buffer.alloc(12);
+  enc[0] = 2; enc.writeUInt16BE(2, 2);
+  enc.writeInt32BE(ENCODING_RAW, 4);
+  enc.writeInt32BE(ENCODING_DESKTOP_SIZE, 8);
   write(enc);
 
-  return { width, height };
+  return {
+    width,
+    height,
+    rfbVersion,
+    securityType,
+    securityTypeName: securityType === 1 ? 'None' : 'VNC Authentication',
+    serverName,
+  };
 }
 
-/** Read ONE FramebufferUpdate (skipping Bell/ServerCutText/ColourMap) and apply its Raw rects to fb. */
-async function readOneUpdate(read, fb, width) {
+/** Read ONE FramebufferUpdate (skipping Bell/ServerCutText/ColourMap), applying Raw rects or returning a resize. */
+async function readOneUpdate(read, fb, width, height) {
   for (;;) {
     const type = (await read(1))[0];
     if (type === 0) break;
@@ -232,11 +251,25 @@ async function readOneUpdate(read, fb, width) {
   }
   await read(1); // padding
   const numRects = (await read(2)).readUInt16BE(0);
+  let rawRects = 0;
+  let resized = null;
   for (let r = 0; r < numRects; r++) {
     const hdr = await read(12);
     const rx = hdr.readUInt16BE(0), ry = hdr.readUInt16BE(2), rw = hdr.readUInt16BE(4), rh = hdr.readUInt16BE(6);
     const encoding = hdr.readInt32BE(8);
-    if (encoding !== 0) throw new Error(`RFB: unexpected encoding ${encoding} (requested Raw only)`);
+    if (encoding === ENCODING_DESKTOP_SIZE) {
+      if (rx !== 0 || ry !== 0 || !rw || !rh) {
+        throw new Error(`RFB: invalid DesktopSize rectangle ${rx},${ry} ${rw}x${rh}`);
+      }
+      if (resized || rawRects) throw new Error('RFB: DesktopSize must be the only rectangle in an update');
+      resized = { width: rw, height: rh };
+      continue;
+    }
+    if (encoding !== ENCODING_RAW) throw new Error(`RFB: unexpected encoding ${encoding} (requested Raw + DesktopSize)`);
+    if (resized) throw new Error('RFB: Raw rectangle cannot follow DesktopSize in the same update');
+    if (rx + rw > width || ry + rh > height) {
+      throw new Error(`RFB: Raw rectangle ${rx},${ry} ${rw}x${rh} exceeds framebuffer ${width}x${height}`);
+    }
     const px = await read(rw * rh * 4);
     for (let y = 0; y < rh; y++) {
       for (let x = 0; x < rw; x++) {
@@ -245,13 +278,15 @@ async function readOneUpdate(read, fb, width) {
         fb[d] = px[s]; fb[d + 1] = px[s + 1]; fb[d + 2] = px[s + 2]; fb[d + 3] = 255;
       }
     }
+    rawRects += 1;
   }
-  return numRects;
+  return { numRects, rawRects, resized };
 }
 
 /**
  * Connect + maintain a live framebuffer over incremental RFB updates. Returns immediately with a handle:
- *   ready: Promise<{width,height}> — resolves after the first (full) update lands
+ *   ready: Promise<{width,height,rfbVersion,securityType,securityTypeName,serverName}> — resolves after the
+ *          first (full) update lands
  *   current(): Uint8Array — the live RGBA framebuffer (mutated in place as updates apply)
  *   updateCount(): number — how many FramebufferUpdates have been applied
  *   close(): void — stop the pump + destroy the socket
@@ -261,7 +296,7 @@ export function createStreamingFramebuffer({ host, port, connect, onUpdate, pass
   const sock = connect({ host, port });
   const read = makeReader(sock);
   const write = (b) => sock.write(b);
-  let width = 0, height = 0, fb = null, closed = false, updates = 0;
+  let width = 0, height = 0, fb = null, closed = false, updates = 0, connectionInfo = null;
   let readyResolve, readyReject;
   const ready = new Promise((res, rej) => { readyResolve = res; readyReject = rej; });
 
@@ -275,17 +310,43 @@ export function createStreamingFramebuffer({ host, port, connect, onUpdate, pass
 
   (async () => {
     try {
-      ({ width, height } = await rfbHandshake(read, write, password));
+      connectionInfo = await rfbHandshake(read, write, password);
+      ({ width, height } = connectionInfo);
       fb = new Uint8Array(width * height * 4);
-      requestUpdate(false); // full screen
-      await readOneUpdate(read, fb, width);
-      updates += 1;
-      readyResolve({ width, height });
-      onUpdate?.(fb, updates);
-      while (!closed) {
-        requestUpdate(true); // incremental
-        await readOneUpdate(read, fb, width);
+      // A server may answer the first request with DesktopSize only. Do not declare readiness until a real Raw
+      // framebuffer lands at the negotiated/current dimensions.
+      for (;;) {
+        requestUpdate(false);
+        const result = await readOneUpdate(read, fb, width, height);
         updates += 1;
+        if (result.resized) {
+          ({ width, height } = result.resized);
+          connectionInfo.width = width;
+          connectionInfo.height = height;
+          connectionInfo.resizeCount = (connectionInfo.resizeCount ?? 0) + 1;
+          fb = new Uint8Array(width * height * 4);
+          continue;
+        }
+        if (result.rawRects === 0) continue;
+        readyResolve({ ...connectionInfo });
+        onUpdate?.(fb, updates);
+        break;
+      }
+      let incremental = true;
+      while (!closed) {
+        requestUpdate(incremental);
+        const result = await readOneUpdate(read, fb, width, height);
+        updates += 1;
+        if (result.resized) {
+          ({ width, height } = result.resized);
+          connectionInfo.width = width;
+          connectionInfo.height = height;
+          connectionInfo.resizeCount = (connectionInfo.resizeCount ?? 0) + 1;
+          fb = new Uint8Array(width * height * 4);
+          incremental = false;
+          continue;
+        }
+        incremental = true;
         onUpdate?.(fb, updates);
       }
     } catch (err) {
@@ -297,6 +358,7 @@ export function createStreamingFramebuffer({ host, port, connect, onUpdate, pass
     ready,
     current: () => fb,
     dims: () => ({ width, height }),
+    info: () => connectionInfo,
     updateCount: () => updates,
     close: () => { closed = true; try { sock.destroy?.(); } catch { /* ignore */ } },
   };

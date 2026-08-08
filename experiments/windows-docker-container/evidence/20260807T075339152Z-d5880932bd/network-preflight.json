@@ -1,0 +1,25 @@
+{
+  "schema": "labview-benchmark-actor/windows-docker-network-preflight@1",
+  "status": "passed",
+  "containerId": "b5e78ac9cc31423de78ba45e22ebb0eddbe0608a4a11be868a7773c2a91f690e",
+  "wallTime": "2026-08-07T07:55:57.465Z",
+  "classification": null,
+  "target": {
+    "containerId": "b5e78ac9cc31423de78ba45e22ebb0eddbe0608a4a11be868a7773c2a91f690e",
+    "networkName": "nat",
+    "networkId": "a2e0cc3906121020b3f96d9b1f588923c7500cd463bb89bf975d3c218c588cbf",
+    "endpointId": "304a2af9d0ab8bdb4c57dcaa0a249707fed6fe331b8f61103704cd612e2cc1ac",
+    "ipAddress": "172.21.9.62",
+    "ipPrefixLength": 16,
+    "gateway": "172.21.0.1"
+  },
+  "dockerPublishedPorts": [],
+  "dockerPortOutput": [],
+  "directProbe": {
+    "connected": true,
+    "elapsedMs": 1.4552,
+    "error": null,
+    "endpoint": "172.21.9.62:5900",
+    "clock": "host process.hrtime.bigint"
+  }
+}
