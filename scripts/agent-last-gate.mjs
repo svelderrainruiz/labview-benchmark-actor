@@ -24,7 +24,17 @@ const skipTests = argv.includes('--skip-tests');
 const emitJson = argv.includes('--json');
 
 const SIZE_CEILING_BYTES = 1024 * 1024; // 1 MiB -- a real extension .vsix is ~26 KB.
-const ALLOW_SET = [/^package\.json$/, /^README\.md$/, /^CHANGELOG\.md$/, /^LICENSE(\.[A-Za-z]+)?$/i, /^out\//, /^media\//];
+const ALLOW_SET = [
+  /^package\.json$/,
+  /^README\.md$/,
+  /^CHANGELOG\.md$/,
+  /^LICENSE(\.[A-Za-z]+)?$/i,
+  /^release-components\.json$/,
+  /^release-risk-baseline\.json$/,
+  /^standards-score-baseline\.json$/,
+  /^out\//,
+  /^media\//,
+];
 
 const checks = [];
 function record(name, pass, detail) {
