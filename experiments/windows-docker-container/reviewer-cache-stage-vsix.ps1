@@ -110,8 +110,21 @@ $stagePhase = if ($installedCount) { 'REVIEWER-VSIX-RESTAGE-START' } else { 'REV
 $installedPhase = if ($installedCount) { 'REVIEWER-VSIX-RESTAGED' } else { 'REVIEWER-VSIX-INSTALLED' }
 $worktreeStatus = Join-Path $activeEvidenceRoot "vsix-worktree-status-attempt-$attempt.txt"
 $worktreePatch = Join-Path $activeEvidenceRoot "vsix-worktree-attempt-$attempt.patch"
-git -C $repoRoot status --porcelain=v1 | Set-Content -LiteralPath $worktreeStatus -Encoding UTF8
-git -C $repoRoot diff --binary --full-index HEAD | Set-Content -LiteralPath $worktreePatch -Encoding UTF8
+$statusLines = @(& git -C $repoRoot status --porcelain=v1)
+if ($LASTEXITCODE) { throw 'Could not capture release worktree status before VSIX staging.' }
+$patchLines = @(& git -C $repoRoot diff --binary --full-index HEAD)
+if ($LASTEXITCODE) { throw 'Could not capture release worktree patch before VSIX staging.' }
+$utf8 = [Text.UTF8Encoding]::new($false)
+[IO.File]::WriteAllText(
+  $worktreeStatus,
+  $(if ($statusLines.Count) { "$($statusLines -join "`n")`n" } else { '' }),
+  $utf8
+)
+[IO.File]::WriteAllText(
+  $worktreePatch,
+  $(if ($patchLines.Count) { "$($patchLines -join "`n")`n" } else { '' }),
+  $utf8
+)
 $provenance = [ordered]@{
   schema = 'labview-benchmark-actor/local-vsix-worktree@1'
   wallTime = [DateTime]::UtcNow.ToString('o')
