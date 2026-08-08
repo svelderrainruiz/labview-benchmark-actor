@@ -4,16 +4,19 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import readline from 'node:readline';
+import { assessReleaseRisk, riskSummaryLines, verifyGovernedRisk } from './release-risk.mjs';
 
 const mode = process.argv[2];
 const workspace = process.cwd();
-const HUMAN_TASKS_VERSION = '1.0.1';
+const HUMAN_TASKS_VERSION = '1.0.2';
 const startedNs = process.hrtime.bigint();
 const startedWallTime = new Date().toISOString();
 const events = [];
 let eventIndex = 0;
 const releaseComponents = JSON.parse(readFileSync(new URL('../release-components.json', import.meta.url), 'utf8'));
 const governance = releaseComponents.governance;
+const releaseRiskBaseline = JSON.parse(readFileSync(new URL('../release-risk-baseline.json', import.meta.url), 'utf8'));
+const standardsScoreBaseline = JSON.parse(readFileSync(new URL('../standards-score-baseline.json', import.meta.url), 'utf8'));
 const REQUIRED_STANDARD_FILES = [
   'ISO_10007_2017(en).pdf',
   '12207-2017.pdf',
@@ -137,21 +140,43 @@ async function governanceReview() {
     `${governance.workbenchImage}@${governance.workbenchDigest}`,
     'python3', 'scripts/run_assurance.py', '/target', '--profile', 'release-gate',
   ]);
+  const risk = assessReleaseRisk(releaseRiskBaseline, {
+    artifactExists: (artifact) => existsSync(path.join(workspace, artifact)),
+    scoreBaseline: standardsScoreBaseline,
+  });
+  if (!risk.ok) throw new Error(`Release risk baseline is invalid: ${risk.reasons.join('; ')}`);
+  const governedRisk = verifyGovernedRisk(risk, governance.releaseRisk);
+  if (!governedRisk.ok) {
+    throw new Error(`Release risk does not match the governed system state: ${governedRisk.reasons.join('; ')}`);
+  }
+  for (const [index, line] of riskSummaryLines(risk).entries()) {
+    event(index === 0 ? 'release-risk-score' : 'release-risk-gate', line, index === 0 ? {
+      present: risk.present,
+      missing: risk.missing,
+      total: risk.total,
+      completionPercent: risk.completionPercent,
+      status: risk.status,
+    } : risk.rows[index - 1]);
+  }
+  return risk;
 }
 
 async function reviewerReadiness() {
   await agentPreflight();
-  await governanceReview();
+  return governanceReview();
 }
 
 async function releaseCandidate() {
-  await reviewerReadiness();
+  const risk = await reviewerReadiness();
   if (!existsSync(path.join(workspace, 'package.json'))) {
     throw new Error('Release Candidate Check must run from a labview-benchmark-actor repository workspace.');
   }
-  await run('npm', ['test']);
-  await run(process.execPath, ['experiments/verify-local-gates.mjs']);
-  await run('npm', ['run', 'package']);
+  await run('npm', ['run', 'ci:local']);
+  if (risk.status !== 'READY') {
+    throw new Error(
+      `Release evidence is ${risk.status} at ${risk.present}/${risk.total}; complete the printed missing proofs.`
+    );
+  }
 }
 
 const tasks = {

@@ -31,6 +31,7 @@ import { parseAsciiReport, parseSummary } from './vi-analyzer/parse-vi-analyzer-
 import { verifyManifest as verifyExtensionAgentsManifest, agentsSha256, readManifest as readExtensionAgentsManifest, AGENTS_MD as EXTENSION_AGENTS_MD } from '../scripts/agentsManifest.mjs';
 import { normalizeZipTimestamps } from '../scripts/normalize-vsix.mjs';
 import { verifyPublishedVsix, sha256File } from '../scripts/verify-published-vsix.mjs';
+import { loadExperimentGovernance } from './experiment-governance.mjs';
 import { RATE_PROFILES, runProfile } from './mprr-ring/mprrPacketHarness.mjs';
 import { sealBootBenchmark } from './mprr-boot-benchmark/seal-boot-benchmark.mjs';
 import { parseSerialLog, parseSerialMarkerLine } from './mprr-boot-benchmark/serial-marker.mjs';
@@ -1364,14 +1365,22 @@ check('release-lineage', () => {
 check('coverage-artifact-meets-floor', () => {
   const floor = readJson('coverage-thresholds.json').floor;
   const xml = readFileSync(join(pkgRoot, 'coverage', 'cobertura-coverage.xml'), 'utf8');
-  const m = xml.match(/line-rate="([0-9.]+)"/);
-  assert(m, 'coverage/cobertura-coverage.xml must carry a line-rate');
-  const linePct = Number(m[1]) * 100;
+  const lineMatch = xml.match(/line-rate="([0-9.]+)"/);
+  const branchMatch = xml.match(/branch-rate="([0-9.]+)"/);
+  assert(lineMatch, 'coverage/cobertura-coverage.xml must carry a line-rate');
+  assert(branchMatch, 'coverage/cobertura-coverage.xml must carry a branch-rate');
+  const linePct = Number(lineMatch[1]) * 100;
+  const branchPct = Number(branchMatch[1]) * 100;
   assert(linePct >= floor.lines, `coverage line-rate ${linePct.toFixed(2)}% must meet the parametrized floor ${floor.lines}%`);
+  assert(branchPct >= floor.branches, `coverage branch-rate ${branchPct.toFixed(2)}% must meet the parametrized floor ${floor.branches}%`);
   const wf = join(pkgRoot, '.github', 'workflows', 'coverage.yml');
   assert(existsSync(wf), 'the PR Coverage Gate workflow (.github/workflows/coverage.yml) must exist');
   assert(/name:\s*PR Coverage Gate/.test(readFileSync(wf, 'utf8')), 'workflow must publish the "PR Coverage Gate / coverage" context');
-  return { linePct: +linePct.toFixed(2), floor: floor.lines };
+  return {
+    linePct: +linePct.toFixed(2),
+    branchPct: +branchPct.toFixed(2),
+    floor: { lines: floor.lines, branches: floor.branches },
+  };
 });
 
 // 18. Viewer time-cursor logic receipt is green: pointer + keyboard map to an in-bounds sample and no
@@ -1453,14 +1462,15 @@ check('human-task-shortcuts', () => {
   ]) assert(provider.includes(label), `task provider missing '${label}'`);
   assert(provider.includes("ELECTRON_RUN_AS_NODE: '1'"), 'human tasks must use VS Code bundled Node');
   assert(stage.includes("extension-tasks', 'human-task-runner.mjs"), 'human task runner is not staged into media');
+  assert(stage.includes("extension-tasks', 'release-risk.mjs"), 'release risk evaluator is not staged into media');
   assert(runner.includes('REPO_STANDARDS_REVIEW'), 'governance task lacks local standards checkout override');
   assert(runner.includes('STANDARDS_ROOT') && runner.includes('governance.standardsRootDefault'), 'governance task lacks local standards-corpus discovery');
   assert(runner.includes("`${corpus}:/standards:ro`") && runner.includes("'STANDARDS_ROOT=/standards'"), 'governance task does not mount standards read-only');
   assert(runner.includes('governance.standardsReviewCommit') && runner.includes('governance.workbenchDigest'), 'governance task does not pin its source commit and image digest');
-  assert(provider.includes("HUMAN_TASKS_VERSION = '1.0.1'"), 'task provider lacks bundle version 1.0.1');
-  assert(runner.includes("HUMAN_TASKS_VERSION = '1.0.1'"), 'task runner lacks bundle version 1.0.1');
+  assert(provider.includes("HUMAN_TASKS_VERSION = '1.0.2'"), 'task provider lacks bundle version 1.0.2');
+  assert(runner.includes("HUMAN_TASKS_VERSION = '1.0.2'"), 'task runner lacks bundle version 1.0.2');
   const agents = readFileSync(join(pkgRoot, 'extension-agents', 'AGENTS.md'), 'utf8');
-  assert(agents.includes('Compound human tasks — bundle v1.0.1'), 'generated AGENTS lacks task bundle version');
+  assert(agents.includes('Compound human tasks — bundle v1.0.2'), 'generated AGENTS lacks task bundle version');
   const collector = readFileSync(join(pkgRoot, 'reviewer-workstation', 'collect-review-raw.ps1'), 'utf8');
   for (const proof of ['reviewTarget', 'candidate', 'commands', 'taskDefinitions', 'agents', 'capabilities', 'reviewerSettings', 'screenshotpng']) {
     assert(collector.includes(proof), `raw review collector lacks ${proof} evidence`);
@@ -1489,6 +1499,10 @@ check('release-component-versioning', () => {
   const hook = readFileSync(join(pkgRoot, '.githooks', 'pre-commit'), 'utf8');
   const workflow = readFileSync(join(pkgRoot, '.github', 'workflows', 'extension-release.yml'), 'utf8');
   const releaseCli = readFileSync(join(pkgRoot, 'scripts', 'lba.mjs'), 'utf8');
+  const riskBaseline = readJson('release-risk-baseline.json');
+  const riskCore = readFileSync(join(pkgRoot, 'extension-tasks', 'release-risk.mjs'), 'utf8');
+  const agents = readFileSync(join(pkgRoot, 'extension-agents', 'AGENTS.md'), 'utf8');
+  const experimentGovernance = readJson(join('experiments', 'governance-overrides.json'));
   assert(versions.schema === 'labview-benchmark-actor/release-components@1', 'release component schema mismatch');
   assert(pkg.version === versions.extension && lock.version === versions.extension && lock.packages[''].version === versions.extension, 'extension package versions drifted');
   assert(agentsManifest.version === versions.agents, 'AGENTS version drifted');
@@ -1497,6 +1511,13 @@ check('release-component-versioning', () => {
   assert(versions.canonicalDistribution === 'github-release' && versions.marketplaceChannel === 'prerelease', 'distribution policy drifted');
   assert(/^[0-9a-f]{40}$/.test(versions.governance.standardsReviewCommit), 'standards-review commit is not pinned');
   assert(/^sha256:[0-9a-f]{64}$/.test(versions.governance.workbenchDigest), 'governance workbench digest is not pinned');
+  assert(versions.governance.standardsReviewVersion === '0.2.19', 'standards-review version is not pinned');
+  assert(riskBaseline.releaseVersion === versions.extension, 'release-risk version drifted');
+  assert(riskBaseline.source.workbenchVersion === versions.governance.standardsReviewVersion, 'release-risk workbench version drifted');
+  assert(riskBaseline.source.standardsReviewCommit === versions.governance.standardsReviewCommit, 'release-risk source commit drifted');
+  assert(riskBaseline.source.workbenchDigest === versions.governance.workbenchDigest, 'release-risk image digest drifted');
+  assert(riskCore.includes("const GATES = ['coverage', 'cm', 'req', 'arch', 'doc', 'dod']"), 'release-risk evaluator lacks all scorecard gates');
+  assert(agents.includes('repo-standards-review 0.2.19') && agents.includes('12/28 (42.9%)') && agents.includes('Prioritize DoD blockers'), 'generated AGENTS lacks forward risk awareness');
   assert(hook.includes('release-components.mjs --precommit'), 'precommit release-component gate missing');
   assert(
     workflow.includes('inputs.publish_marketplace')
@@ -1505,7 +1526,63 @@ check('release-component-versioning', () => {
     'GitHub-first Marketplace prerelease policy drifted',
   );
   assert(releaseCli.includes("'--target', 'main'"), 'GitHub release target-main control drifted');
+  assert(experimentGovernance.version === versions.experimentGovernance, 'experiment-governance version drifted');
   return { extension: versions.extension, agents: versions.agents, lbabus: versions.lbabus, humanTasks: versions.humanTasks };
+});
+
+check('standards-release-risk-baseline', () => {
+  const baseline = readJson('release-risk-baseline.json');
+  const scoreBaseline = readJson('standards-score-baseline.json');
+  const gateNames = ['coverage', 'cm', 'req', 'arch', 'doc', 'dod'];
+  assert(baseline.schema === 'labview-benchmark-actor/release-risk-baseline@1', 'release-risk schema mismatch');
+  assert(baseline.source.workbenchVersion === '0.2.19' && baseline.source.scoreSchema === '1.2.0', 'workbench score identity drifted');
+  assert(scoreBaseline.source.workbenchVersion === baseline.source.workbenchVersion, 'retained score workbench version drifted');
+  assert(scoreBaseline.source.standardsReviewCommit === baseline.source.standardsReviewCommit, 'retained score source commit drifted');
+  assert(scoreBaseline.source.workbenchDigest === baseline.source.workbenchDigest, 'retained score image digest drifted');
+  assert(scoreBaseline.source.rawScoreSha256 === baseline.source.rawScoreSha256, 'retained raw score hash drifted');
+  assert(Object.values(baseline.staticBaseline.maturity).length === 5 && Object.values(baseline.staticBaseline.maturity).every((score) => score === 5), 'raw maturity baseline is not 25/25');
+  assert(gateNames.every((gate) => (
+    baseline.staticBaseline.gates[gate].status === 'PASS'
+    && baseline.staticBaseline.gates[gate].rawMissingProof === '-'
+    && JSON.stringify(scoreBaseline.gates[gate]) === JSON.stringify(baseline.staticBaseline.gates[gate])
+  )), 'raw scorecard baseline did not preserve every PASS/dash cell');
+  assert(baseline.releaseEvidence.map((row) => row.gate).join(',') === gateNames.join(','), 'release-risk rows are incomplete or reordered');
+  const proofs = baseline.releaseEvidence.flatMap((row) => row.proofs);
+  const present = proofs.filter((proof) => proof.status === 'present').length;
+  assert(present === 12 && proofs.length === 28, 'release-risk baseline is not the governed 12/28 score');
+  assert(baseline.releaseEvidence.every((row) => row.risk && row.action && row.proofs.some((proof) => proof.status === 'missing')), 'release-risk row lacks risk/action/missing proof');
+  assert(proofs.filter((proof) => proof.status === 'present').every((proof) => proof.evidence && proof.artifacts?.every((artifact) => existsSync(join(pkgRoot, artifact)))), 'present release proof does not resolve to committed artifacts');
+  assert(proofs.filter((proof) => proof.status === 'missing').every((proof) => proof.evidence === null && proof.artifacts === undefined), 'missing release proof carries success-shaped evidence');
+  const runner = readFileSync(join(pkgRoot, 'extension-tasks', 'human-task-runner.mjs'), 'utf8');
+  assert(runner.includes("event(index === 0 ? 'release-risk-score' : 'release-risk-gate'"), 'Governance Review does not emit the risk overlay');
+  assert(runner.includes('verifyGovernedRisk(risk, governance.releaseRisk)'), 'runtime risk does not match the governed system tuple');
+  assert(runner.includes("if (risk.status !== 'READY')"), 'Release Candidate Check does not fail closed on blocked risk');
+  const agents = readFileSync(join(pkgRoot, 'extension-agents', 'AGENTS.md'), 'utf8');
+  for (const signal of ['repo-standards-review 0.2.19', '12/28 (42.9%)', 'Missing Proof cells are `-`', 'Do not publish', 'expected artifact']) {
+    assert(agents.includes(signal), `generated AGENTS lacks release-risk signal '${signal}'`);
+  }
+  return { workbenchMaturity: '25/25', staticGates: '6/6 PASS', releaseEvidence: `${present}/${proofs.length}`, status: 'BLOCKED' };
+});
+
+check('experiment-lifecycle-local-kpi', () => {
+  const result = loadExperimentGovernance();
+  assert(result.ok, `experiment governance failed: ${result.reasons.join('; ')}`);
+  assert(result.kpi.total === 62 && result.kpi.governed === 62 && result.kpi.ungoverned === 0, 'experiment governance KPI is not 62/62');
+  assert(result.kpi.forbiddenProductionReferences === 0, 'prohibited experiments reach production surfaces');
+  assert(result.kpi.prototypes === 1 && result.kpi.superseded === 2, 'prototype/superseded lifecycle baseline drifted');
+  assert(readJson(join('experiments', 'governance-overrides.json')).version === '1.0.0', 'experiment-governance/KPI version drifted');
+  const pkg = readJson('package.json');
+  assert(pkg.scripts?.['ci:local:quick'] === 'node scripts/local-continuous-kpi.mjs --quick', 'quick local KPI command missing');
+  assert(pkg.scripts?.['ci:local'] === 'node scripts/local-continuous-kpi.mjs', 'full local KPI command missing');
+  const kpi = readFileSync(join(pkgRoot, 'scripts', 'local-continuous-kpi.mjs'), 'utf8');
+  for (const proof of ['release-components.mjs', 'experiment-governance.mjs', "['run', 'test:coverage']", 'verify-local-gates.mjs', 'verify-correspondences.mjs', "['run', 'package']", 'Repeated normalized VSIX builds differ', '.lba', 'local-ci']) {
+    assert(kpi.includes(proof), `local continuous KPI lacks ${proof}`);
+  }
+  const agents = readFileSync(join(pkgRoot, 'extension-agents', 'AGENTS.md'), 'utf8');
+  for (const target of ['62/62 governed', '0 ungoverned', '0 forbidden production references', 'npm run ci:local:quick', 'npm run ci:local', '.lba/local-ci/latest.json']) {
+    assert(agents.includes(target), `generated AGENTS lacks KPI target '${target}'`);
+  }
+  return result.kpi;
 });
 
 // 21. A GitHub Codespace install route is defined via a PREBUILT dev container image: the recipe

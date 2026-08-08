@@ -2,7 +2,7 @@ import * as vscode from 'vscode';
 import * as path from 'node:path';
 
 const TASK_TYPE = 'labviewBenchmarkActor';
-export const HUMAN_TASKS_VERSION = '1.0.1';
+export const HUMAN_TASKS_VERSION = '1.0.2';
 const TASKS = [
   ['agent-preflight', 'LBA: Agent Preflight'],
   ['governance-review', 'LBA: Governance Review'],

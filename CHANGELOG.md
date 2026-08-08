@@ -6,7 +6,7 @@ follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project
 
 ## [Unreleased]
 
-## [1.4.2] - 2026-08-08
+## [1.4.3] - 2026-08-08
 
 ### Fixed
 - **Rotated reviewer keys are release- and purpose-scoped.** Production reviewer enrollment now
@@ -22,15 +22,26 @@ follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project
 - **Icon Editor prerequisites are explicit.** Shipped agent guidance now requires installed/activated
   VI Package Manager and applying `icon-editor-developer.vipc` to each intended LabVIEW 2026 Q3
   bitness before treating `ni/labview-icon-editor` as provisioned.
-- **Generated agent instructions pin the next-agent toolchain.** AGENTS.md 0.3.6 now specifies exact
+- **Generated agent instructions pin the next-agent toolchain.** AGENTS.md 0.3.7 now specifies exact
   `lbabus` and Node versions, .NET runtime/SDK roles, Git/GitHub/GitLab/ripgrep minimums, and the
   validated Vagrant/VirtualBox/LabVIEW/TightVNC reviewer stack; tests fail if core pins disappear.
-- **Human task workflows and review evidence are versioned.** Compound task bundle 1.0.1 is shown in
+- **Human task workflows and review evidence are versioned.** Compound task bundle 1.0.2 is shown in
   generated AGENTS.md and task details, while a maintained collector captures indexed raw candidate,
   command/task, agent-instruction, capability, reviewer-setting, VM, and screenshot evidence before teardown.
 - **Governed tasks produce deterministic noninteractive receipts.** Every task and child-output event carries
   an index, UTC wall timestamp, monotonic nanoseconds, and the named `process.hrtime.bigint` clock source.
   Dedicated task terminals suppress reuse prompts and receipts persist under extension global storage.
+- **Static PASS no longer hides release risk.** The exact repo-standards-review 0.2.19 commit/image is bound into
+  the system definition. Generated AGENTS preserves the raw 25/25 and six PASS baseline, interprets every `-`
+  Missing Proof cell conservatively, and exposes a transparent 12/28 release-evidence score with per-gate risks
+  and forward actions. Governance Review prints the same overlay into its indexed receipt.
+- **Experiments have an enforced lifecycle and local KPI.** Versioned experiment-governance/KPI bundle 1.0.0 uses
+  RTM references to govern active experiments; explicit
+  overrides classify every remainder and prohibit prototype/superseded/evidence-only production use. Quick local CI
+  verifies incremental CHANGELOG/system state; clean full local CI retains tests, gates, correspondence, and two-build
+  package reproducibility before a verdict.
+- **Branch coverage is enforced at 95%.** Deterministic defensive-path tests raise measured branches to 96.10%;
+  the cross-platform c8 gate now measures all source files and fails below 95% branches.
 - **Release components follow one SemVer contract.** `release-components.json` binds the extension, AGENTS,
   `lbabus`, human-task, exact standards-review commit, and workbench-image digest. The repository precommit hook
   rejects component changes without their component and extension version bumps, final staged package metadata,

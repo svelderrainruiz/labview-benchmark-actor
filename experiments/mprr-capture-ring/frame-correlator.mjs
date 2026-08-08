@@ -11,7 +11,7 @@
 
 /** Escape text for safe HTML insertion. */
 function esc(v) {
-  return String(v == null ? '' : v)
+  return String(v)
     .replace(/&/g, '&amp;')
     .replace(/</g, '&lt;')
     .replace(/>/g, '&gt;')

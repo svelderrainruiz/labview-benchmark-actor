@@ -123,6 +123,8 @@ progressively.
 | LBA-REQ-093 | The system shall pin the exact Node.js version that packages the `.vsix` in a repo-root `.nvmrc` sourced by every release-path workflow, so a fail-closed gate proves the reviewed build and the CI publish build use the identical Node version and cannot drift across a Node minor. | LBA-REQ-085/086 make the `.vsix` byte-reproducible within a Node major, but the packaged bytes are reproducible only within an EXACT Node version -- a Node minor can perturb them -- and every release-path workflow pinned `node-version: '24'`, which floats to the latest 24.x in the runner cache, so a future minor could silently drift CI's sha from the reviewed sha and re-break the reviewed==shipped gate at publish, the most expensive place to find it. | A repo-root `.nvmrc` pins the exact version (`24.19.0`); `extension-release.yml`, `vsix-cross-plane-repro.yml`, and `acg-cross-plane-corroboration.yml` source it via `node-version-file: .nvmrc` (no floating literal); `lba release-preflight` asserts the local Node equals `.nvmrc`. | The gate `release-path-node-pinned` proves `.nvmrc` pins an exact version and every release-path workflow sources it (pinning no floating literal), and the `scripts/lba.mjs` selftest proves the exact-version preflight (an equal Node clears, a later 24.x fails). |
 | LBA-REQ-094 | The extension shall contribute discoverable compound VS Code tasks for agent preflight, local standards governance, reviewer mesh readiness, and release-candidate verification, so human operators can execute the governed workflows without reconstructing command sequences. | Marketplace users do not receive repository `.vscode` tasks, and repeated manual command entry caused signed review failures. The release governance pass also depends on local access to `svelderrainruiz/repo-standards-review`, its published Linux-container workbench, and the local governed standards corpus. | A `labviewBenchmarkActor` TaskProvider launches a packaged runner with VS Code's Node runtime. The governance task requires a local standards checkout, the eight-PDF standards corpus, Docker Linux mode, and the published `assurance-workbench:main` release-gate profile; it mounts the corpus read-only and compound tasks stop on the first failure. | `npm test` proves the provider exposes all four named tasks and uses `ELECTRON_RUN_AS_NODE`; `human-task-shortcuts` in `verify-local-gates` proves the runner's local-checkout, standards-corpus, Linux-engine, workbench-image, and fail-closed wiring. |
 | LBA-REQ-095 | The system shall bind extension, AGENTS, `lbabus`, and human-task SemVer to one release definition, emit deterministic noninteractive task receipts, and admit a Marketplace prerelease only after its bytes match the canonical GitHub Release, so review chronology and released system identity cannot drift. | Signed 1.4.1 review rejected unindexed task output, ambiguous clocks, independent internal versions, and Marketplace-first publication. | `release-components.json` is checked by a repository precommit hook and local gate; tasks use dedicated terminals and indexed UTC/monotonic receipt events; the publish workflow requires and hashes the existing GitHub Release VSIX before `vsce publish --pre-release`. | `test/human-task-runner.mjs`, `test/release-components.mjs`, and the `release-component-versioning` local gate prove clock/index receipts, drift rejection, final staged metadata, target-main release cutting, and GitHub-first prerelease publication. |
+| LBA-REQ-096 | The generated agent contract shall preserve the exact standards-workbench score and conservatively overlay every `-` Missing Proof cell with evidence-counted candidate risk and artifact-dependent forward actions, so a static PASS cannot be mistaken for release readiness. | repo-standards-review correctly found the repository artifacts mature, but its six `-` cells did not represent human, hosted, cross-plane, immutable-release, Marketplace, or experiment-lifecycle proof. | `standards-score-baseline.json` and `release-risk-baseline.json` retain both score layers; a pure evaluator derives 12/28 BLOCKED, requires committed artifacts for present proof, and fails on drift; Governance Review and AGENTS expose all six risks/actions. | `test/release-risk.mjs` plus `standards-release-risk-baseline` prove score derivation, artifact resolution, gate completeness, exact workbench identity, AGENTS awareness, and receipt wiring. |
+| LBA-REQ-097 | The system shall classify every experiment lifecycle and continuously verify before verdict that prohibited experiments do not reach production and the local CHANGELOG/system-version/test/gate/correspondence/package KPI is current, so prototypes cannot silently become active implementations. | Historical and exploratory directories outlive their learning; without lifecycle and production boundaries they can be reused accidentally, while end-loaded release checks allow incremental documentation drift. | RTM paths govern active experiments; an override manifest classifies the remainder; a pure verifier rejects gaps/references; quick/full local KPI scripts retain machine receipts and AGENTS states numeric targets. | `test/experiment-governance.mjs` plus `experiment-lifecycle-local-kpi` prove full inventory, prohibited-reference rejection, superseded replacement, KPI wiring, and agent guidance. |
 
 ---
 
@@ -2943,6 +2945,48 @@ progressively.
    release asset.
   - Deterministic tests and a local gate reject version, task-receipt, release-target, and publication-order drift.
 
+### LBA-REQ-096: Standards scorecard release-risk overlay
+
+- Status: Proven
+- Area: Assurance / operation / release (ADR-0079)
+- Statement: The generated agent contract shall preserve the exact standards-workbench score and conservatively
+  overlay every `-` Missing Proof cell with evidence-counted candidate risk and artifact-dependent forward actions,
+  so a static PASS cannot be mistaken for release readiness.
+- Rationale: The pinned repo-standards-review 0.2.19 workbench correctly reports static repository maturity as 25/25
+  with six PASS gates, but it does not model the exact candidate's human, hosted, cross-plane, canonical-release, and
+  Marketplace-closeout proofs.
+- Acceptance Criteria:
+  - The raw workbench version, commit, image digest, score schema, five maturity values, six statuses/confidences, and
+    `-` Missing Proof values remain identifiable.
+  - A separate baseline covers coverage, CM, requirements, architecture, documentation, and DoD with explicit present
+    and missing proof items, residual risk, and a detailed next action.
+  - Completion is derived as present/all proof items with no hidden weights; every present proof resolves to committed
+    artifacts and invalid, incomplete, or success-shaped missing rows fail closed.
+  - Governance Review prints the release score and all six action rows into the indexed receipt.
+  - Generated AGENTS explains the static-score boundary and requires exact-version artifacts before closing a risk.
+  - Release Candidate Check returns nonzero while the overlay status is BLOCKED.
+
+### LBA-REQ-097: Experiment lifecycle and local continuous KPI
+
+- Status: Proven
+- Area: Configuration management / assurance / operation (ADR-0080)
+- Statement: The system shall classify every experiment lifecycle and continuously verify before verdict that
+  prohibited experiments do not reach production and the local CHANGELOG/system-version/test/gate/correspondence/
+  package KPI is current, so prototypes cannot silently become active implementations.
+- Rationale: Experiments can remain after an implementation supersedes them. Explicit lifecycle, production boundary,
+  and continuous local checks prevent stale prototypes from becoming release dependencies.
+- Acceptance Criteria:
+  - Every immediate experiment directory is directly referenced by the RTM or has an explicit lifecycle override.
+  - Overrides name an owner and requirements; prototypes/non-active experiments prohibit production use; superseded
+    entries name an existing replacement.
+  - Production source, workflows, scripts, reviewer tooling, task tooling, and package metadata do not reference a
+    prohibited or evidence-only experiment.
+  - Quick local CI checks CHANGELOG/system version, experiment lifecycle, release-risk, traceability, and report
+    currency during incremental work.
+  - Full local CI requires a clean worktree, runs tests/gates/correspondence, packages twice byte-identically, and
+    retains a KPI receipt before verdict.
+  - Generated AGENTS states numeric targets and distinguishes local KPI PASS from release readiness.
+
 ## Traceability (requirement → architecture view / test)
 
 | Requirement | Architecture view | Test items |
@@ -3042,3 +3086,5 @@ progressively.
 | LBA-REQ-093 | Packaging / boundary (Node-version-pinned reproducible .vsix) | T-093 |
 | LBA-REQ-094 | Operation / developer experience (extension-contributed compound tasks) | T-094 |
 | LBA-REQ-095 | Configuration management / operation / release (system SemVer and canonical distribution) | T-095 |
+| LBA-REQ-096 | Assurance / operation / release (standards scorecard release-risk overlay) | T-096 |
+| LBA-REQ-097 | Configuration management / assurance / operation (experiment lifecycle and local KPI) | T-097 |

@@ -1,7 +1,8 @@
 import { execFileSync } from 'node:child_process';
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
+import { assessReleaseRisk, verifyGovernedRisk } from '../extension-tasks/release-risk.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 
@@ -36,6 +37,11 @@ export function verifyReleaseComponents(input) {
     changelog,
     releaseWorkflow,
     releaseCli,
+    releaseRiskBaseline,
+    standardsScoreBaseline,
+    artifactExists = () => true,
+    experimentGovernanceManifest,
+    experimentGovernanceSource,
   } = input;
 
   if (components.schema !== 'labview-benchmark-actor/release-components@1') {
@@ -56,6 +62,30 @@ export function verifyReleaseComponents(input) {
   if (!String(components.governance?.workbenchImage || '').includes('repo-standards-review/assurance-workbench')) {
     reasons.push('governance workbench image is missing');
   }
+  if (!/^\d+\.\d+\.\d+$/.test(components.governance?.standardsReviewVersion || '')) {
+    reasons.push('governance standards-review version must be exact SemVer');
+  }
+  const risk = assessReleaseRisk(releaseRiskBaseline, { artifactExists, scoreBaseline: standardsScoreBaseline });
+  if (!risk.ok) reasons.push(...risk.reasons.map((reason) => `release risk baseline: ${reason}`));
+  if (releaseRiskBaseline?.releaseVersion !== components.extension) {
+    reasons.push('release risk baseline version does not match extension version');
+  }
+  if (
+    releaseRiskBaseline?.source?.workbenchVersion !== components.governance?.standardsReviewVersion
+    || releaseRiskBaseline?.source?.standardsReviewCommit !== components.governance?.standardsReviewCommit
+    || releaseRiskBaseline?.source?.workbenchDigest !== components.governance?.workbenchDigest
+  ) {
+    reasons.push('release risk baseline does not match the governed standards-review identity');
+  }
+  if (
+    standardsScoreBaseline?.source?.workbenchVersion !== components.governance?.standardsReviewVersion
+    || standardsScoreBaseline?.source?.standardsReviewCommit !== components.governance?.standardsReviewCommit
+    || standardsScoreBaseline?.source?.workbenchDigest !== components.governance?.workbenchDigest
+  ) {
+    reasons.push('standards score baseline does not match the governed standards-review identity');
+  }
+  const governedRisk = verifyGovernedRisk(risk, components.governance?.releaseRisk);
+  reasons.push(...governedRisk.reasons.map((reason) => `release risk system state: ${reason}`));
   if (packageJson.version !== components.extension) {
     reasons.push('package.json version does not match release-components.json');
   }
@@ -73,6 +103,12 @@ export function verifyReleaseComponents(input) {
   if (lbabus && lbabus !== components.lbabus) reasons.push('lbabus version does not match release-components.json');
   if (tasksSource && tasksSource !== components.humanTasks) reasons.push('human task source version does not match release-components.json');
   if (tasksRunner && tasksRunner !== components.humanTasks) reasons.push('human task runner version does not match release-components.json');
+  if (experimentGovernanceManifest?.version !== components.experimentGovernance) {
+    reasons.push('experiment-governance manifest version does not match release-components.json');
+  }
+  if (!experimentGovernanceSource?.includes(`EXPERIMENT_GOVERNANCE_VERSION = '${components.experimentGovernance}'`)) {
+    reasons.push('experiment-governance source version does not match release-components.json');
+  }
   if (!agentsText.includes(`exactly \`${components.lbabus}\` for this extension build`)) {
     reasons.push('AGENTS.md does not pin the governed lbabus version');
   }
@@ -105,26 +141,57 @@ function currentInput() {
     changelog: text('CHANGELOG.md'),
     releaseWorkflow: text('.github/workflows/extension-release.yml'),
     releaseCli: text('scripts/lba.mjs'),
+    releaseRiskBaseline: readJson('release-risk-baseline.json'),
+    standardsScoreBaseline: readJson('standards-score-baseline.json'),
+    artifactExists: (artifact) => existsSync(path.join(root, artifact)),
+    experimentGovernanceManifest: readJson('experiments/governance-overrides.json'),
+    experimentGovernanceSource: text('experiments/experiment-governance.mjs'),
   };
 }
 
 export function verifyStagedReleaseMetadata({ staged, unstaged, previous, current }) {
   const reasons = [];
   const changed = (prefixes) => staged.some((file) => prefixes.some((prefix) => file === prefix || file.startsWith(`${prefix}/`)));
-  const agentsChanged = changed(['extension-agents']);
+  const agentsChanged = changed(['extension-agents', 'release-risk-baseline.json', 'standards-score-baseline.json']);
   const lbabusChanged = changed(['tools/collab-cli']);
   const tasksChanged = changed(['extension-tasks', 'src/humanTasks.ts']);
-  const componentChanged = agentsChanged || lbabusChanged || tasksChanged;
+  const experimentsChanged = changed([
+    'experiments/experiment-governance.mjs',
+    'experiments/governance-overrides.json',
+    'scripts/local-continuous-kpi.mjs',
+  ]);
+  const componentChanged = agentsChanged || lbabusChanged || tasksChanged || experimentsChanged;
 
   if (agentsChanged && previous.agents === current.agents) reasons.push('AGENTS component changed without an agents version bump');
   if (lbabusChanged && previous.lbabus === current.lbabus) reasons.push('lbabus component changed without an lbabus version bump');
   if (tasksChanged && previous.humanTasks === current.humanTasks) reasons.push('human task component changed without a humanTasks version bump');
+  if (experimentsChanged && previous.experimentGovernance === current.experimentGovernance) reasons.push('experiment governance changed without an experimentGovernance version bump');
 
   if (componentChanged) {
     if (previous.extension === current.extension) reasons.push('governed component changed without an extension version bump');
     for (const file of ['package.json', 'package-lock.json', 'release-components.json', 'CHANGELOG.md']) {
       if (!staged.includes(file)) reasons.push(`${file} must be staged with a governed component change`);
-      if (unstaged.includes(file)) reasons.push(`${file} has unstaged edits; release metadata must be in its final staged state`);
+    }
+    for (const file of [
+      '.githooks/pre-commit',
+      '.github/workflows/extension-release.yml',
+      'CHANGELOG.md',
+      'extension-agents/AGENTS.md',
+      'extension-agents/agents.manifest.json',
+      'extension-tasks/human-task-runner.mjs',
+      'extension-tasks/release-risk.mjs',
+      'package.json',
+      'package-lock.json',
+      'release-components.json',
+      'release-risk-baseline.json',
+      'scripts/install-git-hooks.mjs',
+      'scripts/lba.mjs',
+      'scripts/release-components.mjs',
+      'src/humanTasks.ts',
+      'standards-score-baseline.json',
+      'tools/collab-cli/LbaBus.csproj',
+    ]) {
+      if (unstaged.includes(file)) reasons.push(`${file} has unstaged edits; governed release inputs must match the staged index`);
     }
   }
   return { ok: reasons.length === 0, reasons };

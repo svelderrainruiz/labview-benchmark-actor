@@ -32,15 +32,15 @@
       "purposes": ["quorum"]
     },
     {
-      "publicKeyPem": "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEAiQeCvxFqMqe7idNZxLBd6FoffnfbAjazwoHjtB2xgFY=\n-----END PUBLIC KEY-----\n",
-      "validFrom": "1.4.2",
-      "validThrough": "1.4.2",
+      "publicKeyPem": "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEAoK954rhACvTtU3++eU/EfBwvn1gVUiUusOfGlmmiMro=\n-----END PUBLIC KEY-----\n",
+      "validFrom": "1.4.3",
+      "validThrough": "1.4.3",
       "purposes": ["visual"]
     },
     {
-      "publicKeyPem": "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEA/xReSeNV4X5cl6f7Vzi5aSTraWOcVRQch1hjoDXYxMA=\n-----END PUBLIC KEY-----\n",
-      "validFrom": "1.4.2",
-      "validThrough": "1.4.2",
+      "publicKeyPem": "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEAsA0IwU+GrddDmYc0mCJX2BDKSfHxSGbsEMtbXXN40Vg=\n-----END PUBLIC KEY-----\n",
+      "validFrom": "1.4.3",
+      "validThrough": "1.4.3",
       "purposes": ["quorum"]
     }
   ]

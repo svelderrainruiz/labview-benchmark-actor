@@ -10,6 +10,13 @@ so the WIN and LINUX planes install the exact same pinned version and cannot dri
 
 ## [Unreleased]
 
+## [0.15.2] — 2026-08-08
+
+### Changed
+
+- Bind scoped 1.4.3 reviewer enrollment and the exact repo-standards-review 0.2.19
+  release-risk baseline into the governed extension system definition.
+
 ## [0.15.1] — 2026-08-08
 
 ### Changed
@@ -280,7 +287,8 @@ so the published release notes are self-complete.
 
 - Shared versioned .NET CLI (`lbabus`) for the WIN↔LINUX coordination bus (#6).
 
-[Unreleased]: https://github.com/LabVIEW-Community-CI-CD/labview-benchmark-actor/compare/collab-cli-v0.15.1...HEAD
+[Unreleased]: https://github.com/LabVIEW-Community-CI-CD/labview-benchmark-actor/compare/collab-cli-v0.15.2...HEAD
+[0.15.2]: https://github.com/LabVIEW-Community-CI-CD/labview-benchmark-actor/compare/collab-cli-v0.15.1...collab-cli-v0.15.2
 [0.15.1]: https://github.com/LabVIEW-Community-CI-CD/labview-benchmark-actor/compare/collab-cli-v0.15.0...collab-cli-v0.15.1
 [0.15.0]: https://github.com/LabVIEW-Community-CI-CD/labview-benchmark-actor/compare/collab-cli-v0.14.0...collab-cli-v0.15.0
 [0.8.2]: https://github.com/LabVIEW-Community-CI-CD/labview-benchmark-actor/compare/collab-cli-v0.8.0...collab-cli-v0.8.2

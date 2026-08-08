@@ -2,7 +2,7 @@
 
 - Status: Accepted
 - Date: 2026-08-08
-- Deciders: 1.4.2 human reviewer + release agent
+- Deciders: signed 1.4.1 feedback + maintainer + 1.4.3 release agent
 - Relates to: LBA-REQ-095 (realized here), LBA-REQ-020 (release agreement), LBA-REQ-057 (human gate),
   LBA-REQ-085 / LBA-REQ-086 / LBA-REQ-093 (reviewed artifact reproducibility)
 

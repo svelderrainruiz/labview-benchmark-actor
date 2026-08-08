@@ -33,7 +33,7 @@ function pct(v) { return Math.max(0, Math.min(100, Number(v) || 0)); }
 function calibrationSvg(curve) {
   const W = 640; const H = 280; const padL = 48; const padR = 20; const padT = 20; const padB = 44;
   const plotW = W - padL - padR; const plotH = H - padT - padB;
-  const pts = Array.isArray(curve) ? curve : [];
+  const pts = curve;
   const cnt = pts.length;
   const xAt = (i) => padL + (cnt <= 1 ? 0 : (i / (cnt - 1)) * plotW);
   const yAt = (v) => padT + (1 - pct(v) / 100) * plotH;
