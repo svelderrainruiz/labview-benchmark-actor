@@ -71,7 +71,7 @@ $activeEvidenceRoot = if ($metadata.PSObject.Properties['activeResume']) {
 if ($lock.runId -ne $activeRunId -or $lock.vmName -ne $metadata.vm.name -or $lock.releasedWallTime) {
   throw 'Reviewer cache lock ownership mismatch.'
 }
-if ($metadata.state -ne 'activated-capture-passed') {
+if ($metadata.state -notin @('activated-capture-passed', 'vsix-installed')) {
   throw "Reviewer cache state '$($metadata.state)' is not ready for VSIX staging."
 }
 $env:VAGRANT_HOME = $metadata.vagrant.home
