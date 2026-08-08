@@ -577,9 +577,16 @@ export const COMMANDS = {
       try {
         const q = await queryMarketplaceExtension({ publisher, name });
         const r = assertPublished(q, { publisher, name, version });
-        if (!r.ok) { console.error(`\u2717 ${extId} ${version} NOT confirmed live: ${r.reason}`); process.exit(1); }
+        if (!r.ok) {
+          console.error(`\u2717 ${extId} ${version} NOT confirmed live: ${r.reason}`);
+          process.exitCode = 1;
+          return;
+        }
         console.log(`\u2713 ${extId} ${version} is LIVE on the Marketplace (latest ${r.latest}; recent: ${r.versions.slice(0, 5).join(', ')})`);
-      } catch (e) { console.error(`\u2717 Marketplace query error: ${e.message}`); process.exit(1); }
+      } catch (e) {
+        console.error(`\u2717 Marketplace query error: ${e.message}`);
+        process.exitCode = 1;
+      }
     },
   },
   'release-cut-github': {
@@ -886,5 +893,5 @@ if (invokedDirectly) {
   }
   const c = COMMANDS[cmd];
   if (!c) { console.error(`unknown subcommand: ${cmd} (try: lba help)`); process.exit(2); }
-  c.run(args);
+  await c.run(args);
 }

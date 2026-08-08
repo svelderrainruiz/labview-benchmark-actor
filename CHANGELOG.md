@@ -17,6 +17,11 @@ follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project
   proof remains fail-closed: the acquired `1024x768` image is uniformly black, is explicitly marked
   unusable, and cannot be represented as an interactive desktop or visual LabVIEW benchmark.
 
+### Fixed
+- **Marketplace publication verification exits cleanly on a missing version or query failure.** The
+  asynchronous `release-verify-published` command now finishes its Marketplace query before setting
+  a failing exit code instead of forcing process termination while Node still owns network handles.
+
 ## [1.3.0] - 2026-08-06
 
 ### Added
