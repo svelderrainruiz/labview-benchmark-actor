@@ -6,9 +6,9 @@
   "capability": null,
   "candidate": {
     "component": "extension",
-    "version": "1.4.8",
-    "commit": "c3ece57892fe628f3f0de5692f10c6c77d02eeae",
-    "vsixSha256": "dfa5ace0ce263f8876f51dcf0612713753e7a4e2f990555675fca771f198b799"
+    "version": "1.4.9",
+    "commit": "4da4e806d06e66529f695250e0eed5f534cff108",
+    "vsixSha256": "3554ce5f93a65e7147e15bb479abbda93b7fd3c7f23118c7cecbeacff9c2a768"
   },
   "staged": {
     "drive": "await-agent-reply",
@@ -16,20 +16,20 @@
     "matched": true,
     "candidate": {
       "component": "extension",
-      "version": "1.4.8",
-      "commit": "c3ece57892fe628f3f0de5692f10c6c77d02eeae",
-      "vsixSha256": "dfa5ace0ce263f8876f51dcf0612713753e7a4e2f990555675fca771f198b799"
+      "version": "1.4.9",
+      "commit": "4da4e806d06e66529f695250e0eed5f534cff108",
+      "vsixSha256": "3554ce5f93a65e7147e15bb479abbda93b7fd3c7f23118c7cecbeacff9c2a768"
     },
     "frame": {
       "transport": "TCP",
-      "remote": "127.0.0.1:55680",
-      "ts": "2026-08-08T21:19:41.966Z",
+      "remote": "127.0.0.1:49931",
+      "ts": "2026-08-08T23:07:10.851Z",
       "senderId": "WIN",
-      "seq": "1786223981",
+      "seq": "1786230430",
       "type": "DONE",
-      "task": "stage-1.4.8-c3ece578-2118",
+      "task": "stage-1.4.9-4da4e806-2307",
       "ackOf": null,
-      "payload": "{\"schema\":\"labview-benchmark-actor/release-stage@1\",\"candidate\":{\"component\":\"extension\",\"version\":\"1.4.8\",\"commit\":\"c3ece57892fe628f3f0de5692f10c6c77d02eeae\",\"vsixSha256\":\"dfa5ace0ce263f8876f51dcf0612713753e7a4e2f990555675fca771f198b799\"}}"
+      "payload": "{\"schema\":\"labview-benchmark-actor/release-stage@1\",\"candidate\":{\"component\":\"extension\",\"version\":\"1.4.9\",\"commit\":\"4da4e806d06e66529f695250e0eed5f534cff108\",\"vsixSha256\":\"3554ce5f93a65e7147e15bb479abbda93b7fd3c7f23118c7cecbeacff9c2a768\"}}"
     }
   },
   "machine": {
@@ -44,8 +44,8 @@
       "crossPlane": true,
       "consensusVerdict": "pass",
       "consensus": {
-        "version": "1.4.8",
-        "sourceCommit": "c3ece57892fe628f3f0de5692f10c6c77d02eeae",
+        "version": "1.4.9",
+        "sourceCommit": "4da4e806d06e66529f695250e0eed5f534cff108",
         "verdict": "pass",
         "seriesHash": "7ad1c75d08244013d339c3f256fd14220a2df7cea56d5be5b38af2d82d68efaa",
         "pngSha256": null,
@@ -64,16 +64,16 @@
       {
         "schema": "labview-benchmark-actor/acg-human-signoff-v1",
         "subject": {
-          "verdictDigest": "d8f8a6655b817fb716c082f0d71b49bc668f1d30781cadf9e352a8da4ac6c1c4",
+          "verdictDigest": "bbdb57821b32c2fcf4cce7f637563dae96b4f9dfc18e65f894cb6feea41f4486",
           "consensusVerdict": "pass"
         },
         "reviewer": "reviewer@vi-tech.nl",
         "decision": "approve",
         "station": "WINDOWS_VM",
         "algorithm": "ed25519",
-        "publicKeyPem": "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEAjoblu4aKIrkfDMxTD5fmexR5TwJn4EPdBlCXXpsVAMg=\n-----END PUBLIC KEY-----\n",
-        "signedAt": "2026-08-08T21:25:02.332Z",
-        "signature": "rL47T3tvb6AAmxJbVQO25yu5/NURDG69acNOey9vJ0/pQQhsdtlhJe4bC77M7QKJ6NvvvbdmoGaPhnKed+wfDQ=="
+        "publicKeyPem": "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEAbZrYjluQ1dUFUpF7Qy6i5t6JmdF2SdbpgT2/tnGw7LE=\n-----END PUBLIC KEY-----\n",
+        "signedAt": "2026-08-08T23:08:32.639Z",
+        "signature": "mzAMrbrgjSNy+sbEcOOnMss5cD0HdEu75AxYc9VxN9iBL8rbFETJCP49PFdlOl/J3r6Gq+/TVVqY/n0og8iWCA=="
       }
     ]
   },
@@ -82,14 +82,14 @@
       "schema": "labview-benchmark-actor/reviewer-verdict@1",
       "target": {
         "component": "extension",
-        "version": "1.4.8",
-        "commit": "c3ece57892fe628f3f0de5692f10c6c77d02eeae",
-        "vsixSha256": "dfa5ace0ce263f8876f51dcf0612713753e7a4e2f990555675fca771f198b799"
+        "version": "1.4.9",
+        "commit": "4da4e806d06e66529f695250e0eed5f534cff108",
+        "vsixSha256": "3554ce5f93a65e7147e15bb479abbda93b7fd3c7f23118c7cecbeacff9c2a768"
       },
       "verdict": "pass",
       "reviewer": "reviewer@vi-tech.nl",
       "station": "WINDOWS_VM",
-      "notes": "PASS for LabVIEW Benchmark Actor 1.4.8, commit c3ece57892fe628f3f0de5692f10c6c77d02eeae, VSIX SHA-256 dfa5ace0ce263f8876f51dcf0612713753e7a4e2f990555675fca771f198b799, 147924 bytes. Verified full KPI PASS, AGENTS 0.3.12 integrity, Windows command-shim behavior, signing identity binding, launcher fail-closed behavior, strict visual target binding, installed command/MCP surfaces, 18/18 hosted checks, and ADR-0078 through ADR-0080. Interactive panels and the full compound Release Candidate task were NOT RUN because this host lacks VM/Docker capability. This PASS is not publication authorization; release remains BLOCKED pending quorum/composite, canonical release, lineage, and Marketplace closeout.",
+      "notes": "PASS for LabVIEW Benchmark Actor 1.4.9 at commit 4da4e806d06e66529f695250e0eed5f534cff108, VSIX SHA-256 3554ce5f93a65e7147e15bb479abbda93b7fd3c7f23118c7cecbeacff9c2a768, 148116 bytes.  Verified full KPI PASS, 96.02% branch coverage, 203/203 gates, 179/179 correspondences, 18/18 hosted checks, exact local/hosted byte identity, prerelease VSIX metadata, AGENTS 0.3.13 integrity, lbabus 0.15.8 selfcheck, Windows npm.cmd behavior, release-scoped signing, strict visual target binding, installed commands/panels/MCP, and ADR-0078 through ADR-0080. Historical 1.4.8 evidence remains immutable and cannot authorize 1.4.9.  This PASS is candidate-scoped only and does not authorize publication. The governed release-risk overlay remains 12/28 BLOCKED pending the listed downstream proofs.",
       "evidence": [
         {
           "kind": "candidate-receipt",
@@ -97,38 +97,38 @@
         },
         {
           "kind": "hosted-ci",
-          "ref": "all 18/18 PR #15 hosted checks PASS for the exact commit"
+          "ref": "all 18/18 PR #18 hosted checks PASS for the exact commit"
         },
         {
           "kind": "cross-plane",
           "ref": "Linux/Windows VSIX byte identity and four-substrate corroboration PASS"
         },
         {
-          "kind": "signing-readiness",
-          "ref": "live reviewer-VM quorum-key derivation and exact public-key enrollment match PASS"
+          "kind": "marketplace-remediation",
+          "ref": "VSIX manifest carries Microsoft.VisualStudio.Code.PreRelease=true and agent-last-gate packages through the canonical command"
         }
       ],
-      "renderedAt": "2026-08-08T21:12:12.036Z"
+      "renderedAt": "2026-08-08T23:05:03.904Z"
     },
     "signOff": {
       "schema": "labview-benchmark-actor/acg-human-signoff-v1",
       "subject": {
-        "verdictDigest": "fde3f93cbf7b049f34512493f3b45b3c52da3f3405495ad41cb9b4e7846a79fd",
+        "verdictDigest": "37ce0746d8cff39cd9ebb650c7d0c06e6035277bde8fe2fa80f2df1490695862",
         "consensusVerdict": "pass",
         "target": {
           "component": "extension",
-          "version": "1.4.8",
-          "commit": "c3ece57892fe628f3f0de5692f10c6c77d02eeae",
-          "vsixSha256": "dfa5ace0ce263f8876f51dcf0612713753e7a4e2f990555675fca771f198b799"
+          "version": "1.4.9",
+          "commit": "4da4e806d06e66529f695250e0eed5f534cff108",
+          "vsixSha256": "3554ce5f93a65e7147e15bb479abbda93b7fd3c7f23118c7cecbeacff9c2a768"
         }
       },
       "reviewer": "reviewer@vi-tech.nl",
       "decision": "approve",
       "station": "WINDOWS_VM",
       "algorithm": "ed25519",
-      "publicKeyPem": "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEAp1eaifgDEd1NuoimEUq3RsZPr/SkT7A8/sKWPMmV2Hw=\n-----END PUBLIC KEY-----\n",
-      "signedAt": "2026-08-08T21:12:12.037Z",
-      "signature": "BjkyYQLjZOA7peVIazdRsDZGcnFnrVp81kM/h9u98IKc3G83x7e7oBxxJwpDWesrRnGzkqcOIfVSAf4K2V6JCg=="
+      "publicKeyPem": "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEAVmzzStppmtOWRS6FP6ThtHgDsBimP5je9PSXoM58gHY=\n-----END PUBLIC KEY-----\n",
+      "signedAt": "2026-08-08T23:05:03.920Z",
+      "signature": "tHnrqJaIHoreSyJ+M3tG6kR8eb5ngOOyZO7jLYNU8mRTFrMk+437Y58NJ9JANIgSshdCBmT6gINbNh0G0rTjDw=="
     }
   },
   "reviewerAllowlist": {
@@ -238,6 +238,22 @@
         "purposes": [
           "quorum"
         ]
+      },
+      {
+        "publicKeyPem": "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEAVmzzStppmtOWRS6FP6ThtHgDsBimP5je9PSXoM58gHY=\n-----END PUBLIC KEY-----\n",
+        "validFrom": "1.4.9",
+        "validThrough": "1.4.9",
+        "purposes": [
+          "visual"
+        ]
+      },
+      {
+        "publicKeyPem": "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEAbZrYjluQ1dUFUpF7Qy6i5t6JmdF2SdbpgT2/tnGw7LE=\n-----END PUBLIC KEY-----\n",
+        "validFrom": "1.4.9",
+        "validThrough": "1.4.9",
+        "purposes": [
+          "quorum"
+        ]
       }
     ]
   },
@@ -262,7 +278,7 @@
   },
   "verdict": {
     "compositeReleaseProven": true,
-    "reason": "both gates publish for extension 1.4.8: machine quorum + enrolled sign-off (ADR-0018) AND human visual PASS (LBA-REQ-057), bound to the same net-staged candidate"
+    "reason": "both gates publish for extension 1.4.9: machine quorum + enrolled sign-off (ADR-0018) AND human visual PASS (LBA-REQ-057), bound to the same net-staged candidate"
   },
-  "digest": "0a6e11285ead914b36f1f12bee752c1e16f0f1f06adc263d4f5e712ecb2340aa"
+  "digest": "5069dc1a82aeec5a1447a3145543de9aaa83531c41abf931c5b981cfddda22e6"
 }

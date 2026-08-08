@@ -288,7 +288,7 @@ try {
     );
   }
   for (const prerequisite of [
-    /lbabus[^]*0\.15\.7/,
+    /lbabus[^]*0\.15\.8/,
     /Node\.js[^]*24\.19\.0/,
     /\.NET runtime[^]*>=8\.0/,
     /Git \/ Git for Windows[^]*>=2\.30/,
