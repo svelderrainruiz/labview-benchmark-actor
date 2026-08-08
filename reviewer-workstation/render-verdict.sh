@@ -45,8 +45,8 @@ guest_handoff="C:\\Users\\${user}\\AppData\\Roaming\\Code\\User\\globalStorage\\
 # the .vsix is not staged. Used by `guard` + the auto-guarded set-target to enforce reviewed==shipped (#411).
 guest_vsix="${LBA_GUEST_VSIX:-C:\\lba-review\\candidate.vsix}"
 staged_vsix_sha() {
-  gc run --exe 'C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe' --wait-stdout -- \
-    powershell -NoProfile -Command "if (Test-Path '${guest_vsix}') { (Get-FileHash -Algorithm SHA256 '${guest_vsix}').Hash }" 2>/dev/null | tr -d '\r' | grep -oiE '[0-9a-f]{64}' | head -1
+  gc run --exe 'C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe' --wait-stdout --wait-stderr -- \
+    -NoLogo -NoProfile -NonInteractive -Command "if (Test-Path '${guest_vsix}') { (Get-FileHash -Algorithm SHA256 '${guest_vsix}').Hash }" 2>/dev/null | tr -d '\r' | grep -oiE '[0-9a-f]{64}' | head -1
 }
 
 case "$sub" in
@@ -77,7 +77,8 @@ case "$sub" in
       const ev = (process.env.EVID || "").split("\n").map((s) => s.trim()).filter(Boolean).map((s) => { const i = s.indexOf(":"); return { kind: i > 0 ? s.slice(0, i) : "note", ref: i > 0 ? s.slice(i + 1) : s }; });
       process.stdout.write(JSON.stringify({ component: process.env.COMP, version: process.env.VER, commit: process.env.COMMIT || null, vsixSha256: process.env.VSIX || null, evidence: ev }, null, 2));
     ' > "$tmp/review-target.json"
-    gc run --exe 'C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe' --wait-stdout -- powershell -Command "New-Item -ItemType Directory -Force -Path '${guest_handoff}' | Out-Null" >/dev/null 2>&1 || true
+    gc run --exe 'C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe' --wait-stdout --wait-stderr -- \
+      -NoLogo -NoProfile -NonInteractive -Command "New-Item -ItemType Directory -Force -Path '${guest_handoff}' | Out-Null" >/dev/null 2>&1
     gc copyto --target-directory "${guest_handoff}\\" "$tmp/review-target.json" >/dev/null
     rm -rf "$tmp"
     echo "[render-verdict] review target set in the VM: ${component} ${version} (commit ${commit:-none}). Run 'Render Reviewer Verdict' in the VM to sign." >&2
