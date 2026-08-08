@@ -30,5 +30,6 @@ package-lock.json
 AGENT-TOOLING-SNAGS.md
 playwright/**
 coverage/**
+.lba/**
 .c8rc.json
 coverage-thresholds.json

@@ -3543,6 +3543,8 @@ check('vsix-cross-plane-repro-workflow-wired', () => {
       `.gitattributes must LF-pin packaged root ${file}`,
     );
   }
+  const vscodeIgnore = readFileSync(join(pkgRoot, '.vscodeignore'), 'utf8').replace(/\r\n/g, '\n');
+  assert(/^\.lba\/\*\*$/m.test(vscodeIgnore), '.vscodeignore must exclude local KPI receipts from the VSIX');
   return { planes: ['linux', 'windows'], proof: 'npm run package on both -> identical sha256 (fail-closed)' };
 });
 
