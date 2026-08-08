@@ -21,7 +21,7 @@ if (-not (Test-Path -LiteralPath $CandidatePath)) { throw "Staged candidate is m
 $lbabusPath = 'C:\lba-tools\lbabus\lbabus.exe'
 if (-not (Test-Path -LiteralPath $lbabusPath)) { throw "Reviewer lbabus is missing at '$lbabusPath'." }
 $lbabusVersion = (& $lbabusPath version 2>&1 | Out-String).Trim()
-if ($LASTEXITCODE -ne 0 -or $lbabusVersion -ne '0.15.4') {
+if ($LASTEXITCODE -ne 0 -or $lbabusVersion -ne '0.15.5') {
   throw "Reviewer lbabus version '$lbabusVersion' is invalid."
 }
 

@@ -13,7 +13,7 @@ export function resolveLbabusExecutable(
     if (pathExists(staged)) return staged;
     const localAppData = String(env.LOCALAPPDATA ?? '').trim();
     if (localAppData) {
-      const local = path.join(localAppData, 'lba', 'lbabus.exe');
+      const local = path.win32.join(localAppData, 'lba', 'lbabus.exe');
       if (pathExists(local)) return local;
     }
   }

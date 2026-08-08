@@ -1467,10 +1467,11 @@ check('human-task-shortcuts', () => {
   assert(runner.includes('STANDARDS_ROOT') && runner.includes('governance.standardsRootDefault'), 'governance task lacks local standards-corpus discovery');
   assert(runner.includes("`${corpus}:/standards:ro`") && runner.includes("'STANDARDS_ROOT=/standards'"), 'governance task does not mount standards read-only');
   assert(runner.includes('governance.standardsReviewCommit') && runner.includes('governance.workbenchDigest'), 'governance task does not pin its source commit and image digest');
-  assert(provider.includes("HUMAN_TASKS_VERSION = '1.0.4'"), 'task provider lacks bundle version 1.0.4');
-  assert(runner.includes("HUMAN_TASKS_VERSION = '1.0.4'"), 'task runner lacks bundle version 1.0.4');
+  assert(provider.includes("HUMAN_TASKS_VERSION = '1.0.5'"), 'task provider lacks bundle version 1.0.5');
+  assert(runner.includes("HUMAN_TASKS_VERSION = '1.0.5'"), 'task runner lacks bundle version 1.0.5');
   const agents = readFileSync(join(pkgRoot, 'extension-agents', 'AGENTS.md'), 'utf8');
-  assert(agents.includes('Compound human tasks — bundle v1.0.4'), 'generated AGENTS lacks task bundle version');
+  assert(agents.includes('Compound human tasks — bundle v1.0.5'), 'generated AGENTS lacks task bundle version');
+  assert(runner.includes("process.platform === 'win32' ? 'npm.cmd' : 'npm'"), 'human task runner does not use the Windows npm command shim');
   assert(provider.includes('LBA_LBABUS_PATH: resolveLbabusExecutable()'), 'human tasks do not receive the resolved lbabus executable');
   assert(runner.includes("process.env.LBA_LBABUS_PATH || ''"), 'human task runner ignores the resolved lbabus executable');
   const lbabusPath = readFileSync(join(pkgRoot, 'src', 'lbabusPath.ts'), 'utf8');
@@ -1552,6 +1553,7 @@ check('release-component-versioning', () => {
   const hook = readFileSync(join(pkgRoot, '.githooks', 'pre-commit'), 'utf8');
   const workflow = readFileSync(join(pkgRoot, '.github', 'workflows', 'extension-release.yml'), 'utf8');
   const releaseCli = readFileSync(join(pkgRoot, 'scripts', 'lba.mjs'), 'utf8');
+  const releaseComponentsSource = readFileSync(join(pkgRoot, 'scripts', 'release-components.mjs'), 'utf8');
   const riskBaseline = readJson('release-risk-baseline.json');
   const riskCore = readFileSync(join(pkgRoot, 'extension-tasks', 'release-risk.mjs'), 'utf8');
   const agents = readFileSync(join(pkgRoot, 'extension-agents', 'AGENTS.md'), 'utf8');
@@ -1579,6 +1581,8 @@ check('release-component-versioning', () => {
     'GitHub-first Marketplace prerelease policy drifted',
   );
   assert(releaseCli.includes("'--target', 'main'"), 'GitHub release target-main control drifted');
+  assert(releaseComponentsSource.includes("fromHead('experiments/governance-overrides.json')"), 'first-introduction fallback omits experiment-governance version');
+  assert(releaseCli.includes("purpose: 'quorum'") && releaseCli.includes('no quorum key enrolled'), 'signing readiness is not version/quorum scoped');
   assert(experimentGovernance.version === versions.experimentGovernance, 'experiment-governance version drifted');
   return { extension: versions.extension, agents: versions.agents, lbabus: versions.lbabus, humanTasks: versions.humanTasks };
 });

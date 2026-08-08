@@ -2943,6 +2943,8 @@ progressively.
    VS Code/Explorer process inherited PATH before staging.
   - Reviewer staging provisions the pinned Git/ripgrep/GitHub CLI/GitLab CLI/.NET toolchain and requires a green
    `lbabus selfcheck` before presenting the candidate.
+  - Windows human tasks invoke the npm command shim, and signing readiness accepts only a key valid for the requested
+   release version and quorum purpose.
   - `release-cut-github` explicitly targets `main`.
   - Marketplace publication is opt-in after the canonical GitHub Release exists, verifies the release VSIX hash
    equals the staged VSIX hash, runs from the release tag, and uses `vsce publish --pre-release` on the downloaded

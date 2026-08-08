@@ -223,11 +223,18 @@ function previousComponents() {
       .match(/<Version>([^<]+)<\/Version>/)?.[1] ?? '';
     const previousTasks = fromHead('src/humanTasks.ts')
       .match(/HUMAN_TASKS_VERSION\s*=\s*'([^']+)'/)?.[1] ?? '';
+    let previousExperimentGovernance = '';
+    try {
+      previousExperimentGovernance = JSON.parse(fromHead('experiments/governance-overrides.json')).version ?? '';
+    } catch {
+      // The first experiment-governance introduction has no prior component version.
+    }
     return {
       extension: previousPackage.version,
       agents: previousAgents.version,
       lbabus: previousLbabus,
       humanTasks: previousTasks,
+      experimentGovernance: previousExperimentGovernance,
     };
   }
 }

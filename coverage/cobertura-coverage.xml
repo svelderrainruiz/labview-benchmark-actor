@@ -1,11 +1,11 @@
 <?xml version="1.0" ?>
 <!DOCTYPE coverage SYSTEM "http://cobertura.sourceforge.net/xml/coverage-04.dtd">
-<coverage lines-valid="4754" lines-covered="4565" line-rate="0.9601999999999999" branches-valid="1580" branches-covered="1518" branch-rate="0.9606999999999999" timestamp="0" complexity="0" version="0.1">
+<coverage lines-valid="4754" lines-covered="4565" line-rate="0.9601999999999999" branches-valid="1581" branches-covered="1518" branch-rate="0.9601000000000001" timestamp="0" complexity="0" version="0.1">
   <sources>
     <source>C:\dev\gh\labview-benchmark-actor.worktrees\windows-docker-tightvnc-labview-experiment</source>
   </sources>
   <packages>
-    <package name="media" line-rate="1" branch-rate="0.9915">
+    <package name="media" line-rate="1" branch-rate="0.9904999999999999">
       <classes>
         <class name="benchmark-panels.mjs" filename="media\benchmark-panels.mjs" line-rate="1" branch-rate="1">
           <methods>
@@ -1113,7 +1113,7 @@
             <line number="99" hits="1" branch="false"/>
           </lines>
         </class>
-        <class name="frame-correlator.mjs" filename="media\frame-correlator.mjs" line-rate="1" branch-rate="1">
+        <class name="frame-correlator.mjs" filename="media\frame-correlator.mjs" line-rate="1" branch-rate="0.9642000000000001">
           <methods>
             <method name="esc" hits="10" signature="()V">
               <lines>
@@ -1145,7 +1145,7 @@
             <line number="11" hits="3" branch="false"/>
             <line number="12" hits="3" branch="false"/>
             <line number="13" hits="10" branch="true" condition-coverage="100% (1/1)"/>
-            <line number="14" hits="10" branch="false"/>
+            <line number="14" hits="10" branch="true" condition-coverage="0% (0/1)"/>
             <line number="15" hits="10" branch="false"/>
             <line number="16" hits="10" branch="false"/>
             <line number="17" hits="10" branch="false"/>

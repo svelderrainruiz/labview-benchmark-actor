@@ -288,7 +288,7 @@ try {
     );
   }
   for (const prerequisite of [
-    /lbabus[^]*0\.15\.4/,
+    /lbabus[^]*0\.15\.5/,
     /Node\.js[^]*24\.19\.0/,
     /\.NET runtime[^]*>=8\.0/,
     /Git \/ Git for Windows[^]*>=2\.30/,
@@ -313,7 +313,7 @@ try {
     'human task provider exposes the four governed shortcuts',
   );
   assert(humanTasks.every((task) => task.execution.options.env.ELECTRON_RUN_AS_NODE === '1'), 'human tasks use the bundled VS Code Node runtime');
-  assert(humanTasks.every((task) => task.detail === 'Governed human task bundle v1.0.4'), 'human tasks expose bundle version 1.0.4');
+  assert(humanTasks.every((task) => task.detail === 'Governed human task bundle v1.0.5'), 'human tasks expose bundle version 1.0.5');
   assert(humanTasks.every((task) => typeof task.execution.options.env.LBA_LBABUS_PATH === 'string'), 'human tasks pass the resolved lbabus executable');
   assert(humanTasks.every((task) => task.execution.options.env.LBA_TASK_EVIDENCE_ROOT === join(gsRoot, 'task-runs')), 'human tasks retain receipts under extension global storage');
   assert(humanTasks.every((task) => task.presentationOptions.showReuseMessage === false), 'human tasks suppress the terminal reuse prompt');

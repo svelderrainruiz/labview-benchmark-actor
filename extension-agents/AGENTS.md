@@ -16,7 +16,7 @@ Treat this as an executable agent preflight, not optional human setup prose. Run
 | Tool | Required/validated version | Agent action |
 | --- | --- | --- |
 | VS Code | `>=1.101.0` | Required for the extension and contributed MCP server. |
-| `lbabus` | **exactly `0.15.4` for this extension build** | Run `lbabus version`. Reviewer staging installs this version at `C:\lba-tools\lbabus\lbabus.exe`; extension commands, MCP, and human tasks resolve that path explicitly so a stale Explorer/VS Code PATH cannot hide it. Else install with `dotnet tool install --global LabVIEWBenchmarkActor.CollabBus --version 0.15.4`. |
+| `lbabus` | **exactly `0.15.5` for this extension build** | Run `lbabus version`. Reviewer staging installs this version at `C:\lba-tools\lbabus\lbabus.exe`; extension commands, MCP, and human tasks resolve that path explicitly so a stale Explorer/VS Code PATH cannot hide it. Else install with `dotnet tool install --global LabVIEWBenchmarkActor.CollabBus --version 0.15.5`. |
 | Node.js | **exactly `24.19.0` for source-checkout repository/release work** | Match the repository `.nvmrc`; packaging is Node-version-bound. Evidence-only reviewer workspaces use VS Code's bundled runtime and do not require a separate Node installation. |
 | .NET runtime | `>=8.0` | Required to execute the framework-dependent `lbabus` payload. |
 | .NET SDK | `>=8.0` when building/staging `lbabus` | Required for `dotnet build/publish`; runtime-only hosts can consume but not rebuild it. |
@@ -31,7 +31,7 @@ Optional substrate versions used by this release's validated Windows reviewer la
 2.8.81**. Docker, Vagrant, VirtualBox, VMware, LabVIEW, FFmpeg, and VIPM are workload-specific: their absence
 must be reported explicitly by capabilities, never silently treated as available.
 
-## Compound human tasks — bundle v1.0.4
+## Compound human tasks — bundle v1.0.5
 
 Open **Terminal: Run Task**. These tasks are contributed by the installed extension, so downloaded Marketplace
 users receive them without a repository `.vscode/tasks.json`:
@@ -113,7 +113,7 @@ coverage is at least **96%**, branch coverage is at least **95%**, and **203/203
 `.lba/local-ci/latest.json`; collect it with the pre-verdict evidence. Release evidence may still be BLOCKED, in which
 case follow the detailed missing-proof actions above rather than treating local CI as a release verdict.
 
-Task bundle **v1.0.4** is noninteractive, fails on the first nonzero child command, prefixes every command/output
+Task bundle **v1.0.5** is noninteractive, fails on the first nonzero child command, prefixes every command/output
 event with a stable index, UTC wall timestamp, monotonic nanoseconds, and clock source, and writes a machine-readable
 receipt under extension global storage. Before deleting a disposable human-review VM,
 the operator must run the maintained raw-data collector so the next agent receives the target, candidate hash,

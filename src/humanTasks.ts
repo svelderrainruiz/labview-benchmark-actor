@@ -3,7 +3,7 @@ import * as path from 'node:path';
 import { resolveLbabusExecutable } from './lbabusPath';
 
 const TASK_TYPE = 'labviewBenchmarkActor';
-export const HUMAN_TASKS_VERSION = '1.0.4';
+export const HUMAN_TASKS_VERSION = '1.0.5';
 const TASKS = [
   ['agent-preflight', 'LBA: Agent Preflight'],
   ['governance-review', 'LBA: Governance Review'],

@@ -58,7 +58,7 @@ export function buildBenchmarkActorMcpServerDefinitionFields(options: {
 }
 
 /** Map the extension's `lbabus net` config to the env the stdio MCP server reads (LBA-REQ-066, ADR-0046,
- *  net-only). Empty values are omitted (a graceful no-op when the net bus is unconfigured). */
+ *  net-only). Empty net values are omitted; the resolved lbabus executable is always provided. */
 export function busEnvFromConfig(cfg: { netHosts: string; netLog: string }): Record<string, string> {
   const env: Record<string, string> = { LBA_LBABUS_PATH: resolveLbabusExecutable() };
   if (cfg.netHosts) { env.VIHS_COLLAB_NET_HOSTS = cfg.netHosts; }

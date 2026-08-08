@@ -8,7 +8,7 @@ import { assessReleaseRisk, riskSummaryLines, verifyGovernedRisk } from './relea
 
 const mode = process.argv[2];
 const workspace = process.cwd();
-const HUMAN_TASKS_VERSION = '1.0.4';
+const HUMAN_TASKS_VERSION = '1.0.5';
 const startedNs = process.hrtime.bigint();
 const startedWallTime = new Date().toISOString();
 const events = [];
@@ -16,6 +16,7 @@ let eventIndex = 0;
 const releaseComponents = JSON.parse(readFileSync(new URL('../release-components.json', import.meta.url), 'utf8'));
 const governance = releaseComponents.governance;
 const lbabusExecutable = String(process.env.LBA_LBABUS_PATH || '').trim() || 'lbabus';
+const npmExecutable = process.platform === 'win32' ? 'npm.cmd' : 'npm';
 const releaseRiskBaseline = JSON.parse(readFileSync(new URL('../release-risk-baseline.json', import.meta.url), 'utf8'));
 const standardsScoreBaseline = JSON.parse(readFileSync(new URL('../standards-score-baseline.json', import.meta.url), 'utf8'));
 const REQUIRED_STANDARD_FILES = [
@@ -172,7 +173,7 @@ async function releaseCandidate() {
   if (!existsSync(path.join(workspace, 'package.json'))) {
     throw new Error('Release Candidate Check must run from a labview-benchmark-actor repository workspace.');
   }
-  await run('npm', ['run', 'ci:local']);
+  await run(npmExecutable, ['run', 'ci:local']);
   if (risk.status !== 'READY') {
     throw new Error(
       `Release evidence is ${risk.status} at ${risk.present}/${risk.total}; complete the printed missing proofs.`

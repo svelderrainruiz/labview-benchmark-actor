@@ -6,6 +6,20 @@ follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project
 
 ## [Unreleased]
 
+## [1.4.6] - 2026-08-08
+
+### Fixed
+
+- **Hosted Linux checks use a true Windows path model.** The injected-platform `lbabus` resolver now uses
+  `path.win32`, so Linux CI deterministically validates the Windows `%LOCALAPPDATA%\lba\lbabus.exe` fallback
+  instead of mixing host separators.
+- **Reviewer task and signing readiness are platform/purpose aware.** Windows compound tasks launch `npm.cmd`,
+  and signing status selects only keys valid for the requested version and `quorum` purpose before printing a
+  quorum command.
+- **Clean-checkout governance matches local governance.** The generated agent-last-gate receipt directory now has
+  a tracked contract, first-introduction component fallback includes experiment-governance versioning, null frame
+  titles remain empty, and MCP environment documentation reflects the always-present resolved lbabus path.
+
 ## [1.4.5] - 2026-08-08
 
 ### Fixed
