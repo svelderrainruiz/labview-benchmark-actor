@@ -305,7 +305,24 @@
           "markdownDescription": "Path to this actor's local `lbabus net` receive-log (written by `net listen --log`) that **Poll Bus** reads. Empty = the CLI default."
         }
       }
-    }
+    },
+    "taskDefinitions": [
+      {
+        "type": "labviewBenchmarkActor",
+        "required": ["task"],
+        "properties": {
+          "task": {
+            "type": "string",
+            "enum": [
+              "agent-preflight",
+              "governance-review",
+              "reviewer-readiness",
+              "release-candidate"
+            ]
+          }
+        }
+      }
+    ]
   },
   "scripts": {
     "vscode:prepublish": "npm run compile",

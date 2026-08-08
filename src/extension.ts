@@ -7,6 +7,7 @@ import { pathToFileURL } from 'node:url';
 import * as path from 'node:path';
 
 import { registerBenchmarkActorMcpServerProvider } from './mcp/benchmarkActorMcpServerProvider';
+import { registerHumanTasks } from './humanTasks';
 
 const execFileAsync = promisify(execFile);
 
@@ -1769,6 +1770,7 @@ async function runThroughputLadderCommand(context: vscode.ExtensionContext, outp
 
 export function activate(context: vscode.ExtensionContext): void {
   const output = getOutput(context);
+  context.subscriptions.push(registerHumanTasks(context));
 
   context.subscriptions.push(
     vscode.commands.registerCommand('labviewBenchmarkActor.showCapabilities', () =>

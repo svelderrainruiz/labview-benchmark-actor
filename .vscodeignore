@@ -14,6 +14,7 @@ reviewer-workstation/**
 cleanroom/**
 scripts/**
 extension-agents/**
+extension-tasks/**
 node_modules/**
 .devcontainer/**
 .dockerignore

@@ -1432,6 +1432,38 @@ check('extension-manifest-boundary', () => {
   return { name: pkg.name, commands: commands.length, movedModules: manifest.modules.length };
 });
 
+check('human-task-shortcuts', () => {
+  const pkg = readJson('package.json');
+  const definitions = pkg.contributes?.taskDefinitions;
+  assert(Array.isArray(definitions) && definitions.length === 1, 'extension must contribute one task definition');
+  assert(definitions[0].type === 'labviewBenchmarkActor', 'human task type mismatch');
+  assert(
+    definitions[0].properties?.task?.enum?.join(',') ===
+      'agent-preflight,governance-review,reviewer-readiness,release-candidate',
+    'human task ids are incomplete or reordered',
+  );
+  const provider = readFileSync(join(pkgRoot, 'src', 'humanTasks.ts'), 'utf8');
+  const runner = readFileSync(join(pkgRoot, 'extension-tasks', 'human-task-runner.mjs'), 'utf8');
+  const stage = readFileSync(join(pkgRoot, 'scripts', 'stage-media.mjs'), 'utf8');
+  for (const label of [
+    'LBA: Agent Preflight',
+    'LBA: Governance Review',
+    'LBA: Reviewer Mesh Readiness (compound)',
+    'LBA: Release Candidate Check (compound)',
+  ]) assert(provider.includes(label), `task provider missing '${label}'`);
+  assert(provider.includes("ELECTRON_RUN_AS_NODE: '1'"), 'human tasks must use VS Code bundled Node');
+  assert(stage.includes("extension-tasks', 'human-task-runner.mjs"), 'human task runner is not staged into media');
+  assert(runner.includes('REPO_STANDARDS_REVIEW'), 'governance task lacks local standards checkout override');
+  assert(runner.includes("docker.stdout.trim() !== 'linux'"), 'governance task lacks Linux Docker guard');
+  assert(
+    runner.includes('registry.gitlab.com/svelderrainruiz/repo-standards-review/assurance-workbench:main')
+      && runner.includes("'--profile', 'release-gate'"),
+    'governance task lacks the published release-gate workbench command',
+  );
+  assert(runner.includes("if (result.status !== 0) throw"), 'human task runner must fail closed on child errors');
+  return { taskType: definitions[0].type, tasks: definitions[0].properties.task.enum.length };
+});
+
 // 21. A GitHub Codespace install route is defined via a PREBUILT dev container image: the recipe
 //     (.devcontainer/build/devcontainer.json) provisions node + dotnet and is built + published to GHCR
 //     by CI (.github/workflows/devcontainer-prebuild.yml); the runtime .devcontainer/devcontainer.json

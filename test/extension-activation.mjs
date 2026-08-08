@@ -53,6 +53,7 @@ const inputQueue = [];
 const errorResponseQueue = [];
 const openedExternal = [];
 const configStore = {};
+const taskProviders = [];
 let agentsContentProvider = null;
 const mockVscode = {
   window: {
@@ -129,6 +130,21 @@ const mockVscode = {
       return { dispose() {} };
     },
     executeCommand: async (id) => { executedCommands.push(id); return undefined; },
+  },
+  tasks: {
+    registerTaskProvider: (type, provider) => {
+      taskProviders.push({ type, provider });
+      return { dispose() {} };
+    },
+  },
+  TaskScope: { Workspace: 1 },
+  ProcessExecution: class {
+    constructor(process, args, options) { this.process = process; this.args = args; this.options = options; }
+  },
+  Task: class {
+    constructor(definition, scope, name, source, execution) {
+      Object.assign(this, { definition, scope, name, source, execution });
+    }
   },
   env: {
     openExternal: (uri) => { openedExternal.push(uri && uri.toString ? uri.toString() : String(uri)); return Promise.resolve(true); },
@@ -270,6 +286,18 @@ try {
   for (const cmd of expected) {
     assert(ids.includes(cmd), `activate() registers command ${cmd}`);
   }
+  assert(taskProviders.length === 1 && taskProviders[0].type === 'labviewBenchmarkActor', 'activate() registers the human task provider');
+  const humanTasks = await taskProviders[0].provider.provideTasks();
+  assert(
+    JSON.stringify(humanTasks.map((task) => task.name)) === JSON.stringify([
+      'LBA: Agent Preflight',
+      'LBA: Governance Review',
+      'LBA: Reviewer Mesh Readiness (compound)',
+      'LBA: Release Candidate Check (compound)',
+    ]),
+    'human task provider exposes the four governed shortcuts',
+  );
+  assert(humanTasks.every((task) => task.execution.options.env.ELECTRON_RUN_AS_NODE === '1'), 'human tasks use the bundled VS Code Node runtime');
   assert(
     subscriptions.length >= expected.length,
     'activate() pushes a disposable per command onto context.subscriptions'

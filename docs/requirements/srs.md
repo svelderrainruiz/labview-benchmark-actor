@@ -121,6 +121,7 @@ progressively.
 | LBA-REQ-091 | The system shall ingest a live mesh-run dispatch and the actors' returned plane-tagged receipts into a run-bound actor-tasking + receipt-collection bound to the dispatchId -- so a fail-closed gate blocks fulfillment unless every collected receipt provably ran the dispatched benchmark on a tasked plane. | The fan-out (LBA-REQ-076) validates COMMITTED tasking + collection fixtures, but a LIVE run must bind the actual dispatch (the workflow `client_payload`) + the actors' returned receipt artifacts into that contract; nothing governed that ingestion step, so an agent-driven live run could feed the fulfillment gate a receipt set assembled outside the real dispatch. | `meshIngest.mjs` reads a validated live dispatch (`requestOk` + identity self-consistency, LBA-REQ-074) + a folder of `returned-receipt@1` files and REUSES the LBA-REQ-076 fan-out (`deriveTasking` + `buildCollection` + `validateTasking` + `validateCollection`) to produce a run-bound tasking + collection bound to the `dispatchId`; fails closed on an uncovered plane, a declared/receipt plane mismatch, a receipt identity mismatch, an unbound task, a duplicate actor, a malformed dispatch, or a malformed returned receipt. | `node experiments/mesh-fulfillment/meshIngest.selftest.mjs` (8/8); gated by `mesh-run-ingest`. |
 | LBA-REQ-092 | The system shall corroborate a run-bound receipt collection across its planes and compare the planes' benchmark metrics -- so a fail-closed gate blocks a cross-plane result unless the collected receipts span >= 2 distinct OS-planes, every plane's benchmark PASSED, and each re-derives the dispatched benchmark identity. | LBA-REQ-091 binds a live dispatch + returned receipts into a run-bound collection, but nothing consumed it to a single cross-plane verdict + comparison; "corroborated + compared" (the campaign milestone) was ungoverned over the ingested receipts. | `meshCorroborate.mjs` (`corroborateRun`) corroborates the collected plane receipts cross-plane (>= 2 planes, all PASS, each re-deriving `dispatchIdentity{metric,workload,n}` = the collection identity) + REUSES benchmark-store `compareRuns` (LBA-REQ-010) for the WIN-vs-LINUX delta, emitting a run-bound `mesh-cross-plane-report@1`; fails closed on a single-plane collection, a non-PASS plane, an identity mismatch, a malformed collection, a non-trend receipt, or a plane mismatch. | `node experiments/mesh-fulfillment/meshCorroborate.selftest.mjs` (8/8) + the committed two-plane collection corroborates; gated by `mesh-cross-plane-corroborate`. |
 | LBA-REQ-093 | The system shall pin the exact Node.js version that packages the `.vsix` in a repo-root `.nvmrc` sourced by every release-path workflow, so a fail-closed gate proves the reviewed build and the CI publish build use the identical Node version and cannot drift across a Node minor. | LBA-REQ-085/086 make the `.vsix` byte-reproducible within a Node major, but the packaged bytes are reproducible only within an EXACT Node version -- a Node minor can perturb them -- and every release-path workflow pinned `node-version: '24'`, which floats to the latest 24.x in the runner cache, so a future minor could silently drift CI's sha from the reviewed sha and re-break the reviewed==shipped gate at publish, the most expensive place to find it. | A repo-root `.nvmrc` pins the exact version (`24.19.0`); `extension-release.yml`, `vsix-cross-plane-repro.yml`, and `acg-cross-plane-corroboration.yml` source it via `node-version-file: .nvmrc` (no floating literal); `lba release-preflight` asserts the local Node equals `.nvmrc`. | The gate `release-path-node-pinned` proves `.nvmrc` pins an exact version and every release-path workflow sources it (pinning no floating literal), and the `scripts/lba.mjs` selftest proves the exact-version preflight (an equal Node clears, a later 24.x fails). |
+| LBA-REQ-094 | The extension shall contribute discoverable compound VS Code tasks for agent preflight, local standards governance, reviewer mesh readiness, and release-candidate verification, so human operators can execute the governed workflows without reconstructing command sequences. | Marketplace users do not receive repository `.vscode` tasks, and repeated manual command entry caused signed review failures. The release governance pass also depends on local access to `svelderrainruiz/repo-standards-review` and its published Linux-container workbench. | A `labviewBenchmarkActor` TaskProvider launches a packaged runner with VS Code's Node runtime. The governance task requires a local standards checkout, Docker Linux mode, and the published `assurance-workbench:main` release-gate profile; compound tasks stop on the first failure. | `npm test` proves the provider exposes all four named tasks and uses `ELECTRON_RUN_AS_NODE`; `human-task-shortcuts` in `verify-local-gates` proves the runner's local-checkout, Linux-engine, workbench-image, and fail-closed wiring. |
 
 ---
 
@@ -2894,6 +2895,26 @@ progressively.
   `docs/release/release-procedure.md` + `docs/release/release-runbook.md`. Filed as issue #408 while driving the
   1.1.1 Marketplace publish; authored under the singular-requirement directive (one `shall`).
 
+### LBA-REQ-094: Extension-contributed compound human tasks
+
+- Status: Proven
+- Area: Operation / developer experience (ADR-0077)
+- Statement: The extension shall contribute discoverable compound VS Code tasks for agent preflight, local
+  standards governance, reviewer mesh readiness, and release-candidate verification, so human operators can
+  execute the governed workflows without reconstructing command sequences.
+- Rationale: Marketplace users do not receive repository `.vscode/tasks.json`, while signed 1.4.1 reviews found
+  that repeatedly typing the documented command sequences was error-prone. A genuine governance pass also requires
+  local access to `svelderrainruiz/repo-standards-review` and its published Linux-container workbench.
+- Acceptance Criteria:
+  - The installed extension contributes **LBA: Agent Preflight**, **LBA: Governance Review**,
+    **LBA: Reviewer Mesh Readiness (compound)**, and **LBA: Release Candidate Check (compound)**.
+  - Tasks use VS Code's bundled runtime through `ELECTRON_RUN_AS_NODE=1`.
+  - Governance fails closed unless the local standards checkout exists and Docker reports Linux-container mode.
+  - Governance invokes
+    `registry.gitlab.com/svelderrainruiz/repo-standards-review/assurance-workbench:main` with the `release-gate`
+    profile against the current workspace.
+  - Tests and local gates verify task labels, packaged-runner wiring, and the fail-closed governance prerequisites.
+
 ## Traceability (requirement → architecture view / test)
 
 | Requirement | Architecture view | Test items |
@@ -2991,3 +3012,4 @@ progressively.
 | LBA-REQ-091 | Deployment (run-bound mesh ingestion) | T-091 |
 | LBA-REQ-092 | Deployment (run-bound cross-plane corroborate + compare) | T-092 |
 | LBA-REQ-093 | Packaging / boundary (Node-version-pinned reproducible .vsix) | T-093 |
+| LBA-REQ-094 | Operation / developer experience (extension-contributed compound tasks) | T-094 |
