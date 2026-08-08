@@ -11,42 +11,26 @@
     "vsixSha256": "5f15ca6e77b40989232ab21bd40d1d79cbb88061536fdb0a917f9497ab5dd3cc"
   },
   "staged": {
-    "schema": "labview-benchmark-actor/release-net-stage@1",
-    "wallTime": "2026-08-08T06:32:02.7152927Z",
-    "drive": "lbabus net -- bus-msg@1 over VirtualBox NAT guest 10.0.2.2 to host loopback 127.0.0.1:7420",
-    "vm": {
-      "name": "actor-reviewer-stage-bee6a8fc",
-      "ownership": "disposable-linked-clone",
-      "sourceVmUuid": "f296a95b-7470-496a-bab7-791c973efd37",
-      "sourceSnapshotUuid": "c5d7e440-707d-4522-a06e-f2d358f3e4c3"
-    },
+    "drive": "await-agent-reply",
+    "vm": "reviewer-vm",
     "matched": true,
-    "frame": {
-      "schema": "labview-benchmark-actor/bus-msg@1",
-      "sessionId": "default",
-      "senderId": "WIN",
-      "seq": 1786170644,
-      "ts": {
-        "wall": "2026-08-08T06:30:44.264Z"
-      },
-      "type": "DONE",
-      "task": "extension-release-1.4.0",
-      "payload": "staged extension 1.4.0 sha256 5f15ca6e77b40989232ab21bd40d1d79cbb88061536fdb0a917f9497ab5dd3cc commit 38df82c42d001a185c8289195ba1e5e11088c387"
-    },
     "candidate": {
       "component": "extension",
       "version": "1.4.0",
       "commit": "38df82c42d001a185c8289195ba1e5e11088c387",
-      "vsixSha256": "5f15ca6e77b40989232ab21bd40d1d79cbb88061536fdb0a917f9497ab5dd3cc",
-      "size": 127272
+      "vsixSha256": "5f15ca6e77b40989232ab21bd40d1d79cbb88061536fdb0a917f9497ab5dd3cc"
     },
-    "proof": {
-      "guestCandidatePath": "C:\\lba-review\\net-stage\\candidate.vsix",
-      "guestSha256": "5f15ca6e77b40989232ab21bd40d1d79cbb88061536fdb0a917f9497ab5dd3cc",
-      "guestSize": 127272,
-      "lbabusVersion": "0.15.0",
-      "hostListener": "127.0.0.1:7420",
-      "listenerMessageCount": 1
+    "frame": {
+      "schema": "labview-benchmark-actor/bus-msg@1",
+      "sessionId": "default",
+      "senderId": "WIN",
+      "seq": 1786173005,
+      "ts": {
+        "wall": "2026-08-08T07:10:05.295Z"
+      },
+      "type": "DONE",
+      "task": "extension-release-1.4.0",
+      "payload": "{\"schema\":\"labview-benchmark-actor/release-stage@1\",\"candidate\":{\"component\":\"extension\",\"version\":\"1.4.0\",\"commit\":\"38df82c42d001a185c8289195ba1e5e11088c387\",\"vsixSha256\":\"5f15ca6e77b40989232ab21bd40d1d79cbb88061536fdb0a917f9497ab5dd3cc\"}}"
     }
   },
   "machine": {
@@ -179,5 +163,5 @@
     "compositeReleaseProven": true,
     "reason": "both gates publish for extension 1.4.0: machine quorum + enrolled sign-off (ADR-0018) AND human visual PASS (LBA-REQ-057), bound to the same net-staged candidate"
   },
-  "digest": "2c226e0c603c9bdf5956e1609c8b5e7dad61ef78073cb9281cb75c4c458f4c9f"
+  "digest": "fffb451e945c3957c0ed431c4ef00e7718af0e0b202b379f8edf90eb38194e8c"
 }
