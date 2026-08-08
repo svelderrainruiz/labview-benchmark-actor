@@ -6,6 +6,17 @@ follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project
 
 ## [Unreleased]
 
+## [1.4.0] - 2026-08-08
+
+### Added
+- **Verified Windows-container TightVNC image acquisition.** The local experiment now retains and
+  independently verifies the PNG decoded from the exact run-owned container's authenticated RFB
+  stream, binds its container/network/relay provenance into a deterministic MPRR transport replay,
+  and executes the repository's `lbabus` capability probe inside the pinned image. Verbose
+  timestamped host and container diagnostics expose each acquisition and cleanup stage. The live
+  proof remains fail-closed: the acquired `1024x768` image is uniformly black, is explicitly marked
+  unusable, and cannot be represented as an interactive desktop or visual LabVIEW benchmark.
+
 ## [1.3.0] - 2026-08-06
 
 ### Added
