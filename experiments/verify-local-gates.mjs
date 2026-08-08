@@ -3537,6 +3537,12 @@ check('vsix-cross-plane-repro-workflow-wired', () => {
   const attrs = readFileSync(join(pkgRoot, '.gitattributes'), 'utf8').replace(/\r\n/g, '\n');
   assert(/^\*\.mjs text eol=lf$/m.test(attrs), '.gitattributes must LF-pin *.mjs (packaged media + bundled acg-mcp sources)');
   assert(/^\*\.ts text eol=lf$/m.test(attrs), '.gitattributes must LF-pin *.ts (so tsc string literals are LF on every plane)');
+  for (const file of ['release-components.json', 'release-risk-baseline.json', 'standards-score-baseline.json']) {
+    assert(
+      new RegExp(`^/${file.replace('.', '\\.')} text eol=lf$`, 'm').test(attrs),
+      `.gitattributes must LF-pin packaged root ${file}`,
+    );
+  }
   return { planes: ['linux', 'windows'], proof: 'npm run package on both -> identical sha256 (fail-closed)' };
 });
 
