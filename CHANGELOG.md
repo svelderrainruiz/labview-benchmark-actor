@@ -6,6 +6,16 @@ follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project
 
 ## [Unreleased]
 
+## [1.4.9] - 2026-08-08
+
+### Fixed
+
+- **Canonical VSIX artifacts are packaged for the Marketplace prerelease channel.** The reproducible package command
+  now passes VSCE's `--pre-release` flag before normalization, so the exact reviewed and immutable-release bytes can
+  be published with `vsce publish --pre-release --packagePath` instead of failing at Marketplace closeout.
+- **The agent last gate exercises the canonical package command.** Its size proof now uses `npm run package`, keeping
+  prerelease metadata and normalization aligned with local KPI, cross-plane CI, GitHub Release, and Marketplace.
+
 ## [1.4.8] - 2026-08-08
 
 ### Fixed
