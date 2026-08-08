@@ -267,7 +267,9 @@ async function main() {
       writeRelayEvidence();
       log('loopback relay closed', {
         bound: relayRecord.bound,
-        bytes: relayRecord.stats?.totalBytes,
+        totalBytes:
+          relayRecord.stats.downstreamToUpstreamBytes
+          + relayRecord.stats.upstreamToDownstreamBytes,
         listenerBindingsAfterClose,
       });
     } catch (error) {

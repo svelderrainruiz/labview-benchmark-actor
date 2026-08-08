@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
+import { cpSync, mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
@@ -8,6 +8,7 @@ import { encodePng } from '../manual-procedure-record/capture-adapter.mjs';
 import { analyzePixels } from './experiment-core.mjs';
 
 const root = mkdtempSync(path.join(os.tmpdir(), 'lba-win-vnc-verify-'));
+const nonuniformRoot = mkdtempSync(path.join(os.tmpdir(), 'lba-win-vnc-verify-nonuniform-'));
 const verifier = path.join(import.meta.dirname, 'verify-evidence.mjs');
 const writeJson = (name, value) => writeFileSync(path.join(root, name), `${JSON.stringify(value)}\n`);
 
@@ -165,6 +166,37 @@ try {
   assert.ok(manifest.files.some((entry) => entry.path === imageRelative));
   assert.ok(manifest.files.some((entry) => entry.path === 'host-orchestration.log' && /^[a-f0-9]{64}$/.test(entry.sha256)));
 
+  cpSync(root, nonuniformRoot, { recursive: true });
+  const nonuniformRgba = new Uint8Array([
+    0, 0, 0, 255, 0, 0, 0, 255, 255, 255, 255, 255, 255, 255, 255, 255,
+    0, 0, 0, 255, 0, 0, 0, 255, 255, 255, 255, 255, 255, 255, 255, 255,
+  ]);
+  const nonuniformImagePath = path.join(nonuniformRoot, imageRelative);
+  writeFileSync(nonuniformImagePath, encodePng(nonuniformRgba, 4, 2));
+  const nonuniformFailure = structuredClone(failure);
+  nonuniformFailure.classification = 'transport-only-nonuniform-framebuffer';
+  nonuniformFailure.rfb.width = 4;
+  nonuniformFailure.imageAcquisition.status = 'acquired-nonuniform-but-not-interpreted';
+  nonuniformFailure.imageAcquisition.rfb.width = 4;
+  nonuniformFailure.imageAcquisition.size = statSync(nonuniformImagePath).size;
+  nonuniformFailure.imageAcquisition.pngSha256 = createHash('sha256')
+    .update(readFileSync(nonuniformImagePath))
+    .digest('hex');
+  nonuniformFailure.imageAcquisition.rgbaSha256 = createHash('sha256')
+    .update(nonuniformRgba)
+    .digest('hex');
+  nonuniformFailure.imageAcquisition.analysis = analyzePixels(nonuniformRgba, 4, 2);
+  assert.equal(nonuniformFailure.imageAcquisition.analysis.passed, true);
+  for (const name of ['capture-summary.json', 'failure-receipt.json']) {
+    writeFileSync(path.join(nonuniformRoot, name), `${JSON.stringify(nonuniformFailure)}\n`);
+  }
+  const nonuniform = spawnSync(
+    process.execPath,
+    [verifier, '--finalize-and-verify', nonuniformRoot],
+    { encoding: 'utf8' },
+  );
+  assert.equal(nonuniform.status, 0, nonuniform.stderr);
+
   writeFileSync(path.join(root, 'host-orchestration.log'), 'tampered\n');
   const tampered = spawnSync(process.execPath, [verifier, '--verify', root], { encoding: 'utf8' });
   assert.notEqual(tampered.status, 0, 'manifest verification must fail after evidence tampering');
@@ -172,4 +204,5 @@ try {
   console.log('windows-docker evidence verifier self-test: PASS');
 } finally {
   rmSync(root, { recursive: true, force: true });
+  rmSync(nonuniformRoot, { recursive: true, force: true });
 }

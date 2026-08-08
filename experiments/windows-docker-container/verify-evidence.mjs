@@ -217,7 +217,11 @@ function verify(root) {
         acquisition.analysis,
         'transport image pixel analysis mismatch',
       );
-      assert.equal(acquisition.analysis.passed, false, 'transport-only diagnostic image unexpectedly passed visual proof');
+      assert.equal(
+        acquisition.analysis.passed,
+        acquisition.status === 'acquired-nonuniform-but-not-interpreted',
+        `transport image analysis contradicts status '${acquisition.status}'`,
+      );
       assert.equal(lbabusStage.schema, 'labview-benchmark-actor/windows-container-lbabus-stage@1');
       assert.equal(lbabusContainer.schema, 'labview-benchmark-actor/windows-container-lbabus@1');
       assert.equal(lbabusContainer.status, 'passed', 'container lbabus capability probe did not pass');
