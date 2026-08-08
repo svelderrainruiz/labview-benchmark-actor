@@ -238,7 +238,7 @@ jobs:
         # The operator supplies the VSCE_PAT secret to actually publish -- AFTER the human reviewer-VM
         # last gate and the bidirectional WIN <-> LINUX agreement gate above. Publishes the EXACT staged
         # artifact already built, tested, and agreement-gated.
-        if: ${{ github.repository == 'LabVIEW-Community-CI-CD/labview-benchmark-actor' }}
+        if: ${{ github.repository == 'LabVIEW-Community-CI-CD/labview-benchmark-actor' || github.repository == 'svelderrainruiz/labview-benchmark-actor' }}
         env:
           VSCE_PAT: ${{ secrets.VSCE_PAT }}
         run: |
