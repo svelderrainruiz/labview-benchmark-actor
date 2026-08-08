@@ -16,6 +16,9 @@ follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project
 - **Host capabilities remain useful without `lbabus`.** The VS Code command falls back to a built-in
   read-only probe instead of surfacing raw `spawn lbabus ENOENT`, and reports Docker, Vagrant,
   VirtualBox, VMware, LabVIEW 32/64-bit, and LabVIEWCLI availability with detected versions.
+- **Reviewer workstations join the mesh immediately.** Local reviewer staging publishes the repository
+  `lbabus` Windows apphost, installs and version-checks it in a stable user-PATH location, and requires
+  that proof alongside the exact VSIX; a full VS Code restart picks up the new PATH.
 - **Icon Editor prerequisites are explicit.** Shipped agent guidance now requires installed/activated
   VI Package Manager and applying `icon-editor-developer.vipc` to each intended LabVIEW 2026 Q3
   bitness before treating `ni/labview-icon-editor` as provisioned.

@@ -36,6 +36,7 @@ $ErrorActionPreference = 'Stop'
 function Step([string]$m) { Write-Host "[stage-local] $m" -ForegroundColor Cyan }
 
 $repoRoot = Split-Path $PSScriptRoot -Parent
+$lbabusTemp = $null
 Push-Location $repoRoot
 try {
   # 1) Build the candidate .vsix from the working tree (unless skipped / supplied prebuilt).
@@ -72,6 +73,26 @@ try {
   Step "vagrant upload -> $GuestVsixPath"
   vagrant upload $Vsix $GuestVsixPath $Machine
   if ($LASTEXITCODE -ne 0) { throw "vagrant upload failed ($LASTEXITCODE)." }
+
+  # The reviewer is a real mesh actor, not just a visual shell. Publish a framework-dependent Windows apphost
+  # from this exact repository and install it into a stable user-PATH location before exercising capabilities.
+  $lbabusTemp = Join-Path ([IO.Path]::GetTempPath()) "lba-reviewer-lbabus-$PID"
+  $lbabusPublish = Join-Path $lbabusTemp 'publish'
+  $lbabusZip = Join-Path $lbabusTemp 'lbabus-win-x64.zip'
+  New-Item -ItemType Directory -Path $lbabusPublish -Force | Out-Null
+  Step 'publish reviewer lbabus Windows apphost'
+  dotnet publish (Join-Path $repoRoot 'tools\collab-cli\LbaBus.csproj') `
+    --configuration Release --runtime win-x64 --self-contained false `
+    -p:UseAppHost=true --output $lbabusPublish --nologo --verbosity quiet
+  if ($LASTEXITCODE -ne 0) { throw "lbabus publish failed ($LASTEXITCODE)." }
+  Compress-Archive -Path (Join-Path $lbabusPublish '*') -DestinationPath $lbabusZip
+  vagrant upload $lbabusZip 'C:/Windows/Temp/lbabus-win-x64.zip' $Machine | Out-Null
+  vagrant upload (Join-Path $PSScriptRoot 'bin\guest-install-lbabus.ps1') 'C:/Windows/Temp/lba-guest-install-lbabus.ps1' $Machine | Out-Null
+  $lbabusInstall = (vagrant winrm -c "powershell -NoProfile -ExecutionPolicy Bypass -File C:\Windows\Temp\lba-guest-install-lbabus.ps1 -PayloadZip C:\Windows\Temp\lbabus-win-x64.zip" 2>&1 | Out-String)
+  $lbabusInstall -split "`n" | ForEach-Object { if ($_.Trim()) { Write-Host "    $($_.TrimEnd())" } }
+  if ($lbabusInstall -notmatch '"version":"0\.15\.0"') {
+    throw "Guest lbabus install/verify failed:`n$lbabusInstall"
+  }
 
   # 4) Install into the INTERACTIVE reviewer's profile (issue #121) + verify by outcome. A guest-side
   #    helper resolves the console user's real profile path (folder name can differ from the username).
@@ -121,7 +142,8 @@ B. Command surface (Ctrl+Shift+P -> "LabVIEW Benchmark Actor:")
    - Show Agent Instructions      -> the embedded AGENTS.md opens.
    - Write Agent Instructions     -> materializes AGENTS.md into the open folder.
    - Check Agent Instructions     -> reports match/drift vs the embedded canonical.
-   - Show Host Capabilities / Poll Bus / Post Note -> need `lbabus` + `gh auth login` first.
+   - Show Host Capabilities / Poll Bus / Post Note -> reviewer staging installs `lbabus`; restart VS Code so
+     the extension host inherits its updated user PATH. Configure a bus peer before Poll/Post.
 
 C. Documentation
    - README (above) is the shipped doc surface. Deeper specs (SRS/ADRs/user guide) are in
@@ -142,5 +164,8 @@ Report issues back to the agent; nothing is published until you approve.
   Step 'The candidate extension is installed; nothing has been published.'
 }
 finally {
+  if ($lbabusTemp -and (Test-Path -LiteralPath $lbabusTemp)) {
+    Remove-Item -LiteralPath $lbabusTemp -Recurse -Force
+  }
   Pop-Location
 }

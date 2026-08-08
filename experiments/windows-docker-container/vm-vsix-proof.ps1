@@ -18,6 +18,12 @@ $extensions = @(& $code.Source --list-extensions --show-versions 2>&1)
 $installed = $extensions | Where-Object { $_ -match "^$([regex]::Escape($ExpectedExtensionId))@" } | Select-Object -First 1
 if (-not $installed) { throw "Extension '$ExpectedExtensionId' is not installed." }
 if (-not (Test-Path -LiteralPath $CandidatePath)) { throw "Staged candidate is missing at '$CandidatePath'." }
+$lbabusPath = 'C:\lba-tools\lbabus\lbabus.exe'
+if (-not (Test-Path -LiteralPath $lbabusPath)) { throw "Reviewer lbabus is missing at '$lbabusPath'." }
+$lbabusVersion = (& $lbabusPath version 2>&1 | Out-String).Trim()
+if ($LASTEXITCODE -ne 0 -or $lbabusVersion -ne '0.15.0') {
+  throw "Reviewer lbabus version '$lbabusVersion' is invalid."
+}
 
 [pscustomobject]@{
   schema = 'labview-benchmark-actor/windows-vagrant-reviewer-vsix-proof@1'
@@ -34,4 +40,6 @@ if (-not (Test-Path -LiteralPath $CandidatePath)) { throw "Staged candidate is m
   candidatePath = $CandidatePath
   candidateSize = (Get-Item -LiteralPath $CandidatePath).Length
   candidateSha256 = (Get-FileHash -LiteralPath $CandidatePath -Algorithm SHA256).Hash.ToLowerInvariant()
+  lbabusPath = $lbabusPath
+  lbabusVersion = $lbabusVersion
 } | ConvertTo-Json -Compress
