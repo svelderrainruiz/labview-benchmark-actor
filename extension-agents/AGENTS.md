@@ -16,7 +16,7 @@ Treat this as an executable agent preflight, not optional human setup prose. Run
 | Tool | Required/validated version | Agent action |
 | --- | --- | --- |
 | VS Code | `>=1.101.0` | Required for the extension and contributed MCP server. |
-| `lbabus` | **exactly `0.15.0` for this extension build** | Run `lbabus version`. Reviewer staging installs this version. Else install with `dotnet tool install --global LabVIEWBenchmarkActor.CollabBus --version 0.15.0`; restart VS Code afterward. |
+| `lbabus` | **exactly `0.15.1` for this extension build** | Run `lbabus version`. Reviewer staging installs this version. Else install with `dotnet tool install --global LabVIEWBenchmarkActor.CollabBus --version 0.15.1`; restart VS Code afterward. |
 | Node.js | **exactly `24.19.0` for repository/release work** | Match the repository `.nvmrc`; packaging is Node-version-bound. |
 | .NET runtime | `>=8.0` | Required to execute the framework-dependent `lbabus` payload. |
 | .NET SDK | `>=8.0` when building/staging `lbabus` | Required for `dotnet build/publish`; runtime-only hosts can consume but not rebuild it. |
@@ -24,24 +24,31 @@ Treat this as an executable agent preflight, not optional human setup prose. Run
 | ripgrep (`rg`) | `>=13.0` | Required by `lbabus grep` and repository search gates. |
 | GitHub CLI (`gh`) | `>=2.20` | Required for GitHub workflow/artifact/release operations. |
 | GitLab CLI (`glab`) | `>=1.25` for a fully green `lbabus selfcheck` | Install when running the complete pinned collaboration-toolchain gate. |
+| Standards corpus | Eight governed PDFs under `C:\design\standards` (or `STANDARDS_ROOT`) | Required by **LBA: Governance Review**: ISO 10007, 12207, 15289, 29119-2/3, 29148, 42010, and 26514. The task mounts this local corpus read-only; never commit or redistribute it. |
 
 Optional substrate versions used by this release's validated Windows reviewer lane are **Vagrant 2.4.9**,
 **VirtualBox 7.2.8**, **LabVIEW 2026 Q3** (32-bit and/or 64-bit as the workload requires), and **TightVNC
 2.8.81**. Docker, Vagrant, VirtualBox, VMware, LabVIEW, FFmpeg, and VIPM are workload-specific: their absence
 must be reported explicitly by capabilities, never silently treated as available.
 
-## Compound human tasks — bundle v1.0.0
+## Compound human tasks — bundle v1.0.1
 
 Open **Terminal: Run Task**. These tasks are contributed by the installed extension, so downloaded Marketplace
 users receive them without a repository `.vscode/tasks.json`:
 
 - **LBA: Agent Preflight** — `lbabus version`, `selfcheck`, and host capabilities.
 - **LBA: Governance Review** — local `repo-standards-review` checkout plus the published Linux
-  `assurance-workbench:main` `release-gate` profile.
+  `assurance-workbench:main` `release-gate` profile and the local standards corpus.
 - **LBA: Reviewer Mesh Readiness (compound)** — preflight, then governance.
 - **LBA: Release Candidate Check (compound)** — reviewer readiness, tests, local gates, and packaging.
 
-Task bundle **v1.0.0** fails on the first nonzero child command. Before deleting a disposable human-review VM,
+Governance requires the standards PDFs at `C:\design\standards` (or `STANDARDS_ROOT`) and mounts them read-only at
+`/standards`; the PDFs remain local and are never packaged. `release-components.json` pins the exact
+`repo-standards-review` commit and published workbench image digest used by this extension build.
+
+Task bundle **v1.0.1** is noninteractive, fails on the first nonzero child command, prefixes every command/output
+event with a stable index, UTC wall timestamp, monotonic nanoseconds, and clock source, and writes a machine-readable
+receipt under extension global storage. Before deleting a disposable human-review VM,
 the operator must run the maintained raw-data collector so the next agent receives the target, candidate hash,
 installed commands/tasks, AGENTS hash/version, `lbabus capabilities`, safe reviewer settings, VM identity, and
 screenshot.

@@ -10,6 +10,14 @@ so the WIN and LINUX planes install the exact same pinned version and cannot dri
 
 ## [Unreleased]
 
+## [0.15.1] — 2026-08-08
+
+### Changed
+
+- Host capability probes report Docker, Vagrant, VirtualBox, VMware, LabVIEW 32/64-bit, and
+  LabVIEWCLI versions with bounded process-tree cleanup, supporting the extension's reviewer
+  preflight and deterministic human-task receipts.
+
 ## [0.15.0] — 2026-08-03
 
 ### Removed
@@ -272,7 +280,8 @@ so the published release notes are self-complete.
 
 - Shared versioned .NET CLI (`lbabus`) for the WIN↔LINUX coordination bus (#6).
 
-[Unreleased]: https://github.com/LabVIEW-Community-CI-CD/labview-benchmark-actor/compare/collab-cli-v0.15.0...HEAD
+[Unreleased]: https://github.com/LabVIEW-Community-CI-CD/labview-benchmark-actor/compare/collab-cli-v0.15.1...HEAD
+[0.15.1]: https://github.com/LabVIEW-Community-CI-CD/labview-benchmark-actor/compare/collab-cli-v0.15.0...collab-cli-v0.15.1
 [0.15.0]: https://github.com/LabVIEW-Community-CI-CD/labview-benchmark-actor/compare/collab-cli-v0.14.0...collab-cli-v0.15.0
 [0.8.2]: https://github.com/LabVIEW-Community-CI-CD/labview-benchmark-actor/compare/collab-cli-v0.8.0...collab-cli-v0.8.2
 [0.8.1]: https://github.com/LabVIEW-Community-CI-CD/labview-benchmark-actor/pull/97

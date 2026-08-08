@@ -1454,22 +1454,58 @@ check('human-task-shortcuts', () => {
   assert(provider.includes("ELECTRON_RUN_AS_NODE: '1'"), 'human tasks must use VS Code bundled Node');
   assert(stage.includes("extension-tasks', 'human-task-runner.mjs"), 'human task runner is not staged into media');
   assert(runner.includes('REPO_STANDARDS_REVIEW'), 'governance task lacks local standards checkout override');
-  assert(provider.includes("HUMAN_TASKS_VERSION = '1.0.0'"), 'task provider lacks bundle version 1.0.0');
-  assert(runner.includes("HUMAN_TASKS_VERSION = '1.0.0'"), 'task runner lacks bundle version 1.0.0');
+  assert(runner.includes('STANDARDS_ROOT') && runner.includes('governance.standardsRootDefault'), 'governance task lacks local standards-corpus discovery');
+  assert(runner.includes("`${corpus}:/standards:ro`") && runner.includes("'STANDARDS_ROOT=/standards'"), 'governance task does not mount standards read-only');
+  assert(runner.includes('governance.standardsReviewCommit') && runner.includes('governance.workbenchDigest'), 'governance task does not pin its source commit and image digest');
+  assert(provider.includes("HUMAN_TASKS_VERSION = '1.0.1'"), 'task provider lacks bundle version 1.0.1');
+  assert(runner.includes("HUMAN_TASKS_VERSION = '1.0.1'"), 'task runner lacks bundle version 1.0.1');
   const agents = readFileSync(join(pkgRoot, 'extension-agents', 'AGENTS.md'), 'utf8');
-  assert(agents.includes('Compound human tasks — bundle v1.0.0'), 'generated AGENTS lacks task bundle version');
+  assert(agents.includes('Compound human tasks — bundle v1.0.1'), 'generated AGENTS lacks task bundle version');
   const collector = readFileSync(join(pkgRoot, 'reviewer-workstation', 'collect-review-raw.ps1'), 'utf8');
   for (const proof of ['reviewTarget', 'candidate', 'commands', 'taskDefinitions', 'agents', 'capabilities', 'reviewerSettings', 'screenshotpng']) {
     assert(collector.includes(proof), `raw review collector lacks ${proof} evidence`);
   }
-  assert(runner.includes("docker.stdout.trim() !== 'linux'"), 'governance task lacks Linux Docker guard');
+  assert(runner.includes("dockerOs.trim() !== 'linux'"), 'governance task lacks Linux Docker guard');
   assert(
-    runner.includes('registry.gitlab.com/svelderrainruiz/repo-standards-review/assurance-workbench:main')
+    runner.includes('governance.workbenchImage')
       && runner.includes("'--profile', 'release-gate'"),
     'governance task lacks the published release-gate workbench command',
   );
-  assert(runner.includes("if (result.status !== 0) throw"), 'human task runner must fail closed on child errors');
+  assert(runner.includes("if (exitCode.code !== 0) throw"), 'human task runner must fail closed on child errors');
+  assert(provider.includes('showReuseMessage: false') && provider.includes('TaskPanelKind.Dedicated'), 'human tasks must use dedicated terminals without reuse prompts');
+  for (const proof of ['index: eventIndex', 'wallTime:', 'monotonicNs:', "clockSource: 'process.hrtime.bigint'", "stdio: ['ignore', 'pipe', 'pipe']", "readline.createInterface"]) {
+    assert(runner.includes(proof), `human task runner lacks deterministic ${proof} evidence`);
+  }
   return { taskType: definitions[0].type, tasks: definitions[0].properties.task.enum.length };
+});
+
+check('release-component-versioning', () => {
+  const versions = readJson('release-components.json');
+  const pkg = readJson('package.json');
+  const lock = readJson('package-lock.json');
+  const agentsManifest = readJson(join('extension-agents', 'agents.manifest.json'));
+  const lbabus = readFileSync(join(pkgRoot, 'tools', 'collab-cli', 'LbaBus.csproj'), 'utf8');
+  const tasks = readFileSync(join(pkgRoot, 'src', 'humanTasks.ts'), 'utf8');
+  const hook = readFileSync(join(pkgRoot, '.githooks', 'pre-commit'), 'utf8');
+  const workflow = readFileSync(join(pkgRoot, '.github', 'workflows', 'extension-release.yml'), 'utf8');
+  const releaseCli = readFileSync(join(pkgRoot, 'scripts', 'lba.mjs'), 'utf8');
+  assert(versions.schema === 'labview-benchmark-actor/release-components@1', 'release component schema mismatch');
+  assert(pkg.version === versions.extension && lock.version === versions.extension && lock.packages[''].version === versions.extension, 'extension package versions drifted');
+  assert(agentsManifest.version === versions.agents, 'AGENTS version drifted');
+  assert(lbabus.includes(`<Version>${versions.lbabus}</Version>`), 'lbabus version drifted');
+  assert(tasks.includes(`HUMAN_TASKS_VERSION = '${versions.humanTasks}'`), 'human task version drifted');
+  assert(versions.canonicalDistribution === 'github-release' && versions.marketplaceChannel === 'prerelease', 'distribution policy drifted');
+  assert(/^[0-9a-f]{40}$/.test(versions.governance.standardsReviewCommit), 'standards-review commit is not pinned');
+  assert(/^sha256:[0-9a-f]{64}$/.test(versions.governance.workbenchDigest), 'governance workbench digest is not pinned');
+  assert(hook.includes('release-components.mjs --precommit'), 'precommit release-component gate missing');
+  assert(
+    workflow.includes('inputs.publish_marketplace')
+      && workflow.includes('gh release download')
+      && workflow.includes('vsce publish --pre-release --packagePath "$release_dir/'),
+    'GitHub-first Marketplace prerelease policy drifted',
+  );
+  assert(releaseCli.includes("'--target', 'main'"), 'GitHub release target-main control drifted');
+  return { extension: versions.extension, agents: versions.agents, lbabus: versions.lbabus, humanTasks: versions.humanTasks };
 });
 
 // 21. A GitHub Codespace install route is defined via a PREBUILT dev container image: the recipe

@@ -1,5 +1,6 @@
 .vscode/**
 .github/**
+.githooks/**
 src/**
 test/**
 tsconfig.json

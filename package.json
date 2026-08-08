@@ -2,7 +2,7 @@
   "name": "labview-benchmark-actor",
   "displayName": "LabVIEW Benchmark Actor",
   "description": "Standalone agentic benchmark-actor infrastructure with cross-plane coordination (lbabus) for LabVIEW benchmarking.",
-  "version": "1.4.1",
+  "version": "1.4.2",
   "publisher": "svelderrainruiz",
   "license": "0BSD",
   "author": "Sergio Velderrain",
@@ -309,7 +309,9 @@
     "taskDefinitions": [
       {
         "type": "labviewBenchmarkActor",
-        "required": ["task"],
+        "required": [
+          "task"
+        ],
         "properties": {
           "task": {
             "type": "string",
@@ -329,7 +331,9 @@
     "compile": "tsc -p ./ && node scripts/stage-media.mjs && node scripts/stage-acg-mcp.mjs",
     "watch": "tsc -watch -p ./",
     "lba": "node scripts/lba.mjs",
-    "test": "npm run compile && node test/extension-activation.mjs && node test/viewer-render.mjs && node test/viewer-plain-render.mjs && node test/panels-render.mjs && node test/mcp-server.mjs && node test/normalize-vsix.mjs && node test/verify-published-vsix.mjs && node scripts/mcpToolDoc.mjs --check docs/mcp-tools.md",
+    "prepare": "node scripts/install-git-hooks.mjs",
+    "release:check-components": "node scripts/release-components.mjs",
+    "test": "npm run compile && node test/extension-activation.mjs && node test/viewer-render.mjs && node test/viewer-plain-render.mjs && node test/panels-render.mjs && node test/mcp-server.mjs && node test/human-task-runner.mjs && node test/release-components.mjs && node test/normalize-vsix.mjs && node test/verify-published-vsix.mjs && node scripts/mcpToolDoc.mjs --check docs/mcp-tools.md",
     "package": "vsce package --out labview-benchmark-actor.vsix && node scripts/normalize-vsix.mjs labview-benchmark-actor.vsix",
     "test:coverage": "node scripts/coverage.mjs",
     "coverage:bump": "node scripts/coverage.mjs --bump"

@@ -1,24 +1,72 @@
 #!/usr/bin/env node
-import { spawnSync } from 'node:child_process';
-import { existsSync } from 'node:fs';
+import { spawn } from 'node:child_process';
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import readline from 'node:readline';
 
 const mode = process.argv[2];
 const workspace = process.cwd();
-const HUMAN_TASKS_VERSION = '1.0.0';
+const HUMAN_TASKS_VERSION = '1.0.1';
+const startedNs = process.hrtime.bigint();
+const startedWallTime = new Date().toISOString();
+const events = [];
+let eventIndex = 0;
+const releaseComponents = JSON.parse(readFileSync(new URL('../release-components.json', import.meta.url), 'utf8'));
+const governance = releaseComponents.governance;
+const REQUIRED_STANDARD_FILES = [
+  'ISO_10007_2017(en).pdf',
+  '12207-2017.pdf',
+  '15289-2019.pdf',
+  '29119-2-2021.pdf',
+  '29119-3-2021.pdf',
+  '29148-2018.pdf',
+  '42010-2022.pdf',
+  'ISO_IEC_IEEE_26514_2022(en).pdf',
+];
 
-function run(command, args, options = {}) {
-  console.log(`\n> ${command} ${args.join(' ')}`);
-  const result = spawnSync(command, args, {
+function event(type, message, detail = {}) {
+  eventIndex += 1;
+  const item = {
+    index: eventIndex,
+    wallTime: new Date().toISOString(),
+    monotonicNs: (process.hrtime.bigint() - startedNs).toString(),
+    clockSource: 'process.hrtime.bigint',
+    type,
+    message,
+    detail,
+  };
+  events.push(item);
+  console.log(
+    `[${String(item.index).padStart(4, '0')}] wall=${item.wallTime} monotonicNs=${item.monotonicNs} `
+    + `clock=${item.clockSource} ${type.toUpperCase()} ${message}`,
+  );
+}
+
+async function run(command, args, options = {}) {
+  const step = eventIndex + 1;
+  event('command-start', `${command} ${args.join(' ')}`, { step });
+  const child = spawn(command, args, {
     cwd: options.cwd ?? workspace,
-    encoding: 'utf8',
-    stdio: 'inherit',
+    stdio: ['ignore', 'pipe', 'pipe'],
     shell: false,
     env: process.env,
   });
-  if (result.error) throw result.error;
-  if (result.status !== 0) throw new Error(`${command} exited ${result.status}`);
+  let stdout = '';
+  child.stdout.on('data', (chunk) => { stdout += chunk; });
+  for (const [stream, type] of [[child.stdout, 'stdout'], [child.stderr, 'stderr']]) {
+    readline.createInterface({ input: stream }).on('line', (line) => event(type, line, { step }));
+  }
+  const exitCode = await new Promise((resolve, reject) => {
+    child.once('error', (error) => {
+      event('command-error', `${command} could not start: ${error.message}`, { step });
+      reject(error);
+    });
+    child.once('close', (code, signal) => resolve({ code, signal }));
+  });
+  event('command-end', `${command} exited ${exitCode.code}`, { step, exitCode: exitCode.code, signal: exitCode.signal });
+  if (exitCode.code !== 0) throw new Error(`${command} exited ${exitCode.code}`);
+  return stdout;
 }
 
 function standardsReviewPath() {
@@ -30,13 +78,25 @@ function standardsReviewPath() {
   return candidates.find((candidate) => existsSync(path.join(candidate, '.git'))) ?? null;
 }
 
-function agentPreflight() {
-  run('lbabus', ['version']);
-  run('lbabus', ['selfcheck']);
-  run('lbabus', ['capabilities']);
+function standardsRoot() {
+  const candidates = [
+    process.env.STANDARDS_ROOT,
+    process.platform === 'win32' ? governance.standardsRootDefault : null,
+    '/mnt/c/design/standards',
+  ].filter(Boolean);
+  return candidates.find((candidate) => (
+    existsSync(candidate)
+    && REQUIRED_STANDARD_FILES.every((file) => existsSync(path.join(candidate, file)))
+  )) ?? null;
 }
 
-function governanceReview() {
+async function agentPreflight() {
+  await run('lbabus', ['version']);
+  await run('lbabus', ['selfcheck']);
+  await run('lbabus', ['capabilities']);
+}
+
+async function governanceReview() {
   const standards = standardsReviewPath();
   if (!standards) {
     throw new Error(
@@ -44,32 +104,54 @@ function governanceReview() {
       + 'or set REPO_STANDARDS_REVIEW.'
     );
   }
-  run('git', ['-C', standards, 'status', '--short']);
-  const docker = spawnSync('docker', ['info', '--format', '{{.OSType}}'], { encoding: 'utf8' });
-  if (docker.status !== 0 || docker.stdout.trim() !== 'linux') {
+  const corpus = standardsRoot();
+  if (!corpus) {
+    throw new Error(
+      'The governed standards PDF corpus is required. Set STANDARDS_ROOT or populate C:\\design\\standards '
+      + `with: ${REQUIRED_STANDARD_FILES.join(', ')}.`
+    );
+  }
+  event('standards-corpus', `Using standards corpus ${corpus}`, {
+    root: corpus,
+    files: REQUIRED_STANDARD_FILES,
+    containerMount: '/standards:ro',
+    standardsReviewCommit: governance.standardsReviewCommit,
+    workbench: `${governance.workbenchImage}@${governance.workbenchDigest}`,
+  });
+  await run('git', ['-C', standards, 'status', '--short']);
+  const standardsCommit = (await run('git', ['-C', standards, 'rev-parse', 'HEAD'])).trim();
+  if (standardsCommit !== governance.standardsReviewCommit) {
+    throw new Error(
+      `repo-standards-review commit ${standardsCommit} does not match governed commit ${governance.standardsReviewCommit}.`
+    );
+  }
+  const dockerOs = await run('docker', ['info', '--format', '{{.OSType}}']);
+  if (dockerOs.trim() !== 'linux') {
     throw new Error('repo-standards-review requires Docker in Linux-container mode.');
   }
-  run('docker', [
+  await run('docker', [
     'run', '--rm',
     '-v', `${workspace}:/target`,
-    'registry.gitlab.com/svelderrainruiz/repo-standards-review/assurance-workbench:main',
+    '-v', `${corpus}:/standards:ro`,
+    '-e', 'STANDARDS_ROOT=/standards',
+    `${governance.workbenchImage}@${governance.workbenchDigest}`,
     'python3', 'scripts/run_assurance.py', '/target', '--profile', 'release-gate',
   ]);
 }
 
-function reviewerReadiness() {
-  agentPreflight();
-  governanceReview();
+async function reviewerReadiness() {
+  await agentPreflight();
+  await governanceReview();
 }
 
-function releaseCandidate() {
-  reviewerReadiness();
+async function releaseCandidate() {
+  await reviewerReadiness();
   if (!existsSync(path.join(workspace, 'package.json'))) {
     throw new Error('Release Candidate Check must run from a labview-benchmark-actor repository workspace.');
   }
-  run('npm', ['test']);
-  run(process.execPath, ['experiments/verify-local-gates.mjs']);
-  run('npm', ['run', 'package']);
+  await run('npm', ['test']);
+  await run(process.execPath, ['experiments/verify-local-gates.mjs']);
+  await run('npm', ['run', 'package']);
 }
 
 const tasks = {
@@ -79,16 +161,38 @@ const tasks = {
   'release-candidate': releaseCandidate,
 };
 
-if (!tasks[mode]) {
-  console.error(`usage: human-task-runner.mjs <${Object.keys(tasks).join('|')}>`);
-  process.exit(2);
-}
-
 try {
-  console.log(`LBA governed human task bundle v${HUMAN_TASKS_VERSION}`);
-  tasks[mode]();
-  console.log(`\nLBA task '${mode}': PASS`);
+  event('task-start', `LBA governed human task bundle v${HUMAN_TASKS_VERSION}`, {
+    task: mode,
+    extensionVersion: process.env.LBA_EXTENSION_VERSION || null,
+    startedWallTime,
+  });
+  if (!tasks[mode]) {
+    throw new Error(`usage: human-task-runner.mjs <${Object.keys(tasks).join('|')}>`);
+  }
+  await tasks[mode]();
+  event('task-end', `LBA task '${mode}': PASS`, { outcome: 'PASS' });
 } catch (error) {
-  console.error(`\nLBA task '${mode}': FAIL — ${error instanceof Error ? error.message : String(error)}`);
+  event('task-end', `LBA task '${mode}': FAIL — ${error instanceof Error ? error.message : String(error)}`, {
+    outcome: 'FAIL',
+  });
   process.exitCode = 1;
+} finally {
+  const root = process.env.LBA_TASK_EVIDENCE_ROOT;
+  if (root) {
+    mkdirSync(root, { recursive: true });
+    const timestamp = startedWallTime.replace(/[:.]/g, '-');
+    const file = path.join(root, `${timestamp}-${mode || 'unknown'}.json`);
+    event('receipt', `Finalizing task receipt at ${file}`, { file });
+    writeFileSync(file, `${JSON.stringify({
+      schema: 'labview-benchmark-actor/human-task-receipt@1',
+      taskBundleVersion: HUMAN_TASKS_VERSION,
+      extensionVersion: process.env.LBA_EXTENSION_VERSION || null,
+      task: mode,
+      startedWallTime,
+      monotonicClockSource: 'process.hrtime.bigint',
+      outcome: process.exitCode ? 'FAIL' : 'PASS',
+      events,
+    }, null, 2)}\n`);
+  }
 }

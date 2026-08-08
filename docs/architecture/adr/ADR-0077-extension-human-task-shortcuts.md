@@ -30,6 +30,8 @@ binary. Governance must fail closed when the local standards checkout or Docker 
   host Node prerequisite for Marketplace users.
 - Require the local standards checkout at `REPO_STANDARDS_REVIEW` or the maintained default path, and require Docker
   to report `OSType=linux` before invoking the workbench image.
+- Require the local standards corpus at `STANDARDS_ROOT` or `C:\design\standards`, prove the eight governed PDFs
+  exist, and mount it read-only at `/standards`. The corpus is local reference material and is never packaged.
 - Keep every child command visible in the terminal and stop at the first nonzero exit.
 - Version the compound task bundle independently and display that version in generated AGENTS.md and task details.
 - Require the maintained raw-review collector before disposable VM teardown; it retains target/candidate identities,

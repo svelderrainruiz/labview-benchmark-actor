@@ -6,7 +6,7 @@ follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project
 
 ## [Unreleased]
 
-## [1.4.1] - 2026-08-08
+## [1.4.2] - 2026-08-08
 
 ### Fixed
 - **Rotated reviewer keys are release- and purpose-scoped.** Production reviewer enrollment now
@@ -22,12 +22,22 @@ follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project
 - **Icon Editor prerequisites are explicit.** Shipped agent guidance now requires installed/activated
   VI Package Manager and applying `icon-editor-developer.vipc` to each intended LabVIEW 2026 Q3
   bitness before treating `ni/labview-icon-editor` as provisioned.
-- **Generated agent instructions pin the next-agent toolchain.** AGENTS.md 0.3.4 now specifies exact
+- **Generated agent instructions pin the next-agent toolchain.** AGENTS.md 0.3.6 now specifies exact
   `lbabus` and Node versions, .NET runtime/SDK roles, Git/GitHub/GitLab/ripgrep minimums, and the
   validated Vagrant/VirtualBox/LabVIEW/TightVNC reviewer stack; tests fail if core pins disappear.
-- **Human task workflows and review evidence are versioned.** Compound task bundle 1.0.0 is shown in
+- **Human task workflows and review evidence are versioned.** Compound task bundle 1.0.1 is shown in
   generated AGENTS.md and task details, while a maintained collector captures indexed raw candidate,
   command/task, agent-instruction, capability, reviewer-setting, VM, and screenshot evidence before teardown.
+- **Governed tasks produce deterministic noninteractive receipts.** Every task and child-output event carries
+  an index, UTC wall timestamp, monotonic nanoseconds, and the named `process.hrtime.bigint` clock source.
+  Dedicated task terminals suppress reuse prompts and receipts persist under extension global storage.
+- **Release components follow one SemVer contract.** `release-components.json` binds the extension, AGENTS,
+  `lbabus`, human-task, exact standards-review commit, and workbench-image digest. The repository precommit hook
+  rejects component changes without their component and extension version bumps, final staged package metadata,
+  and a matching CHANGELOG section.
+- **GitHub Release is canonical.** Marketplace delivery uses the prerelease channel and cannot silently
+  substitute a stable Marketplace publication for the reviewed, signed GitHub Release artifact. The secondary
+  dispatch runs from the release tag and publishes the downloaded canonical asset, avoiding drift if `main` advances.
 
 ## [1.4.0] - 2026-08-08
 

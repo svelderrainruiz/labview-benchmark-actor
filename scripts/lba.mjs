@@ -705,10 +705,10 @@ export const COMMANDS = {
       const quoted = assets.map((a) => `'${a}'`).join(' ');
       if (!args.includes('--create')) {
         console.log(`\u2713 artifact verified for ${r.tag} (vsix ${String(r.vsix)}). DRY-RUN -- re-run with --create (needs your authorized bypass token) to cut it:`);
-        console.log(`  gh release create ${r.tag} ${quoted} --title '${r.tag}' --notes 'Immutable release ${version}.'`);
+        console.log(`  gh release create ${r.tag} ${quoted} --target main --title '${r.tag}' --notes 'Immutable release ${version}.'`);
         return;
       }
-      execFileSync('gh', ['release', 'create', r.tag, ...assets, '--title', r.tag, '--notes', `Immutable release ${version}.`], { stdio: 'inherit' });
+      execFileSync('gh', ['release', 'create', r.tag, ...assets, '--target', 'main', '--title', r.tag, '--notes', `Immutable release ${version}.`], { stdio: 'inherit' });
       console.log(`\u2713 cut ${r.tag} with ${assets.length} asset(s).`);
     },
   },

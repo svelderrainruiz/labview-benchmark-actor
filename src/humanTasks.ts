@@ -2,7 +2,7 @@ import * as vscode from 'vscode';
 import * as path from 'node:path';
 
 const TASK_TYPE = 'labviewBenchmarkActor';
-export const HUMAN_TASKS_VERSION = '1.0.0';
+export const HUMAN_TASKS_VERSION = '1.0.1';
 const TASKS = [
   ['agent-preflight', 'LBA: Agent Preflight'],
   ['governance-review', 'LBA: Governance Review'],
@@ -14,7 +14,12 @@ function taskFor(context: vscode.ExtensionContext, id: string, name: string): vs
   const runner = path.join(context.extensionUri.fsPath, 'media', 'human-task-runner.mjs');
   const execution = new vscode.ProcessExecution(process.execPath, [runner, id], {
     cwd: vscode.workspace.workspaceFolders?.[0]?.uri.fsPath,
-    env: { ...process.env, ELECTRON_RUN_AS_NODE: '1' },
+    env: {
+      ...process.env,
+      ELECTRON_RUN_AS_NODE: '1',
+      LBA_TASK_EVIDENCE_ROOT: path.join(context.globalStorageUri.fsPath, 'task-runs'),
+      LBA_EXTENSION_VERSION: String(context.extension?.packageJSON?.version ?? ''),
+    },
   });
   const task = new vscode.Task(
     { type: TASK_TYPE, task: id },
@@ -22,8 +27,17 @@ function taskFor(context: vscode.ExtensionContext, id: string, name: string): vs
     name,
     `LabVIEW Benchmark Actor tasks v${HUMAN_TASKS_VERSION}`,
     execution,
+    [],
   );
   task.detail = `Governed human task bundle v${HUMAN_TASKS_VERSION}`;
+  task.presentationOptions = {
+    reveal: vscode.TaskRevealKind.Always,
+    panel: vscode.TaskPanelKind.Dedicated,
+    clear: true,
+    echo: true,
+    focus: false,
+    showReuseMessage: false,
+  };
   return task;
 }
 

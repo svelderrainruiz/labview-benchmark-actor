@@ -1,0 +1,15 @@
+{
+  "schema": "labview-benchmark-actor/release-components@1",
+  "extension": "1.4.2",
+  "agents": "0.3.6",
+  "lbabus": "0.15.1",
+  "humanTasks": "1.0.1",
+  "canonicalDistribution": "github-release",
+  "marketplaceChannel": "prerelease",
+  "governance": {
+    "standardsReviewCommit": "d44f210ded557cda6d4598cdaffe938da51d873e",
+    "workbenchImage": "registry.gitlab.com/svelderrainruiz/repo-standards-review/assurance-workbench",
+    "workbenchDigest": "sha256:0fbb71c193ab71dae4b37a2f012fd5369632ff80c47b807c09c86d7a2877cb94",
+    "standardsRootDefault": "C:\\design\\standards"
+  }
+}

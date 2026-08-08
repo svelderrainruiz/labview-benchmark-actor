@@ -101,5 +101,6 @@
 | LBA-REQ-092 | Run-bound cross-plane corroborate + compare (the ingested collection) | Proven | §3.2 Deployment | ADR-0075 | T-092 | 6 |
 | LBA-REQ-093 | The Node-version-pinned reproducible package (reviewed Node equals shipped Node) | Proven | §3.1 Packaging / boundary | ADR-0076 | T-093 | 7 |
 | LBA-REQ-094 | Extension-contributed compound human tasks | Proven | — | ADR-0077 | T-094 | 7 |
+| LBA-REQ-095 | System-level SemVer, task chronology, and canonical distribution | Proven | — | ADR-0078 | T-095 | 12 |
 
-_Generated for 94 requirements._
+_Generated for 95 requirements._
