@@ -70,14 +70,17 @@ ok('signReviewerVerdict produces an acg-human-signoff-v1 bound to the verdict di
 ok('verifyReviewerVerdict verifies a good sign-off + fails closed on tampering', () => {
   const v = buildReviewerVerdict({ target, verdict: 'pass', reviewer, evidence });
   const s = signReviewerVerdict(v, { privateKeyPem, reviewer });
+  const other = generateEnrolledKeypair();
   assert.equal(verifyReviewerVerdict(v, s, { reviewerAllowlist: allowlist }).ok, true);
+  assert.equal(verifyReviewerVerdict(v, s, {
+    reviewerAllowlist: { [reviewer]: [other.publicKeyPem, publicKeyPem] },
+  }).ok, true);
   // a tampered verdict (different notes) no longer matches the signed digest
   const tampered = { ...v, notes: 'tampered' };
   assert.equal(verifyReviewerVerdict(tampered, s, { reviewerAllowlist: allowlist }).ok, false);
   // an un-enrolled reviewer
   assert.equal(verifyReviewerVerdict(v, s, { reviewerAllowlist: {} }).ok, false);
   // a key that does not match the enrolled one
-  const other = generateEnrolledKeypair();
   assert.equal(verifyReviewerVerdict(v, s, { reviewerAllowlist: { [reviewer]: other.publicKeyPem } }).ok, false);
   // a forged signature
   assert.equal(verifyReviewerVerdict(v, { ...s, signature: Buffer.from('forged').toString('base64') }, { reviewerAllowlist: allowlist }).ok, false);

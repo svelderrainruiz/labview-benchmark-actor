@@ -1,4 +1,7 @@
 {
-  "_comment": "Enrolled reviewer visual-verdict signing keys (reviewer id -> Ed25519 SPKI public key PEM). Add entries with reviewer-workstation/enroll-reviewer.mjs (the private key stays LOCAL to the reviewer, never committed). The verify-visual-review gate + the extension-release workflow verify a release's signed reviewer verdict against these keys (LBA-REQ-057, ADR-0037).",
-  "reviewer@vi-tech.nl": "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEAWRnlX++0MkQq+vtVEEMnBDON+cQEjNi49qFY07DwV2g=\n-----END PUBLIC KEY-----\n"
+  "_comment": "Enrolled reviewer visual-verdict signing keys (reviewer id -> one Ed25519 SPKI public key PEM or an array retaining rotated keys). Add entries with reviewer-workstation/enroll-reviewer.mjs (the private key stays LOCAL to the reviewer, never committed). Never remove a key that authenticates historical release evidence. The verify-visual-review gate + the extension-release workflow verify a release's signed reviewer verdict against these keys (LBA-REQ-057, ADR-0037).",
+  "reviewer@vi-tech.nl": [
+    "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEAWRnlX++0MkQq+vtVEEMnBDON+cQEjNi49qFY07DwV2g=\n-----END PUBLIC KEY-----\n",
+    "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEA48x43N+/xB6wzHzEVbPBrEs71/hVNa5k3VQ5LdlvsAg=\n-----END PUBLIC KEY-----\n"
+  ]
 }

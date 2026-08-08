@@ -36,6 +36,10 @@ follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project
   available. When LabVIEW's titled `LVFrame` still reports `0x0`, a recorded narrow expansion around
   the same-process client bounds includes its visible title, menu, and frame without promoting the ROI
   to a full-desktop claim. Missing capture summaries now surface the original capture failure directly.
+- **Reviewer key rotation preserves historical signatures.** Reviewer allowlist entries may retain an
+  ordered set of enrolled Ed25519 public keys, allowing a missing VM-local private key to be replaced
+  without invalidating prior release evidence. Signing-status discovery now invokes guest PowerShell
+  directly and recognizes rotated-key entries.
 
 ## [1.3.0] - 2026-08-06
 

@@ -128,9 +128,14 @@ export function verifyReviewerVerdict(verdict, signOff, { reviewerAllowlist = {}
   if (!REVIEWER_STATIONS.includes(signOff.station)) reasons.push(`unknown reviewer station ${signOff.station}`);
   const actualDigest = reviewerVerdictDigest(verdict);
   if (signOff.subject?.verdictDigest !== actualDigest) reasons.push('sign-off does not match this verdict');
-  const enrolledKey = reviewerAllowlist[signOff.reviewer];
-  if (!enrolledKey) reasons.push(`reviewer "${signOff.reviewer}" is not enrolled`);
-  else if (normPem(enrolledKey) !== normPem(signOff.publicKeyPem)) reasons.push(`presented key does not match the enrolled key for "${signOff.reviewer}"`);
+  const enrolledKeys = Array.isArray(reviewerAllowlist[signOff.reviewer])
+    ? reviewerAllowlist[signOff.reviewer]
+    : [reviewerAllowlist[signOff.reviewer]];
+  const normalizedKeys = enrolledKeys
+    .filter((key) => typeof key === 'string' && key.trim())
+    .map(normPem);
+  if (normalizedKeys.length === 0) reasons.push(`reviewer "${signOff.reviewer}" is not enrolled`);
+  else if (!normalizedKeys.includes(normPem(signOff.publicKeyPem))) reasons.push(`presented key does not match an enrolled key for "${signOff.reviewer}"`);
   try {
     const ok = crypto.verify(null, signMessage(signOff.reviewer, signOff.decision, signOff.station, actualDigest), crypto.createPublicKey(signOff.publicKeyPem), Buffer.from(signOff.signature || '', 'base64'));
     if (!ok) reasons.push('sign-off signature does not verify');
