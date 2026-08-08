@@ -6,60 +6,91 @@
   "capability": null,
   "candidate": {
     "component": "extension",
-    "version": "1.3.0",
-    "commit": "a4a917027dde07b43838518ad609682f62483c53",
-    "vsixSha256": "a1e2c4bb49768ea7de874796a41a3d9b91cd133ec8c4dc5e40d0ffebabf2350b"
+    "version": "1.4.0",
+    "commit": "38df82c42d001a185c8289195ba1e5e11088c387",
+    "vsixSha256": "5f15ca6e77b40989232ab21bd40d1d79cbb88061536fdb0a917f9497ab5dd3cc"
   },
   "staged": {
-    "drive": "release/1.3.0 WIN-plane staging (local shared-folder path, offline-signed): reviewer VM staged the ext 1.3.0 candidate a4a9170 -- the node-24 vsix a1e2c4bb -- via lba-vm-share; FFmpeg package-store discovery verified by human capture; enrolled reviewer signed PASS on WINDOWS_VM.",
-    "vm": "reviewer-workstation-vmware",
+    "schema": "labview-benchmark-actor/release-net-stage@1",
+    "wallTime": "2026-08-08T06:32:02.7152927Z",
+    "drive": "lbabus net -- bus-msg@1 over VirtualBox NAT guest 10.0.2.2 to host loopback 127.0.0.1:7420",
+    "vm": {
+      "name": "actor-reviewer-stage-bee6a8fc",
+      "ownership": "disposable-linked-clone",
+      "sourceVmUuid": "f296a95b-7470-496a-bab7-791c973efd37",
+      "sourceSnapshotUuid": "c5d7e440-707d-4522-a06e-f2d358f3e4c3"
+    },
     "matched": true,
+    "frame": {
+      "schema": "labview-benchmark-actor/bus-msg@1",
+      "sessionId": "default",
+      "senderId": "WIN",
+      "seq": 1786170644,
+      "ts": {
+        "wall": "2026-08-08T06:30:44.264Z"
+      },
+      "type": "DONE",
+      "task": "extension-release-1.4.0",
+      "payload": "staged extension 1.4.0 sha256 5f15ca6e77b40989232ab21bd40d1d79cbb88061536fdb0a917f9497ab5dd3cc commit 38df82c42d001a185c8289195ba1e5e11088c387"
+    },
     "candidate": {
       "component": "extension",
-      "version": "1.3.0"
+      "version": "1.4.0",
+      "commit": "38df82c42d001a185c8289195ba1e5e11088c387",
+      "vsixSha256": "5f15ca6e77b40989232ab21bd40d1d79cbb88061536fdb0a917f9497ab5dd3cc",
+      "size": 127272
     },
-    "frame": {
-      "type": "DONE",
-      "task": "rev-1.3.0-net",
-      "senderId": "WIN",
-      "payload": "ext 1.3.0 staged + human PASS on WIN reviewer VM (commit a4a9170, node-24 vsix a1e2c4bb): local dual-plane attestation + FFmpeg WinGet package-store discovery fix validated; review PASS"
+    "proof": {
+      "guestCandidatePath": "C:\\lba-review\\net-stage\\candidate.vsix",
+      "guestSha256": "5f15ca6e77b40989232ab21bd40d1d79cbb88061536fdb0a917f9497ab5dd3cc",
+      "guestSize": 127272,
+      "lbabusVersion": "0.15.0",
+      "hostListener": "127.0.0.1:7420",
+      "listenerMessageCount": 1
     }
   },
   "machine": {
     "quorumVerdict": {
       "schema": "labview-benchmark-actor/acg-quorum-verdict-v2",
       "verdict": "pass",
-      "confidence": 1,
+      "confidence": 0.9444444444444444,
       "threshold": 0.5,
-      "witnesses": 2,
-      "concurring": 2,
+      "witnesses": 4,
+      "concurring": 4,
       "majority": true,
       "crossPlane": true,
       "consensusVerdict": "pass",
       "consensus": {
-        "version": "1.3.0",
-        "sourceCommit": "a4a917027dde07b43838518ad609682f62483c53",
+        "version": "1.4.0",
+        "sourceCommit": "38df82c42d001a185c8289195ba1e5e11088c387",
         "verdict": "pass",
         "seriesHash": "7ad1c75d08244013d339c3f256fd14220a2df7cea56d5be5b38af2d82d68efaa",
         "pngSha256": null,
-        "ubuntu": "bookworm"
+        "ubuntu": "jammy"
       },
-      "divergences": []
+      "divergences": [
+        {
+          "witness": "ACTIONS-ubuntu-24.04",
+          "anchor": "ubuntu",
+          "got": "noble",
+          "consensus": "jammy"
+        }
+      ]
     },
     "signOffs": [
       {
         "schema": "labview-benchmark-actor/acg-human-signoff-v1",
         "subject": {
-          "verdictDigest": "275effbda59118821bdcf438f0a0da0c0b9d5ff59644e6b867cf22f75c64ba96",
+          "verdictDigest": "cc3bb7cfcc6a9d2fcc028fe96194994df359ae57f1d5941f5d25550744bb6e65",
           "consensusVerdict": "pass"
         },
         "reviewer": "reviewer@vi-tech.nl",
         "decision": "approve",
         "station": "WINDOWS_VM",
         "algorithm": "ed25519",
-        "publicKeyPem": "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEAWRnlX++0MkQq+vtVEEMnBDON+cQEjNi49qFY07DwV2g=\n-----END PUBLIC KEY-----\n",
-        "signedAt": "2026-08-06T16:48:42.613Z",
-        "signature": "DxdKCAztDD3+FkicWV0A3coKi7KLj1ymdnJeBWo/lTM67cpnINFidG78zjfZya7jJw8q+Z/jP4JqHnUxNz2qBQ=="
+        "publicKeyPem": "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEAWAFKcRM63zi4l4FR5do2zekHiCGUKyMwWaKiJpoLI9k=\n-----END PUBLIC KEY-----\n",
+        "signedAt": "2026-08-08T06:25:24.511Z",
+        "signature": "dAjAFOJrm2jyz6Y4ciAMs/QhGqDjeFjqzhzx06ojv3o3MwrZRAgC+SONtDJiitFYXGXkbPhlTa00zO508ATBDw=="
       }
     ]
   },
@@ -68,9 +99,9 @@
       "schema": "labview-benchmark-actor/reviewer-verdict@1",
       "target": {
         "component": "extension",
-        "version": "1.3.0",
-        "commit": "a4a917027dde07b43838518ad609682f62483c53",
-        "vsixSha256": "a1e2c4bb49768ea7de874796a41a3d9b91cd133ec8c4dc5e40d0ffebabf2350b"
+        "version": "1.4.0",
+        "commit": "38df82c42d001a185c8289195ba1e5e11088c387",
+        "vsixSha256": "5f15ca6e77b40989232ab21bd40d1d79cbb88061536fdb0a917f9497ab5dd3cc"
       },
       "verdict": "pass",
       "reviewer": "reviewer@vi-tech.nl",
@@ -78,44 +109,52 @@
       "notes": "",
       "evidence": [
         {
-          "kind": "attestation",
-          "ref": "C:\\lba-review\\attestation-1.3.0.json"
+          "kind": "pull-request-11",
+          "ref": "merge d8e6311a4de18d229c5b6ffb42a6169448d381df"
         },
         {
-          "kind": "note",
-          "ref": "local dual-plane witnesses LOCAL-windows + LOCAL-linux; no GitHub Actions"
+          "kind": "pull-request-12",
+          "ref": "merge 0459adfbe4d96ffc0a7435e54e579e2f86c1493a"
         },
         {
-          "kind": "note",
-          "ref": "FFmpeg discovery fix: WinGet package-store Gyan.FFmpeg_* fallback"
+          "kind": "activated-capture",
+          "ref": "reviewer-cache-resume-20260808T004909358Z-8f9474ef/activated-capture/manifest.json"
+        },
+        {
+          "kind": "agent-last-gate",
+          "ref": "8/8"
         }
       ],
-      "renderedAt": "2026-08-06T16:46:39.519Z"
+      "renderedAt": "2026-08-08T05:17:54.584Z"
     },
     "signOff": {
       "schema": "labview-benchmark-actor/acg-human-signoff-v1",
       "subject": {
-        "verdictDigest": "e1dd8fac78d715853850b427d82a476d38bdc1493436da65578a64c2f3aa9260",
+        "verdictDigest": "d51f99c904a568411e350cb2c4100fc4a8af899239537413b994294eb1feaea6",
         "consensusVerdict": "pass",
         "target": {
           "component": "extension",
-          "version": "1.3.0",
-          "commit": "a4a917027dde07b43838518ad609682f62483c53",
-          "vsixSha256": "a1e2c4bb49768ea7de874796a41a3d9b91cd133ec8c4dc5e40d0ffebabf2350b"
+          "version": "1.4.0",
+          "commit": "38df82c42d001a185c8289195ba1e5e11088c387",
+          "vsixSha256": "5f15ca6e77b40989232ab21bd40d1d79cbb88061536fdb0a917f9497ab5dd3cc"
         }
       },
       "reviewer": "reviewer@vi-tech.nl",
       "decision": "approve",
       "station": "WINDOWS_VM",
       "algorithm": "ed25519",
-      "publicKeyPem": "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEAWRnlX++0MkQq+vtVEEMnBDON+cQEjNi49qFY07DwV2g=\n-----END PUBLIC KEY-----\n",
-      "signedAt": "2026-08-06T16:46:39.525Z",
-      "signature": "th3UJETDYYv3+vsBiZnPxateFbjCQwFo+jisoGmzaIUI/LJL8Ie+ymDtPosQdslnGYroBLaR1tUpGgfdAYwrCQ=="
+      "publicKeyPem": "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEA48x43N+/xB6wzHzEVbPBrEs71/hVNa5k3VQ5LdlvsAg=\n-----END PUBLIC KEY-----\n",
+      "signedAt": "2026-08-08T05:17:54.585Z",
+      "signature": "8sYnF1akz0mhLcC3owBX7q95l8epboqAF8fHv4E7w5YLahqvv9UduFnVN0fXYD/Im7cuVww+CMAP5RfpslN3DQ=="
     }
   },
   "reviewerAllowlist": {
-    "_comment": "Enrolled reviewer visual-verdict signing keys (reviewer id -> Ed25519 SPKI public key PEM). Add entries with reviewer-workstation/enroll-reviewer.mjs (the private key stays LOCAL to the reviewer, never committed). The verify-visual-review gate + the extension-release workflow verify a release's signed reviewer verdict against these keys (LBA-REQ-057, ADR-0037).",
-    "reviewer@vi-tech.nl": "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEAWRnlX++0MkQq+vtVEEMnBDON+cQEjNi49qFY07DwV2g=\n-----END PUBLIC KEY-----\n"
+    "_comment": "Enrolled reviewer visual-verdict signing keys (reviewer id -> one Ed25519 SPKI public key PEM or an array retaining rotated keys). Add entries with reviewer-workstation/enroll-reviewer.mjs (the private key stays LOCAL to the reviewer, never committed). Never remove a key that authenticates historical release evidence. The verify-visual-review gate + the extension-release workflow verify a release's signed reviewer verdict against these keys (LBA-REQ-057, ADR-0037).",
+    "reviewer@vi-tech.nl": [
+      "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEAWRnlX++0MkQq+vtVEEMnBDON+cQEjNi49qFY07DwV2g=\n-----END PUBLIC KEY-----\n",
+      "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEA48x43N+/xB6wzHzEVbPBrEs71/hVNa5k3VQ5LdlvsAg=\n-----END PUBLIC KEY-----\n",
+      "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEAWAFKcRM63zi4l4FR5do2zekHiCGUKyMwWaKiJpoLI9k=\n-----END PUBLIC KEY-----\n"
+    ]
   },
   "gate": {
     "minReviewers": 1,
@@ -138,7 +177,7 @@
   },
   "verdict": {
     "compositeReleaseProven": true,
-    "reason": "both gates publish for extension 1.3.0: machine quorum + enrolled sign-off (ADR-0018) AND human visual PASS (LBA-REQ-057), bound to the same net-staged candidate"
+    "reason": "both gates publish for extension 1.4.0: machine quorum + enrolled sign-off (ADR-0018) AND human visual PASS (LBA-REQ-057), bound to the same net-staged candidate"
   },
-  "digest": "30a4840f2b37ebff4d103f2a0b3314ad7043544cd950ea65ddaa702a455de678"
+  "digest": "2c226e0c603c9bdf5956e1609c8b5e7dad61ef78073cb9281cb75c4c458f4c9f"
 }

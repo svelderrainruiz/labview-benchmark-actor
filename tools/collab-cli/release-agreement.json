@@ -580,6 +580,77 @@
               "signature": "th3UJETDYYv3+vsBiZnPxateFbjCQwFo+jisoGmzaIUI/LJL8Ie+ymDtPosQdslnGYroBLaR1tUpGgfdAYwrCQ=="
             }
           }
+        },
+        "1.4.0": {
+          "summary": "extension 1.4.0 release agreement",
+          "signoffs": {
+            "WIN": {
+              "agreed": true,
+              "reviewedCommit": "38df82c42d001a185c8289195ba1e5e11088c387",
+              "at": "2026-08-08T06:33:52.858Z",
+              "note": "GitHub Actions windows-2022 and windows-2025 witnesses passed; retained exact-UUID reviewer staged and signed the exact VSIX."
+            },
+            "LINUX": {
+              "agreed": true,
+              "reviewedCommit": "38df82c42d001a185c8289195ba1e5e11088c387",
+              "at": "2026-08-08T06:33:52.858Z",
+              "note": "GitHub Actions ubuntu-22.04 and ubuntu-24.04 witnesses passed at candidate commit in run 31242170655."
+            }
+          },
+          "visualReview": {
+            "verdict": {
+              "schema": "labview-benchmark-actor/reviewer-verdict@1",
+              "target": {
+                "component": "extension",
+                "version": "1.4.0",
+                "commit": "38df82c42d001a185c8289195ba1e5e11088c387",
+                "vsixSha256": "5f15ca6e77b40989232ab21bd40d1d79cbb88061536fdb0a917f9497ab5dd3cc"
+              },
+              "verdict": "pass",
+              "reviewer": "reviewer@vi-tech.nl",
+              "station": "WINDOWS_VM",
+              "notes": "",
+              "evidence": [
+                {
+                  "kind": "pull-request-11",
+                  "ref": "merge d8e6311a4de18d229c5b6ffb42a6169448d381df"
+                },
+                {
+                  "kind": "pull-request-12",
+                  "ref": "merge 0459adfbe4d96ffc0a7435e54e579e2f86c1493a"
+                },
+                {
+                  "kind": "activated-capture",
+                  "ref": "reviewer-cache-resume-20260808T004909358Z-8f9474ef/activated-capture/manifest.json"
+                },
+                {
+                  "kind": "agent-last-gate",
+                  "ref": "8/8"
+                }
+              ],
+              "renderedAt": "2026-08-08T05:17:54.584Z"
+            },
+            "signOff": {
+              "schema": "labview-benchmark-actor/acg-human-signoff-v1",
+              "subject": {
+                "verdictDigest": "d51f99c904a568411e350cb2c4100fc4a8af899239537413b994294eb1feaea6",
+                "consensusVerdict": "pass",
+                "target": {
+                  "component": "extension",
+                  "version": "1.4.0",
+                  "commit": "38df82c42d001a185c8289195ba1e5e11088c387",
+                  "vsixSha256": "5f15ca6e77b40989232ab21bd40d1d79cbb88061536fdb0a917f9497ab5dd3cc"
+                }
+              },
+              "reviewer": "reviewer@vi-tech.nl",
+              "decision": "approve",
+              "station": "WINDOWS_VM",
+              "algorithm": "ed25519",
+              "publicKeyPem": "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEA48x43N+/xB6wzHzEVbPBrEs71/hVNa5k3VQ5LdlvsAg=\n-----END PUBLIC KEY-----\n",
+              "signedAt": "2026-08-08T05:17:54.585Z",
+              "signature": "8sYnF1akz0mhLcC3owBX7q95l8epboqAF8fHv4E7w5YLahqvv9UduFnVN0fXYD/Im7cuVww+CMAP5RfpslN3DQ=="
+            }
+          }
         }
       }
     }
