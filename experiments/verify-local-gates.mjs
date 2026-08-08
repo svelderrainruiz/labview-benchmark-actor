@@ -2701,6 +2701,19 @@ check('handoff-verdict', () => {
   const { privateKeyPem, publicKeyPem } = generateReviewerKeypair();
   const reviewer = 'reviewer@example';
   const allow = { [reviewer]: publicKeyPem };
+  const committedReviewerAllowlist = readJson('tools/collab-cli/reviewer-allowlist.json');
+  const productionKeys = Object.entries(committedReviewerAllowlist)
+    .filter(([identity]) => identity !== '_comment')
+    .flatMap(([, keys]) => Array.isArray(keys) ? keys : [keys]);
+  assert(productionKeys.length > 0, 'committed reviewer allowlist has no keys');
+  assert(productionKeys.every((key) => (
+    key && typeof key === 'object' && !Array.isArray(key)
+    && typeof key.publicKeyPem === 'string' && key.publicKeyPem.includes('BEGIN PUBLIC KEY')
+    && /^\d+\.\d+\.\d+$/.test(key.validFrom)
+    && /^\d+\.\d+\.\d+$/.test(key.validThrough)
+    && Array.isArray(key.purposes) && key.purposes.length > 0
+    && key.purposes.every((purpose) => ['visual', 'quorum'].includes(purpose))
+  )), 'committed production reviewer keys must have SemVer validity bounds and explicit purposes');
   const verdict = buildReviewerVerdict({ target: { component: 'extension', version: '0.5.0', commit: 'c'.repeat(40), vsixSha256: 'd'.repeat(64) }, verdict: 'pass', reviewer, station: 'WINDOWS_VM', evidence: [{ kind: 'capture', ref: 'run-x' }], renderedAt: '2026-08-03T00:00:00Z' });
   const signed = signReviewerVerdict(verdict, { privateKeyPem, reviewer });
   assert(verifyReviewerVerdict(verdict, signed, { reviewerAllowlist: allow }).ok, 'the enrolled reviewer sign-off verifies');

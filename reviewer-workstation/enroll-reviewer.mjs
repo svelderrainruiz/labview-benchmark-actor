@@ -17,8 +17,17 @@ const arg = (k, d = '') => {
 
 const reviewer = arg('reviewer');
 const keyOut = arg('key-out');
-if (!reviewer || !keyOut) {
-  console.error('usage: enroll-reviewer.mjs --reviewer <id> --key-out <priv.pem>');
+const validFrom = arg('valid-from');
+const validThrough = arg('valid-through');
+const purposes = arg('purposes').split(',').map((value) => value.trim()).filter(Boolean);
+if (
+  !reviewer || !keyOut
+  || !/^\d+\.\d+\.\d+$/.test(validFrom)
+  || !/^\d+\.\d+\.\d+$/.test(validThrough)
+  || purposes.length === 0
+  || purposes.some((purpose) => !['visual', 'quorum'].includes(purpose))
+) {
+  console.error('usage: enroll-reviewer.mjs --reviewer <id> --key-out <priv.pem> --valid-from X.Y.Z --valid-through X.Y.Z --purposes visual[,quorum]');
   process.exit(2);
 }
 
@@ -27,7 +36,9 @@ writeFileSync(keyOut, privateKeyPem);
 try { chmodSync(keyOut, 0o600); } catch { /* best-effort on non-POSIX */ }
 
 // The allowlist entry (public key) goes into the committed reviewer allowlist; the private key stays local.
-process.stdout.write(`${JSON.stringify({ [reviewer]: publicKeyPem }, null, 2)}\n`);
+process.stdout.write(`${JSON.stringify({
+  [reviewer]: { publicKeyPem, validFrom, validThrough, purposes },
+}, null, 2)}\n`);
 console.error(`enrolled "${reviewer}": private key -> ${keyOut} (keep it local; NEVER commit it).`);
 console.error('Add the public-key entry above to tools/collab-cli/reviewer-allowlist.json and set');
 console.error('labviewBenchmarkActor.reviewerId + labviewBenchmarkActor.reviewerKeyPath in the reviewer VM.');

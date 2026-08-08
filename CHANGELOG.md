@@ -6,6 +6,14 @@ follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project
 
 ## [Unreleased]
 
+## [1.4.1] - 2026-08-08
+
+### Fixed
+- **Rotated reviewer keys are release- and purpose-scoped.** Production reviewer enrollment now
+  assigns each retained Ed25519 public key an inclusive SemVer validity range and explicit
+  `visual`/`quorum` purposes. Historical signatures remain verifiable, while an old, visual-only,
+  out-of-range, or versionless scoped key fails closed instead of authorizing a newer release.
+
 ## [1.4.0] - 2026-08-08
 
 ### Added

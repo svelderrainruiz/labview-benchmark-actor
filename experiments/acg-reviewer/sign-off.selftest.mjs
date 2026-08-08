@@ -30,6 +30,26 @@ ok('a sign-off signs and verifies (either station)', () => {
   }
 });
 
+ok('scoped quorum keys enforce release version and purpose', () => {
+  const versioned = {
+    ...passVerdict,
+    consensus: { ...passVerdict.consensus, version: '1.4.0' },
+  };
+  const signed = sign(alice, 'reviewer:alice', { verdict: versioned });
+  const scoped = (validFrom, validThrough, purposes = ['quorum']) => ({
+    'reviewer:alice': [{ publicKeyPem: alice.publicKeyPem, validFrom, validThrough, purposes }],
+  });
+  assert.equal(verifyReleaseSignOff(versioned, signed, {
+    reviewerAllowlist: scoped('1.4.0', '1.4.0'),
+  }).ok, true);
+  assert.equal(verifyReleaseSignOff(versioned, signed, {
+    reviewerAllowlist: scoped('1.3.0', '1.3.9'),
+  }).ok, false);
+  assert.equal(verifyReleaseSignOff(versioned, signed, {
+    reviewerAllowlist: scoped('1.4.0', '1.4.0', ['visual']),
+  }).ok, false);
+});
+
 // 2. publish only when the quorum passes AND an enrolled approve sign-off accompanies it.
 ok('publish when quorum passes + an enrolled approve sign-off', () => {
   const d = gateReleasePublish({ quorumVerdict: passVerdict, signOffs: [sign(alice, 'reviewer:alice')], reviewerAllowlist: allow });

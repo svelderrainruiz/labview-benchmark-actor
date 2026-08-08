@@ -423,12 +423,18 @@ export function readReviewerAllowlist() {
   try {
     const raw = JSON.parse(read('tools/collab-cli/reviewer-allowlist.json') || '{}');
     const out = {};
+    const validKey = (key) => typeof key === 'string'
+      ? key.trim() !== ''
+      : key && typeof key === 'object' && !Array.isArray(key)
+        && typeof key.publicKeyPem === 'string' && key.publicKeyPem.trim() !== ''
+        && typeof key.validFrom === 'string' && typeof key.validThrough === 'string'
+        && Array.isArray(key.purposes) && key.purposes.length > 0;
     for (const [k, v] of Object.entries(raw)) {
       if (
         k !== '_comment'
         && (
-          typeof v === 'string'
-          || (Array.isArray(v) && v.length > 0 && v.every((key) => typeof key === 'string' && key.trim()))
+          validKey(v)
+          || (Array.isArray(v) && v.length > 0 && v.every(validKey))
         )
       ) out[k] = v;
     }
@@ -462,6 +468,7 @@ export function signingStatus({ reviewerId, reviewerKeyPath, keyExists, station,
   const id = String(reviewerId || '').trim();
   const st = station || STATIONS.UNKNOWN;
   const enrolledKeys = (Array.isArray(enrolledPublicKey) ? enrolledPublicKey : [enrolledPublicKey])
+    .map((key) => typeof key === 'string' ? key : key?.publicKeyPem)
     .filter((key) => typeof key === 'string' && key.trim());
   const enrolled = enrolledKeys.length > 0;
   const norm = (k) => String(k || '').replace(/-----(BEGIN|END) PUBLIC KEY-----/g, '').replace(/\s+/g, '');
@@ -945,7 +952,8 @@ const SELFTEST = [
   }],
   ['signing-status confirms a public-key MATCH clears + reports enrolled (#414)', () => {
     const enrolled = readReviewerAllowlist()['reviewer@vi-tech.nl'];
-    const presented = Array.isArray(enrolled) ? enrolled.at(-1) : enrolled;
+    const selected = Array.isArray(enrolled) ? enrolled.at(-1) : enrolled;
+    const presented = typeof selected === 'string' ? selected : selected.publicKeyPem;
     const s = signingStatus({ reviewerId: 'reviewer@vi-tech.nl', reviewerKeyPath: '/k.pem', keyExists: true, station: STATIONS.HOST, enrolledPublicKey: enrolled, presentedPublicKey: presented });
     return s.ok && s.enrolled === true && s.keyMatch === 'match';
   }],
