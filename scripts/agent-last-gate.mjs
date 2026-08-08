@@ -90,7 +90,7 @@ if (skipTests) {
 
 // --- 4. packaged size (fail closed above the ceiling -- catches a VM-disk/node_modules leak) ---
 {
-  const pkg = runShell('npx vsce package --out labview-benchmark-actor.vsix');
+  const pkg = runShell('npm run package');
   const vsixPath = join(root, 'labview-benchmark-actor.vsix');
   if (pkg.status !== 0 || !existsSync(vsixPath)) {
     record('vsix-size', false, `vsce package failed: ${lastLine(pkg.stderr) || lastLine(pkg.stdout)}`);

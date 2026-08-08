@@ -10,6 +10,12 @@ so the WIN and LINUX planes install the exact same pinned version and cannot dri
 
 ## [Unreleased]
 
+## [0.15.8] — 2026-08-08
+
+### Changed
+
+- Enroll fresh 1.4.9 purpose-scoped reviewer keys after prerelease packaging changed the canonical VSIX bytes.
+
 ## [0.15.7] — 2026-08-08
 
 ### Changed
@@ -319,7 +325,8 @@ so the published release notes are self-complete.
 
 - Shared versioned .NET CLI (`lbabus`) for the WIN↔LINUX coordination bus (#6).
 
-[Unreleased]: https://github.com/LabVIEW-Community-CI-CD/labview-benchmark-actor/compare/collab-cli-v0.15.7...HEAD
+[Unreleased]: https://github.com/LabVIEW-Community-CI-CD/labview-benchmark-actor/compare/collab-cli-v0.15.8...HEAD
+[0.15.8]: https://github.com/LabVIEW-Community-CI-CD/labview-benchmark-actor/compare/collab-cli-v0.15.7...collab-cli-v0.15.8
 [0.15.7]: https://github.com/LabVIEW-Community-CI-CD/labview-benchmark-actor/compare/collab-cli-v0.15.6...collab-cli-v0.15.7
 [0.15.6]: https://github.com/LabVIEW-Community-CI-CD/labview-benchmark-actor/compare/collab-cli-v0.15.5...collab-cli-v0.15.6
 [0.15.5]: https://github.com/LabVIEW-Community-CI-CD/labview-benchmark-actor/compare/collab-cli-v0.15.4...collab-cli-v0.15.5

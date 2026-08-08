@@ -118,6 +118,9 @@ export function verifyReleaseComponents(input) {
   if (!changelog.includes(`## [${components.extension}]`)) {
     reasons.push('CHANGELOG.md has no section for the extension version');
   }
+  if (!packageJson.scripts?.package?.includes('vsce package --pre-release')) {
+    reasons.push('canonical package command does not produce a Marketplace prerelease VSIX');
+  }
   if (!releaseWorkflow.includes('vsce publish --pre-release')) {
     reasons.push('Marketplace workflow does not publish through the prerelease channel');
   }

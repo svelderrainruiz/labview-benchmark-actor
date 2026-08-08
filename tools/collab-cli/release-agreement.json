@@ -722,6 +722,77 @@
               "signature": "BjkyYQLjZOA7peVIazdRsDZGcnFnrVp81kM/h9u98IKc3G83x7e7oBxxJwpDWesrRnGzkqcOIfVSAf4K2V6JCg=="
             }
           }
+        },
+        "1.4.9": {
+          "summary": "Extension 1.4.9 prerelease artifact contract and exact-candidate composite PASS.",
+          "signoffs": {
+            "WIN": {
+              "agreed": true,
+              "reviewedCommit": "4da4e806d06e66529f695250e0eed5f534cff108",
+              "at": "2026-08-08T23:08:48.258Z",
+              "note": "Windows 2022/2025 exact-head witnesses PASS; reviewer VM staged prerelease VSIX 3554ce5f, emitted correlated WIN DONE, and produced verified quorum plus signed visual PASS."
+            },
+            "LINUX": {
+              "agreed": true,
+              "reviewedCommit": "4da4e806d06e66529f695250e0eed5f534cff108",
+              "at": "2026-08-08T23:08:48.258Z",
+              "note": "Exact-head workflow_dispatch run 31283220848: Ubuntu 22.04 and 24.04 witnesses PASS at 4da4e806, cross-plane consensus PASS."
+            }
+          },
+          "visualReview": {
+            "verdict": {
+              "schema": "labview-benchmark-actor/reviewer-verdict@1",
+              "target": {
+                "component": "extension",
+                "version": "1.4.9",
+                "commit": "4da4e806d06e66529f695250e0eed5f534cff108",
+                "vsixSha256": "3554ce5f93a65e7147e15bb479abbda93b7fd3c7f23118c7cecbeacff9c2a768"
+              },
+              "verdict": "pass",
+              "reviewer": "reviewer@vi-tech.nl",
+              "station": "WINDOWS_VM",
+              "notes": "PASS for LabVIEW Benchmark Actor 1.4.9 at commit 4da4e806d06e66529f695250e0eed5f534cff108, VSIX SHA-256 3554ce5f93a65e7147e15bb479abbda93b7fd3c7f23118c7cecbeacff9c2a768, 148116 bytes.  Verified full KPI PASS, 96.02% branch coverage, 203/203 gates, 179/179 correspondences, 18/18 hosted checks, exact local/hosted byte identity, prerelease VSIX metadata, AGENTS 0.3.13 integrity, lbabus 0.15.8 selfcheck, Windows npm.cmd behavior, release-scoped signing, strict visual target binding, installed commands/panels/MCP, and ADR-0078 through ADR-0080. Historical 1.4.8 evidence remains immutable and cannot authorize 1.4.9.  This PASS is candidate-scoped only and does not authorize publication. The governed release-risk overlay remains 12/28 BLOCKED pending the listed downstream proofs.",
+              "evidence": [
+                {
+                  "kind": "candidate-receipt",
+                  "ref": "full KPI bound to commit/hash/size, 96.02% branches, 203/203 gates, 179/179 correspondences"
+                },
+                {
+                  "kind": "hosted-ci",
+                  "ref": "all 18/18 PR #18 hosted checks PASS for the exact commit"
+                },
+                {
+                  "kind": "cross-plane",
+                  "ref": "Linux/Windows VSIX byte identity and four-substrate corroboration PASS"
+                },
+                {
+                  "kind": "marketplace-remediation",
+                  "ref": "VSIX manifest carries Microsoft.VisualStudio.Code.PreRelease=true and agent-last-gate packages through the canonical command"
+                }
+              ],
+              "renderedAt": "2026-08-08T23:05:03.904Z"
+            },
+            "signOff": {
+              "schema": "labview-benchmark-actor/acg-human-signoff-v1",
+              "subject": {
+                "verdictDigest": "37ce0746d8cff39cd9ebb650c7d0c06e6035277bde8fe2fa80f2df1490695862",
+                "consensusVerdict": "pass",
+                "target": {
+                  "component": "extension",
+                  "version": "1.4.9",
+                  "commit": "4da4e806d06e66529f695250e0eed5f534cff108",
+                  "vsixSha256": "3554ce5f93a65e7147e15bb479abbda93b7fd3c7f23118c7cecbeacff9c2a768"
+                }
+              },
+              "reviewer": "reviewer@vi-tech.nl",
+              "decision": "approve",
+              "station": "WINDOWS_VM",
+              "algorithm": "ed25519",
+              "publicKeyPem": "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEAVmzzStppmtOWRS6FP6ThtHgDsBimP5je9PSXoM58gHY=\n-----END PUBLIC KEY-----\n",
+              "signedAt": "2026-08-08T23:05:03.920Z",
+              "signature": "tHnrqJaIHoreSyJ+M3tG6kR8eb5ngOOyZO7jLYNU8mRTFrMk+437Y58NJ9JANIgSshdCBmT6gINbNh0G0rTjDw=="
+            }
+          }
         }
       }
     }
