@@ -8,6 +8,28 @@ command **"LabVIEW Benchmark Actor: Write Agent Instructions"** so your coding a
 You are an AI coding agent working in a workspace where the **labview-benchmark-actor** extension is
 installed. This file tells you how to leverage it.
 
+## Next-agent prerequisite contract
+
+Treat this as an executable agent preflight, not optional human setup prose. Run **Show Host Capabilities** and
+`lbabus selfcheck` before proposing work; stop and remediate a missing required tool rather than guessing.
+
+| Tool | Required/validated version | Agent action |
+| --- | --- | --- |
+| VS Code | `>=1.101.0` | Required for the extension and contributed MCP server. |
+| `lbabus` | **exactly `0.15.0` for this extension build** | Run `lbabus version`. Reviewer staging installs this version. Else install with `dotnet tool install --global LabVIEWBenchmarkActor.CollabBus --version 0.15.0`; restart VS Code afterward. |
+| Node.js | **exactly `24.19.0` for repository/release work** | Match the repository `.nvmrc`; packaging is Node-version-bound. |
+| .NET runtime | `>=8.0` | Required to execute the framework-dependent `lbabus` payload. |
+| .NET SDK | `>=8.0` when building/staging `lbabus` | Required for `dotnet build/publish`; runtime-only hosts can consume but not rebuild it. |
+| Git / Git for Windows | `>=2.30` | Required for provenance, worktrees, release lineage, and patch evidence. |
+| ripgrep (`rg`) | `>=13.0` | Required by `lbabus grep` and repository search gates. |
+| GitHub CLI (`gh`) | `>=2.20` | Required for GitHub workflow/artifact/release operations. |
+| GitLab CLI (`glab`) | `>=1.25` for a fully green `lbabus selfcheck` | Install when running the complete pinned collaboration-toolchain gate. |
+
+Optional substrate versions used by this release's validated Windows reviewer lane are **Vagrant 2.4.9**,
+**VirtualBox 7.2.8**, **LabVIEW 2026 Q3** (32-bit and/or 64-bit as the workload requires), and **TightVNC
+2.8.81**. Docker, Vagrant, VirtualBox, VMware, LabVIEW, FFmpeg, and VIPM are workload-specific: their absence
+must be reported explicitly by capabilities, never silently treated as available.
+
 ## What the extension provides
 
 The extension surfaces the LabVIEW benchmark-actor's cross-plane benchmark data and coordination inside VS

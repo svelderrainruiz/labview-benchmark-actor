@@ -256,6 +256,16 @@ try {
       `generated AGENTS.md documents contributed command: ${contribution.title}`,
     );
   }
+  for (const prerequisite of [
+    /lbabus[^]*0\.15\.0/,
+    /Node\.js[^]*24\.19\.0/,
+    /\.NET runtime[^]*>=8\.0/,
+    /Git \/ Git for Windows[^]*>=2\.30/,
+    /Vagrant 2\.4\.9/,
+    /VirtualBox 7\.2\.8/,
+  ]) {
+    assert(prerequisite.test(generatedAgents), `generated AGENTS.md pins next-agent prerequisite ${prerequisite}`);
+  }
   const ids = registered.map((r) => r.id);
   for (const cmd of expected) {
     assert(ids.includes(cmd), `activate() registers command ${cmd}`);

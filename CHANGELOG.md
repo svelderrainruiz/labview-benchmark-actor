@@ -22,6 +22,9 @@ follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project
 - **Icon Editor prerequisites are explicit.** Shipped agent guidance now requires installed/activated
   VI Package Manager and applying `icon-editor-developer.vipc` to each intended LabVIEW 2026 Q3
   bitness before treating `ni/labview-icon-editor` as provisioned.
+- **Generated agent instructions pin the next-agent toolchain.** AGENTS.md 0.3.4 now specifies exact
+  `lbabus` and Node versions, .NET runtime/SDK roles, Git/GitHub/GitLab/ripgrep minimums, and the
+  validated Vagrant/VirtualBox/LabVIEW/TightVNC reviewer stack; tests fail if core pins disappear.
 
 ## [1.4.0] - 2026-08-08
 
