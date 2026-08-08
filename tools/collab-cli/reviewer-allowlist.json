@@ -20,13 +20,13 @@
       "purposes": ["quorum"]
     },
     {
-      "publicKeyPem": "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEAy7DuKNTHjmwbVp0R8Xb500oGdYF9mw18y7lexpH+vaU=\n-----END PUBLIC KEY-----\n",
+      "publicKeyPem": "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEAI5APQqjFZzmahwVY4bgxCPcYTj//BgwfQe9gl9awLfU=\n-----END PUBLIC KEY-----\n",
       "validFrom": "1.4.1",
       "validThrough": "1.4.1",
       "purposes": ["visual"]
     },
     {
-      "publicKeyPem": "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEAd4A/Rsmuu9pVnNt6iQG32WDS/9Wm09NBjgLwavBrcTU=\n-----END PUBLIC KEY-----\n",
+      "publicKeyPem": "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEAxnWhvgrdI/rZLte4hUQ/rStCBp86+TrYtVxdcO8sjWY=\n-----END PUBLIC KEY-----\n",
       "validFrom": "1.4.1",
       "validThrough": "1.4.1",
       "purposes": ["quorum"]
