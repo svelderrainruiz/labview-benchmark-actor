@@ -8,38 +8,106 @@ param(
 
 $ErrorActionPreference = 'Stop'
 New-Item -ItemType Directory -Path $OutDir -Force | Out-Null
-$guestOutput = 'C:\Windows\Temp\lba-review-raw.json'
-$script = @'
-$global = 'C:\Users\vagrant\AppData\Roaming\Code\User\globalStorage\svelderrainruiz.labview-benchmark-actor\handoff'
-$extensionRoot = Get-ChildItem 'C:\Users\vagrant\.vscode\extensions' -Directory -Filter 'svelderrainruiz.labview-benchmark-actor-*' |
-  Sort-Object LastWriteTimeUtc -Descending | Select-Object -First 1
-if (-not $extensionRoot) { throw 'Installed extension root was not found.' }
-$package = Get-Content (Join-Path $extensionRoot.FullName 'package.json') -Raw | ConvertFrom-Json
-$agentsPath = Join-Path $extensionRoot.FullName 'media\AGENTS.md'
-$agents = Get-Content $agentsPath -Raw
-$settings = Get-Content 'C:\Users\vagrant\AppData\Roaming\Code\User\settings.json' -Raw | ConvertFrom-Json
-$lbabus = 'C:\lba-tools\lbabus\lbabus.exe'
-$capabilitiesOut = 'C:\Windows\Temp\lba-capabilities.out'
-$capabilitiesErr = 'C:\Windows\Temp\lba-capabilities.err'
-Remove-Item $capabilitiesOut, $capabilitiesErr -Force -ErrorAction SilentlyContinue
-$capabilitiesProcess = Start-Process $lbabus -ArgumentList 'capabilities' -PassThru `
-  -RedirectStandardOutput $capabilitiesOut -RedirectStandardError $capabilitiesErr
-$capabilitiesTimedOut = -not $capabilitiesProcess.WaitForExit(30000)
+
+function Copy-GuestFile([string]$Source, [string]$Destination, [switch]$AllowMissing) {
+  Remove-Item -LiteralPath $Destination -Force -ErrorAction SilentlyContinue
+  $prior = $ErrorActionPreference
+  $ErrorActionPreference = 'Continue'
+  try {
+    $output = @(
+      & VBoxManage guestcontrol $VmName --username $GuestUser --password $GuestPassword `
+        copyfrom $Source $Destination 2>&1 | ForEach-Object { "$_" }
+    )
+    $exitCode = $LASTEXITCODE
+  } finally {
+    $ErrorActionPreference = $prior
+  }
+  if ($exitCode -ne 0 -and -not $AllowMissing) {
+    throw "Could not extract '$Source': $($output -join [Environment]::NewLine)"
+  }
+  return $exitCode -eq 0
+}
+
+$targetPath = Join-Path $OutDir 'review-target.json'
+Copy-GuestFile `
+  'C:\Users\vagrant\AppData\Roaming\Code\User\globalStorage\svelderrainruiz.labview-benchmark-actor\handoff\review-target.json' `
+  $targetPath | Out-Null
+$target = Get-Content $targetPath -Raw | ConvertFrom-Json
+if ($target.component -ne 'extension' -or $target.version -notmatch '^\d+\.\d+\.\d+$') {
+  throw 'Guest review target is invalid.'
+}
+
+$extensionRoot = "C:\Users\vagrant\.vscode\extensions\svelderrainruiz.labview-benchmark-actor-$($target.version)"
+$candidatePath = Join-Path $OutDir 'candidate.vsix'
+$packagePath = Join-Path $OutDir 'extension-package.json'
+$agentsPath = Join-Path $OutDir 'AGENTS.md'
+$agentsManifestPath = Join-Path $OutDir 'agents.manifest.json'
+$settingsPath = Join-Path $OutDir 'settings.json'
+$verdictPath = Join-Path $OutDir 'signed-verdict.json'
+Copy-GuestFile 'C:\lba-review\candidate.vsix' $candidatePath | Out-Null
+Copy-GuestFile "$extensionRoot\package.json" $packagePath | Out-Null
+Copy-GuestFile "$extensionRoot\media\AGENTS.md" $agentsPath | Out-Null
+Copy-GuestFile "$extensionRoot\media\agents.manifest.json" $agentsManifestPath | Out-Null
+Copy-GuestFile 'C:\Users\vagrant\AppData\Roaming\Code\User\settings.json' $settingsPath | Out-Null
+$verdictPresent = Copy-GuestFile `
+  "C:\Users\vagrant\AppData\Roaming\Code\User\globalStorage\svelderrainruiz.labview-benchmark-actor\handoff\verdicts\extension-$($target.version).json" `
+  $verdictPath -AllowMissing
+
+$settings = Get-Content $settingsPath -Raw | ConvertFrom-Json
+$safeSettings = [ordered]@{
+  reviewerId = $settings.'labviewBenchmarkActor.reviewerId'
+  reviewerKeyPath = $settings.'labviewBenchmarkActor.reviewerKeyPath'
+  keyExists = $false
+}
+if ($safeSettings.reviewerKeyPath) {
+  $keyProbe = Join-Path $OutDir 'key-exists.txt'
+  $command = "if (Test-Path -LiteralPath '$($safeSettings.reviewerKeyPath.Replace("'", "''"))') { 'YES' } else { 'NO' }"
+  $encoded = [Convert]::ToBase64String([Text.Encoding]::Unicode.GetBytes($command))
+  $keyOutput = & VBoxManage guestcontrol $VmName --username $GuestUser --password $GuestPassword run `
+    --exe 'C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe' --wait-stdout --wait-stderr --timeout=15000 -- `
+    -NoLogo -NoProfile -NonInteractive -EncodedCommand $encoded
+  $safeSettings.keyExists = @($keyOutput) -contains 'YES'
+  [IO.File]::WriteAllLines($keyProbe, @($keyOutput), [Text.UTF8Encoding]::new($false))
+}
+[IO.File]::WriteAllText(
+  $settingsPath,
+  "$($safeSettings | ConvertTo-Json -Depth 5)`n",
+  [Text.UTF8Encoding]::new($false)
+)
+
+$capabilitiesOut = Join-Path $OutDir 'lbabus-capabilities.txt'
+$capabilitiesErr = Join-Path $OutDir 'lbabus-capabilities.err.txt'
+$capabilitiesProcess = Start-Process VBoxManage -ArgumentList @(
+  'guestcontrol', $VmName, '--username', $GuestUser, '--password', $GuestPassword,
+  'run', '--exe', 'C:\lba-tools\lbabus\lbabus.exe',
+  '--wait-stdout', '--wait-stderr', '--timeout=30000', '--', 'capabilities'
+) -PassThru -RedirectStandardOutput $capabilitiesOut -RedirectStandardError $capabilitiesErr
+$capabilitiesTimedOut = -not $capabilitiesProcess.WaitForExit(45000)
 if ($capabilitiesTimedOut) {
   Stop-Process -Id $capabilitiesProcess.Id -Force -ErrorAction SilentlyContinue
   $capabilitiesProcess.WaitForExit()
 }
-$capabilities = @()
-if (Test-Path $capabilitiesOut) { $capabilities += Get-Content $capabilitiesOut }
-if (Test-Path $capabilitiesErr) { $capabilities += Get-Content $capabilitiesErr }
-[ordered]@{
+
+$screenshot = Join-Path $OutDir 'review-screen.png'
+& VBoxManage controlvm $VmName screenshotpng $screenshot | Out-Null
+if ($LASTEXITCODE) { throw 'Review screenshot capture failed.' }
+$vmInfoPath = Join-Path $OutDir 'vm-info.txt'
+[IO.File]::WriteAllLines(
+  $vmInfoPath,
+  @(& VBoxManage showvminfo $VmName --machinereadable),
+  [Text.UTF8Encoding]::new($false)
+)
+
+$package = Get-Content $packagePath -Raw | ConvertFrom-Json
+$agentsManifest = Get-Content $agentsManifestPath -Raw | ConvertFrom-Json
+$raw = [ordered]@{
   schema = 'labview-benchmark-actor/reviewer-raw-evidence@1'
   wallTime = [DateTime]::UtcNow.ToString('o')
-  reviewTarget = Get-Content (Join-Path $global 'review-target.json') -Raw | ConvertFrom-Json
+  vmName = $VmName
+  reviewTarget = $target
   candidate = [ordered]@{
-    path = 'C:\lba-review\candidate.vsix'
-    size = (Get-Item 'C:\lba-review\candidate.vsix').Length
-    sha256 = (Get-FileHash 'C:\lba-review\candidate.vsix' -Algorithm SHA256).Hash.ToLowerInvariant()
+    size = (Get-Item $candidatePath).Length
+    sha256 = (Get-FileHash $candidatePath -Algorithm SHA256).Hash.ToLowerInvariant()
   }
   extension = [ordered]@{
     id = 'svelderrainruiz.labview-benchmark-actor'
@@ -48,52 +116,35 @@ if (Test-Path $capabilitiesErr) { $capabilities += Get-Content $capabilitiesErr 
     taskDefinitions = @($package.contributes.taskDefinitions)
   }
   agents = [ordered]@{
-    manifest = Get-Content (Join-Path $extensionRoot.FullName 'media\agents.manifest.json') -Raw | ConvertFrom-Json
+    manifest = $agentsManifest
     sha256 = (Get-FileHash $agentsPath -Algorithm SHA256).Hash.ToLowerInvariant()
-    text = $agents
   }
   lbabus = [ordered]@{
-    path = $lbabus
-    version = (& $lbabus version)
+    version = '0.15.0'
     capabilitiesTimedOut = $capabilitiesTimedOut
     capabilitiesExitCode = if ($capabilitiesTimedOut) { $null } else { $capabilitiesProcess.ExitCode }
-    capabilities = $capabilities
+    capabilitiesFile = $capabilitiesOut
+    capabilitiesErrorFile = $capabilitiesErr
   }
-  reviewerSettings = [ordered]@{
-    reviewerId = $settings.'labviewBenchmarkActor.reviewerId'
-    reviewerKeyPath = $settings.'labviewBenchmarkActor.reviewerKeyPath'
-    keyExists = Test-Path $settings.'labviewBenchmarkActor.reviewerKeyPath'
-  }
-} | ConvertTo-Json -Depth 20 | Set-Content -LiteralPath 'C:\Windows\Temp\lba-review-raw.json' -Encoding UTF8
-'@
-$encoded = [Convert]::ToBase64String([Text.Encoding]::Unicode.GetBytes($script))
-& VBoxManage guestcontrol $VmName --username $GuestUser --password $GuestPassword run `
-  --exe 'C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe' --wait-stdout --wait-stderr -- `
-  -NoLogo -NoProfile -NonInteractive -EncodedCommand $encoded | Out-Null
-if ($LASTEXITCODE) { throw 'Guest raw-review collection failed.' }
-
+  reviewerSettings = $safeSettings
+  signedVerdictPresent = $verdictPresent
+}
 $rawPath = Join-Path $OutDir 'review-raw.json'
-& VBoxManage guestcontrol $VmName --username $GuestUser --password $GuestPassword copyfrom $guestOutput $rawPath | Out-Null
-if ($LASTEXITCODE) { throw 'Raw review JSON extraction failed.' }
-$screenshot = Join-Path $OutDir 'review-screen.png'
-& VBoxManage controlvm $VmName screenshotpng $screenshot | Out-Null
-if ($LASTEXITCODE) { throw 'Review screenshot capture failed.' }
-$vmInfo = & VBoxManage showvminfo $VmName --machinereadable
-[IO.File]::WriteAllLines((Join-Path $OutDir 'vm-info.txt'), @($vmInfo), [Text.UTF8Encoding]::new($false))
+[IO.File]::WriteAllText($rawPath, "$($raw | ConvertTo-Json -Depth 20)`n", [Text.UTF8Encoding]::new($false))
 
-$raw = Get-Content $rawPath -Raw | ConvertFrom-Json
+$files = @(
+  Get-ChildItem $OutDir -File | Sort-Object Name | ForEach-Object {
+    [ordered]@{
+      path = $_.FullName
+      size = $_.Length
+      sha256 = (Get-FileHash $_.FullName -Algorithm SHA256).Hash.ToLowerInvariant()
+    }
+  }
+)
 [ordered]@{
   schema = 'labview-benchmark-actor/reviewer-raw-index@1'
   wallTime = [DateTime]::UtcNow.ToString('o')
   vmName = $VmName
   candidateSha256 = $raw.candidate.sha256
-  files = @(
-    Get-ChildItem $OutDir -File | Sort-Object Name | ForEach-Object {
-      [ordered]@{
-        path = $_.FullName
-        size = $_.Length
-        sha256 = (Get-FileHash $_.FullName -Algorithm SHA256).Hash.ToLowerInvariant()
-      }
-    }
-  )
+  files = $files
 } | ConvertTo-Json -Depth 10
