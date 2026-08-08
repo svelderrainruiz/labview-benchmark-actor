@@ -30,6 +30,22 @@ Optional substrate versions used by this release's validated Windows reviewer la
 2.8.81**. Docker, Vagrant, VirtualBox, VMware, LabVIEW, FFmpeg, and VIPM are workload-specific: their absence
 must be reported explicitly by capabilities, never silently treated as available.
 
+## Compound human tasks — bundle v1.0.0
+
+Open **Terminal: Run Task**. These tasks are contributed by the installed extension, so downloaded Marketplace
+users receive them without a repository `.vscode/tasks.json`:
+
+- **LBA: Agent Preflight** — `lbabus version`, `selfcheck`, and host capabilities.
+- **LBA: Governance Review** — local `repo-standards-review` checkout plus the published Linux
+  `assurance-workbench:main` `release-gate` profile.
+- **LBA: Reviewer Mesh Readiness (compound)** — preflight, then governance.
+- **LBA: Release Candidate Check (compound)** — reviewer readiness, tests, local gates, and packaging.
+
+Task bundle **v1.0.0** fails on the first nonzero child command. Before deleting a disposable human-review VM,
+the operator must run the maintained raw-data collector so the next agent receives the target, candidate hash,
+installed commands/tasks, AGENTS hash/version, `lbabus capabilities`, safe reviewer settings, VM identity, and
+screenshot.
+
 ## What the extension provides
 
 The extension surfaces the LabVIEW benchmark-actor's cross-plane benchmark data and coordination inside VS

@@ -2,6 +2,7 @@ import * as vscode from 'vscode';
 import * as path from 'node:path';
 
 const TASK_TYPE = 'labviewBenchmarkActor';
+export const HUMAN_TASKS_VERSION = '1.0.0';
 const TASKS = [
   ['agent-preflight', 'LBA: Agent Preflight'],
   ['governance-review', 'LBA: Governance Review'],
@@ -15,13 +16,15 @@ function taskFor(context: vscode.ExtensionContext, id: string, name: string): vs
     cwd: vscode.workspace.workspaceFolders?.[0]?.uri.fsPath,
     env: { ...process.env, ELECTRON_RUN_AS_NODE: '1' },
   });
-  return new vscode.Task(
+  const task = new vscode.Task(
     { type: TASK_TYPE, task: id },
     vscode.TaskScope.Workspace,
     name,
-    'LabVIEW Benchmark Actor',
+    `LabVIEW Benchmark Actor tasks v${HUMAN_TASKS_VERSION}`,
     execution,
   );
+  task.detail = `Governed human task bundle v${HUMAN_TASKS_VERSION}`;
+  return task;
 }
 
 export function registerHumanTasks(context: vscode.ExtensionContext): vscode.Disposable {

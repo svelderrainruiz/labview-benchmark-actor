@@ -2913,6 +2913,8 @@ progressively.
   - Governance invokes
     `registry.gitlab.com/svelderrainruiz/repo-standards-review/assurance-workbench:main` with the `release-gate`
     profile against the current workspace.
+  - Generated AGENTS.md and contributed task details expose the compound task-bundle version.
+  - The maintained collector retains hashed raw review data and a screenshot before a disposable VM is deleted.
   - Tests and local gates verify task labels, packaged-runner wiring, and the fail-closed governance prerequisites.
 
 ## Traceability (requirement → architecture view / test)

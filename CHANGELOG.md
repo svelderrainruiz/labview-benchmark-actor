@@ -25,6 +25,9 @@ follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project
 - **Generated agent instructions pin the next-agent toolchain.** AGENTS.md 0.3.4 now specifies exact
   `lbabus` and Node versions, .NET runtime/SDK roles, Git/GitHub/GitLab/ripgrep minimums, and the
   validated Vagrant/VirtualBox/LabVIEW/TightVNC reviewer stack; tests fail if core pins disappear.
+- **Human task workflows and review evidence are versioned.** Compound task bundle 1.0.0 is shown in
+  generated AGENTS.md and task details, while a maintained collector captures indexed raw candidate,
+  command/task, agent-instruction, capability, reviewer-setting, VM, and screenshot evidence before teardown.
 
 ## [1.4.0] - 2026-08-08
 

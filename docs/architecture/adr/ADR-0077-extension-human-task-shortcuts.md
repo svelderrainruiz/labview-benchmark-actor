@@ -31,6 +31,10 @@ binary. Governance must fail closed when the local standards checkout or Docker 
 - Require the local standards checkout at `REPO_STANDARDS_REVIEW` or the maintained default path, and require Docker
   to report `OSType=linux` before invoking the workbench image.
 - Keep every child command visible in the terminal and stop at the first nonzero exit.
+- Version the compound task bundle independently and display that version in generated AGENTS.md and task details.
+- Require the maintained raw-review collector before disposable VM teardown; it retains target/candidate identities,
+  installed commands/tasks, AGENTS version/hash/text, `lbabus capabilities`, safe reviewer settings, VM info, and a
+  screenshot for the next agent.
 - Gate task contribution, exact labels, bundled-runner wiring, local-checkout requirement, Linux-engine guard, and
   the published workbench image command deterministically.
 
@@ -41,6 +45,7 @@ binary. Governance must fail closed when the local standards checkout or Docker 
 - Marketplace users can run the preflight even when `node` is absent from PATH; workload tools such as Docker,
   `lbabus`, and the standards checkout remain explicit prerequisites.
 - Governance is reproducible against the same published workbench image used by the external standards repository.
+- Human-review evidence survives VM cleanup as indexed, hashed raw artifacts.
 - The compound release task is intentionally strict and potentially long-running; it is a release/readiness action,
   not a background convenience.
 

@@ -298,6 +298,7 @@ try {
     'human task provider exposes the four governed shortcuts',
   );
   assert(humanTasks.every((task) => task.execution.options.env.ELECTRON_RUN_AS_NODE === '1'), 'human tasks use the bundled VS Code Node runtime');
+  assert(humanTasks.every((task) => task.detail === 'Governed human task bundle v1.0.0'), 'human tasks expose bundle version 1.0.0');
   assert(
     subscriptions.length >= expected.length,
     'activate() pushes a disposable per command onto context.subscriptions'

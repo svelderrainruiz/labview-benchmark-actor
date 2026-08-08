@@ -1454,6 +1454,14 @@ check('human-task-shortcuts', () => {
   assert(provider.includes("ELECTRON_RUN_AS_NODE: '1'"), 'human tasks must use VS Code bundled Node');
   assert(stage.includes("extension-tasks', 'human-task-runner.mjs"), 'human task runner is not staged into media');
   assert(runner.includes('REPO_STANDARDS_REVIEW'), 'governance task lacks local standards checkout override');
+  assert(provider.includes("HUMAN_TASKS_VERSION = '1.0.0'"), 'task provider lacks bundle version 1.0.0');
+  assert(runner.includes("HUMAN_TASKS_VERSION = '1.0.0'"), 'task runner lacks bundle version 1.0.0');
+  const agents = readFileSync(join(pkgRoot, 'extension-agents', 'AGENTS.md'), 'utf8');
+  assert(agents.includes('Compound human tasks — bundle v1.0.0'), 'generated AGENTS lacks task bundle version');
+  const collector = readFileSync(join(pkgRoot, 'reviewer-workstation', 'collect-review-raw.ps1'), 'utf8');
+  for (const proof of ['reviewTarget', 'candidate', 'commands', 'taskDefinitions', 'agents', 'capabilities', 'reviewerSettings', 'screenshotpng']) {
+    assert(collector.includes(proof), `raw review collector lacks ${proof} evidence`);
+  }
   assert(runner.includes("docker.stdout.trim() !== 'linux'"), 'governance task lacks Linux Docker guard');
   assert(
     runner.includes('registry.gitlab.com/svelderrainruiz/repo-standards-review/assurance-workbench:main')

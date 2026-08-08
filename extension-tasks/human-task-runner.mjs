@@ -6,6 +6,7 @@ import path from 'node:path';
 
 const mode = process.argv[2];
 const workspace = process.cwd();
+const HUMAN_TASKS_VERSION = '1.0.0';
 
 function run(command, args, options = {}) {
   console.log(`\n> ${command} ${args.join(' ')}`);
@@ -84,6 +85,7 @@ if (!tasks[mode]) {
 }
 
 try {
+  console.log(`LBA governed human task bundle v${HUMAN_TASKS_VERSION}`);
   tasks[mode]();
   console.log(`\nLBA task '${mode}': PASS`);
 } catch (error) {
