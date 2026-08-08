@@ -56,8 +56,12 @@ Code:
 Windows-specific guidance for agents using this extension on a Windows host:
 
 - **LabVIEW runtime & bitness.** Run **Show Host Capabilities** first — a Windows host often has *both* 32-bit
-  and 64-bit LabVIEW installed. Match the bitness to the target VIs (for example, the icon-editor project is
-  32-bit). When a LabVIEW CLI operation (such as VI Analyzer) cold-launches LabVIEW and fails with `-350000`
+  and 64-bit LabVIEW installed. Match the bitness to the target VIs. The
+  [`ni/labview-icon-editor`](https://github.com/ni/labview-icon-editor) repository is a VI/LabVIEW Project that
+  uses LUnit: install and activate VI Package Manager first, then apply
+  `C:\dev\gh\labview-icon-editor\icon-editor-developer.vipc` for each LabVIEW 2026 Q3 bitness you intend to run
+  (32-bit and/or 64-bit). Do not benchmark it as provisioned until those VIPC dependencies succeed. When a
+  LabVIEW CLI operation (such as VI Analyzer) cold-launches LabVIEW and fails with `-350000`
   ("failed to establish a connection with LabVIEW"), the VI Server TCP port does not match: the CLI defaults to
   port **3363**, so pass the matching `-LabVIEWPath <the intended bitness>` and `-PortNumber 3363` (or enable
   VI Server / align `server.tcp.port` in that LabVIEW's `.ini`).

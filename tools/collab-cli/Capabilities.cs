@@ -17,6 +17,7 @@ internal static class Capabilities
     {
         ProbeDocker(),
         ProbeVagrant(),
+        ProbeVirtualBox(),
         ProbeVmware(),
         ProbeLabViewCli(),
     };
@@ -51,6 +52,14 @@ internal static class Capabilities
         if (vmrun is null)
         {
             return new HostCapability("vmware", false, "vmrun not found");
+        }
+
+        private static HostCapability ProbeVirtualBox()
+        {
+            (int? code, string outText) = Run("VBoxManage", "--version");
+            return code == 0 && outText.Length > 0
+                ? new HostCapability("virtualbox", true, $"VirtualBox {outText.Trim()}")
+                : new HostCapability("virtualbox", false, "VBoxManage not found");
         }
 
         (int? code, string outText) = Run(vmrun, "list");

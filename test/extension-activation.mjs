@@ -278,17 +278,16 @@ try {
   assert(/id="lba-series"/.test(html) && /"t":0/.test(html), 'viewer HTML seeds the benchmark series data block');
   assert(/<svg id="chart"/.test(html), 'viewer HTML renders the chart svg surface');
 
-  // Prerequisite-remediation (LBA-REQ-002 / T-002): invoking a CLI-backed command when the `lbabus`
-  // prerequisite is absent must surface actionable remediation via showErrorMessage rather than fail
-  // silently. child_process is mocked to fail with ENOENT, standing in for a missing coordination CLI.
+  // Capabilities remain useful when lbabus is absent: the extension falls back to a read-only native probe.
   const showCapabilities = registered.find((r) => r.id === 'labviewBenchmarkActor.showCapabilities');
   assert(showCapabilities, 'showCapabilities command is registered');
+  const warningsBeforeCapabilities = warnMessages.length;
   await showCapabilities.handler();
-  assert(errorMessages.length === 1, 'a missing-CLI failure surfaces exactly one error message');
-  assert(/lbabus failed/.test(errorMessages[0]), 'the remediation names the failing prerequisite CLI (lbabus)');
+  assert(errorMessages.length === 0, 'missing lbabus does not turn the read-only capabilities command into an error');
+  assert(warnMessages.length === warningsBeforeCapabilities + 1, 'the capabilities fallback surfaces one actionable warning');
   assert(
-    /Install the coordination CLI/.test(errorMessages[0]),
-    'the remediation tells the operator to install the coordination CLI'
+    /built-in fallback/.test(warnMessages.at(-1)) && /install lbabus/i.test(warnMessages.at(-1)),
+    'the warning explains the fallback and how to enable coordination commands'
   );
 
   // Create Cleanroom Worker VM (LBA distributed CI): the cloner drives VBoxManage + ssh via a bash script, so

@@ -17,6 +17,45 @@ const execFileAsync = promisify(execFile);
 
 const CLI = 'lbabus';
 
+async function probeCommand(command: string, args: string[]): Promise<string | null> {
+  try {
+    const { stdout, stderr } = await execFileAsync(command, args, {
+      timeout: 10000,
+      windowsHide: true,
+    });
+    return (stdout.trim() || stderr.trim()) || null;
+  } catch {
+    return null;
+  }
+}
+
+async function nativeHostCapabilities(): Promise<string[]> {
+  const [docker, vagrant, virtualBox, vmware] = await Promise.all([
+    probeCommand('docker', ['version', '--format', '{{.Server.Os}}/{{.Server.Arch}} engine {{.Server.Version}}']),
+    probeCommand('vagrant', ['--version']),
+    probeCommand('VBoxManage', ['--version']),
+    probeCommand('vmrun', ['list']),
+  ]);
+  const lines = [
+    `native host capability fallback — ${process.platform}/${process.arch}, Node ${process.version}`,
+    `  [${docker ? 'yes' : ' no'}] docker       ${docker ?? 'not installed or daemon unavailable'}`,
+    `  [${vagrant ? 'yes' : ' no'}] vagrant      ${vagrant ?? 'not installed'}`,
+    `  [${virtualBox ? 'yes' : ' no'}] virtualbox   ${virtualBox ? `VirtualBox ${virtualBox}` : 'VBoxManage not found'}`,
+    `  [${vmware ? 'yes' : ' no'}] vmware       ${vmware?.split(/\r?\n/)[0] ?? 'vmrun not found'}`,
+  ];
+  if (process.platform === 'win32') {
+    const labview64 = 'C:\\Program Files\\National Instruments\\LabVIEW 2026\\LabVIEW.exe';
+    const labview32 = 'C:\\Program Files (x86)\\National Instruments\\LabVIEW 2026\\LabVIEW.exe';
+    const labviewCli = await probeCommand('where.exe', ['LabVIEWCLI.exe']);
+    lines.push(
+      `  [${existsSync(labview64) ? 'yes' : ' no'}] labview-x64  ${existsSync(labview64) ? labview64 : 'not installed'}`,
+      `  [${existsSync(labview32) ? 'yes' : ' no'}] labview-x86  ${existsSync(labview32) ? labview32 : 'not installed'}`,
+      `  [${labviewCli ? 'yes' : ' no'}] labview-cli  ${labviewCli?.split(/\r?\n/)[0] ?? 'not on PATH'}`,
+    );
+  }
+  return lines;
+}
+
 function getOutput(context: vscode.ExtensionContext): vscode.OutputChannel {
   const channel = vscode.window.createOutputChannel('LabVIEW Benchmark Actor');
   context.subscriptions.push(channel);
@@ -33,6 +72,15 @@ async function runCli(output: vscode.OutputChannel, args: string[], timeoutMs: n
     output.appendLine(stdout.trimEnd());
     output.show(true);
   } catch (err) {
+    if (args[0] === 'capabilities' && (err as NodeJS.ErrnoException)?.code === 'ENOENT') {
+      output.appendLine('lbabus is not installed; showing the built-in read-only capability fallback.');
+      for (const line of await nativeHostCapabilities()) output.appendLine(line);
+      output.show(true);
+      void vscode.window.showWarningMessage(
+        'lbabus is not installed. Host capabilities were shown with the built-in fallback; install lbabus to enable coordination-bus commands.'
+      );
+      return;
+    }
     const message = err instanceof Error ? err.message : String(err);
     output.appendLine(`error: ${message}`);
     output.show(true);

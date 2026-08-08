@@ -13,6 +13,12 @@ follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project
   assigns each retained Ed25519 public key an inclusive SemVer validity range and explicit
   `visual`/`quorum` purposes. Historical signatures remain verifiable, while an old, visual-only,
   out-of-range, or versionless scoped key fails closed instead of authorizing a newer release.
+- **Host capabilities remain useful without `lbabus`.** The VS Code command falls back to a built-in
+  read-only probe instead of surfacing raw `spawn lbabus ENOENT`, and reports Docker, Vagrant,
+  VirtualBox, VMware, LabVIEW 32/64-bit, and LabVIEWCLI availability with detected versions.
+- **Icon Editor prerequisites are explicit.** Shipped agent guidance now requires installed/activated
+  VI Package Manager and applying `icon-editor-developer.vipc` to each intended LabVIEW 2026 Q3
+  bitness before treating `ni/labview-icon-editor` as provisioned.
 
 ## [1.4.0] - 2026-08-08
 
