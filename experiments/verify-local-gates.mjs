@@ -2287,6 +2287,10 @@ check('mcp-server-surface-contract', () => {
   for (const deny of ['reviewer-workstation/**', '**/.vagrant/**', 'node_modules/**', 'experiments/**', 'tools/**', 'docs/**', 'cleanroom/**', 'scripts/**']) {
     assert(ignore.includes(deny), `.vscodeignore must exclude ${deny} (#123 packaging-leak guard)`);
   }
+  const lastGate = readFileSync(join(pkgRoot, 'scripts', 'agent-last-gate.mjs'), 'utf8');
+  for (const runtimeRoot of ['release-components', 'release-risk-baseline', 'standards-score-baseline']) {
+    assert(lastGate.includes(`^${runtimeRoot}\\.json$`), `agent-last-gate must allow packaged ${runtimeRoot}.json`);
+  }
   // The dynamic protocol round-trip is wired into npm test.
   assert(/test\/mcp-server\.mjs/.test(pkg.scripts?.test ?? ''), 'npm test must run test/mcp-server.mjs');
   return { providerId: manifestId, tools: 4, protocol: '2025-06-18' };
