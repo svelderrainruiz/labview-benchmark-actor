@@ -120,7 +120,7 @@ $raw = [ordered]@{
     sha256 = (Get-FileHash $agentsPath -Algorithm SHA256).Hash.ToLowerInvariant()
   }
   lbabus = [ordered]@{
-    version = '0.15.2'
+    version = '0.15.3'
     capabilitiesTimedOut = $capabilitiesTimedOut
     capabilitiesExitCode = if ($capabilitiesTimedOut) { $null } else { $capabilitiesProcess.ExitCode }
     capabilitiesFile = $capabilitiesOut

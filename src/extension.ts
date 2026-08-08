@@ -8,6 +8,7 @@ import * as path from 'node:path';
 
 import { registerBenchmarkActorMcpServerProvider } from './mcp/benchmarkActorMcpServerProvider';
 import { registerHumanTasks } from './humanTasks';
+import { resolveLbabusExecutable } from './lbabusPath';
 
 const execFileAsync = promisify(execFile);
 
@@ -16,7 +17,7 @@ const execFileAsync = promisify(execFile);
 // host capabilities, poll the coordination bus, and post a coordination note from the IDE. The extension
 // depends only on `vscode` + Node built-ins -- no external prototype-private module on its graph.
 
-const CLI = 'lbabus';
+const CLI = resolveLbabusExecutable();
 
 async function probeCommand(command: string, args: string[]): Promise<string | null> {
   try {

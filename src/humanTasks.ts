@@ -1,8 +1,9 @@
 import * as vscode from 'vscode';
 import * as path from 'node:path';
+import { resolveLbabusExecutable } from './lbabusPath';
 
 const TASK_TYPE = 'labviewBenchmarkActor';
-export const HUMAN_TASKS_VERSION = '1.0.2';
+export const HUMAN_TASKS_VERSION = '1.0.3';
 const TASKS = [
   ['agent-preflight', 'LBA: Agent Preflight'],
   ['governance-review', 'LBA: Governance Review'],
@@ -19,6 +20,7 @@ function taskFor(context: vscode.ExtensionContext, id: string, name: string): vs
       ELECTRON_RUN_AS_NODE: '1',
       LBA_TASK_EVIDENCE_ROOT: path.join(context.globalStorageUri.fsPath, 'task-runs'),
       LBA_EXTENSION_VERSION: String(context.extension?.packageJSON?.version ?? ''),
+      LBA_LBABUS_PATH: resolveLbabusExecutable(),
     },
   });
   const task = new vscode.Task(

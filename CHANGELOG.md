@@ -6,6 +6,16 @@ follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project
 
 ## [Unreleased]
 
+## [1.4.4] - 2026-08-08
+
+### Fixed
+
+- **Reviewer `lbabus` survives stale Windows PATH inheritance.** The extension command host, contributed MCP
+  server, and compound human tasks resolve the staged `C:\lba-tools\lbabus\lbabus.exe` explicitly (with an
+  optional `LBA_LBABUS_PATH` override and normal PATH fallback). This remediates the signed 1.4.3 FAIL where the
+  exact 0.15.2 binary was installed and verified but VS Code's inherited Explorer environment still reported
+  `Tool error: the 'lbabus' coordination CLI is not on PATH`.
+
 ## [1.4.3] - 2026-08-08
 
 ### Fixed

@@ -8,13 +8,14 @@ import { assessReleaseRisk, riskSummaryLines, verifyGovernedRisk } from './relea
 
 const mode = process.argv[2];
 const workspace = process.cwd();
-const HUMAN_TASKS_VERSION = '1.0.2';
+const HUMAN_TASKS_VERSION = '1.0.3';
 const startedNs = process.hrtime.bigint();
 const startedWallTime = new Date().toISOString();
 const events = [];
 let eventIndex = 0;
 const releaseComponents = JSON.parse(readFileSync(new URL('../release-components.json', import.meta.url), 'utf8'));
 const governance = releaseComponents.governance;
+const lbabusExecutable = String(process.env.LBA_LBABUS_PATH || '').trim() || 'lbabus';
 const releaseRiskBaseline = JSON.parse(readFileSync(new URL('../release-risk-baseline.json', import.meta.url), 'utf8'));
 const standardsScoreBaseline = JSON.parse(readFileSync(new URL('../standards-score-baseline.json', import.meta.url), 'utf8'));
 const REQUIRED_STANDARD_FILES = [
@@ -94,9 +95,9 @@ function standardsRoot() {
 }
 
 async function agentPreflight() {
-  await run('lbabus', ['version']);
-  await run('lbabus', ['selfcheck']);
-  await run('lbabus', ['capabilities']);
+  await run(lbabusExecutable, ['version']);
+  await run(lbabusExecutable, ['selfcheck']);
+  await run(lbabusExecutable, ['capabilities']);
 }
 
 async function governanceReview() {

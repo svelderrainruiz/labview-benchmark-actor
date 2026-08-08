@@ -2939,6 +2939,8 @@ progressively.
    advance and final staged package metadata plus CHANGELOG agree.
   - Human tasks ignore stdin, use dedicated terminals without reuse prompts, and retain indexed JSON events carrying
    UTC wall time, monotonic nanoseconds, and the `process.hrtime.bigint` clock-source name.
+  - Extension commands, MCP, and human tasks resolve the stable reviewer `lbabus` installation even when the running
+   VS Code/Explorer process inherited PATH before staging.
   - `release-cut-github` explicitly targets `main`.
   - Marketplace publication is opt-in after the canonical GitHub Release exists, verifies the release VSIX hash
    equals the staged VSIX hash, runs from the release tag, and uses `vsce publish --pre-release` on the downloaded

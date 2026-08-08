@@ -1467,10 +1467,20 @@ check('human-task-shortcuts', () => {
   assert(runner.includes('STANDARDS_ROOT') && runner.includes('governance.standardsRootDefault'), 'governance task lacks local standards-corpus discovery');
   assert(runner.includes("`${corpus}:/standards:ro`") && runner.includes("'STANDARDS_ROOT=/standards'"), 'governance task does not mount standards read-only');
   assert(runner.includes('governance.standardsReviewCommit') && runner.includes('governance.workbenchDigest'), 'governance task does not pin its source commit and image digest');
-  assert(provider.includes("HUMAN_TASKS_VERSION = '1.0.2'"), 'task provider lacks bundle version 1.0.2');
-  assert(runner.includes("HUMAN_TASKS_VERSION = '1.0.2'"), 'task runner lacks bundle version 1.0.2');
+  assert(provider.includes("HUMAN_TASKS_VERSION = '1.0.3'"), 'task provider lacks bundle version 1.0.3');
+  assert(runner.includes("HUMAN_TASKS_VERSION = '1.0.3'"), 'task runner lacks bundle version 1.0.3');
   const agents = readFileSync(join(pkgRoot, 'extension-agents', 'AGENTS.md'), 'utf8');
-  assert(agents.includes('Compound human tasks — bundle v1.0.2'), 'generated AGENTS lacks task bundle version');
+  assert(agents.includes('Compound human tasks — bundle v1.0.3'), 'generated AGENTS lacks task bundle version');
+  assert(provider.includes('LBA_LBABUS_PATH: resolveLbabusExecutable()'), 'human tasks do not receive the resolved lbabus executable');
+  assert(runner.includes("process.env.LBA_LBABUS_PATH || ''"), 'human task runner ignores the resolved lbabus executable');
+  const lbabusPath = readFileSync(join(pkgRoot, 'src', 'lbabusPath.ts'), 'utf8');
+  const extension = readFileSync(join(pkgRoot, 'src', 'extension.ts'), 'utf8');
+  const mcpProvider = readFileSync(join(pkgRoot, 'src', 'mcp', 'benchmarkActorMcpServerProvider.ts'), 'utf8');
+  const mcpServer = readFileSync(join(pkgRoot, 'src', 'mcp', 'runBenchmarkActorMcpServer.ts'), 'utf8');
+  assert(lbabusPath.includes('C:\\\\lba-tools\\\\lbabus\\\\lbabus.exe'), 'lbabus resolver lacks the stable reviewer installation');
+  assert(extension.includes('const CLI = resolveLbabusExecutable()'), 'extension commands ignore the lbabus resolver');
+  assert(mcpProvider.includes('LBA_LBABUS_PATH: resolveLbabusExecutable()'), 'MCP provider does not pass the resolved lbabus executable');
+  assert(mcpServer.includes('process.env.LBA_LBABUS_PATH'), 'MCP server ignores the resolved lbabus executable');
   const collector = readFileSync(join(pkgRoot, 'reviewer-workstation', 'collect-review-raw.ps1'), 'utf8');
   for (const proof of ['reviewTarget', 'candidate', 'commands', 'taskDefinitions', 'agents', 'capabilities', 'reviewerSettings', 'screenshotpng']) {
     assert(collector.includes(proof), `raw review collector lacks ${proof} evidence`);
