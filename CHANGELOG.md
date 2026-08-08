@@ -25,6 +25,10 @@ follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project
   stages the already-built pinned-Node VSIX without rebuilding it, rejects a mismatched expected
   SHA-256 before VM mutation, and verifies the uploaded guest candidate hash before accepting the
   interactive-profile installation.
+- **Reviewer cache artifacts survive later candidate builds.** New cache seals archive their exact
+  VSIX under the cache root instead of retaining a mutable worktree path. The historical cache has an
+  explicit recovery path that verifies and binds an installed-extension archive and per-file manifest
+  to the powered-off source snapshot when the original timestamped VSIX was not retained.
 
 ## [1.3.0] - 2026-08-06
 

@@ -66,10 +66,32 @@ if (!cacheRootArg || !outputArg) {
   });
   if (packageRef.sha256 !== metadata.package.sha256) throw new Error('package SHA-256 no longer matches cache metadata');
   const configRef = await ref(vmInfo.CfgFile, { role: 'retained-vm-config' });
-  const vsixRef = await ref(metadata.vsix.path, {
-    role: 'local-vsix',
-    version: metadata.vsix.version,
-  });
+  const sourceArtifactRetained = metadata.vsix.sourceArtifactRetained !== false;
+  const vsixRef = sourceArtifactRetained
+    ? await ref(metadata.vsix.path, {
+        role: 'local-vsix',
+        version: metadata.vsix.version,
+      })
+    : {
+        path: metadata.vsix.path,
+        size: metadata.vsix.size,
+        sha256: metadata.vsix.sha256,
+        role: 'historical-local-vsix-identity',
+        version: metadata.vsix.version,
+        sourceArtifactRetained: false,
+        installedSnapshotProof: {
+          sourceVmUuid: metadata.vm.uuid,
+          sourceSnapshotUuid: metadata.snapshot.uuid,
+          extensionId: 'svelderrainruiz.labview-benchmark-actor',
+          version: metadata.vsix.version,
+          manifest: await ref(metadata.vsix.installedSnapshotManifestPath, {
+            role: 'installed-extension-manifest',
+          }),
+          archive: await ref(metadata.vsix.installedSnapshotArchivePath, {
+            role: 'installed-extension-archive',
+          }),
+        },
+      };
   const captureManifest = await ref(metadata.capture.manifest, { role: 'activated-mprr-manifest' });
   const usableResources = resources.samples
     .filter((sample) => Number.isFinite(sample.cpuPct) && Number.isFinite(sample.ramMb))
@@ -219,6 +241,7 @@ if (!cacheRootArg || !outputArg) {
   if (metadata.guestCleanupPath) evidenceFiles.push(metadata.guestCleanupPath);
   if (metadata.maintenanceLifecyclePath) evidenceFiles.push(metadata.maintenanceLifecyclePath);
   if (metadata.lastReviewLifecyclePath) evidenceFiles.push(metadata.lastReviewLifecyclePath);
+  if (metadata.vsix.repairReceiptPath) evidenceFiles.push(metadata.vsix.repairReceiptPath);
   for (const file of evidenceFiles) {
     receipt.evidence.push(await ref(file));
   }

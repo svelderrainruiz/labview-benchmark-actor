@@ -168,6 +168,31 @@ if (
 if ((MachineValue $info 'VMState') -ne 'poweroff') { throw 'Retained reviewer VM is not powered off.' }
 if ($info -match 'lba-reviewer-vnc-') { throw 'Ephemeral reviewer VNC NAT rule remains.' }
 
+$artifactRoot = Join-Path $CacheRoot 'artifacts'
+New-Item -ItemType Directory -Path $artifactRoot -Force | Out-Null
+$archivedVsixPath = Join-Path $artifactRoot "labview-benchmark-actor-$($metadata.vsix.version)-$($metadata.vsix.sha256).vsix"
+if (Test-Path -LiteralPath $archivedVsixPath) {
+  $archivedHash = (Get-FileHash -LiteralPath $archivedVsixPath -Algorithm SHA256).Hash.ToLowerInvariant()
+  if ($archivedHash -ne $metadata.vsix.sha256) {
+    throw "Existing archived VSIX '$archivedVsixPath' has an unexpected SHA-256."
+  }
+} else {
+  $sourceVsixHash = (Get-FileHash -LiteralPath $metadata.vsix.path -Algorithm SHA256).Hash.ToLowerInvariant()
+  if ($sourceVsixHash -ne $metadata.vsix.sha256) {
+    throw 'VSIX source changed before immutable cache archival.'
+  }
+  $temporaryVsixPath = "$archivedVsixPath.$PID.tmp"
+  Copy-Item -LiteralPath $metadata.vsix.path -Destination $temporaryVsixPath
+  if ((Get-FileHash -LiteralPath $temporaryVsixPath -Algorithm SHA256).Hash.ToLowerInvariant() -ne $metadata.vsix.sha256) {
+    Remove-Item -LiteralPath $temporaryVsixPath -Force
+    throw 'Archived VSIX copy failed SHA-256 verification.'
+  }
+  Move-Item -LiteralPath $temporaryVsixPath -Destination $archivedVsixPath
+}
+$metadata.vsix | Add-Member -NotePropertyName originalPath -NotePropertyValue $metadata.vsix.path -Force
+$metadata.vsix.path = $archivedVsixPath
+$metadata.vsix | Add-Member -NotePropertyName sourceArtifactRetained -NotePropertyValue $true -Force
+
 $snapshotName = "reviewer-activated-vsix-$($metadata.vsix.sha256.Substring(0, 12))-$([DateTime]::UtcNow.ToString('yyyyMMddHHmmss'))"
 $snapshotList = Invoke-Native 'VBoxManage' @('snapshot', $providerId, 'list', '--machinereadable') $logPath -AllowFailure
 $existingSnapshots = $snapshotList.Output -join "`n"
