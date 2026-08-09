@@ -5,7 +5,16 @@ import { createHash } from 'node:crypto';
 import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
 import { dirname, isAbsolute, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { spawnInvocation } from '../extension-tasks/process-command.mjs';
+function spawnInvocation(command, args = [], options = {}) {
+  const invocation = { ...options, encoding: 'utf8', shell: false };
+  const needsCmdShim = process.platform === 'win32' && /\\.(cmd|bat)$/i.test(command);
+  if (!needsCmdShim) {
+    return spawnSync(command, args, invocation);
+  }
+  const quotedCommand = `"${command}"`;
+  const quotedArgs = args.map((arg) => (String(arg).includes(' ') ? `"${arg}"` : String(arg)));
+  return spawnSync('cmd.exe', ['/d', '/s', '/c', [quotedCommand, ...quotedArgs].join(' ')], invocation);
+}
 import { verifyManifest as verifyAgentsManifest, agentsSha256, readManifest as readAgentsManifest, AGENTS_MD as EXTENSION_AGENTS_MD } from '../scripts/agentsManifest.mjs';
 import { parseCorrespondenceSummary, parseCoverageSummary, parseLocalGateSummary } from '../scripts/local-kpi-core.mjs';
 import { buildCloseout, closeoutDigest, validateCloseout } from './release-risk-closeout.mjs';
