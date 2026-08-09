@@ -849,6 +849,14 @@ async function renderReviewerVerdictCommand(context: vscode.ExtensionContext, ou
   }
   const extVersion = String((context.extension?.packageJSON as { version?: string } | undefined)?.version ?? '0.0.0');
   const target = readReviewTarget(globalDir, extVersion);
+  if (target.version !== extVersion) {
+    reportUiError(
+      output,
+      'Render reviewer verdict',
+      new Error(`Review target version ${target.version} does not match active extension version ${extVersion}; fully restart VS Code after staging`),
+    );
+    return;
+  }
   let station: ReturnType<typeof reviewerStationForEnvironment>;
   try {
     const stagedStation = process.platform === 'linux' && String(process.env.CODESPACES || '').toLowerCase() !== 'true'

@@ -233,7 +233,8 @@ workspace root.
 - **Pre:** complete TC-00 through TC-11 as applicable; the exact `review-target.json` and target-bound
   `reviewer-station.json` are staged in the extension handoff directory; reviewer id and the fresh
   version-scoped visual private key are configured in this disposable VM. The station marker records
-  the verified VirtualBox provider, DMI product, and host-observed guest machine-id.
+  the verified VirtualBox provider, DMI product, and host-observed guest machine-id. Staging occurred
+  with VS Code fully stopped, and the newly staged extension is now active after relaunch.
 - **Steps:**
   1. Run **LabVIEW Benchmark Actor: Render Reviewer Verdict**.
   2. Select the verdict that matches the completed manual review and enter concise notes.

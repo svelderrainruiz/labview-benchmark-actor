@@ -147,7 +147,8 @@ surface, and the benchmark viewer. Nothing is published until the reviewer appro
 The governed Ubuntu visual-review lane uses a fresh graphical Ubuntu 24.04 VM built from the stock
 ISO. Provision LabVIEW without activation, let the operator activate in the VM console, and then copy
 the exact candidate VSIX, `review-target.json`, repository checkout, and fresh version-scoped visual
-private key into the disposable guest. Inside the guest run:
+private key into the disposable guest. Fully close every VS Code window (`pgrep -x code` must return
+no PID), then inside the guest run:
 
 ```bash
 node reviewer-workstation/stage-ubuntu-vsix.mjs \
@@ -173,7 +174,8 @@ VirtualBox guest identity; physical Ubuntu, WSL, containers, and a different VM 
 [the manual plan](../docs/testing/reviewer-manual-test-plan.md), then use **LabVIEW Benchmark Actor:
 Render Reviewer Verdict** inside VS Code. Linux verdict rendering fails closed without the staging
 marker or when the marker's provider/product/machine-id differs from the current host; it no longer
-infers `UBUNTU_VM` from the operating system alone.
+infers `UBUNTU_VM` from the operating system alone. Launch VS Code only after staging completes; the
+verdict command also requires the active extension version to equal the staged target version.
 
 Extract the public record and raw non-secret review evidence before deleting the VM and private key.
 The quorum key is distinct and is used only for the later machine-quorum sign-off.

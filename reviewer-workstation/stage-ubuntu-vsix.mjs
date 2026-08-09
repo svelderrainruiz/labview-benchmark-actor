@@ -112,6 +112,23 @@ export function validateUbuntuVmIdentity({ identity, expectedProvider, expectedM
   return { ok: failures.length === 0, failures };
 }
 
+export function validateUbuntuStageHost({ runningCodePids }) {
+  const failures = [];
+  if (String(runningCodePids ?? '').trim()) {
+    failures.push('fully close every VS Code process before staging the Ubuntu reviewer candidate');
+  }
+  return { ok: failures.length === 0, failures };
+}
+
+function runningCodeProcessIds() {
+  try {
+    return execFileSync('pgrep', ['-u', String(process.getuid()), '-x', 'code'], { encoding: 'utf8' }).trim();
+  } catch (error) {
+    if (error instanceof Error && 'status' in error && error.status === 1) return '';
+    throw error;
+  }
+}
+
 function detectUbuntuVmIdentity() {
   let provider;
   try {
@@ -176,6 +193,8 @@ function main() {
     expectedMachineId: args['vm-id'],
   });
   if (!vmEvidence.ok) throw new Error(vmEvidence.failures.join('; '));
+  const hostEvidence = validateUbuntuStageHost({ runningCodePids: runningCodeProcessIds() });
+  if (!hostEvidence.ok) throw new Error(hostEvidence.failures.join('; '));
   mkdirSync(workspace, { recursive: true, mode: 0o700 });
   mkdirSync(dirname(receiptPath), { recursive: true, mode: 0o700 });
   mkdirSync(handoff, { recursive: true, mode: 0o700 });
@@ -240,6 +259,7 @@ function main() {
       monotonicClockSource: 'process.hrtime.bigint',
     },
     outcome: 'PASS',
+    extensionHostWasStopped: true,
     failures: [],
   };
   writeJsonAtomic(receiptPath, receipt);

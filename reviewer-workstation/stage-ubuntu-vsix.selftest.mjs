@@ -6,6 +6,7 @@ import {
   validateUbuntuCandidateArtifact,
   validateUbuntuKpiReceipt,
   validateUbuntuReviewTarget,
+  validateUbuntuStageHost,
   validateUbuntuStageEvidence,
   validateUbuntuVmIdentity,
 } from './stage-ubuntu-vsix.mjs';
@@ -84,6 +85,8 @@ assert.equal(validateUbuntuVmIdentity({
   expectedProvider: 'oracle',
   expectedMachineId: vmIdentity.machineId,
 }).ok, false);
+assert.equal(validateUbuntuStageHost({ runningCodePids: '' }).ok, true);
+assert.equal(validateUbuntuStageHost({ runningCodePids: '123\n456' }).ok, false);
 assert.equal(validateUbuntuVmIdentity({
   identity: vmIdentity,
   expectedProvider: 'wsl',
@@ -150,6 +153,10 @@ assert(
 assert(
   source.indexOf('const vmEvidence = validateUbuntuVmIdentity') < source.indexOf("execFileSync(code, ['--install-extension'"),
   'reviewer virtualization identity is validated before installation',
+);
+assert(
+  source.indexOf('const hostEvidence = validateUbuntuStageHost') < source.indexOf("execFileSync(code, ['--install-extension'"),
+  'the extension host is proven stopped before installation',
 );
 assert.match(source, /reviewer-station\.json/);
 assert.match(source, /handoffReviewTarget/);

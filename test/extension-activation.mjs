@@ -1527,7 +1527,20 @@ try {
     // (3) configured + a Pass choice + notes -> a signed verdict written that verifies against the enrolled key.
     mockVscode.workspace.getConfiguration = () => ({ get: (k, d) => (k === 'reviewerId' ? reviewer : k === 'reviewerKeyPath' ? keyFile : d) });
     mkdirSync(join(gsRoot, 'handoff'), { recursive: true });
-    const liveTarget = { component: 'extension', version: '0.5.0', commit: 'e'.repeat(40), vsixSha256: 'f'.repeat(64), evidence: [{ kind: 'capture', ref: 'run-live' }] };
+    writeFileSync(join(gsRoot, 'handoff', 'review-target.json'), JSON.stringify({
+      component: 'extension',
+      version: '9.9.9',
+      commit: 'e'.repeat(40),
+      vsixSha256: 'f'.repeat(64),
+      evidence: [],
+    }));
+    const versionErrors = errorMessages.length;
+    await render();
+    assert(
+      errorMessages.slice(versionErrors).some((m) => /does not match active extension version/.test(m)),
+      'renderReviewerVerdict rejects a target for a different active extension version',
+    );
+    const liveTarget = { component: 'extension', version: '0.1.0', commit: 'e'.repeat(40), vsixSha256: 'f'.repeat(64), evidence: [{ kind: 'capture', ref: 'run-live' }] };
     writeFileSync(join(gsRoot, 'handoff', 'review-target.json'), JSON.stringify(liveTarget));
     writeFileSync(join(gsRoot, 'handoff', 'reviewer-station.json'), JSON.stringify({
       schema: 'labview-benchmark-actor/reviewer-station@1',
@@ -1545,10 +1558,10 @@ try {
     process.env.PATH = ''; // the command's best-effort lbabus bus post must not shell a REAL post during the test
     await render();
     process.env.PATH = savedPath;
-    const verdictFile = join(gsRoot, 'handoff', 'verdicts', 'extension-0.5.0.json');
+    const verdictFile = join(gsRoot, 'handoff', 'verdicts', 'extension-0.1.0.json');
     assert(existsSync(verdictFile), 'renderReviewerVerdict wrote the signed verdict');
     const rec = JSON.parse(readFileSync(verdictFile, 'utf8'));
-    assert(rec.verdict.verdict === 'pass' && rec.verdict.target.version === '0.5.0' && rec.signOff.schema === rv.SIGNOFF_SCHEMA && rec.signOff.decision === 'approve' && rec.signOff.reviewer === reviewer, 'the signed verdict records pass + approve + the reviewer');
+    assert(rec.verdict.verdict === 'pass' && rec.verdict.target.version === '0.1.0' && rec.signOff.schema === rv.SIGNOFF_SCHEMA && rec.signOff.decision === 'approve' && rec.signOff.reviewer === reviewer, 'the signed verdict records pass + approve + the reviewer');
     assert(rv.verifyReviewerVerdict(rec.verdict, rec.signOff, { reviewerAllowlist: { [reviewer]: rvKeys.publicKeyPem } }).ok, 'the extension-signed verdict verifies against the enrolled key');
 
     // (4) Request changes with dismissed notes and a bare bus failure -> conservative signed reject, no throw.
