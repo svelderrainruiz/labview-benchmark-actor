@@ -1357,6 +1357,26 @@ try {
     writeFileSync(join(vt, 'handoff', 'review-target.json'), JSON.stringify({ component: 'extension', version: '0.5.0', commit: 'c'.repeat(40), vsixSha256: 'd'.repeat(64), evidence: [{ kind: 'capture', ref: 'run-x' }] }));
     const t1 = ext.readReviewTarget(vt, '9.9.9');
     assert(t1.version === '0.5.0' && t1.commit.length === 40 && t1.evidence.length === 1, 'readReviewTarget reads the target file');
+    let markerThrew = false; try { ext.readReviewerStationMarker(vt, t1); } catch { markerThrew = true; }
+    assert(markerThrew, 'readReviewerStationMarker requires an explicit staged marker');
+    markerThrew = false; try { ext.readReviewerStationMarker(vt, { ...t1, commit: null }); } catch { markerThrew = true; }
+    assert(markerThrew, 'readReviewerStationMarker requires a complete exact target');
+    writeFileSync(join(vt, 'handoff', 'reviewer-station.json'), '{bad');
+    markerThrew = false; try { ext.readReviewerStationMarker(vt, t1); } catch { markerThrew = true; }
+    assert(markerThrew, 'readReviewerStationMarker rejects unreadable JSON');
+    writeFileSync(join(vt, 'handoff', 'reviewer-station.json'), JSON.stringify({
+      schema: 'labview-benchmark-actor/reviewer-station@1',
+      station: 'UBUNTU_VM',
+      target: { component: t1.component, version: t1.version, commit: 'f'.repeat(40), vsixSha256: t1.vsixSha256 },
+    }));
+    markerThrew = false; try { ext.readReviewerStationMarker(vt, t1); } catch { markerThrew = true; }
+    assert(markerThrew, 'readReviewerStationMarker rejects a marker for another target');
+    writeFileSync(join(vt, 'handoff', 'reviewer-station.json'), JSON.stringify({
+      schema: 'labview-benchmark-actor/reviewer-station@1',
+      station: 'UBUNTU_VM',
+      target: { component: t1.component, version: t1.version, commit: t1.commit, vsixSha256: t1.vsixSha256 },
+    }));
+    assert(ext.readReviewerStationMarker(vt, t1) === 'UBUNTU_VM', 'readReviewerStationMarker accepts an exact target-bound Ubuntu marker');
     writeFileSync(join(vt, 'handoff', 'review-target.json'), JSON.stringify({
       component: 1,
       version: null,
@@ -1412,7 +1432,18 @@ try {
     // (3) configured + a Pass choice + notes -> a signed verdict written that verifies against the enrolled key.
     mockVscode.workspace.getConfiguration = () => ({ get: (k, d) => (k === 'reviewerId' ? reviewer : k === 'reviewerKeyPath' ? keyFile : d) });
     mkdirSync(join(gsRoot, 'handoff'), { recursive: true });
-    writeFileSync(join(gsRoot, 'handoff', 'review-target.json'), JSON.stringify({ component: 'extension', version: '0.5.0', commit: 'e'.repeat(40), vsixSha256: 'f'.repeat(64), evidence: [{ kind: 'capture', ref: 'run-live' }] }));
+    const liveTarget = { component: 'extension', version: '0.5.0', commit: 'e'.repeat(40), vsixSha256: 'f'.repeat(64), evidence: [{ kind: 'capture', ref: 'run-live' }] };
+    writeFileSync(join(gsRoot, 'handoff', 'review-target.json'), JSON.stringify(liveTarget));
+    writeFileSync(join(gsRoot, 'handoff', 'reviewer-station.json'), JSON.stringify({
+      schema: 'labview-benchmark-actor/reviewer-station@1',
+      station: 'UBUNTU_VM',
+      target: {
+        component: liveTarget.component,
+        version: liveTarget.version,
+        commit: liveTarget.commit,
+        vsixSha256: liveTarget.vsixSha256,
+      },
+    }));
     mockVscode.window.showInformationMessage = () => 'Pass';
     mockVscode.window.showInputBox = async () => 'looks right end to end';
     const savedPath = process.env.PATH;

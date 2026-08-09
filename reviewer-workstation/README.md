@@ -151,25 +151,21 @@ private key into the disposable guest. Inside the guest run:
 
 ```bash
 node reviewer-workstation/stage-ubuntu-vsix.mjs \
-  --vsix /home/actor/lba-review/labview-benchmark-actor-1.4.10.vsix \
+  --vsix /home/actor/lba-review/labview-benchmark-actor.vsix \
   --target /home/actor/lba-review/review-target.json \
   --workspace /home/actor/lba-review/workspace \
-  --receipt /home/actor/lba-review/ubuntu-review-stage.json
+  --receipt /home/actor/lba-review/ubuntu-review-stage.json \
+  --handoff "$HOME/.config/Code/User/globalStorage/svelderrainruiz.labview-benchmark-actor/handoff"
 ```
 
-The command runs only on Linux, verifies the candidate's 40-hex commit and 64-hex SHA-256, reads the
-VSIX manifest, installs with `code --install-extension --force`, requires the exact
-`svelderrainruiz.labview-benchmark-actor@<version>` identity in the installed list, and writes a
-non-secret receipt with wall and monotonic timing. Follow
-[the manual plan](../docs/testing/reviewer-manual-test-plan.md), then render and sign the exact
-request inside the VM with station `UBUNTU_VM`:
-
-```bash
-node reviewer-workstation/sign-visual-verdict.mjs \
-  --key /home/actor/.lba-review/visual-private.pem \
-  --request /home/actor/lba-review/workspace/verdict-request.json \
-  --out /home/actor/lba-review/workspace/signed-visual-verdict.json
-```
+The command runs only on Linux and verifies the candidate's 40-hex commit, 64-hex SHA-256, and VSIX
+manifest **before** installing anything. It then installs with `code --install-extension --force`,
+requires the exact `svelderrainruiz.labview-benchmark-actor@<version>` identity, writes a non-secret
+receipt with wall and monotonic timing, and atomically stages the exact target plus a target-bound
+`UBUNTU_VM` marker where the extension reads them. Follow
+[the manual plan](../docs/testing/reviewer-manual-test-plan.md), then use **LabVIEW Benchmark Actor:
+Render Reviewer Verdict** inside VS Code. Linux verdict rendering fails closed without the staging
+marker; it no longer infers `UBUNTU_VM` from the operating system alone.
 
 Extract the public record and raw non-secret review evidence before deleting the VM and private key.
 The quorum key is distinct and is used only for the later machine-quorum sign-off.

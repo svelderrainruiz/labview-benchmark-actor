@@ -2,7 +2,7 @@
 
 import { createHash } from 'node:crypto';
 import { execFileSync } from 'node:child_process';
-import { copyFileSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { copyFileSync, mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
 import { basename, dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -19,7 +19,7 @@ export function validateUbuntuReviewTarget(target) {
   return { ok: failures.length === 0, failures };
 }
 
-export function validateUbuntuStageEvidence({ target, vsixBytes, manifest, installedExtensions }) {
+export function validateUbuntuCandidateArtifact({ target, vsixBytes, manifest }) {
   const failures = [...validateUbuntuReviewTarget(target).failures];
   const actualSha256 = sha256(vsixBytes);
   if (actualSha256 !== String(target?.vsixSha256 ?? '').toLowerCase()) failures.push('VSIX SHA-256 does not match target');
@@ -28,6 +28,12 @@ export function validateUbuntuStageEvidence({ target, vsixBytes, manifest, insta
       || manifest?.version !== target?.version) {
     failures.push('VSIX manifest identity does not match target');
   }
+  return { ok: failures.length === 0, failures, actualSha256 };
+}
+
+export function validateUbuntuStageEvidence({ target, vsixBytes, manifest, installedExtensions }) {
+  const artifact = validateUbuntuCandidateArtifact({ target, vsixBytes, manifest });
+  const failures = [...artifact.failures];
   const expectedInstalled = `${EXTENSION_ID}@${target?.version ?? ''}`.toLowerCase();
   if (!installedExtensions.map((item) => item.trim().toLowerCase()).includes(expectedInstalled)) {
     failures.push(`installed extension list does not contain ${expectedInstalled}`);
@@ -35,9 +41,15 @@ export function validateUbuntuStageEvidence({ target, vsixBytes, manifest, insta
   return {
     ok: failures.length === 0,
     failures,
-    actualSha256,
+    actualSha256: artifact.actualSha256,
     expectedInstalled,
   };
+}
+
+function writeJsonAtomic(file, value) {
+  const temporary = `${file}.${process.pid}.tmp`;
+  writeFileSync(temporary, `${JSON.stringify(value, null, 2)}\n`, { encoding: 'utf8', mode: 0o600 });
+  renameSync(temporary, file);
 }
 
 function parseArgs(argv) {
@@ -56,7 +68,7 @@ function parseArgs(argv) {
 function main() {
   if (process.platform !== 'linux') throw new Error('Ubuntu candidate staging must run inside the Linux reviewer VM');
   const args = parseArgs(process.argv.slice(2));
-  for (const name of ['vsix', 'target', 'workspace', 'receipt']) {
+  for (const name of ['vsix', 'target', 'workspace', 'receipt', 'handoff']) {
     if (!args[name]) throw new Error(`--${name} is required`);
   }
   const code = args.code || 'code';
@@ -64,11 +76,17 @@ function main() {
   const targetPath = resolve(args.target);
   const workspace = resolve(args.workspace);
   const receiptPath = resolve(args.receipt);
+  const handoff = resolve(args.handoff);
   const target = JSON.parse(readFileSync(targetPath, 'utf8'));
   const targetShape = validateUbuntuReviewTarget(target);
   if (!targetShape.ok) throw new Error(targetShape.failures.join('; '));
   const vsixBytes = readFileSync(vsixPath);
   const manifest = JSON.parse(execFileSync('unzip', ['-p', vsixPath, 'extension/package.json'], { encoding: 'utf8' }));
+  const candidate = validateUbuntuCandidateArtifact({ target, vsixBytes, manifest });
+  if (!candidate.ok) throw new Error(candidate.failures.join('; '));
+  mkdirSync(workspace, { recursive: true, mode: 0o700 });
+  mkdirSync(dirname(receiptPath), { recursive: true, mode: 0o700 });
+  mkdirSync(handoff, { recursive: true, mode: 0o700 });
   const startedAt = new Date().toISOString();
   const startedNs = process.hrtime.bigint();
   execFileSync(code, ['--install-extension', vsixPath, '--force'], { stdio: 'inherit' });
@@ -77,12 +95,27 @@ function main() {
     .filter(Boolean);
   const evidence = validateUbuntuStageEvidence({ target, vsixBytes, manifest, installedExtensions });
   if (!evidence.ok) throw new Error(evidence.failures.join('; '));
-  mkdirSync(workspace, { recursive: true, mode: 0o700 });
-  mkdirSync(dirname(receiptPath), { recursive: true, mode: 0o700 });
   const stagedVsix = join(workspace, basename(vsixPath));
   const stagedTarget = join(workspace, 'review-target.json');
+  const stagedMarker = join(workspace, 'reviewer-station.json');
+  const handoffTarget = join(handoff, 'review-target.json');
+  const handoffMarker = join(handoff, 'reviewer-station.json');
   copyFileSync(vsixPath, stagedVsix);
   copyFileSync(targetPath, stagedTarget);
+  const stationMarker = {
+    schema: 'labview-benchmark-actor/reviewer-station@1',
+    station: 'UBUNTU_VM',
+    target: {
+      component: target.component,
+      version: target.version,
+      commit: target.commit,
+      vsixSha256: evidence.actualSha256,
+    },
+    stagedAt: new Date().toISOString(),
+  };
+  writeJsonAtomic(stagedMarker, stationMarker);
+  writeJsonAtomic(handoffTarget, target);
+  writeJsonAtomic(handoffMarker, stationMarker);
   const finishedNs = process.hrtime.bigint();
   const receipt = {
     schema: 'labview-benchmark-actor/ubuntu-review-stage@1',
@@ -98,6 +131,9 @@ function main() {
     artifacts: {
       vsix: stagedVsix,
       reviewTarget: stagedTarget,
+      reviewerStation: stagedMarker,
+      handoffReviewTarget: handoffTarget,
+      handoffReviewerStation: handoffMarker,
     },
     installedExtension: evidence.expectedInstalled,
     timing: {
@@ -109,7 +145,7 @@ function main() {
     outcome: 'PASS',
     failures: [],
   };
-  writeFileSync(receiptPath, `${JSON.stringify(receipt, null, 2)}\n`, { encoding: 'utf8', mode: 0o600 });
+  writeJsonAtomic(receiptPath, receipt);
   console.log(`ubuntu reviewer candidate staged: ${receipt.installedExtension} ${receipt.candidate.vsixSha256}`);
 }
 

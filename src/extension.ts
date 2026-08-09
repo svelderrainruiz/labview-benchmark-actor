@@ -15,6 +15,7 @@ import {
   ffmpegCaptureArgsForPlatform,
   labviewCandidatesForPlatform,
   linuxSamplerScript,
+  parseX11DisplaySize,
 } from './capturePlatform';
 
 const execFileAsync = promisify(execFile);
@@ -602,6 +603,39 @@ export function readReviewTarget(
   }
 }
 
+export function readReviewerStationMarker(
+  globalDir: string,
+  target: { component: string; version: string; commit: string | null; vsixSha256: string | null },
+): 'UBUNTU_VM' {
+  const markerPath = path.join(handoffPaths(globalDir).root, 'reviewer-station.json');
+  const targetCommit = target.commit ?? '';
+  const targetVsixSha256 = target.vsixSha256 ?? '';
+  if (!/^[a-f0-9]{40}$/i.test(targetCommit)
+      || !/^[a-f0-9]{64}$/i.test(targetVsixSha256)
+      || !/^\d+\.\d+\.\d+$/.test(target.version)) {
+    throw new Error('Ubuntu reviewer station requires an exact version, commit, and VSIX SHA-256 target');
+  }
+  if (!existsSync(markerPath)) {
+    throw new Error('Ubuntu reviewer station marker is missing; restage the exact candidate before rendering a verdict');
+  }
+  let marker: Record<string, unknown>;
+  try {
+    marker = JSON.parse(readFileSync(markerPath, 'utf8')) as Record<string, unknown>;
+  } catch (error) {
+    throw new Error(`Ubuntu reviewer station marker is unreadable: ${error instanceof Error ? error.message : String(error)}`);
+  }
+  const markerTarget = marker.target as Record<string, unknown> | undefined;
+  if (marker.schema !== 'labview-benchmark-actor/reviewer-station@1'
+      || marker.station !== 'UBUNTU_VM'
+      || markerTarget?.component !== target.component
+      || markerTarget?.version !== target.version
+      || String(markerTarget?.commit ?? '').toLowerCase() !== targetCommit.toLowerCase()
+      || String(markerTarget?.vsixSha256 ?? '').toLowerCase() !== targetVsixSha256.toLowerCase()) {
+    throw new Error('Ubuntu reviewer station marker does not match the exact review target');
+  }
+  return 'UBUNTU_VM';
+}
+
 /** Build + sign a reviewer verdict via the loaded builder (pure orchestration): validate, then Ed25519-sign. */
 export function buildSignedVerdict(
   builder: HandoffVerdictBuilder,
@@ -786,6 +820,16 @@ async function renderReviewerVerdictCommand(context: vscode.ExtensionContext, ou
   }
   const extVersion = String((context.extension?.packageJSON as { version?: string } | undefined)?.version ?? '0.0.0');
   const target = readReviewTarget(globalDir, extVersion);
+  let station: ReturnType<typeof reviewerStationForEnvironment>;
+  try {
+    const stagedStation = process.platform === 'linux' && String(process.env.CODESPACES || '').toLowerCase() !== 'true'
+      ? readReviewerStationMarker(globalDir, target)
+      : undefined;
+    station = reviewerStationForEnvironment(process.platform, process.env, stagedStation);
+  } catch (err) {
+    reportUiError(output, 'Render reviewer verdict', err);
+    return;
+  }
   const choice = await vscode.window.showInformationMessage(`Reviewer visual verdict for ${target.component} ${target.version}?`, 'Pass', 'Request changes', 'Fail');
   if (!choice) {
     return;
@@ -799,7 +843,7 @@ async function renderReviewerVerdictCommand(context: vscode.ExtensionContext, ou
       target,
       verdict,
       reviewer,
-      station: reviewerStationForEnvironment(),
+      station,
       notes: notes || '',
       evidence: target.evidence,
       privateKeyPem,
@@ -1207,6 +1251,24 @@ async function captureLaunchCommand(context: vscode.ExtensionContext, output: vs
     await promptInstallFfmpeg(output);
     return;
   }
+  let x11VideoSize: string | undefined;
+  if (process.platform === 'linux') {
+    try {
+      const { stdout } = await execFileAsync('xdpyinfo', ['-display', String(process.env.DISPLAY || '')], {
+        timeout: 5000,
+        windowsHide: true,
+      });
+      x11VideoSize = parseX11DisplaySize(stdout);
+    } catch (error) {
+      const reason = error instanceof Error ? error.message : String(error);
+      reportUiError(
+        output,
+        'Capture LabVIEW Launch (X11 desktop size)',
+        new Error(`Unable to resolve the full X11 desktop dimensions (${reason}). Install x11-utils and retry.`),
+      );
+      return;
+    }
+  }
   const dir = path.join(capturesRoot(context), `run-${Date.now()}`);
   try {
     mkdirSync(dir, { recursive: true });
@@ -1229,7 +1291,7 @@ async function captureLaunchCommand(context: vscode.ExtensionContext, output: vs
   try {
     ffmpegProc = spawn(
       ffmpeg,
-      ffmpegCaptureArgsForPlatform(process.platform, framePattern),
+      ffmpegCaptureArgsForPlatform(process.platform, framePattern, process.env, x11VideoSize),
       { windowsHide: true, stdio: ['pipe', 'ignore', 'pipe'] }
     );
   } catch (err) {

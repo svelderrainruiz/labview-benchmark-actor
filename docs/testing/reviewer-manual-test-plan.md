@@ -168,13 +168,15 @@ workspace root.
 - **Pre:** the reviewer's box has **licensed LabVIEW** (per the BYO docs).
 - **Steps:**
   1. Close all LabVIEW windows so the next process is a real launch transition.
-  2. On Ubuntu, confirm `echo $XDG_SESSION_TYPE` is `x11` (an Ubuntu Xorg session), then run
+  2. On Ubuntu, confirm `echo $XDG_SESSION_TYPE` is `x11` (an Ubuntu Xorg session) and
+     `command -v xdpyinfo` succeeds, then run
      **LabVIEW Benchmark Actor: Capture LabVIEW Launch**.
   3. Wait until the activated LabVIEW start screen is visible, then click **Stop LabVIEW Capture** in the status bar.
   4. Inspect the opened frame correlator and the retained `capture.json`.
 - **Expected:** LabVIEW launches successfully; the correlator contains real non-blank frames spanning the transition.
   Windows records `plane=WIN`, `source=ffmpeg-gdigrab`; Ubuntu Xorg records `plane=LINUX`,
-  `source=ffmpeg-x11grab`. The capture includes CPU/RAM samples and can be scrubbed.
+  `source=ffmpeg-x11grab`. The capture covers the full X11 desktop, includes CPU/RAM/disk samples,
+  and can be scrubbed.
 - **Result:** _____
 
 ### TC-10 — MCP server (programmatic capability)
@@ -228,15 +230,17 @@ workspace root.
 - **Result:** _____
 
 ### TC-12 — Render signed reviewer verdict
-- **Pre:** complete TC-00 through TC-11 as applicable; the exact `review-target.json` is staged; reviewer id and the
-  fresh version-scoped visual private key are configured in this disposable VM.
+- **Pre:** complete TC-00 through TC-11 as applicable; the exact `review-target.json` and target-bound
+  `reviewer-station.json` are staged in the extension handoff directory; reviewer id and the fresh
+  version-scoped visual private key are configured in this disposable VM.
 - **Steps:**
   1. Run **LabVIEW Benchmark Actor: Render Reviewer Verdict**.
   2. Select the verdict that matches the completed manual review and enter concise notes.
   3. Inspect the generated public signed record before extraction.
 - **Expected:** the record targets the exact component/version/40-hex commit/64-hex VSIX SHA-256, uses
-  `UBUNTU_VM` on Ubuntu or `WINDOWS_VM` on Windows, and its Ed25519 signature verifies against the enrolled
-  visual-purpose key. No private key or credential appears in the public record.
+  `UBUNTU_VM` on Ubuntu only when the exact target-bound station marker is present, or `WINDOWS_VM`
+  on Windows, and its Ed25519 signature verifies against the enrolled visual-purpose key. No private
+  key or credential appears in the public record.
 - **Result:** _____
 
 ---

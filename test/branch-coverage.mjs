@@ -8,6 +8,7 @@ import {
   ffmpegCaptureArgsForPlatform,
   labviewCandidatesForPlatform,
   linuxSamplerScript,
+  parseX11DisplaySize,
 } from '../out/capturePlatform.js';
 import {
   buildBenchmarkPanelHtml,
@@ -443,9 +444,10 @@ assert.equal(
 );
 assert.equal(coberturaWorkingTreeText(cobertura, 'linux'), normalizeCoberturaXml(cobertura));
 assert.equal(reviewerStationForEnvironment('win32', {}), 'WINDOWS_VM');
-assert.equal(reviewerStationForEnvironment('linux', {}), 'UBUNTU_VM');
+assert.equal(reviewerStationForEnvironment('linux', {}, 'UBUNTU_VM'), 'UBUNTU_VM');
 assert.equal(reviewerStationForEnvironment('linux', { CODESPACES: 'true' }), 'LINUX_CODESPACE');
-assert.equal(reviewerStationForEnvironment('darwin', {}), 'WINDOWS_VM');
+throws(() => reviewerStationForEnvironment('linux', {}), /staging marker/);
+throws(() => reviewerStationForEnvironment('darwin', {}), /unsupported/);
 assert.deepEqual(labviewCandidatesForPlatform('linux'), [
   '/usr/local/natinst/LabVIEW-2026-64/labview',
   '/usr/local/natinst/LabVIEW-2026-64/labview64',
@@ -462,8 +464,8 @@ assert.deepEqual(captureMetadataForPlatform('win32'), {
   source: 'ffmpeg-gdigrab',
 });
 assert.deepEqual(
-  ffmpegCaptureArgsForPlatform('linux', '/tmp/frame.png', { DISPLAY: ':0', XDG_SESSION_TYPE: 'x11' }),
-  ['-y', '-f', 'x11grab', '-framerate', '12', '-draw_mouse', '0', '-i', ':0', '/tmp/frame.png'],
+  ffmpegCaptureArgsForPlatform('linux', '/tmp/frame.png', { DISPLAY: ':0', XDG_SESSION_TYPE: 'x11' }, '1280x800'),
+  ['-y', '-f', 'x11grab', '-framerate', '12', '-video_size', '1280x800', '-draw_mouse', '0', '-i', ':0', '/tmp/frame.png'],
 );
 assert.deepEqual(
   ffmpegCaptureArgsForPlatform('win32', 'frame.png', {}),
@@ -471,10 +473,14 @@ assert.deepEqual(
 );
 throws(() => ffmpegCaptureArgsForPlatform('linux', 'frame.png', { XDG_SESSION_TYPE: 'x11' }), /requires DISPLAY/);
 throws(() => ffmpegCaptureArgsForPlatform('linux', 'frame.png', { DISPLAY: ':0', XDG_SESSION_TYPE: 'wayland' }), /requires an Xorg session/);
+throws(() => ffmpegCaptureArgsForPlatform('linux', 'frame.png', { DISPLAY: ':0', XDG_SESSION_TYPE: 'x11' }), /desktop dimensions/);
 throws(() => ffmpegCaptureArgsForPlatform('darwin', 'frame.png', {}), /unsupported/);
+assert.equal(parseX11DisplaySize('dimensions: 800x600 pixels'), '800x600');
+throws(() => parseX11DisplaySize('no dimensions'), /did not report/);
 const linuxSampler = linuxSamplerScript("/tmp/res'ources.jsonl");
 assert.match(linuxSampler, /\/proc\/stat/);
 assert.match(linuxSampler, /MemAvailable/);
+assert.match(linuxSampler, /\/proc\/diskstats/);
 assert.match(linuxSampler, /res'\\''ources\.jsonl/);
 
 console.log('branch-coverage: PASS');

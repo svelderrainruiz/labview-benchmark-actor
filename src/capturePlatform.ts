@@ -31,6 +31,7 @@ export function ffmpegCaptureArgsForPlatform(
   platform: NodeJS.Platform,
   framePattern: string,
   env: NodeJS.ProcessEnv = process.env,
+  x11VideoSize?: string,
 ): string[] {
   if (platform === 'win32') {
     return ['-y', '-f', 'gdigrab', '-framerate', '12', '-i', 'desktop', framePattern];
@@ -42,9 +43,19 @@ export function ffmpegCaptureArgsForPlatform(
     if (sessionType !== 'x11') {
       throw new Error('Ubuntu LabVIEW capture requires an Xorg session (XDG_SESSION_TYPE=x11); Wayland rootless Xwayland produces incomplete frames');
     }
-    return ['-y', '-f', 'x11grab', '-framerate', '12', '-draw_mouse', '0', '-i', display, framePattern];
+    const videoSize = String(x11VideoSize ?? '');
+    if (!/^[1-9]\d*x[1-9]\d*$/.test(videoSize)) {
+      throw new Error('Ubuntu LabVIEW capture requires the active X11 desktop dimensions');
+    }
+    return ['-y', '-f', 'x11grab', '-framerate', '12', '-video_size', videoSize, '-draw_mouse', '0', '-i', display, framePattern];
   }
   throw new Error(`LabVIEW launch capture is unsupported on ${platform}`);
+}
+
+export function parseX11DisplaySize(xdpyinfo: string): string {
+  const match = /\bdimensions:\s+([1-9]\d*)x([1-9]\d*)\s+pixels\b/i.exec(xdpyinfo);
+  if (!match) throw new Error('xdpyinfo did not report active X11 desktop dimensions');
+  return `${match[1]}x${match[2]}`;
 }
 
 function shellQuote(value: string): string {
@@ -59,6 +70,18 @@ export function linuxSamplerScript(outFile: string): string {
     'read_cpu() {',
     "  awk '/^cpu / { idle=$5+$6; total=0; for(i=2;i<=NF;i++) total+=$i; print total, idle; exit }' /proc/stat",
     '}',
+    'read_disks() {',
+    "  awk 'NF >= 14 { print $3, $6, $10, $13 }' /proc/diskstats",
+    '}',
+    'declare -A prev_read prev_write prev_io',
+    'while read -r name sectors_read sectors_written io_ms; do',
+    '  case "$name" in loop*|ram*|zram*) continue ;; esac',
+    '  [ -d "/sys/block/$name" ] || continue',
+    '  prev_read["$name"]=$sectors_read',
+    '  prev_write["$name"]=$sectors_written',
+    '  prev_io["$name"]=$io_ms',
+    'done < <(read_disks)',
+    'prev_ms=$(date +%s%3N)',
     'set -- $(read_cpu); prev_total=$1; prev_idle=$2',
     'while true; do',
     '  sleep 0.1',
@@ -69,8 +92,30 @@ export function linuxSamplerScript(outFile: string): string {
     "  avail_kb=$(awk '/^MemAvailable:/ {print $2}' /proc/meminfo)",
     "  ram=$(awk -v t=\"$total_kb\" -v a=\"$avail_kb\" 'BEGIN { printf \"%.1f\", (t-a)/1024 }')",
     '  ms=$(date +%s%3N)',
-    "  printf '{\"ms\":%s,\"cpuPct\":%s,\"ramMb\":%s,\"diskPct\":0,\"disks\":[]}\\n' \"$ms\" \"$cpu\" \"$ram\" >> \"$out\"",
+    '  elapsed=$((ms-prev_ms)); [ "$elapsed" -gt 0 ] || elapsed=1',
+    "  disk_pct=0; disks=''; separator=''",
+    '  while read -r name sectors_read sectors_written io_ms; do',
+    '    case "$name" in loop*|ram*|zram*) continue ;; esac',
+    '    [ -d "/sys/block/$name" ] || continue',
+    '    read_delta=$((sectors_read-${prev_read[$name]:-$sectors_read}))',
+    '    write_delta=$((sectors_written-${prev_write[$name]:-$sectors_written}))',
+    '    io_delta=$((io_ms-${prev_io[$name]:-$io_ms}))',
+    '    [ "$read_delta" -ge 0 ] || read_delta=0',
+    '    [ "$write_delta" -ge 0 ] || write_delta=0',
+    '    [ "$io_delta" -ge 0 ] || io_delta=0',
+    "    read_mbs=$(awk -v s=\"$read_delta\" -v e=\"$elapsed\" 'BEGIN { printf \"%.3f\", s*512*1000/e/1048576 }')",
+    "    write_mbs=$(awk -v s=\"$write_delta\" -v e=\"$elapsed\" 'BEGIN { printf \"%.3f\", s*512*1000/e/1048576 }')",
+    "    util=$(awk -v i=\"$io_delta\" -v e=\"$elapsed\" 'BEGIN { v=100*i/e; if(v>100)v=100; printf \"%.1f\", v }')",
+    "    disk_pct=$(awk -v a=\"$disk_pct\" -v b=\"$util\" 'BEGIN { print (b>a ? b : a) }')",
+    "    disks=\"${disks}${separator}{\\\"name\\\":\\\"${name}\\\",\\\"writeMBs\\\":${write_mbs},\\\"readMBs\\\":${read_mbs}}\"",
+    "    separator=','",
+    '    prev_read["$name"]=$sectors_read',
+    '    prev_write["$name"]=$sectors_written',
+    '    prev_io["$name"]=$io_ms',
+    '  done < <(read_disks)',
+    "  printf '{\"ms\":%s,\"cpuPct\":%s,\"ramMb\":%s,\"diskPct\":%s,\"disks\":[%s]}\\n' \"$ms\" \"$cpu\" \"$ram\" \"$disk_pct\" \"$disks\" >> \"$out\"",
     '  prev_total=$total; prev_idle=$idle',
+    '  prev_ms=$ms',
     'done',
   ].join('\n');
 }
