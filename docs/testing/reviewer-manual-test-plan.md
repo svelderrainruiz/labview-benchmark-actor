@@ -116,9 +116,10 @@ workspace root.
 - **Expected:** the **"LabVIEW Benchmark Actor"** output channel shows the last ~10 bus messages
   including the marked inbound NOTE (the configured-log path runs
   `lbabus net poll --log <reviewer-log> --tail 10`); no error. If
-  `busNetLog` is empty, the extension omits `--log` and the CLI uses its documented default.
-  If no frame has arrived, the missing/empty receive-log exits 0 with a "nothing heard yet" hint,
-  but that does not satisfy this positive test.
+  `busNetLog` is empty, the extension omits `--log`; with no `VIHS_COLLAB_NET_LOG` fallback the
+  CLI exits 0 with "no receive-log configured ... nothing to poll." A configured path that does
+  not exist exits 0 with "nothing heard yet"; an existing empty log exits 0 without printing a
+  frame. None of those no-frame outcomes satisfies this positive test.
   If the CLI is missing, the channel shows a clear error (record it).
 - **Result:** _____
 
