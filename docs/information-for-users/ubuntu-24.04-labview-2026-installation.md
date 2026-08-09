@@ -329,8 +329,12 @@ The first boot again accumulated a VirtualBox timer/NAT stall. A controlled rese
 `2026-08-09T14:18:07.2787897Z` did. The bootstrap receipt completed at
 `2026-08-09T14:18:54.921224159Z`. Host-loopback SSH proof was observed at
 `2026-08-09T14:22:15.1713096Z`, **1,679.3033096s (27m 59.3033096s)** after the original running state. This is a
-conservative observed upper bound: WSL polling initially targeted WSL's own loopback and could not reach the
-Windows-loopback-only NAT rule; final proof used host Git SSH without broadening the `127.0.0.1` bind.
+conservative observed upper bound. The NAT rule mapped Windows `127.0.0.1:22523` to guest port `22`. This replay
+did not use one fixed-interval readiness loop with an overall timeout: operator probes followed bounded waits of
+300, 600, 120, 90, 90, 5, and 120 seconds, and the final host SSH invocation used a five-second connection timeout.
+Early WSL probes targeted WSL's own loopback and could not reach the Windows-loopback-only NAT rule; final proof
+used host Git SSH without broadening the `127.0.0.1` bind. Therefore no single polling interval defines sampling
+uncertainty for this replay; the earlier first proof remains the canonical five-second bounded-poll measurement.
 
 The SSH proof returned uid `1000`, hostname `actor`, Git, active SSH, active guest utilities, and the PASS receipt.
 LabVIEW provisioning and activation were not attempted. Evidence is outside Git under
