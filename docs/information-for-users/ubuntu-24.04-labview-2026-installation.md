@@ -388,8 +388,8 @@ login boundary reached without logging in:
 
 ![Production golden base ready](images/ubuntu-24.04-labview-2026/golden-base-ready.png)
 
-The normalized proof digest is
-`24964590e194f201f64b280597e0cd6dfcbcc84f69bb2422b4e7fadd0c56c428`. Raw evidence remains outside Git under
+The line-ending-neutral normalized proof digest is
+`2f4fadeb8e5b7857e24386cd5b824830692429cf17ce00c6365031b3d69b66f2`. Raw evidence remains outside Git under
 `E:\lba-session-evidence\b31cca8a-ef61-4e1c-bd75-f5d5b4c4850a\lba-ubuntu-golden-proof-20260809T152012Z`:
 
 - `live-run.json` SHA-256 `4aefe67e5fae55234a2c7fb6fc9450407ca18b740b9d22da57a668973f641c7d`;

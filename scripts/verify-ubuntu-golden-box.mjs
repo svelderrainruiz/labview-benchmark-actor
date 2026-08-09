@@ -11,7 +11,8 @@ const defaultMetadata = join(repoRoot, 'cleanroom', 'ubuntu-labview', 'productio
 const defaultProof = join(repoRoot, 'cleanroom', 'ubuntu-labview', 'production-golden-base-proof.json');
 
 export function sha256(value) {
-  return createHash('sha256').update(value).digest('hex');
+  const canonical = typeof value === 'string' ? value.replace(/\r\n?/g, '\n') : value;
+  return createHash('sha256').update(canonical).digest('hex');
 }
 
 export function validateBaseBootstrapReceipt(receipt) {

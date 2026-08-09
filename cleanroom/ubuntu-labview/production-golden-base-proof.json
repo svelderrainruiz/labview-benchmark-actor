@@ -70,8 +70,8 @@
     }
   },
   "definition": {
-    "vagrantfileSha256": "84f47663c116ef4f73090268793c918f0f45dcf1d24e1773fdcca7bd8688fe65",
-    "metadataSha256": "83fc087de533167555c2276f20c3709c148cd7ba906277dfa5adcf7a2a7875f1"
+    "vagrantfileSha256": "7f7cd12c8d19f7cbd1e7a9b495b93f6f57b359eb3b1188d486edb3a7d1e30f1a",
+    "metadataSha256": "a4ec7e0dcc45614c320a8ebe49e5a120a2bf7ccc5647df828b3cccac7722e832"
   },
   "evidence": {
     "baseBootstrapReceiptSha256": "c4df3ccc1b2cc16265c3a4f262598108d8bd3d2fd639ccf68f8dfbd7ba5f34bc",
@@ -93,5 +93,5 @@
   },
   "outcome": "PASS",
   "failures": [],
-  "digest": "24964590e194f201f64b280597e0cd6dfcbcc84f69bb2422b4e7fadd0c56c428"
+  "digest": "2f4fadeb8e5b7857e24386cd5b824830692429cf17ce00c6365031b3d69b66f2"
 }

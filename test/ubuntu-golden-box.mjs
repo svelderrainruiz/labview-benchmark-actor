@@ -40,6 +40,11 @@ const baseReceipt = {
 
 assert.equal(validateGoldenBoxDefinition({ metadata, vagrantfile }).ok, true, 'committed golden definition must validate');
 assert.equal(
+  sha256(vagrantfile),
+  sha256(vagrantfile.replace(/\r\n?/g, '\n')),
+  'golden definition hash must be line-ending neutral',
+);
+assert.equal(
   validateGoldenBoxDefinition({
     metadata: { ...metadata, definition: { ...metadata.definition, sha256: '0'.repeat(64) } },
     vagrantfile,
