@@ -120,6 +120,31 @@ export function validateUbuntuStageHost({ runningCodePids }) {
   return { ok: failures.length === 0, failures };
 }
 
+export function validateUbuntuKpiInventories({ kpi, localGateOutput, correspondenceOutput }) {
+  const failures = [];
+  const gateSummary = /(\d+)\/(\d+) checks passed/.exec(String(localGateOutput ?? ''));
+  const correspondenceSummary = /governed-tests=(\d+)/.exec(String(correspondenceOutput ?? ''));
+  const correspondencePass = /all correspondence rules PASS \(graph conformant\)/.test(String(correspondenceOutput ?? ''));
+  const expectedGateTotal = gateSummary ? Number(gateSummary[2]) : null;
+  const expectedCorrespondenceTotal = correspondenceSummary ? Number(correspondenceSummary[1]) : null;
+  if (!gateSummary || gateSummary[1] !== gateSummary[2]) failures.push('exact local gate inventory did not pass');
+  if (!correspondenceSummary || !correspondencePass) failures.push('exact correspondence inventory did not pass');
+  if (kpi?.kpi?.localGates?.passed !== expectedGateTotal
+      || kpi?.kpi?.localGates?.total !== expectedGateTotal) {
+    failures.push('candidate KPI local gate inventory does not match the exact source');
+  }
+  if (kpi?.kpi?.correspondences?.passed !== expectedCorrespondenceTotal
+      || kpi?.kpi?.correspondences?.total !== expectedCorrespondenceTotal) {
+    failures.push('candidate KPI correspondence inventory does not match the exact source');
+  }
+  return {
+    ok: failures.length === 0,
+    failures,
+    expectedGateTotal,
+    expectedCorrespondenceTotal,
+  };
+}
+
 function runningCodeProcessIds() {
   try {
     return execFileSync('pgrep', ['-u', String(process.getuid()), '-x', 'code'], { encoding: 'utf8' }).trim();
@@ -186,6 +211,18 @@ function main() {
   if (!candidate.ok) throw new Error(candidate.failures.join('; '));
   const kpiEvidence = validateUbuntuKpiReceipt({ target, kpi, vsixBytes, coverageFloors });
   if (!kpiEvidence.ok) throw new Error(kpiEvidence.failures.join('; '));
+  const localGateOutput = execFileSync(
+    process.execPath,
+    [join(ROOT, 'experiments', 'verify-local-gates.mjs')],
+    { encoding: 'utf8' },
+  );
+  const correspondenceOutput = execFileSync(
+    process.execPath,
+    [join(ROOT, 'experiments', 'reqs-coverage', 'verify-correspondences.mjs')],
+    { encoding: 'utf8' },
+  );
+  const inventoryEvidence = validateUbuntuKpiInventories({ kpi, localGateOutput, correspondenceOutput });
+  if (!inventoryEvidence.ok) throw new Error(inventoryEvidence.failures.join('; '));
   const vmIdentity = detectUbuntuVmIdentity();
   const vmEvidence = validateUbuntuVmIdentity({
     identity: vmIdentity,
@@ -252,6 +289,10 @@ function main() {
       handoffReviewerStation: handoffMarker,
     },
     installedExtension: evidence.expectedInstalled,
+    verifiedInventories: {
+      localGates: inventoryEvidence.expectedGateTotal,
+      correspondences: inventoryEvidence.expectedCorrespondenceTotal,
+    },
     timing: {
       startedAt,
       finishedAt: new Date().toISOString(),

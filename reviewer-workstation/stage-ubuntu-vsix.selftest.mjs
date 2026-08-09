@@ -5,6 +5,7 @@ import { readFileSync } from 'node:fs';
 import {
   validateUbuntuCandidateArtifact,
   validateUbuntuKpiReceipt,
+  validateUbuntuKpiInventories,
   validateUbuntuReviewTarget,
   validateUbuntuStageHost,
   validateUbuntuStageEvidence,
@@ -87,6 +88,23 @@ assert.equal(validateUbuntuVmIdentity({
 }).ok, false);
 assert.equal(validateUbuntuStageHost({ runningCodePids: '' }).ok, true);
 assert.equal(validateUbuntuStageHost({ runningCodePids: '123\n456' }).ok, false);
+const localGateOutput = '210/210 checks passed on linux-x64 (node v24.19.0)';
+const correspondenceOutput = [
+  'correspondences: requirements=97 governed-tests=182 ADRs=80 information-items=16 dod-outcomes=7',
+  'correspondences: all correspondence rules PASS (graph conformant)',
+].join('\n');
+assert.equal(validateUbuntuKpiInventories({ kpi, localGateOutput, correspondenceOutput }).ok, true);
+assert.equal(validateUbuntuKpiInventories({
+  kpi: { ...kpi, kpi: { ...kpi.kpi, localGates: { passed: 1, total: 1 } } },
+  localGateOutput,
+  correspondenceOutput,
+}).ok, false);
+assert.equal(validateUbuntuKpiInventories({
+  kpi: { ...kpi, kpi: { ...kpi.kpi, correspondences: { passed: 1, total: 1, graphConformant: true } } },
+  localGateOutput,
+  correspondenceOutput,
+}).ok, false);
+assert.equal(validateUbuntuKpiInventories({ kpi, localGateOutput: 'failed', correspondenceOutput: 'failed' }).ok, false);
 assert.equal(validateUbuntuVmIdentity({
   identity: vmIdentity,
   expectedProvider: 'wsl',
@@ -157,6 +175,10 @@ assert(
 assert(
   source.indexOf('const hostEvidence = validateUbuntuStageHost') < source.indexOf("execFileSync(code, ['--install-extension'"),
   'the extension host is proven stopped before installation',
+);
+assert(
+  source.indexOf('const inventoryEvidence = validateUbuntuKpiInventories') < source.indexOf("execFileSync(code, ['--install-extension'"),
+  'exact gate and correspondence inventories are rerun before installation',
 );
 assert.match(source, /reviewer-station\.json/);
 assert.match(source, /handoffReviewTarget/);

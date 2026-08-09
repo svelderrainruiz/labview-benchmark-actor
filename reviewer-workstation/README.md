@@ -164,8 +164,9 @@ node reviewer-workstation/stage-ubuntu-vsix.mjs \
 
 The command runs only on Linux and binds the candidate's version, 40-hex commit, 64-hex SHA-256,
 bytes, clean state, coverage floors, correspondence graph, local gates, and duplicate packages to a
-passing full local-KPI receipt, then verifies the VSIX manifest **before** installing anything. It
-then installs with `code --install-extension --force`,
+passing full local-KPI receipt, reruns the exact local-gate and correspondence inventories and
+requires their totals to match the receipt, then verifies the VSIX manifest **before** installing
+anything. It then installs with `code --install-extension --force`,
 requires the exact `svelderrainruiz.labview-benchmark-actor@<version>` identity, writes a non-secret
 receipt with wall and monotonic timing, and atomically stages the exact target plus a target-bound
 `UBUNTU_VM` marker where the extension reads them. The marker is emitted only after

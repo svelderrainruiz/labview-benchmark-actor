@@ -1,6 +1,6 @@
 <?xml version="1.0" ?>
 <!DOCTYPE coverage SYSTEM "http://cobertura.sourceforge.net/xml/coverage-04.dtd">
-<coverage lines-valid="5065" lines-covered="4840" line-rate="0.9555" branches-valid="1662" branches-covered="1582" branch-rate="0.9518000000000001" timestamp="0" complexity="0" version="0.1">
+<coverage lines-valid="5068" lines-covered="4843" line-rate="0.9556" branches-valid="1663" branches-covered="1583" branch-rate="0.9518000000000001" timestamp="0" complexity="0" version="0.1">
   <sources>
     <source>.</source>
   </sources>
@@ -2785,7 +2785,7 @@
         </class>
       </classes>
     </package>
-    <package name="src" line-rate="0.9048" branch-rate="0.8886">
+    <package name="src" line-rate="0.9048999999999999" branch-rate="0.8887999999999999">
       <classes>
         <class name="capturePlatform.ts" filename="src\capturePlatform.ts" line-rate="1" branch-rate="1">
           <methods>
@@ -5684,28 +5684,31 @@
         </class>
         <class name="reviewerStation.ts" filename="src\reviewerStation.ts" line-rate="1" branch-rate="1">
           <methods>
-            <method name="reviewerStationForEnvironment" hits="9" signature="()V">
+            <method name="reviewerStationForEnvironment" hits="10" signature="()V">
               <lines>
-                <line number="3" hits="9"/>
+                <line number="3" hits="10"/>
               </lines>
             </method>
           </methods>
           <lines>
             <line number="1" hits="1" branch="false"/>
             <line number="2" hits="1" branch="false"/>
-            <line number="3" hits="9" branch="true" condition-coverage="100% (1/1)"/>
-            <line number="4" hits="9" branch="false"/>
-            <line number="5" hits="9" branch="false"/>
-            <line number="6" hits="9" branch="false"/>
-            <line number="7" hits="9" branch="false"/>
-            <line number="8" hits="9" branch="true" condition-coverage="100% (3/3)"/>
-            <line number="9" hits="9" branch="true" condition-coverage="100% (2/2)"/>
-            <line number="10" hits="2" branch="true" condition-coverage="100% (1/1)"/>
+            <line number="3" hits="10" branch="true" condition-coverage="100% (1/1)"/>
+            <line number="4" hits="10" branch="false"/>
+            <line number="5" hits="10" branch="false"/>
+            <line number="6" hits="10" branch="false"/>
+            <line number="7" hits="10" branch="false"/>
+            <line number="8" hits="10" branch="true" condition-coverage="100% (3/3)"/>
+            <line number="9" hits="2" branch="true" condition-coverage="100% (1/1)"/>
+            <line number="10" hits="1" branch="false"/>
             <line number="11" hits="1" branch="false"/>
-            <line number="12" hits="1" branch="false"/>
-            <line number="13" hits="9" branch="true" condition-coverage="100% (2/2)"/>
-            <line number="14" hits="1" branch="true" condition-coverage="100% (1/1)"/>
+            <line number="12" hits="10" branch="true" condition-coverage="100% (2/2)"/>
+            <line number="13" hits="2" branch="true" condition-coverage="100% (1/1)"/>
+            <line number="14" hits="1" branch="false"/>
             <line number="15" hits="1" branch="false"/>
+            <line number="16" hits="10" branch="true" condition-coverage="100% (2/2)"/>
+            <line number="17" hits="1" branch="true" condition-coverage="100% (1/1)"/>
+            <line number="18" hits="1" branch="false"/>
           </lines>
         </class>
       </classes>

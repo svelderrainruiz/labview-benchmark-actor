@@ -444,7 +444,8 @@ assert.equal(coberturaWorkingTreeText(cobertura, 'checked\nout'), normalizeCober
 assert.equal(coberturaWorkingTreeText(cobertura), normalizeCoberturaXml(cobertura));
 assert.equal(reviewerStationForEnvironment('win32', {}), 'WINDOWS_VM');
 assert.equal(reviewerStationForEnvironment('linux', {}, 'UBUNTU_VM'), 'UBUNTU_VM');
-assert.equal(reviewerStationForEnvironment('linux', { CODESPACES: 'true' }), 'LINUX_CODESPACE');
+assert.equal(reviewerStationForEnvironment('linux', { CODESPACES: 'true' }, 'LINUX_CODESPACE'), 'LINUX_CODESPACE');
+throws(() => reviewerStationForEnvironment('linux', { CODESPACES: 'true' }), /independently staged/);
 throws(() => reviewerStationForEnvironment('linux', {}), /staging marker/);
 throws(() => reviewerStationForEnvironment('darwin', {}), /unsupported/);
 assert.deepEqual(labviewCandidatesForPlatform('linux'), [
