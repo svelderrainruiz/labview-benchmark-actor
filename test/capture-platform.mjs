@@ -13,6 +13,7 @@ assert.equal(
   labviewCandidatesForPlatform('linux')[0],
   '/usr/local/natinst/LabVIEW-2026-64/labview',
 );
+assert.match(labviewCandidatesForPlatform('win32')[0], /Program Files/);
 assert.deepEqual(
   ffmpegCaptureArgsForPlatform('linux', '/tmp/frame-%05d.png', { DISPLAY: ':0', XDG_SESSION_TYPE: 'x11' }, '1920x1080'),
   ['-y', '-f', 'x11grab', '-framerate', '12', '-video_size', '1920x1080', '-draw_mouse', '0', '-i', ':0', '/tmp/frame-%05d.png'],
@@ -23,6 +24,10 @@ assert.throws(
 );
 assert.throws(
   () => ffmpegCaptureArgsForPlatform('linux', '/tmp/frame.png', { DISPLAY: ':0', XDG_SESSION_TYPE: 'wayland' }),
+  /requires an Xorg session/,
+);
+assert.throws(
+  () => ffmpegCaptureArgsForPlatform('linux', '/tmp/frame.png', { DISPLAY: ':0' }),
   /requires an Xorg session/,
 );
 assert.throws(

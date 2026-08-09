@@ -1361,9 +1361,31 @@ try {
     assert(markerThrew, 'readReviewerStationMarker requires an explicit staged marker');
     markerThrew = false; try { ext.readReviewerStationMarker(vt, { ...t1, commit: null }); } catch { markerThrew = true; }
     assert(markerThrew, 'readReviewerStationMarker requires a complete exact target');
+    markerThrew = false; try { ext.readReviewerStationMarker(vt, { ...t1, vsixSha256: null }); } catch { markerThrew = true; }
+    assert(markerThrew, 'readReviewerStationMarker requires an exact VSIX digest');
     writeFileSync(join(vt, 'handoff', 'reviewer-station.json'), '{bad');
     markerThrew = false; try { ext.readReviewerStationMarker(vt, t1); } catch { markerThrew = true; }
     assert(markerThrew, 'readReviewerStationMarker rejects unreadable JSON');
+    writeFileSync(join(vt, 'handoff', 'reviewer-station.json'), JSON.stringify({
+      schema: 'labview-benchmark-actor/reviewer-station@1',
+      station: 'UBUNTU_VM',
+    }));
+    markerThrew = false; try { ext.readReviewerStationMarker(vt, t1); } catch { markerThrew = true; }
+    assert(markerThrew, 'readReviewerStationMarker requires marker target identity');
+    writeFileSync(join(vt, 'handoff', 'reviewer-station.json'), JSON.stringify({
+      schema: 'labview-benchmark-actor/reviewer-station@1',
+      station: 'UBUNTU_VM',
+      target: { component: t1.component, version: t1.version },
+    }));
+    markerThrew = false; try { ext.readReviewerStationMarker(vt, t1); } catch { markerThrew = true; }
+    assert(markerThrew, 'readReviewerStationMarker requires marker commit identity');
+    writeFileSync(join(vt, 'handoff', 'reviewer-station.json'), JSON.stringify({
+      schema: 'labview-benchmark-actor/reviewer-station@1',
+      station: 'UBUNTU_VM',
+      target: { component: t1.component, version: t1.version, commit: t1.commit },
+    }));
+    markerThrew = false; try { ext.readReviewerStationMarker(vt, t1); } catch { markerThrew = true; }
+    assert(markerThrew, 'readReviewerStationMarker requires marker VSIX identity');
     writeFileSync(join(vt, 'handoff', 'reviewer-station.json'), JSON.stringify({
       schema: 'labview-benchmark-actor/reviewer-station@1',
       station: 'UBUNTU_VM',
