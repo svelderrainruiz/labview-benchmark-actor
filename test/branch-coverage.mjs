@@ -4,6 +4,12 @@ import assert from 'node:assert/strict';
 import { coberturaWorkingTreeText, normalizeCoberturaXml } from '../scripts/coverage-core.mjs';
 import { reviewerStationForEnvironment } from '../out/reviewerStation.js';
 import {
+  captureMetadataForPlatform,
+  ffmpegCaptureArgsForPlatform,
+  labviewCandidatesForPlatform,
+  linuxSamplerScript,
+} from '../out/capturePlatform.js';
+import {
   buildBenchmarkPanelHtml,
   buildCrossPlaneResourcePanelHtml,
   buildCrossPlaneTrendPanelHtml,
@@ -440,5 +446,34 @@ assert.equal(reviewerStationForEnvironment('win32', {}), 'WINDOWS_VM');
 assert.equal(reviewerStationForEnvironment('linux', {}), 'UBUNTU_VM');
 assert.equal(reviewerStationForEnvironment('linux', { CODESPACES: 'true' }), 'LINUX_CODESPACE');
 assert.equal(reviewerStationForEnvironment('darwin', {}), 'WINDOWS_VM');
+assert.deepEqual(labviewCandidatesForPlatform('linux'), [
+  '/usr/local/natinst/LabVIEW-2026-64/labview',
+  '/usr/local/natinst/LabVIEW-2026-64/labview64',
+]);
+assert.equal(labviewCandidatesForPlatform('darwin').length, 0);
+assert.deepEqual(captureMetadataForPlatform('linux'), {
+  workload: 'labview-launch',
+  plane: 'LINUX',
+  source: 'ffmpeg-x11grab',
+});
+assert.deepEqual(captureMetadataForPlatform('win32'), {
+  workload: 'labview-launch',
+  plane: 'WIN',
+  source: 'ffmpeg-gdigrab',
+});
+assert.deepEqual(
+  ffmpegCaptureArgsForPlatform('linux', '/tmp/frame.png', { DISPLAY: ':0' }),
+  ['-y', '-f', 'x11grab', '-framerate', '12', '-draw_mouse', '0', '-i', ':0', '/tmp/frame.png'],
+);
+assert.deepEqual(
+  ffmpegCaptureArgsForPlatform('win32', 'frame.png', {}),
+  ['-y', '-f', 'gdigrab', '-framerate', '12', '-i', 'desktop', 'frame.png'],
+);
+throws(() => ffmpegCaptureArgsForPlatform('linux', 'frame.png', {}), /requires DISPLAY/);
+throws(() => ffmpegCaptureArgsForPlatform('darwin', 'frame.png', {}), /unsupported/);
+const linuxSampler = linuxSamplerScript("/tmp/res'ources.jsonl");
+assert.match(linuxSampler, /\/proc\/stat/);
+assert.match(linuxSampler, /MemAvailable/);
+assert.match(linuxSampler, /res'\\''ources\.jsonl/);
 
 console.log('branch-coverage: PASS');

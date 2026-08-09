@@ -50,6 +50,7 @@ Notes:
 | TC-09 | End-to-end LabVIEW run | yes | opt. | yes |
 | TC-10 | MCP server (programmatic) | – | – | – |
 | TC-11 | Agent-chat tool invocation | – | – | – |
+| TC-12 | Render signed reviewer verdict | – | – | – |
 
 ---
 
@@ -166,10 +167,13 @@ workspace root.
 ### TC-09 — End-to-end LabVIEW benchmark run
 - **Pre:** the reviewer's box has **licensed LabVIEW** (per the BYO docs).
 - **Steps:**
-  1. Follow the BYO/run docs to execute a real benchmark run on the guest.
-  2. Open the **Benchmark Viewer** (TC-06) and confirm it reflects the real run's series.
-- **Expected:** the benchmark runs to completion on real LabVIEW; the viewer shows the real
-  series; results are plausible. Record timings and any failures.
+  1. Close all LabVIEW windows so the next process is a real launch transition.
+  2. Run **LabVIEW Benchmark Actor: Capture LabVIEW Launch**.
+  3. Wait until the activated LabVIEW start screen is visible, then click **Stop LabVIEW Capture** in the status bar.
+  4. Inspect the opened frame correlator and the retained `capture.json`.
+- **Expected:** LabVIEW launches successfully; the correlator contains real non-blank frames spanning the transition.
+  Windows records `plane=WIN`, `source=ffmpeg-gdigrab`; Ubuntu records `plane=LINUX`,
+  `source=ffmpeg-x11grab`. The capture includes CPU/RAM samples and can be scrubbed.
 - **Result:** _____
 
 ### TC-10 — MCP server (programmatic capability)
@@ -220,6 +224,18 @@ workspace root.
   management actions and rediscovers the tools on startup. The offline guard in
   `experiments/acg-mcp/grid-tools.selftest.mjs` (gate `acg-mcp`) catches malformed tool schemas at
   build time so this defect cannot ship again.
+- **Result:** _____
+
+### TC-12 — Render signed reviewer verdict
+- **Pre:** complete TC-00 through TC-11 as applicable; the exact `review-target.json` is staged; reviewer id and the
+  fresh version-scoped visual private key are configured in this disposable VM.
+- **Steps:**
+  1. Run **LabVIEW Benchmark Actor: Render Reviewer Verdict**.
+  2. Select the verdict that matches the completed manual review and enter concise notes.
+  3. Inspect the generated public signed record before extraction.
+- **Expected:** the record targets the exact component/version/40-hex commit/64-hex VSIX SHA-256, uses
+  `UBUNTU_VM` on Ubuntu or `WINDOWS_VM` on Windows, and its Ed25519 signature verifies against the enrolled
+  visual-purpose key. No private key or credential appears in the public record.
 - **Result:** _____
 
 ---

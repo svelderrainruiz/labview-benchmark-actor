@@ -2,7 +2,7 @@
   "name": "labview-benchmark-actor",
   "displayName": "LabVIEW Benchmark Actor",
   "description": "Standalone agentic benchmark-actor infrastructure with cross-plane coordination (lbabus) for LabVIEW benchmarking.",
-  "version": "1.4.10",
+  "version": "1.4.11",
   "publisher": "svelderrainruiz",
   "license": "0BSD",
   "author": "Sergio Velderrain",
@@ -252,17 +252,17 @@
         "labviewBenchmarkActor.ffmpegPath": {
           "type": "string",
           "default": "",
-          "markdownDescription": "Path to `ffmpeg.exe` used to capture the LabVIEW launch at 12 fps (Windows `gdigrab`). Leave empty to auto-resolve the installer copy, a WinGet Gyan.FFmpeg package, or `ffmpeg` from `PATH`."
+          "markdownDescription": "Path to `ffmpeg` used to capture the LabVIEW launch at 12 fps (Windows `gdigrab`; Ubuntu graphical session `x11grab`). Leave empty to resolve the Windows installer/WinGet copy or `ffmpeg` from `PATH`."
         },
         "labviewBenchmarkActor.labviewPath": {
           "type": "string",
           "default": "",
-          "markdownDescription": "Path to the `LabVIEW.exe` to launch for a capture. Leave empty to auto-detect LabVIEW 2026 (32-bit then 64-bit) under `National Instruments`."
+          "markdownDescription": "Path to the LabVIEW executable to launch for a capture. Leave empty to auto-detect LabVIEW 2026 on Windows or `/usr/local/natinst/LabVIEW-2026-64/labview` on Ubuntu."
         },
         "labviewBenchmarkActor.mprrTargetVm": {
           "type": "string",
           "default": "",
-          "markdownDescription": "Descriptive name of the target VirtualBox VM the **Capture LabVIEW Launch (mprr)** command benchmarks over VBox-VNC. Cross-platform: works on a Linux host (unlike the Windows `gdigrab` capture) by capturing the VM's LabVIEW launch through the mprr visual ring."
+          "markdownDescription": "Descriptive name of the target VirtualBox VM the **Capture LabVIEW Launch (mprr)** command benchmarks over VBox-VNC. Use this separate VM-oriented path when the target desktop is not the current Windows or Ubuntu graphical session."
         },
         "labviewBenchmarkActor.mprrSshPort": {
           "type": "string",

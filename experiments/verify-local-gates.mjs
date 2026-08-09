@@ -3009,6 +3009,11 @@ check('ubuntu-reviewer-candidate-staging', () => {
   return { station: 'UBUNTU_VM', selftest: 'exact version/hash/installed-extension staging contract' };
 });
 
+check('ubuntu-native-labview-capture', () => {
+  execFileSync(process.execPath, [join(here, '..', 'test', 'capture-platform.mjs')], { stdio: 'pipe' });
+  return { platform: 'Ubuntu graphical seat', source: 'ffmpeg-x11grab', fps: 12 };
+});
+
 check('reviewer-version-contract', () => {
   execFileSync(process.execPath, [join(here, '..', 'reviewer-workstation', 'reviewer-version-contract.selftest.mjs')], { stdio: 'pipe' });
   return { source: 'release-components.json', scope: 'Windows/Ubuntu reviewer staging + continuation readiness' };

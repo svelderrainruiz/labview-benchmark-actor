@@ -10,6 +10,12 @@ import { registerBenchmarkActorMcpServerProvider } from './mcp/benchmarkActorMcp
 import { registerHumanTasks } from './humanTasks';
 import { resolveLbabusExecutable } from './lbabusPath';
 import { reviewerStationForEnvironment } from './reviewerStation';
+import {
+  captureMetadataForPlatform,
+  ffmpegCaptureArgsForPlatform,
+  labviewCandidatesForPlatform,
+  linuxSamplerScript,
+} from './capturePlatform';
 
 const execFileAsync = promisify(execFile);
 
@@ -909,10 +915,7 @@ function resolveLabview(): string | null {
   // Validate a configured labviewPath actually exists (mirrors resolveFfmpegChecked's runnable check): a bogus
   // path would otherwise pass the guard and start a doomed capture (ffmpeg + sampler) that can never launch LabVIEW.
   if (configured) return existsSync(configured) ? configured : null;
-  const candidates = [
-    'C:\\Program Files (x86)\\National Instruments\\LabVIEW 2026\\LabVIEW.exe',
-    'C:\\Program Files\\National Instruments\\LabVIEW 2026\\LabVIEW.exe',
-  ];
+  const candidates = labviewCandidatesForPlatform(process.platform);
   return candidates.find((c) => existsSync(c)) || null;
 }
 
@@ -995,6 +998,25 @@ export function resetFfmpegInstallPendingForTest(): void {
 }
 
 async function promptInstallFfmpeg(output: vscode.OutputChannel): Promise<void> {
+  if (process.platform === 'linux') {
+    const INSTALL = 'Install ffmpeg (apt)';
+    const SET_PATH = 'Set ffmpeg path\u2026';
+    const choice = await vscode.window.showErrorMessage(
+      'ffmpeg is required to capture the active Ubuntu LabVIEW desktop. Install the distribution package or point the extension at an existing ffmpeg binary.',
+      { modal: true },
+      INSTALL,
+      SET_PATH,
+    );
+    if (choice === INSTALL) {
+      const term = vscode.window.createTerminal('Install ffmpeg');
+      term.show(true);
+      term.sendText('sudo apt-get update && sudo apt-get install -y ffmpeg');
+    } else if (choice === SET_PATH) {
+      void vscode.commands.executeCommand('workbench.action.openSettings', 'labviewBenchmarkActor.ffmpegPath');
+    }
+    output.appendLine('capture aborted: ffmpeg not found (prompted apt install / set-path).');
+    return;
+  }
   const INSTALL = 'Install ffmpeg (winget)';
   const DOWNLOAD = 'Download ffmpeg\u2026';
   const SET_PATH = 'Set ffmpeg path\u2026';
@@ -1140,10 +1162,10 @@ async function captureLaunchCommand(context: vscode.ExtensionContext, output: vs
     void vscode.window.showWarningMessage('A LabVIEW capture is already running. Stop it first.');
     return;
   }
-  if (process.platform !== 'win32') {
+  if (!['win32', 'linux'].includes(process.platform)) {
     const RUN_MPRR = 'Run mprr capture';
     const choice = await vscode.window.showErrorMessage(
-      'Capture LabVIEW Launch is Windows-only (gdigrab + LabVIEW.exe). On Linux/macOS, use "Capture LabVIEW Launch (mprr, cross-platform VM)".',
+      `Capture LabVIEW Launch is not supported on ${process.platform}. Use "Capture LabVIEW Launch (mprr, cross-platform VM)".`,
       RUN_MPRR
     );
     if (choice === RUN_MPRR) {
@@ -1154,7 +1176,9 @@ async function captureLaunchCommand(context: vscode.ExtensionContext, output: vs
   const labview = resolveLabview();
   if (!labview) {
     void vscode.window.showErrorMessage(
-      'LabVIEW.exe not found. Set "labviewBenchmarkActor.labviewPath" to your LabVIEW 2026 LabVIEW.exe.'
+      process.platform === 'linux'
+        ? 'LabVIEW not found. Set "labviewBenchmarkActor.labviewPath" to the LabVIEW 2026 Linux executable.'
+        : 'LabVIEW.exe not found. Set "labviewBenchmarkActor.labviewPath" to your LabVIEW 2026 LabVIEW.exe.'
     );
     return;
   }
@@ -1195,13 +1219,17 @@ async function captureLaunchCommand(context: vscode.ExtensionContext, output: vs
   void writeCaptureStatusBeacon(context.extensionUri, dir, (b) => b.buildCapturingStatus({ runDir: dir, startedAt }), output);
   const framePattern = path.join(dir, 'frame-%05d.png');
   const resourcesFile = path.join(dir, 'resources.jsonl');
+  writeFileSync(
+    path.join(dir, 'capture-meta.json'),
+    `${JSON.stringify(captureMetadataForPlatform(process.platform), null, 2)}\n`,
+  );
 
   // 1) ffmpeg screen capture at 12 fps (stdin kept open so we can 'q' it for a clean finalize on stop).
   let ffmpegProc: ChildProcess;
   try {
     ffmpegProc = spawn(
       ffmpeg,
-      ['-y', '-f', 'gdigrab', '-framerate', '12', '-i', 'desktop', framePattern],
+      ffmpegCaptureArgsForPlatform(process.platform, framePattern),
       { windowsHide: true, stdio: ['pipe', 'ignore', 'pipe'] }
     );
   } catch (err) {
@@ -1216,11 +1244,13 @@ async function captureLaunchCommand(context: vscode.ExtensionContext, output: vs
   });
 
   // 2) CPU/RAM/disk sampler.
-  const sampler = spawn(
-    'powershell',
-    ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-Command', samplerScript(resourcesFile)],
-    { windowsHide: true, stdio: 'ignore' }
-  );
+  const sampler = process.platform === 'linux'
+    ? spawn('bash', ['-lc', linuxSamplerScript(resourcesFile)], { stdio: 'ignore' })
+    : spawn(
+      'powershell',
+      ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-Command', samplerScript(resourcesFile)],
+      { windowsHide: true, stdio: 'ignore' }
+    );
 
   // 3) launch LabVIEW itself.
   try {
@@ -1237,7 +1267,7 @@ async function captureLaunchCommand(context: vscode.ExtensionContext, output: vs
   status.show();
 
   activeCapture = { dir, ffmpeg: ffmpegProc, sampler, status, startedAt };
-  output.appendLine(`capture started: ${dir} (ffmpeg 12fps + CPU/RAM/disk; LabVIEW launching)`);
+  output.appendLine(`capture started: ${dir} (${captureMetadataForPlatform(process.platform).source} 12fps + CPU/RAM/disk; LabVIEW launching)`);
   void vscode.window
     .showInformationMessage(
       'Capturing the LabVIEW launch at 12 fps. Click "Stop LabVIEW Capture" in the status bar when the IDE is up.',
@@ -1339,12 +1369,22 @@ export function assembleCaptureFromDir(dir: string, builder: CaptureBuilder): La
       }
     }
   }
+  let meta = captureMetadataForPlatform('win32');
+  const metaFile = path.join(dir, 'capture-meta.json');
+  if (existsSync(metaFile)) {
+    const parsed = JSON.parse(readFileSync(metaFile, 'utf8')) as Partial<typeof meta>;
+    if (parsed.workload === 'labview-launch'
+      && ['WIN', 'LINUX'].includes(String(parsed.plane))
+      && ['ffmpeg-gdigrab', 'ffmpeg-x11grab'].includes(String(parsed.source))) {
+      meta = parsed as typeof meta;
+    }
+  }
   const record = builder.buildLaunchCapture({
     frames,
     resourceSamples,
     startMs: firstFrameMs,
     fps: 12,
-    meta: { workload: 'labview-launch', plane: 'WIN', source: 'ffmpeg-gdigrab' },
+    meta,
   });
   writeFileSync(path.join(dir, 'capture.json'), `${JSON.stringify(record, null, 2)}\n`);
   return record;

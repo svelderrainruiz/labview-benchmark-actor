@@ -288,7 +288,7 @@ try {
     );
   }
   for (const prerequisite of [
-    /lbabus[^]*0\.15\.9/,
+    /lbabus[^]*0\.15\.10/,
     /Node\.js[^]*24\.19\.0/,
     /\.NET runtime[^]*>=8\.0/,
     /Git \/ Git for Windows[^]*>=2\.30/,
@@ -562,11 +562,16 @@ try {
       join(capDir, 'resources.jsonl'),
       '{"ms":1,"cpuPct":10,"ramMb":2000,"diskPct":1,"disks":[{"name":"0 C:","writeMBs":0,"readMBs":0}]}\n\n{bad partial line\n{"ms":2,"cpuPct":12,"ramMb":2010,"diskPct":2,"disks":[{"name":"0 C:","writeMBs":11.4,"readMBs":0.2}]}\n'
     );
+    writeFileSync(
+      join(capDir, 'capture-meta.json'),
+      '{"workload":"labview-launch","plane":"LINUX","source":"ffmpeg-x11grab"}\n',
+    );
     const rec = ext.assembleCaptureFromDir(capDir, capBuilder);
     assert(Array.isArray(rec.frames) && rec.frames.length === 2, `assembleCaptureFromDir builds a 2-frame record, got ${rec.frames && rec.frames.length}`);
     assert(existsSync(join(capDir, 'capture.json')), 'assembleCaptureFromDir writes capture.json alongside the frames');
     assert(Array.isArray(rec.diskNames) && rec.diskNames.includes('0 C:'), 'assembleCaptureFromDir exposes the per-physical-disk names');
     assert(rec.frames[1].disks && rec.frames[1].disks[0].writeMBs === 11.4, 'assembleCaptureFromDir carries per-disk write throughput onto frames');
+    assert(rec.plane === 'LINUX' && rec.source === 'ffmpeg-x11grab', 'assembleCaptureFromDir preserves the native Ubuntu capture source');
 
     // empty dir -> fails closed (no frames were captured).
     const capEmpty = join(tmpdir(), 'lba-test-capture-empty-xyz');
@@ -733,29 +738,29 @@ try {
     assert(sentCommands.length === sentBeforeInvalid, 'createCleanroom aborts (sends no cloner command) when any input fails validation');
   }
 
-  // captureLaunch non-Windows guard (issue #423): must fail FAST with a Windows-only redirect to the
-  // cross-platform mprr capture command. Force a non-win32 platform so this is deterministic on any CI host.
+  // captureLaunch unsupported-platform guard: Linux has a native x11grab path; macOS still redirects to the
+  // cross-platform mprr VM capture.
   {
-    const restorePlatform = setPlatform('linux');
+    const restorePlatform = setPlatform('darwin');
     try {
       const errsBeforeCapture = errorMessages.length;
       const executedBeforeCapture = executedCommands.length;
       errorResponseQueue.push('Run mprr capture');
       await registered.find((r) => r.id === 'labviewBenchmarkActor.captureLaunch').handler();
       assert(
-        errorMessages.slice(errsBeforeCapture).some((m) => /Windows-only/.test(m) && /mprr/.test(m)),
-        'captureLaunch redirects non-Windows hosts to the mprr capture command'
+        errorMessages.slice(errsBeforeCapture).some((m) => /not supported on darwin/.test(m) && /mprr/.test(m)),
+        'captureLaunch redirects unsupported hosts to the mprr capture command'
       );
       assert(
         executedCommands.slice(executedBeforeCapture).includes('labviewBenchmarkActor.captureLaunchMprr'),
         'captureLaunch can jump directly to captureLaunchMprr from the non-Windows guard'
       );
-      // ...and the dismissed branch: closing the Windows-only dialog does NOT jump to mprr.
+      // ...and the dismissed branch does NOT jump to mprr.
       const executedBeforeDismiss = executedCommands.length;
       await registered.find((r) => r.id === 'labviewBenchmarkActor.captureLaunch').handler();
       assert(
         !executedCommands.slice(executedBeforeDismiss).includes('labviewBenchmarkActor.captureLaunchMprr'),
-        'captureLaunch non-Windows guard does nothing when the redirect prompt is dismissed'
+        'captureLaunch unsupported-platform guard does nothing when the redirect prompt is dismissed'
       );
     } finally {
       restorePlatform();
@@ -883,6 +888,28 @@ try {
     } finally {
       delete configStore.labviewPath;
       restorePlatform();
+    }
+    // Linux body reaches its native LabVIEW resolution guard instead of redirecting to the VM-only mprr command.
+    {
+      const restorePlatform = setPlatform('linux');
+      try {
+        const errsBeforeNoLv = errorMessages.length;
+        const executedBeforeNoLv = executedCommands.length;
+        configStore.labviewPath = join(tmpdir(), 'lba-no-linux-labview-here-xyz', 'labview');
+        await registered.find((r) => r.id === 'labviewBenchmarkActor.captureLaunch').handler();
+        delete configStore.labviewPath;
+        assert(
+          errorMessages.slice(errsBeforeNoLv).some((m) => /LabVIEW not found/.test(m) && /Linux executable/.test(m)),
+          'captureLaunch reports a missing Linux LabVIEW executable',
+        );
+        assert(
+          !executedCommands.slice(executedBeforeNoLv).includes('labviewBenchmarkActor.captureLaunchMprr'),
+          'native Linux capture does not redirect to the VM-only mprr command',
+        );
+      } finally {
+        delete configStore.labviewPath;
+        restorePlatform();
+      }
     }
   }
   await registered.find((r) => r.id === 'labviewBenchmarkActor.stopCapture').handler();

@@ -16,8 +16,9 @@ Treat this as an executable agent preflight, not optional human setup prose. Run
 | Tool | Required/validated version | Agent action |
 | --- | --- | --- |
 | VS Code | `>=1.101.0` | Required for the extension and contributed MCP server. |
-| `lbabus` | **exactly `0.15.9` for this extension build** | Run `lbabus version`. Windows reviewer staging installs this version at `C:\lba-tools\lbabus\lbabus.exe`; Ubuntu reviewers use `/usr/local/bin/lbabus`. Extension commands, MCP, and human tasks require the exact binary. Else install with `dotnet tool install --global LabVIEWBenchmarkActor.CollabBus --version 0.15.9`. |
+| `lbabus` | **exactly `0.15.10` for this extension build** | Run `lbabus version`. Windows reviewer staging installs this version at `C:\lba-tools\lbabus\lbabus.exe`; Ubuntu reviewers use `/usr/local/bin/lbabus`. Extension commands, MCP, and human tasks require the exact binary. Else install with `dotnet tool install --global LabVIEWBenchmarkActor.CollabBus --version 0.15.10`. |
 | Node.js | **exactly `24.19.0` for source-checkout repository/release work** | Match the repository `.nvmrc`; packaging is Node-version-bound. Evidence-only reviewer workspaces use VS Code's bundled runtime and do not require a separate Node installation. |
+| `ffmpeg` | distribution package on Ubuntu; Gyan/WinGet or configured path on Windows | Required by **Capture LabVIEW Launch**. Ubuntu uses native `x11grab` on the active graphical seat; Windows uses `gdigrab`. |
 | .NET runtime | `>=8.0` | Required to execute the framework-dependent `lbabus` payload. |
 | .NET SDK | `>=8.0` when building/staging `lbabus` | Required for `dotnet build/publish`; runtime-only hosts can consume but not rebuild it. |
 | Git / Git for Windows | `>=2.30` | Required for provenance, worktrees, release lineage, and patch evidence. |

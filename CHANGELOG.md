@@ -6,6 +6,21 @@ follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project
 
 ## [Unreleased]
 
+## [1.4.11] - 2026-08-09
+
+### Added
+
+- **Ubuntu actors capture LabVIEW launches natively.** `Capture LabVIEW Launch` now uses ffmpeg `x11grab` on the
+  active graphical seat, launches the normal Linux LabVIEW 2026 executable, records 12 FPS PNG evidence, samples
+  Linux CPU/RAM, and labels the assembled record `LINUX` / `ffmpeg-x11grab`.
+- **Ubuntu review acceptance is explicit.** The manual plan requires a real native LabVIEW capture and an
+  exact-candidate signed verdict rendered inside the extension as `UBUNTU_VM`.
+
+### Changed
+
+- **Fresh governed identities.** Extension 1.4.11 advances AGENTS to 0.3.15 and lbabus to 0.15.10. Historical
+  1.4.10 signed FAIL evidence and its scoped public keys remain immutable and cannot authorize this candidate.
+
 ## [1.4.10] - 2026-08-09
 
 ### Added
