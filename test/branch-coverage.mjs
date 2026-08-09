@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 import assert from 'node:assert/strict';
-import { normalizeCoberturaXml } from '../scripts/coverage-core.mjs';
+import { coberturaWorkingTreeText, normalizeCoberturaXml } from '../scripts/coverage-core.mjs';
 import {
   buildBenchmarkPanelHtml,
   buildCrossPlaneResourcePanelHtml,
@@ -430,5 +430,10 @@ assert.equal(
   normalizeCoberturaXml('<coverage timestamp="456"><sources>\n<source>/home/repo</source>\n</sources></coverage>'),
   '<coverage timestamp="0"><sources>\n    <source>.</source>\n  </sources></coverage>',
 );
+assert.equal(
+  coberturaWorkingTreeText(cobertura, 'win32'),
+  '<coverage timestamp="0"><sources>\r\n    <source>.</source>\r\n  </sources></coverage>',
+);
+assert.equal(coberturaWorkingTreeText(cobertura, 'linux'), normalizeCoberturaXml(cobertura));
 
 console.log('branch-coverage: PASS');
