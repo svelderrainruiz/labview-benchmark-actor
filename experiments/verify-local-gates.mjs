@@ -412,6 +412,14 @@ check('ubuntu-base-bootstrap-prerequisites', () => {
   return { standard: 'LBA-REQ-044 remotely automatable Ubuntu base', selftest: 'ubuntu-base-bootstrap (packages, services, receipt, secret safety, fail-closed hook)' };
 });
 
+// 6p3. A production Ubuntu golden box must preserve the proven base contract. The embedded Vagrant definition
+//      validates the receipt on every clone, while production packaging binds the exact base receipt and definition
+//      only after the independent console, activation, and identity-freshness guards have passed.
+check('ubuntu-production-golden-box', () => {
+  execFileSync(process.execPath, [join(here, '..', 'test', 'ubuntu-golden-box.mjs')], { stdio: 'pipe' });
+  return { standard: 'LBA-REQ-033/044 production golden continuity', selftest: 'ubuntu-golden-box (definition, receipt, proof, package guards)' };
+});
+
 // 6q. Human-assisted VM bridge (LBA-REQ-045, ADR-0032): the shared-tmux bridge (tools/vm-bridge/vm-bridge.sh)
 //     lets an automation agent drive the golden VM's interactive shell while a HUMAN types any password/token
 //     directly on the VM -- credentials never transit the agent or the model. Fail-closed if the bridge could

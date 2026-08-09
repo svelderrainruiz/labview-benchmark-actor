@@ -85,6 +85,21 @@ launch, or activate LabVIEW.
 
 VM creation or a completed installer alone is not readiness proof: automation must require the first-boot receipt's
 `outcome` to be `PASS`.
+
+The production golden definition in `production-golden-box.Vagrantfile` revalidates this same receipt on every
+Vagrant clone. `production-golden-box.metadata.json` binds the exact definition and required package guards.
+`golden-activation-cycle.ps1 -Mode Package` refuses to halt, replace, or package the VM until the base receipt,
+console acknowledgement, functional activation, identity freshness, and definition metadata all validate. Its v2
+package receipt binds the exact base receipt, embedded Vagrantfile, metadata, activation receipt, and local box
+bytes. Governed production packaging rejects `-ProductionVagrantfile` overrides; change the tracked definition and
+metadata together instead. The repository does not publish that personal box.
+
+The normalized live base proof is `production-golden-base-proof.json`. It records a fresh stock-ISO VM reaching
+SSH-ready without graphical login in 952.458405s, with 5s bounded polling, Git/SSH/guest-utils PASS, zero recovery
+actions, and complete disposable-VM cleanup. Text definition hashes are canonicalized to LF so the same proof
+validates on Windows and Linux checkouts. This proof covers the pre-LabVIEW base boundary; it does not replace the
+separate activation and identity-freshness evidence required by `-Mode Package`.
+
 Verify the OS-type id on your host with `VBoxManage list ostypes | grep -i ubuntu`.
 
 ## VMware (WIN plane) — the mirror
