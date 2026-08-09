@@ -50,7 +50,7 @@
 | LBA-REQ-041 | Capability-aware distributed task routing | Proven | §3.2 Deployment | ADR-0029 | T-041 | 5 |
 | LBA-REQ-042 | Cross-plane LabVIEW liveness | Proven | §3.2 Deployment | ADR-0030 | T-042 | 5 |
 | LBA-REQ-043 | Cross-plane VI Analyzer determinism | Proven | §3.2 Deployment | ADR-0031 | T-043 | 5 |
-| LBA-REQ-044 | Provisioner installs LabVIEW and VIPM | Proven | §3.2 Deployment | ADR-0023 | T-044 | 5 |
+| LBA-REQ-044 | Provisioner installs LabVIEW and VIPM | Proven | §3.2 Deployment | ADR-0023 | T-044 | 9 |
 | LBA-REQ-045 | Human-assisted VM bridge | Proven | §3.2 Deployment | ADR-0032 | T-045 | 5 |
 | LBA-REQ-046 | VIPM functionally installs a community package | Proven | §3.2 Deployment | ADR-0023 | T-046 | 4 |
 | LBA-REQ-047 | Live golden-VM status and idle-time analysis | Proven | §3.2 Deployment | ADR-0023 | T-047 | 5 |

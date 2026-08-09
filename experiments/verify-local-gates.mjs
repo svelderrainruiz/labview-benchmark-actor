@@ -403,6 +403,15 @@ check('provisioner-installs-labview-and-vipm', () => {
   return { standard: 'ADR-0023 Phase 1', selftest: 'verify-provisioner-labview-vipm 4/4 (LabVIEW + VIPM)' };
 });
 
+// 6p2. The Ubuntu cleanroom base must be remotely automatable before LabVIEW provisioning or human login.
+//      The unattended hook installs OpenSSH, Git, and supported VirtualBox guest utilities, records first-boot
+//      state, keeps the disposable credential out of CLI values and diagnostics, and exposes SSH only on an
+//      explicitly selected host-loopback NAT forward. Missing or unsupported bootstrap mechanisms fail closed.
+check('ubuntu-base-bootstrap-prerequisites', () => {
+  execFileSync(process.execPath, [join(here, '..', 'test', 'ubuntu-base-bootstrap.mjs')], { stdio: 'pipe' });
+  return { standard: 'LBA-REQ-044 remotely automatable Ubuntu base', selftest: 'ubuntu-base-bootstrap (packages, services, receipt, secret safety, fail-closed hook)' };
+});
+
 // 6q. Human-assisted VM bridge (LBA-REQ-045, ADR-0032): the shared-tmux bridge (tools/vm-bridge/vm-bridge.sh)
 //     lets an automation agent drive the golden VM's interactive shell while a HUMAN types any password/token
 //     directly on the VM -- credentials never transit the agent or the model. Fail-closed if the bridge could
