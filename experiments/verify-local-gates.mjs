@@ -1621,6 +1621,15 @@ check('standards-release-risk-baseline', () => {
   return { workbenchMaturity: '25/25', staticGates: '6/6 PASS', releaseEvidence: `${present}/${proofs.length}`, status: 'BLOCKED' };
 });
 
+check('release-risk-post-release-closeout', () => {
+  execFileSync(process.execPath, [join(pkgRoot, 'reviewer-workstation', 'release-risk-closeout.selftest.mjs')], { stdio: 'pipe' });
+  const output = execFileSync(process.execPath, [join(pkgRoot, 'reviewer-workstation', 'release-risk-closeout.mjs')], { encoding: 'utf8' });
+  assert(output.includes('READY 28/28 proofs for 1.4.9'), 'post-release closeout did not resolve the candidate-time baseline');
+  const ignore = readFileSync(join(pkgRoot, '.vscodeignore'), 'utf8').split(/\r?\n/).map((line) => line.trim());
+  assert(ignore.includes('release-risk-closeout.json'), 'post-release closeout must not mutate the immutable candidate package');
+  return { candidateTime: 'BLOCKED 12/28', postRelease: 'READY 28/28', release: '1.4.9' };
+});
+
 check('experiment-lifecycle-local-kpi', () => {
   const result = loadExperimentGovernance();
   assert(result.ok, `experiment governance failed: ${result.reasons.join('; ')}`);

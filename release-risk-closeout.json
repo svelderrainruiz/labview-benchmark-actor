@@ -1,0 +1,182 @@
+{
+  "schema": "labview-benchmark-actor/release-risk-closeout@1",
+  "releaseVersion": "1.4.9",
+  "closedAt": "2026-08-08T23:44:19.110Z",
+  "baseline": {
+    "path": "release-risk-baseline.json",
+    "status": "BLOCKED",
+    "present": 12,
+    "total": 28,
+    "interpretation": "Candidate-time baseline retained byte-identically with the reviewed and released VSIX."
+  },
+  "candidate": {
+    "version": "1.4.9",
+    "commit": "4da4e806d06e66529f695250e0eed5f534cff108",
+    "sealedHead": "2b3960e62431435c3c03103a163287c6a5a268cf",
+    "vsixSha256": "3554ce5f93a65e7147e15bb479abbda93b7fd3c7f23118c7cecbeacff9c2a768",
+    "vsixSize": 148116,
+    "candidateReceiptSha256": "2c327974c8180a1dcce70b9cdd9bd0702e63c6e84daa7cb413382e3de1306faa"
+  },
+  "summary": {
+    "beforePresent": 12,
+    "afterPresent": 28,
+    "total": 28,
+    "completionPercent": 100,
+    "status": "READY"
+  },
+  "resolutions": [
+    {
+      "id": "hosted-ci-final-commit",
+      "status": "present",
+      "evidence": "PR #18 sealed head completed all 18 hosted checks.",
+      "artifacts": [
+        "https://github.com/svelderrainruiz/labview-benchmark-actor/pull/18"
+      ]
+    },
+    {
+      "id": "cross-plane-final-candidate",
+      "status": "present",
+      "evidence": "Exact candidate corroborated across Ubuntu 22.04/24.04 and Windows 2022/2025; sealed-head Linux/Windows VSIX bytes equal the reviewed hash.",
+      "artifacts": [
+        "https://github.com/svelderrainruiz/labview-benchmark-actor/actions/runs/31283220848",
+        "https://github.com/svelderrainruiz/labview-benchmark-actor/actions/runs/31283370796"
+      ]
+    },
+    {
+      "id": "local-candidate-commit",
+      "status": "present",
+      "evidence": "Full KPI receipt bound clean commit 4da4e806, 148116-byte VSIX, duplicate hashes, 96.02% branches, 203/203 gates, and 179/179 correspondences; receipt SHA-256 is recorded in candidate identity.",
+      "artifacts": [
+        "release-risk-closeout.json"
+      ]
+    },
+    {
+      "id": "remote-reviewed-head",
+      "status": "present",
+      "evidence": "PR #18 merged the reviewed seal to main with merge commit e16d6815e6f3a4d4d79d345760ce75f3a16db4d2.",
+      "artifacts": [
+        "https://github.com/svelderrainruiz/labview-benchmark-actor/pull/18"
+      ]
+    },
+    {
+      "id": "canonical-github-release",
+      "status": "present",
+      "evidence": "GitHub Release ext-v1.4.9 is immutable, has eight signed assets, and its VSIX digest equals the reviewed hash.",
+      "artifacts": [
+        "https://github.com/svelderrainruiz/labview-benchmark-actor/releases/tag/ext-v1.4.9"
+      ]
+    },
+    {
+      "id": "main-develop-shared-lineage",
+      "status": "present",
+      "evidence": "Tag commit e16d6815 is an ancestor of main and develop; PR #19 back-merged via merge commit 9d455fd0.",
+      "artifacts": [
+        "https://github.com/svelderrainruiz/labview-benchmark-actor/pull/19"
+      ]
+    },
+    {
+      "id": "signed-human-acceptance",
+      "status": "present",
+      "evidence": "Enrolled Ed25519 PASS binds extension 1.4.9, exact commit, and exact VSIX; verdict SHA-256 3dadc9661f1e95e6b3ade4230d8ebda1f95a296cfe45213948467e1ba9a2f9eb.",
+      "artifacts": [
+        "tools/collab-cli/release-agreement.json"
+      ]
+    },
+    {
+      "id": "signed-architecture-acceptance",
+      "status": "present",
+      "evidence": "Signed PASS notes explicitly accept ADR-0078 through ADR-0080.",
+      "artifacts": [
+        "tools/collab-cli/release-agreement.json",
+        "docs/architecture/adr/README.md"
+      ]
+    },
+    {
+      "id": "hosted-link-check",
+      "status": "present",
+      "evidence": "Docs Link Check passed on the exact reviewed and sealed PR heads.",
+      "artifacts": [
+        "https://github.com/svelderrainruiz/labview-benchmark-actor/pull/18"
+      ]
+    },
+    {
+      "id": "human-agent-usability",
+      "status": "present",
+      "evidence": "Independent VM agent used generated AGENTS 0.3.13 and returned PASS; the human then signed the candidate-scoped verdict.",
+      "artifacts": [
+        "tools/collab-cli/release-agreement.json",
+        "extension-agents/agents.manifest.json"
+      ]
+    },
+    {
+      "id": "reproducible-local-package",
+      "status": "present",
+      "evidence": "Two normalized prerelease packages were byte-identical and the released artifact retained SHA-256 3554ce5f.",
+      "artifacts": [
+        "release-risk-closeout.json",
+        "https://github.com/svelderrainruiz/labview-benchmark-actor/releases/tag/ext-v1.4.9"
+      ]
+    },
+    {
+      "id": "local-continuous-kpi-receipt",
+      "status": "present",
+      "evidence": "Full KPI PASS with clean before/after, 96.02% branches, 203/203 local gates, and 179/179 correspondences.",
+      "artifacts": [
+        "release-risk-closeout.json"
+      ]
+    },
+    {
+      "id": "signed-human-pass",
+      "status": "present",
+      "evidence": "Visual gate verified publish:true for one distinct enrolled approving reviewer.",
+      "artifacts": [
+        "tools/collab-cli/release-agreement.json"
+      ]
+    },
+    {
+      "id": "cross-plane-composite",
+      "status": "present",
+      "evidence": "Exact-head machine quorum, correlated WIN stage frame, quorum signature, and visual PASS bind one candidate; composite digest 5069dc1a82aeec5a1447a3145543de9aaa83531c41abf931c5b981cfddda22e6 proves release.",
+      "artifacts": [
+        "reviewer-workstation/composite-release-decision-receipt.json"
+      ]
+    },
+    {
+      "id": "canonical-release",
+      "status": "present",
+      "evidence": "Immutable ext-v1.4.9 targets main and contains the exact reviewed VSIX plus keyless signature assets.",
+      "artifacts": [
+        "https://github.com/svelderrainruiz/labview-benchmark-actor/releases/tag/ext-v1.4.9"
+      ]
+    },
+    {
+      "id": "marketplace-prerelease-closeout",
+      "status": "present",
+      "evidence": "Workflow 31284266745 published the immutable-release VSIX with prerelease metadata; public Marketplace verification observed latest version 1.4.9.",
+      "artifacts": [
+        "https://github.com/svelderrainruiz/labview-benchmark-actor/actions/runs/31284266745",
+        "https://marketplace.visualstudio.com/items?itemName=svelderrainruiz.labview-benchmark-actor"
+      ]
+    }
+  ],
+  "release": {
+    "tag": "ext-v1.4.9",
+    "id": 367328553,
+    "tagCommit": "e16d6815e6f3a4d4d79d345760ce75f3a16db4d2",
+    "immutable": true,
+    "assetCount": 8
+  },
+  "marketplace": {
+    "extension": "svelderrainruiz.labview-benchmark-actor",
+    "version": "1.4.9",
+    "published": true,
+    "verifiedAt": "2026-08-08T23:44:19.110Z",
+    "verificationSha256": "dcbc83236a4f169665cac6a954c1e3e2e7005355d0c04726e7cd2f18190232fe"
+  },
+  "lineage": {
+    "main": "e16d6815e6f3a4d4d79d345760ce75f3a16db4d2",
+    "develop": "9d455fd0d91aefa2e10d151a6d94e57135f7d736",
+    "shared": true
+  },
+  "digest": "44211071bf94c637c82e1b9571c4bee174a4d076bba2c5742153a8b7d1cac36a"
+}
