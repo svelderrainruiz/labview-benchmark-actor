@@ -39,6 +39,7 @@ ok('buildReviewerVerdict builds a reviewer-verdict@1 with target + evidence + de
   assert.equal(v.evidence.length, 2);
   assert.equal(buildReviewerVerdict({}).verdict, 'fail');          // default verdict is fail (conservative)
   assert.equal(buildReviewerVerdict({}).station, 'WINDOWS_VM');     // default station
+  assert.equal(buildReviewerVerdict({ target, reviewer, station: 'UBUNTU_VM' }).station, 'UBUNTU_VM');
   assert.equal(buildReviewerVerdict({ verdict: 'nope' }).verdict, 'fail'); // unknown verdict -> fail
   assert.deepEqual(buildReviewerVerdict({ evidence: [{ kind: 'x' }] }).evidence, []); // evidence w/o ref dropped
 });
@@ -61,6 +62,9 @@ ok('signReviewerVerdict produces an acg-human-signoff-v1 bound to the verdict di
   assert.equal(s.decision, 'approve');                             // pass -> approve
   assert.equal(s.subject.verdictDigest, reviewerVerdictDigest(v));
   assert.equal(s.algorithm, 'ed25519');
+  const ubuntuVerdict = buildReviewerVerdict({ target, verdict: 'pass', reviewer, station: 'UBUNTU_VM' });
+  const ubuntuSignOff = signReviewerVerdict(ubuntuVerdict, { privateKeyPem, reviewer, station: 'UBUNTU_VM' });
+  assert.equal(verifyReviewerVerdict(ubuntuVerdict, ubuntuSignOff, { reviewerAllowlist: allowlist }).ok, true);
   assert.equal(signReviewerVerdict(buildReviewerVerdict({ target, verdict: 'fail', reviewer }), { privateKeyPem, reviewer }).decision, 'reject');
   assert.throws(() => signReviewerVerdict(v, { reviewer }), /privateKeyPem/);
   assert.throws(() => signReviewerVerdict(v, { privateKeyPem }), /reviewer/);

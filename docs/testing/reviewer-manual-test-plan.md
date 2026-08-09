@@ -4,8 +4,9 @@ Tracking: #108 · Coordination: WIN ↔ LINUX live-only `lbabus net` TCP bus.
 
 This is the checklist an **expert human reviewer** follows to manually validate the
 `labview-benchmark-actor` VS Code extension and its embedded AGENTS.md, running inside a
-Windows 11 reviewer VM. It covers every command the extension contributes plus a subjective
-"dogfood" pass over the AGENTS.md guidance and an end-to-end LabVIEW run.
+disposable graphical Windows 11 or Ubuntu 24.04 reviewer VM. It covers the reviewer-facing
+command set plus a subjective "dogfood" pass over the AGENTS.md guidance and an end-to-end
+LabVIEW run.
 
 Record a result for each case in the **Result** field (`PASS` / `FAIL` + notes), then complete
 the sign-off block at the end.
@@ -16,9 +17,9 @@ the sign-off block at the end.
 
 | Requirement | Needed for | How it arrives |
 | --- | --- | --- |
-| Windows 11 guest (VMware or VirtualBox) | all | reviewer's own box, `vagrant up --provider <vmware_desktop\|virtualbox>` |
+| Graphical Windows 11 or Ubuntu 24.04 guest | all | disposable reviewer VM with a recorded OS/provider identity |
 | VS Code (`code` on PATH) | all | provisioning |
-| `labview-benchmark-actor` extension (`.vsix`) | all | provisioning installs it from the `ext-v*` GitHub Release |
+| Exact candidate `.vsix` | all | pre-publish staging verifies version, commit, SHA-256, and installed extension identity |
 | `lbabus` CLI on PATH | Capabilities, Poll Bus, Post Note | provisioning |
 | Local `lbabus net` peer/log configuration | Poll Bus, Post Note | reviewer configures `labviewBenchmarkActor.busNetHosts` and `labviewBenchmarkActor.busNetLog` |
 | Licensed LabVIEW (reviewer's own) | End-to-end run (TC-09) | reviewer's own box, per BYO docs |
@@ -30,6 +31,7 @@ Notes:
   No GitHub authentication or Discussion transport is involved.
 - **Open Benchmark Viewer**, and all three **AGENTS.md** commands, are self-contained in the
   `.vsix` (no CLI, no LabVIEW, no network) and can be reviewed on any box.
+- A signed Ubuntu verdict must use station `UBUNTU_VM`; Windows uses `WINDOWS_VM`.
 - All extension output lands in the **Output → "LabVIEW Benchmark Actor"** channel; keep it open.
 
 ## 2. Dependency matrix (what each case needs)
@@ -62,9 +64,9 @@ workspace root.
 - **Steps:**
   1. Open VS Code. Open **Extensions** (Ctrl+Shift+X) and confirm `labview-benchmark-actor`
      (publisher `svelderrainruiz`) is installed and enabled.
-  2. Open the Command Palette and confirm all seven commands appear under the
+  2. Open the Command Palette and confirm the commands exercised by this plan appear under the
      "LabVIEW Benchmark Actor:" prefix.
-- **Expected:** the extension is listed and enabled; all seven commands are present.
+- **Expected:** the extension is listed and enabled; the reviewer-facing command set is present.
 - **Result:** _____
 
 ### TC-01 — Write Agent Instructions
@@ -180,12 +182,13 @@ workspace root.
      insufficient.
   2. With the extension active, have the MCP client list available MCP servers/tools.
   3. Confirm **LabVIEW Benchmark Actor: MCP tools** (`labviewBenchmarkActor`) is
-     present and exposes the four tools:
+     present and exposes the four core tools:
      `get_host_capabilities`, `get_benchmark_series`, `poll_coordination_bus`,
-     `post_coordination_note`.
+     `post_coordination_note`, plus the nine folded corroboration-grid tools listed in
+     [../mcp-tools.md](../mcp-tools.md).
   4. Invoke **`get_benchmark_series`** and confirm it returns the bundled MPRR series
      (the same data the viewer renders in TC-06).
-- **Expected:** the server is discoverable and starts locally over stdio; the four tools are
+- **Expected:** the server is discoverable and starts locally over stdio; all 13 tools are
   listed; `get_benchmark_series` returns a structured series with no error. Nothing is sent to the
   internet. See [../mcp-tools.md](../mcp-tools.md) for the full tool contract.
 - **Result:** _____
@@ -194,7 +197,7 @@ workspace root.
 - **Pre:** the extension is installed and active; the editor's AI chat is available in **Agent**
   mode. No CLI or LabVIEW needed. This case exercises the extension's agent-facing tools (its
   Language Model tools and the bundled MCP grid tools) the way a real agent uses them.
-- **Automated drive (VirtualBox reviewer VM):** from the host, run
+- **Automated drive (Windows VirtualBox reviewer VM only):** from the host, run
   `reviewer-workstation/drive-agent-chat.sh --vm <name> --prompt "Open the resource profile benchmark panel" --out <dir>`.
   It starts a fresh chat, types and submits the prompt, and captures PNG evidence at each step
   (`01`..`06`) into `<dir>`. Inspect the frames to judge PASS/FAIL. This is the authoritative
@@ -228,7 +231,8 @@ workspace root.
 | Reviewer | _____ |
 | Date (UTC) | _____ |
 | VM provider | `vmware_desktop` / `virtualbox` |
-| Windows version | _____ |
+| Reviewer station | `WINDOWS_VM` / `UBUNTU_VM` |
+| Guest OS/version | _____ |
 | Extension version (`ext-v…`) | _____ |
 | LabVIEW version (if TC-09) | _____ |
 | Overall result | PASS / PASS-with-notes / FAIL |

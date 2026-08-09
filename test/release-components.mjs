@@ -6,10 +6,11 @@ import { verifyReleaseComponents, verifyStagedReleaseMetadata } from '../scripts
 
 const releaseRiskBaseline = JSON.parse(readFileSync(new URL('../release-risk-baseline.json', import.meta.url), 'utf8'));
 const standardsScoreBaseline = JSON.parse(readFileSync(new URL('../standards-score-baseline.json', import.meta.url), 'utf8'));
+const extensionVersion = releaseRiskBaseline.releaseVersion;
 const base = {
   components: {
     schema: 'labview-benchmark-actor/release-components@1',
-    extension: '1.4.9',
+    extension: extensionVersion,
     agents: '0.3.13',
     lbabus: '0.15.8',
     humanTasks: '1.0.6',
@@ -25,14 +26,14 @@ const base = {
       releaseRisk: { present: 12, total: 28, status: 'BLOCKED' },
     },
   },
-  packageJson: { version: '1.4.9', scripts: { package: 'vsce package --pre-release --out labview-benchmark-actor.vsix' } },
-  packageLock: { version: '1.4.9', packages: { '': { version: '1.4.9' } } },
+  packageJson: { version: extensionVersion, scripts: { package: 'vsce package --pre-release --out labview-benchmark-actor.vsix' } },
+  packageLock: { version: extensionVersion, packages: { '': { version: extensionVersion } } },
   agentsManifest: { version: '0.3.13' },
   agentsText: 'exactly `0.15.8` for this extension build\nbundle v1.0.6',
   lbabusProject: '<Version>0.15.8</Version>',
   humanTasksSource: "HUMAN_TASKS_VERSION = '1.0.6'",
   humanTaskRunner: "HUMAN_TASKS_VERSION = '1.0.6'",
-  changelog: '## [1.4.9]',
+  changelog: `## [${extensionVersion}]`,
   releaseWorkflow: 'vsce publish --pre-release',
   releaseCli: "['--target', 'main']",
   releaseRiskBaseline,

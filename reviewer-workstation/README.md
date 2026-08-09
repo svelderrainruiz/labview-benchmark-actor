@@ -142,6 +142,38 @@ by listing extensions, and drops `C:\lba-review\REVIEW-CHECKLIST.txt` for the re
 Code in the VM and inspect the Extensions-view README page (the Marketplace listing), the command
 surface, and the benchmark viewer. Nothing is published until the reviewer approves.
 
+### Stage an exact candidate on Ubuntu 24.04
+
+The governed Ubuntu visual-review lane uses a fresh graphical Ubuntu 24.04 VM built from the stock
+ISO. Provision LabVIEW without activation, let the operator activate in the VM console, and then copy
+the exact candidate VSIX, `review-target.json`, repository checkout, and fresh version-scoped visual
+private key into the disposable guest. Inside the guest run:
+
+```bash
+node reviewer-workstation/stage-ubuntu-vsix.mjs \
+  --vsix /home/actor/lba-review/labview-benchmark-actor-1.4.10.vsix \
+  --target /home/actor/lba-review/review-target.json \
+  --workspace /home/actor/lba-review/workspace \
+  --receipt /home/actor/lba-review/ubuntu-review-stage.json
+```
+
+The command runs only on Linux, verifies the candidate's 40-hex commit and 64-hex SHA-256, reads the
+VSIX manifest, installs with `code --install-extension --force`, requires the exact
+`svelderrainruiz.labview-benchmark-actor@<version>` identity in the installed list, and writes a
+non-secret receipt with wall and monotonic timing. Follow
+[the manual plan](../docs/testing/reviewer-manual-test-plan.md), then render and sign the exact
+request inside the VM with station `UBUNTU_VM`:
+
+```bash
+node reviewer-workstation/sign-visual-verdict.mjs \
+  --key /home/actor/.lba-review/visual-private.pem \
+  --request /home/actor/lba-review/workspace/verdict-request.json \
+  --out /home/actor/lba-review/workspace/signed-visual-verdict.json
+```
+
+Extract the public record and raw non-secret review evidence before deleting the VM and private key.
+The quorum key is distinct and is used only for the later machine-quorum sign-off.
+
 ## Validate a release on the WIN plane (auth-free, native Windows)
 
 The bidirectional release-agreement gate
