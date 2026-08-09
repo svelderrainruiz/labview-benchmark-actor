@@ -1,6 +1,6 @@
 # Expert reviewer manual test plan — `labview-benchmark-actor` extension + AGENTS.md
 
-Tracking: #108 · Coordination: WIN ↔ LINUX bus (Discussion #1).
+Tracking: #108 · Coordination: WIN ↔ LINUX live-only `lbabus net` TCP bus.
 
 This is the checklist an **expert human reviewer** follows to manually validate the
 `labview-benchmark-actor` VS Code extension and its embedded AGENTS.md, running inside a
@@ -20,20 +20,21 @@ the sign-off block at the end.
 | VS Code (`code` on PATH) | all | provisioning |
 | `labview-benchmark-actor` extension (`.vsix`) | all | provisioning installs it from the `ext-v*` GitHub Release |
 | `lbabus` CLI on PATH | Capabilities, Poll Bus, Post Note | provisioning |
-| GitHub auth for `lbabus` (bus reach) | Poll Bus, Post Note | reviewer supplies (see BYO docs) |
+| Local `lbabus net` peer/log configuration | Poll Bus, Post Note | reviewer configures `labviewBenchmarkActor.busNetHosts` and `labviewBenchmarkActor.busNetLog` |
 | Licensed LabVIEW (reviewer's own) | End-to-end run (TC-09) | reviewer's own box, per BYO docs |
 
 Notes:
 - The extension shells out to `lbabus` (command name `lbabus`) for **Show Host Capabilities**,
-  **Poll Bus**, and **Post Note**; those three need the CLI on PATH, and the two bus commands
-  additionally need GitHub auth so the CLI can reach Discussion #1.
+  **Poll Bus**, and **Post Note**; those three need the CLI on PATH. **Poll Bus** reads the local
+  receive-log written by `lbabus net listen --log`; **Post Note** sends to the configured net peer(s).
+  No GitHub authentication or Discussion transport is involved.
 - **Open Benchmark Viewer**, and all three **AGENTS.md** commands, are self-contained in the
   `.vsix` (no CLI, no LabVIEW, no network) and can be reviewed on any box.
 - All extension output lands in the **Output → "LabVIEW Benchmark Actor"** channel; keep it open.
 
 ## 2. Dependency matrix (what each case needs)
 
-| Case | Feature | CLI | GitHub auth | LabVIEW |
+| Case | Feature | CLI | Net peer/log | LabVIEW |
 | --- | --- | :-: | :-: | :-: |
 | TC-00 | Install / activation | – | – | – |
 | TC-01 | Write Agent Instructions | – | – | – |
@@ -105,7 +106,8 @@ workspace root.
 - **Result:** _____
 
 ### TC-04 — Poll Coordination Bus
-- **Pre:** `lbabus` on PATH; GitHub auth configured.
+- **Pre:** `lbabus` on PATH; an active `lbabus net listen --log <path>` receive-log; set
+  `labviewBenchmarkActor.busNetLog` to that path.
 - **Steps:**
   1. Run **LabVIEW Benchmark Actor: Poll Coordination Bus**.
 - **Expected:** the **"LabVIEW Benchmark Actor"** output channel shows the last ~10 bus messages
@@ -114,12 +116,14 @@ workspace root.
 - **Result:** _____
 
 ### TC-05 — Post Coordination Note
-- **Pre:** `lbabus` on PATH; GitHub auth configured. Use a clearly-marked test note.
+- **Pre:** `lbabus` on PATH; set `labviewBenchmarkActor.busNetHosts` to the live test peer(s).
+  Use a clearly-marked test note.
 - **Steps:**
   1. Run **LabVIEW Benchmark Actor: Post Coordination Note**.
   2. At the prompt, enter an ASCII note, e.g. `NOTE reviewer VM smoke test`.
-- **Expected:** the note is announced (`lbabus net send --type NOTE`); the output channel confirms it;
-  polling (TC-04) then shows the note. Empty input cancels with no send.
+- **Expected:** the note is announced with `lbabus net send --hosts <peers> --type NOTE`; the output
+  channel confirms it, and polling (TC-04) shows it after the peer routes it to the configured receive-log.
+  Empty input cancels with no send. With no peer configured, the command exits as a documented graceful no-op.
 - **Result:** _____
 
 ### TC-06 — Open Benchmark Viewer
