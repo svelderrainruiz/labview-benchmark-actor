@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 import assert from 'node:assert/strict';
-import { capabilityProbeSpec, classifyWorktreeState, executableForProbe, findSecretBearingFields, receiptDigest, validateReceipt } from './continuation-readiness.mjs';
+import { capabilityProbeSpec, classifyRepositoryRelation, classifyWorktreeState, executableForProbe, findSecretBearingFields, receiptDigest, validateReceipt } from './continuation-readiness.mjs';
 
 function makeReceipt(overrides = {}) {
   const base = {
@@ -61,6 +61,11 @@ function makeReceipt(overrides = {}) {
 
 const allGreen = makeReceipt();
 assert.equal(validateReceipt(allGreen).ok, true, 'all-green receipt should validate');
+assert.deepEqual(
+  classifyRepositoryRelation({ head: 'a'.repeat(40), originDevelop: 'a'.repeat(40), mergeBase: 'a'.repeat(40) }),
+  { headEqualsOriginDevelop: true, headIsAncestorOfOriginDevelop: true, originDevelopIsAncestorOfHead: true },
+  'repository relation fields must be booleans',
+);
 assert.deepEqual(
   capabilityProbeSpec('virtualbox'),
   { mode: 'command', command: 'VBoxManage.exe', args: ['--version'] },

@@ -67,6 +67,14 @@ export function classifyWorktreeState({ trackedChanges = [], untrackedPaths = []
   };
 }
 
+export function classifyRepositoryRelation({ head, originDevelop, mergeBase }) {
+  return {
+    headEqualsOriginDevelop: Boolean(head && originDevelop && head === originDevelop),
+    headIsAncestorOfOriginDevelop: Boolean(head && originDevelop && mergeBase && mergeBase === head),
+    originDevelopIsAncestorOfHead: Boolean(head && originDevelop && mergeBase && mergeBase === originDevelop),
+  };
+}
+
 function normalizeForComparison(receipt) {
   const body = stripRuntimeTimingData(JSON.parse(JSON.stringify(receipt)));
   delete body.receiptDigest;
@@ -302,9 +310,7 @@ export function buildReadinessReceipt(opts = {}) {
   receipt.upstream = upstream || null;
   receipt.originDevelop = originDevelop || null;
   receipt.mergeBase = mergeBase || null;
-  receipt.headEqualsOriginDevelop = head && originDevelop && head === originDevelop;
-  receipt.headIsAncestorOfOriginDevelop = !!(head && originDevelop && mergeBase && mergeBase === head);
-  receipt.originDevelopIsAncestorOfHead = !!(head && originDevelop && mergeBase && mergeBase === originDevelop);
+  Object.assign(receipt, classifyRepositoryRelation({ head, originDevelop, mergeBase }));
   receipt.trackedWorktreeClean = worktreeState.trackedWorktreeClean;
   receipt.untrackedPaths = worktreeState.untrackedPaths;
   receipt.trackedChanges = trackedChanges;

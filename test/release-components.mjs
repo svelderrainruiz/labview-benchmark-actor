@@ -118,5 +118,11 @@ assert.equal(verifyStagedReleaseMetadata({
   previous: base.components,
   current: base.components,
 }).ok, false);
+assert.equal(verifyStagedReleaseMetadata({
+  staged: ['extension-tasks/release-risk.mjs'],
+  unstaged: [],
+  previous: base.components,
+  current: base.components,
+}).ok, false);
 
 console.log('release-components: PASS');
