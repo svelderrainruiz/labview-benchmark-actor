@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 import assert from 'node:assert/strict';
-import { capabilityProbeSpec, classifyWorktreeState, findSecretBearingFields, receiptDigest, validateReceipt } from './continuation-readiness.mjs';
+import { capabilityProbeSpec, classifyWorktreeState, executableForProbe, findSecretBearingFields, receiptDigest, validateReceipt } from './continuation-readiness.mjs';
 
 function makeReceipt(overrides = {}) {
   const base = {
@@ -69,6 +69,15 @@ assert.deepEqual(
 assert.equal(capabilityProbeSpec('labview').mode, 'path', 'LabVIEW capability probing must not launch the GUI');
 assert.equal(capabilityProbeSpec('vipm').mode, 'path', 'VIPM capability probing must not launch the GUI');
 assert.deepEqual(capabilityProbeSpec('ffmpeg').args, ['-version']);
+assert.equal(
+  executableForProbe('npm.cmd', 'C:\\Program Files\\nodejs\\npm.cmd', { platform: 'win32' }),
+  'npm.cmd',
+  'Windows cmd shims execute by PATH name while recording their resolved absolute path',
+);
+assert.equal(
+  executableForProbe('node.exe', 'C:\\Program Files\\nodejs\\node.exe', { platform: 'win32' }),
+  'C:\\Program Files\\nodejs\\node.exe',
+);
 
 const wrongVersions = makeReceipt({ tools: { node: { ok: false }, npm: { ok: false }, lbabus: { ok: false } } });
 assert.equal(validateReceipt(wrongVersions).ok, false, 'wrong versions should fail');

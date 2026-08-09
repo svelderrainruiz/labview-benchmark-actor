@@ -169,6 +169,11 @@ function probePathCapability(name, commands) {
   };
 }
 
+export function executableForProbe(command, resolvedPath, { platform = process.platform } = {}) {
+  if (platform === 'win32' && /\.cmd$/i.test(command) && !isAbsolute(command)) return command;
+  return resolvedPath || command;
+}
+
 export function capabilityProbeSpec(name) {
   switch (name) {
     case 'signing-key': return { mode: 'unavailable', reason: 'not evidenced in this host probe' };
@@ -187,8 +192,8 @@ export function capabilityProbeSpec(name) {
 }
 
 function probeCommand(command, args, { name, expectedVersion, minimum = false, required = true } = {}) {
-  const resolvedCommand = resolveExecutablePath(command) || command;
-  const probe = runCommand(resolvedCommand, args, { allowFailure: true });
+  const resolvedPath = resolveExecutablePath(command);
+  const probe = runCommand(executableForProbe(command, resolvedPath), args, { allowFailure: true });
   const available = !probe.error && probe.status === 0;
   const versionText = available ? stripAnsi((probe.stdout || probe.stderr || '').trim()) : '';
   const extracted = versionText.match(/(\d+\.\d+(?:\.\d+)?)/);
@@ -198,7 +203,7 @@ function probeCommand(command, args, { name, expectedVersion, minimum = false, r
     name,
     command,
     args,
-    path: available ? resolvedCommand : null,
+    path: available ? resolvedPath : null,
     available,
     version,
     versionText,
