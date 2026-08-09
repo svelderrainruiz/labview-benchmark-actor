@@ -16,6 +16,13 @@ const vagrantfile = readFileSync(join(repoRoot, 'cleanroom', 'ubuntu-labview', '
 const metadataText = readFileSync(join(repoRoot, 'cleanroom', 'ubuntu-labview', 'production-golden-box.metadata.json'), 'utf8');
 const metadata = JSON.parse(metadataText);
 const activationCycle = readFileSync(join(repoRoot, 'cleanroom', 'ubuntu-labview', 'golden-activation-cycle.ps1'), 'utf8');
+const screenshotPath = 'docs/information-for-users/images/ubuntu-24.04-labview-2026/golden-base-ready.png';
+const screenshotSha256 = sha256(readFileSync(join(repoRoot, screenshotPath)));
+
+function sealProof(value) {
+  const { digest: _digest, ...canonical } = value;
+  return { ...canonical, digest: sha256(JSON.stringify(canonical)) };
+}
 
 const baseReceipt = {
   schema: 'labview-benchmark-actor/ubuntu-base-bootstrap@1',
@@ -78,7 +85,7 @@ const proofWithoutDigest = {
     metadataSha256: sha256(metadataText),
   },
   evidence: { baseBootstrapReceiptSha256: '2'.repeat(64) },
-  screenshots: [{ path: 'docs/information-for-users/images/ubuntu-24.04-labview-2026/golden-base-ready.png', sha256: '3'.repeat(64) }],
+  screenshots: [{ path: screenshotPath, sha256: screenshotSha256 }],
   cleanup: {
     outcome: 'PASS',
     vmUnregistered: true,
@@ -88,21 +95,39 @@ const proofWithoutDigest = {
   outcome: 'PASS',
   failures: [],
 };
-const proof = { ...proofWithoutDigest, digest: sha256(JSON.stringify(proofWithoutDigest)) };
-assert.equal(validateGoldenBaseProof(proof, { metadataText, vagrantfileText: vagrantfile }).ok, true, 'valid golden proof must pass');
+const proof = sealProof(proofWithoutDigest);
+assert.equal(validateGoldenBaseProof(proof, { metadataText, vagrantfileText: vagrantfile, screenshotRoot: repoRoot }).ok, true, 'valid golden proof must pass');
 assert.equal(
-  validateGoldenBaseProof({ ...proof, graphicalLoginPerformed: true }, { metadataText, vagrantfileText: vagrantfile }).ok,
+  validateGoldenBaseProof({ ...proof, graphicalLoginPerformed: true }, { metadataText, vagrantfileText: vagrantfile, screenshotRoot: repoRoot }).ok,
   false,
   'graphical-login proof must fail closed',
 );
 assert.equal(
-  validateGoldenBaseProof({ ...proof, digest: '4'.repeat(64) }, { metadataText, vagrantfileText: vagrantfile }).ok,
+  validateGoldenBaseProof({ ...proof, digest: '4'.repeat(64) }, { metadataText, vagrantfileText: vagrantfile, screenshotRoot: repoRoot }).ok,
   false,
   'tampered proof digest must fail closed',
+);
+assert.equal(
+  validateGoldenBaseProof(sealProof({
+    ...proof,
+    screenshots: [{ path: screenshotPath, sha256: '5'.repeat(64) }],
+  }), { metadataText, vagrantfileText: vagrantfile, screenshotRoot: repoRoot }).ok,
+  false,
+  'tampered screenshot bytes must fail closed',
+);
+assert.equal(
+  validateGoldenBaseProof(sealProof({
+    ...proof,
+    screenshots: [{ path: 'docs/information-for-users/images/ubuntu-24.04-labview-2026/missing.png', sha256: '5'.repeat(64) }],
+  }), { metadataText, vagrantfileText: vagrantfile, screenshotRoot: repoRoot }).ok,
+  false,
+  'missing screenshot evidence must fail closed',
 );
 
 for (const marker of [
   'Assert-BaseBootstrapReceiptForPackage',
+  'Assert-GovernedProductionDefinition',
+  'ProductionVagrantfile overrides are not permitted for governed production packaging',
   'systemctl is-active --quiet ssh.service',
   'systemctl is-enabled --quiet virtualbox-guest-utils.service',
   'base bootstrap receipt validation failed; package is blocked',
@@ -114,10 +139,13 @@ for (const marker of [
   assert.ok(activationCycle.includes(marker), `golden activation cycle must include ${marker}`);
 }
 const packageCase = activationCycle.indexOf("'Package' {");
+const pushLocation = activationCycle.indexOf('Push-Location $VagrantRoot');
+const definitionGuard = activationCycle.indexOf('Assert-GovernedProductionDefinition', activationCycle.indexOf("if ($Mode -eq 'Package')"));
 const baseGuard = activationCycle.indexOf('$baseBootstrap = Assert-BaseBootstrapReceiptForPackage', packageCase);
 const removeExistingBox = activationCycle.indexOf('Remove-Item -LiteralPath $ProductionBoxPath -Force', packageCase);
 const haltGuest = activationCycle.indexOf("Invoke-Vagrant -Arguments @('halt', $Vm)", packageCase);
 assert.ok(packageCase >= 0 && baseGuard > packageCase, 'package mode must invoke the base receipt guard');
+assert.ok(definitionGuard >= 0 && definitionGuard < pushLocation, 'package mode must reject definition overrides before any Vagrant command');
 assert.ok(baseGuard < removeExistingBox && baseGuard < haltGuest, 'base receipt guard must run before box deletion or VM halt');
 
 console.log('ubuntu-golden-box tests: PASS');

@@ -52,6 +52,7 @@ $activationProbe = Join-Path $repoRoot 'experiments\activation\probe-activation.
 $activationBuilder = Join-Path $repoRoot 'experiments\activation\buildActivationReceipt.mjs'
 $registrationScript = Join-Path $repoRoot 'experiments\activation\registerMeshActor.mjs'
 $goldenBoxVerifier = Join-Path $repoRoot 'scripts\verify-ubuntu-golden-box.mjs'
+$governedProductionVagrantfile = Join-Path $PSScriptRoot 'production-golden-box.Vagrantfile'
 $productionMetadata = Join-Path $PSScriptRoot 'production-golden-box.metadata.json'
 $artifactDir = Join-Path $VagrantRoot '.vagrant'
 $baseBootstrapReceipt = Join-Path $artifactDir "golden-$Vm-base-bootstrap-receipt.json"
@@ -217,6 +218,23 @@ function Assert-BaseBootstrapReceiptForPackage {
   return Get-Content -LiteralPath $baseBootstrapReceipt -Raw | ConvertFrom-Json
 }
 
+function Assert-GovernedProductionDefinition {
+  if (-not (Test-Path -LiteralPath $governedProductionVagrantfile -PathType Leaf)) {
+    throw "governed production Vagrantfile is missing: $governedProductionVagrantfile"
+  }
+  if (-not (Test-Path -LiteralPath $ProductionVagrantfile -PathType Leaf)) {
+    throw "production Vagrantfile is missing: $ProductionVagrantfile"
+  }
+  if ((Resolve-Path -LiteralPath $ProductionVagrantfile).Path -ne (Resolve-Path -LiteralPath $governedProductionVagrantfile).Path) {
+    throw 'ProductionVagrantfile overrides are not permitted for governed production packaging'
+  }
+  if (-not (Test-Path -LiteralPath $productionMetadata -PathType Leaf)) {
+    throw "production metadata is missing: $productionMetadata"
+  }
+  & node $goldenBoxVerifier | Out-Host
+  if ($LASTEXITCODE -ne 0) { throw 'production golden definition validation failed; package is blocked' }
+}
+
 function Assert-ActivatedReceiptForPackage {
   Assert-EnrollmentIdentity
   if (-not (Test-ConsoleReadinessReceipt)) { throw 'operator desktop-unlock confirmation is missing or stale; run ConsoleReady and Confirm before packaging' }
@@ -344,6 +362,10 @@ function Confirm-Activation {
   return [pscustomobject]@{ ProbeExit = $probeExit; Receipt = $receipt; IdentityVerified = $identityVerified; FreshnessVerified = $freshnessVerified }
 }
 
+if ($Mode -eq 'Package') {
+  Assert-GovernedProductionDefinition
+}
+
 Push-Location $VagrantRoot
 try {
   Invoke-Vagrant -Arguments @('validate')
@@ -437,10 +459,6 @@ try {
     'Package' {
       $baseBootstrap = Assert-BaseBootstrapReceiptForPackage
       $activation = Assert-ActivatedReceiptForPackage
-      if (-not (Test-Path -LiteralPath $ProductionVagrantfile -PathType Leaf)) { throw "production Vagrantfile is missing: $ProductionVagrantfile" }
-      if (-not (Test-Path -LiteralPath $productionMetadata -PathType Leaf)) { throw "production metadata is missing: $productionMetadata" }
-      & node $goldenBoxVerifier | Out-Host
-      if ($LASTEXITCODE -ne 0) { throw 'production golden definition validation failed; package is blocked' }
       if (Test-Path -LiteralPath $ProductionBoxPath -PathType Leaf) {
         if (-not $OverwriteProductionBox) { throw "production box already exists: $ProductionBoxPath (use -OverwriteProductionBox to replace it)" }
         Remove-Item -LiteralPath $ProductionBoxPath -Force

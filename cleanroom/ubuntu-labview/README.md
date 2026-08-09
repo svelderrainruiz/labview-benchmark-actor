@@ -91,7 +91,8 @@ Vagrant clone. `production-golden-box.metadata.json` binds the exact definition 
 `golden-activation-cycle.ps1 -Mode Package` refuses to halt, replace, or package the VM until the base receipt,
 console acknowledgement, functional activation, identity freshness, and definition metadata all validate. Its v2
 package receipt binds the exact base receipt, embedded Vagrantfile, metadata, activation receipt, and local box
-bytes. The repository does not publish that personal box.
+bytes. Governed production packaging rejects `-ProductionVagrantfile` overrides; change the tracked definition and
+metadata together instead. The repository does not publish that personal box.
 
 The normalized live base proof is `production-golden-base-proof.json`. It records a fresh stock-ISO VM reaching
 SSH-ready without graphical login in 952.458405s, with 5s bounded polling, Git/SSH/guest-utils PASS, zero recovery

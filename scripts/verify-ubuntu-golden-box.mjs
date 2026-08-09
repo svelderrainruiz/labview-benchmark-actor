@@ -2,7 +2,7 @@
 
 import { createHash } from 'node:crypto';
 import { existsSync, readFileSync } from 'node:fs';
-import { dirname, join, resolve } from 'node:path';
+import { dirname, isAbsolute, join, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..');
@@ -93,7 +93,7 @@ function canonicalProof(proof) {
   return canonical;
 }
 
-export function validateGoldenBaseProof(proof, { metadataText, vagrantfileText }) {
+export function validateGoldenBaseProof(proof, { metadataText, vagrantfileText, screenshotRoot = repoRoot }) {
   const failures = [];
   if (proof?.schema !== 'labview-benchmark-actor/ubuntu-golden-base-proof@1') failures.push('golden proof schema is invalid');
   if (!/^[a-f0-9]{40}$/.test(proof?.source?.commit ?? '')) failures.push('golden proof source commit is invalid');
@@ -126,6 +126,18 @@ export function validateGoldenBaseProof(proof, { metadataText, vagrantfileText }
   if (!Array.isArray(proof?.screenshots) || proof.screenshots.length === 0
       || proof.screenshots.some((item) => !item.path || !/^[a-f0-9]{64}$/.test(item.sha256 ?? ''))) {
     failures.push('golden proof screenshot index is invalid');
+  } else {
+    for (const item of proof.screenshots) {
+      const screenshotPath = resolve(screenshotRoot, item.path);
+      const fromRoot = relative(screenshotRoot, screenshotPath);
+      if (isAbsolute(item.path) || fromRoot === '..' || fromRoot.startsWith(`..${process.platform === 'win32' ? '\\' : '/'}`)) {
+        failures.push(`golden proof screenshot escapes the repository: ${item.path}`);
+      } else if (!existsSync(screenshotPath)) {
+        failures.push(`golden proof screenshot is missing: ${item.path}`);
+      } else if (sha256(readFileSync(screenshotPath)) !== item.sha256) {
+        failures.push(`golden proof screenshot digest is invalid: ${item.path}`);
+      }
+    }
   }
   if (proof?.cleanup?.outcome !== 'PASS'
       || proof?.cleanup?.vmUnregistered !== true
