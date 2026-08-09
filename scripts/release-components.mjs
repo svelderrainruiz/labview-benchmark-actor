@@ -160,7 +160,7 @@ export function verifyStagedReleaseMetadata({ staged, unstaged, previous, curren
     (file === 'tools/collab-cli' || file.startsWith('tools/collab-cli/'))
     && file !== 'tools/collab-cli/release-agreement.json'
   ));
-  const tasksChanged = changed(['extension-tasks', 'src/humanTasks.ts']);
+  const tasksChanged = changed(['extension-tasks/human-task-runner.mjs', 'media/human-task-runner.mjs', 'src/humanTasks.ts']);
   const experimentsChanged = changed([
     'experiments/experiment-governance.mjs',
     'experiments/governance-overrides.json',

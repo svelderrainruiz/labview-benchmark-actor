@@ -31,6 +31,8 @@ AGENT-TOOLING-SNAGS.md
 playwright/**
 coverage/**
 .lba/**
+AGENTS.md
+**/AGENTS.md
 .c8rc.json
 coverage-thresholds.json
 release-risk-closeout.json

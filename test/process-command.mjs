@@ -16,7 +16,14 @@ assert.deepEqual(spawnInvocation('npm.cmd', ['run', 'ci:local'], {
   comspec: 'C:\\Windows\\System32\\cmd.exe',
 }), {
   command: 'C:\\Windows\\System32\\cmd.exe',
-  args: ['/d', '/s', '/c', 'npm.cmd', 'run', 'ci:local'],
+  args: ['/d', '/s', '/c', 'call npm.cmd run ci:local'],
+});
+assert.deepEqual(spawnInvocation('C:\\Program Files\\nodejs\\npm.cmd', ['run', 'ci:local'], {
+  platform: 'win32',
+  comspec: 'C:\\Windows\\System32\\cmd.exe',
+}), {
+  command: 'C:\\Windows\\System32\\cmd.exe',
+  args: ['/d', '/s', '/c', 'call "C:\\Program Files\\nodejs\\npm.cmd" run ci:local'],
 });
 
 if (process.platform === 'win32') {

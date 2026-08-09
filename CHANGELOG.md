@@ -6,6 +6,20 @@ follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project
 
 ## [Unreleased]
 
+## [1.4.10] - 2026-08-09
+
+### Added
+
+- **Maintained continuation-host readiness receipts.** A reviewer-workstation command now probes the live host,
+  verifies canonical AGENTS materialization, preserves the 12/28 candidate-time baseline versus the 28/28
+  post-release closeout, runs the governed local gates/correspondence/KPI checks, and emits an atomic receipt under
+  `.lba/continuation/readiness.json` without exposing secrets.
+
+### Fixed
+
+- **Windows `.cmd` invocations are quoted correctly.** The shared process-command wrapper now preserves quoting for
+  executable paths that contain spaces so reviewer-host probes can invoke Windows shims and `npm.cmd` reliably.
+
 ## [1.4.9] - 2026-08-08
 
 ### Fixed

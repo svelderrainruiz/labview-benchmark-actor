@@ -111,6 +111,17 @@ Follow [docs/testing/reviewer-manual-test-plan.md](../docs/testing/reviewer-manu
 from the Command Palette (`Ctrl+Shift+P` → `LabVIEW Benchmark Actor: ...`). The bus and
 capabilities commands require `gh auth login` first (reviewer-supplied).
 
+## Continuation host readiness
+
+Use the maintained continuation-host readiness command from the clean continuation branch to probe the live host, verify the canonical AGENTS materialization, run the governed gates/KPI, and emit a deterministic receipt under `.lba/continuation/readiness.json`:
+
+```powershell
+node reviewer-workstation/continuation-readiness.mjs
+node reviewer-workstation/continuation-readiness.mjs --check
+```
+
+The default command writes the receipt atomically; `--check` validates the existing receipt against the current repository and host state and fails nonzero on drift. If you are about to run a future full candidate KPI, delete the local root `AGENTS.md` artifact first so the KPI starts from the clean, non-materialized state that the canonical release contract expects.
+
 ## Stage a LOCAL candidate (pre-publish last gate)
 
 `provision.ps1` installs a **published** `ext-v*` release. To review the **pre-publish candidate**

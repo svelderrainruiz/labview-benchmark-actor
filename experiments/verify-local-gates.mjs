@@ -130,6 +130,12 @@ function parseCsvLine(line) {
   return fields;
 }
 
+// Continuation-host readiness receipt selftest (pure validation only; no live host execution).
+check('continuation-readiness-selftest', () => {
+  execFileSync(process.execPath, [join(here, '..', 'reviewer-workstation', 'continuation-readiness.selftest.mjs')], { stdio: 'pipe' });
+  return { selftest: 'continuation-readiness pure validation' };
+});
+
 // 1. Bus-prototype receipt is green (LBA-REQ-006/007, T-007).
 check('bus-prototype-receipt-green', () => {
   const receipt = readJson('experiments/bus-prototype/receipt.json');
