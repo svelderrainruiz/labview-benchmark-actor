@@ -8,7 +8,7 @@
 // Usage: npm test   (== npm run compile && node test/extension-activation.mjs)
 
 import Module, { createRequire } from 'node:module';
-import { existsSync, readFileSync, mkdirSync, writeFileSync, rmSync, statSync, copyFileSync, chmodSync } from 'node:fs';
+import { existsSync, readFileSync, readdirSync, mkdirSync, writeFileSync, rmSync, statSync, copyFileSync, chmodSync } from 'node:fs';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { dirname, join } from 'node:path';
 import { tmpdir } from 'node:os';
@@ -198,6 +198,7 @@ const mockVscode = {
 // captureLaunchMprr spawns a real `node` run of the mprr runner; this mock lets the test drive its
 // success / non-zero-exit / spawn-error branches deterministically (the test sets `spawnMode`).
 let spawnMode = { code: 0 };
+const spawnCalls = [];
 let execFileHandler = () => {
   throw Object.assign(new Error('spawn lbabus ENOENT'), { code: 'ENOENT' });
 };
@@ -219,6 +220,7 @@ const childProcessMock = {
   spawnSync: (...args) => spawnSyncHandler(...args),
   execFile: execFileMock,
   spawn: (_file, _args, opts) => {
+    spawnCalls.push({ file: _file, args: _args });
     const mkStream = () => ({ on(event, cb) { if (event === 'data') { cb(Buffer.from('[mprr] run\n')); } return this; } });
     const handlers = {};
     const proc = { stdout: mkStream(), stderr: mkStream(), on(event, cb) { handlers[event] = cb; return this; } };
@@ -908,6 +910,65 @@ try {
         );
       } finally {
         delete configStore.labviewPath;
+        restorePlatform();
+      }
+    }
+    {
+      const restorePlatform = setPlatform('linux');
+      const savedDisplay = process.env.DISPLAY;
+      const savedSessionType = process.env.XDG_SESSION_TYPE;
+      const savedExecFileHandler = execFileHandler;
+      try {
+        process.env.DISPLAY = ':0';
+        process.env.XDG_SESSION_TYPE = 'wayland';
+        configStore.labviewPath = process.execPath;
+        configStore.ffmpegPath = process.execPath;
+        execFileHandler = (file) => file === 'xdpyinfo'
+          ? { stdout: '  dimensions:    1280x800 pixels (338x211 millimeters)\n' }
+          : { stdout: '' };
+        const captureRoot = join(gsRoot, 'captures');
+        const dirsBefore = existsSync(captureRoot) ? readdirSync(captureRoot).length : 0;
+        const spawnsBefore = spawnCalls.length;
+        const errorsBefore = errorMessages.length;
+        await registered.find((r) => r.id === 'labviewBenchmarkActor.captureLaunch').handler();
+        const dirsAfter = existsSync(captureRoot) ? readdirSync(captureRoot).length : 0;
+        assert(
+          errorMessages.slice(errorsBefore).some((m) => /requires an Xorg session/.test(m)),
+          'native Linux capture reports the Xorg requirement',
+        );
+        assert(dirsAfter === dirsBefore, 'Xorg validation fails before creating a capture or beacon directory');
+        assert(spawnCalls.length === spawnsBefore, 'Xorg validation fails before spawning ffmpeg or the sampler');
+
+        delete process.env.DISPLAY;
+        process.env.XDG_SESSION_TYPE = 'x11';
+        const missingDisplayErrors = errorMessages.length;
+        await registered.find((r) => r.id === 'labviewBenchmarkActor.captureLaunch').handler();
+        assert(
+          errorMessages.slice(missingDisplayErrors).some((m) => /requires DISPLAY/.test(m)),
+          'native Linux capture validates DISPLAY before creating a capture beacon',
+        );
+        assert((existsSync(captureRoot) ? readdirSync(captureRoot).length : 0) === dirsBefore, 'missing DISPLAY leaves no stale capture directory');
+
+        process.env.DISPLAY = ':0';
+        execFileHandler = () => { throw 'xdpyinfo unavailable'; };
+        const xdpyErrors = errorMessages.length;
+        await registered.find((r) => r.id === 'labviewBenchmarkActor.captureLaunch').handler();
+        assert(
+          errorMessages.slice(xdpyErrors).some((m) => /Unable to resolve the full X11 desktop dimensions/.test(m)),
+          'native Linux capture reports xdpyinfo failure before creating a capture beacon',
+        );
+        assert((existsSync(captureRoot) ? readdirSync(captureRoot).length : 0) === dirsBefore, 'xdpyinfo failure leaves no stale capture directory');
+        assert(spawnCalls.length === spawnsBefore, 'all X11 preflight failures occur before child process launch');
+
+        execFileHandler = () => { throw new Error('xdpyinfo failed'); };
+        await registered.find((r) => r.id === 'labviewBenchmarkActor.captureLaunch').handler();
+        assert((existsSync(captureRoot) ? readdirSync(captureRoot).length : 0) === dirsBefore, 'Error-shaped xdpyinfo failure also leaves no stale capture directory');
+      } finally {
+        delete configStore.labviewPath;
+        delete configStore.ffmpegPath;
+        execFileHandler = savedExecFileHandler;
+        if (savedDisplay === undefined) delete process.env.DISPLAY; else process.env.DISPLAY = savedDisplay;
+        if (savedSessionType === undefined) delete process.env.XDG_SESSION_TYPE; else process.env.XDG_SESSION_TYPE = savedSessionType;
         restorePlatform();
       }
     }

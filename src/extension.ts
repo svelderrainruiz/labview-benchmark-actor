@@ -1270,6 +1270,14 @@ async function captureLaunchCommand(context: vscode.ExtensionContext, output: vs
     }
   }
   const dir = path.join(capturesRoot(context), `run-${Date.now()}`);
+  const framePattern = path.join(dir, 'frame-%05d.png');
+  let ffmpegArgs: string[];
+  try {
+    ffmpegArgs = ffmpegCaptureArgsForPlatform(process.platform, framePattern, process.env, x11VideoSize);
+  } catch (error) {
+    reportUiError(output, 'Capture LabVIEW Launch (ffmpeg arguments)', error);
+    return;
+  }
   try {
     mkdirSync(dir, { recursive: true });
   } catch (err) {
@@ -1279,7 +1287,6 @@ async function captureLaunchCommand(context: vscode.ExtensionContext, output: vs
   // Handoff beacon: mark the capture in flight so the agent's poll knows one is running (LBA-REQ-055).
   const startedAt = new Date().toISOString();
   void writeCaptureStatusBeacon(context.extensionUri, dir, (b) => b.buildCapturingStatus({ runDir: dir, startedAt }), output);
-  const framePattern = path.join(dir, 'frame-%05d.png');
   const resourcesFile = path.join(dir, 'resources.jsonl');
   writeFileSync(
     path.join(dir, 'capture-meta.json'),
@@ -1291,7 +1298,7 @@ async function captureLaunchCommand(context: vscode.ExtensionContext, output: vs
   try {
     ffmpegProc = spawn(
       ffmpeg,
-      ffmpegCaptureArgsForPlatform(process.platform, framePattern, process.env, x11VideoSize),
+      ffmpegArgs,
       { windowsHide: true, stdio: ['pipe', 'ignore', 'pipe'] }
     );
   } catch (err) {

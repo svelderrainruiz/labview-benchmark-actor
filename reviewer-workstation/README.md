@@ -153,13 +153,15 @@ private key into the disposable guest. Inside the guest run:
 node reviewer-workstation/stage-ubuntu-vsix.mjs \
   --vsix /home/actor/lba-review/labview-benchmark-actor.vsix \
   --target /home/actor/lba-review/review-target.json \
+  --kpi /home/actor/lba-review/local-kpi.json \
   --workspace /home/actor/lba-review/workspace \
   --receipt /home/actor/lba-review/ubuntu-review-stage.json \
   --handoff "$HOME/.config/Code/User/globalStorage/svelderrainruiz.labview-benchmark-actor/handoff"
 ```
 
-The command runs only on Linux and verifies the candidate's 40-hex commit, 64-hex SHA-256, and VSIX
-manifest **before** installing anything. It then installs with `code --install-extension --force`,
+The command runs only on Linux and binds the candidate's version, 40-hex commit, 64-hex SHA-256, and
+bytes to a passing full local-KPI receipt, then verifies the VSIX manifest **before** installing
+anything. It then installs with `code --install-extension --force`,
 requires the exact `svelderrainruiz.labview-benchmark-actor@<version>` identity, writes a non-secret
 receipt with wall and monotonic timing, and atomically stages the exact target plus a target-bound
 `UBUNTU_VM` marker where the extension reads them. Follow

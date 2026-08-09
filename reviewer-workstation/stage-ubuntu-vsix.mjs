@@ -46,6 +46,42 @@ export function validateUbuntuStageEvidence({ target, vsixBytes, manifest, insta
   };
 }
 
+export function validateUbuntuKpiReceipt({ target, kpi, vsixBytes }) {
+  const failures = [];
+  const candidate = kpi?.kpi?.candidate;
+  const localGates = kpi?.kpi?.localGates;
+  const pkg = kpi?.kpi?.package;
+  const actualSha256 = sha256(vsixBytes);
+  if (kpi?.schema !== 'labview-benchmark-actor/local-continuous-kpi@1'
+      || kpi?.mode !== 'full'
+      || kpi?.outcome !== 'PASS') {
+    failures.push('candidate KPI must be a passing full local-continuous-kpi@1 receipt');
+  }
+  if (kpi?.version !== target?.version) failures.push('candidate KPI version does not match target');
+  if (String(candidate?.sourceCommit ?? '').toLowerCase() !== String(target?.commit ?? '').toLowerCase()) {
+    failures.push('candidate KPI commit does not match target');
+  }
+  if (String(candidate?.vsixSha256 ?? '').toLowerCase() !== actualSha256
+      || String(target?.vsixSha256 ?? '').toLowerCase() !== actualSha256) {
+    failures.push('candidate KPI VSIX SHA-256 does not match target bytes');
+  }
+  if (candidate?.vsixSize !== vsixBytes.length) failures.push('candidate KPI VSIX size does not match target bytes');
+  if (candidate?.worktreeCleanBefore !== true || candidate?.worktreeCleanAfter !== true) {
+    failures.push('candidate KPI must attest a clean worktree before and after');
+  }
+  if (!Number.isInteger(localGates?.total)
+      || localGates.total < 1
+      || localGates?.passed !== localGates.total) {
+    failures.push('candidate KPI local gates must all pass');
+  }
+  if (pkg?.identical !== true
+      || String(pkg?.firstSha256 ?? '').toLowerCase() !== actualSha256
+      || String(pkg?.secondSha256 ?? '').toLowerCase() !== actualSha256) {
+    failures.push('candidate KPI must attest byte-identical packages for the target VSIX');
+  }
+  return { ok: failures.length === 0, failures, actualSha256 };
+}
+
 function writeJsonAtomic(file, value) {
   const temporary = `${file}.${process.pid}.tmp`;
   writeFileSync(temporary, `${JSON.stringify(value, null, 2)}\n`, { encoding: 'utf8', mode: 0o600 });
@@ -68,22 +104,26 @@ function parseArgs(argv) {
 function main() {
   if (process.platform !== 'linux') throw new Error('Ubuntu candidate staging must run inside the Linux reviewer VM');
   const args = parseArgs(process.argv.slice(2));
-  for (const name of ['vsix', 'target', 'workspace', 'receipt', 'handoff']) {
+  for (const name of ['vsix', 'target', 'kpi', 'workspace', 'receipt', 'handoff']) {
     if (!args[name]) throw new Error(`--${name} is required`);
   }
   const code = args.code || 'code';
   const vsixPath = resolve(args.vsix);
   const targetPath = resolve(args.target);
+  const kpiPath = resolve(args.kpi);
   const workspace = resolve(args.workspace);
   const receiptPath = resolve(args.receipt);
   const handoff = resolve(args.handoff);
   const target = JSON.parse(readFileSync(targetPath, 'utf8'));
+  const kpi = JSON.parse(readFileSync(kpiPath, 'utf8'));
   const targetShape = validateUbuntuReviewTarget(target);
   if (!targetShape.ok) throw new Error(targetShape.failures.join('; '));
   const vsixBytes = readFileSync(vsixPath);
   const manifest = JSON.parse(execFileSync('unzip', ['-p', vsixPath, 'extension/package.json'], { encoding: 'utf8' }));
   const candidate = validateUbuntuCandidateArtifact({ target, vsixBytes, manifest });
   if (!candidate.ok) throw new Error(candidate.failures.join('; '));
+  const kpiEvidence = validateUbuntuKpiReceipt({ target, kpi, vsixBytes });
+  if (!kpiEvidence.ok) throw new Error(kpiEvidence.failures.join('; '));
   mkdirSync(workspace, { recursive: true, mode: 0o700 });
   mkdirSync(dirname(receiptPath), { recursive: true, mode: 0o700 });
   mkdirSync(handoff, { recursive: true, mode: 0o700 });
@@ -97,11 +137,13 @@ function main() {
   if (!evidence.ok) throw new Error(evidence.failures.join('; '));
   const stagedVsix = join(workspace, basename(vsixPath));
   const stagedTarget = join(workspace, 'review-target.json');
+  const stagedKpi = join(workspace, 'local-kpi.json');
   const stagedMarker = join(workspace, 'reviewer-station.json');
   const handoffTarget = join(handoff, 'review-target.json');
   const handoffMarker = join(handoff, 'reviewer-station.json');
   copyFileSync(vsixPath, stagedVsix);
   copyFileSync(targetPath, stagedTarget);
+  copyFileSync(kpiPath, stagedKpi);
   const stationMarker = {
     schema: 'labview-benchmark-actor/reviewer-station@1',
     station: 'UBUNTU_VM',
@@ -131,6 +173,7 @@ function main() {
     artifacts: {
       vsix: stagedVsix,
       reviewTarget: stagedTarget,
+      localKpi: stagedKpi,
       reviewerStation: stagedMarker,
       handoffReviewTarget: handoffTarget,
       handoffReviewerStation: handoffMarker,

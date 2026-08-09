@@ -4,6 +4,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import {
   validateUbuntuCandidateArtifact,
+  validateUbuntuKpiReceipt,
   validateUbuntuReviewTarget,
   validateUbuntuStageEvidence,
 } from './stage-ubuntu-vsix.mjs';
@@ -24,6 +25,27 @@ const manifest = {
   version,
 };
 const installedExtensions = [`svelderrainruiz.labview-benchmark-actor@${version}`];
+const kpi = {
+  schema: 'labview-benchmark-actor/local-continuous-kpi@1',
+  mode: 'full',
+  version,
+  outcome: 'PASS',
+  kpi: {
+    candidate: {
+      sourceCommit: target.commit,
+      worktreeCleanBefore: true,
+      worktreeCleanAfter: true,
+      vsixSha256: target.vsixSha256,
+      vsixSize: vsixBytes.length,
+    },
+    localGates: { passed: 210, total: 210 },
+    package: {
+      firstSha256: target.vsixSha256,
+      secondSha256: target.vsixSha256,
+      identical: true,
+    },
+  },
+};
 
 assert.equal(validateUbuntuReviewTarget(target).ok, true);
 assert.equal(validateUbuntuReviewTarget({ ...target, commit: 'short' }).ok, false);
@@ -33,6 +55,22 @@ assert.equal(validateUbuntuCandidateArtifact({
   target: { ...target, vsixSha256: '0'.repeat(64) },
   vsixBytes,
   manifest,
+}).ok, false);
+assert.equal(validateUbuntuKpiReceipt({ target, kpi, vsixBytes }).ok, true);
+assert.equal(validateUbuntuKpiReceipt({
+  target,
+  kpi: { ...kpi, kpi: { ...kpi.kpi, candidate: { ...kpi.kpi.candidate, sourceCommit: 'b'.repeat(40) } } },
+  vsixBytes,
+}).ok, false);
+assert.equal(validateUbuntuKpiReceipt({
+  target,
+  kpi: { ...kpi, kpi: { ...kpi.kpi, candidate: { ...kpi.kpi.candidate, worktreeCleanAfter: false } } },
+  vsixBytes,
+}).ok, false);
+assert.equal(validateUbuntuKpiReceipt({
+  target,
+  kpi: { ...kpi, kpi: { ...kpi.kpi, package: { ...kpi.kpi.package, identical: false } } },
+  vsixBytes,
 }).ok, false);
 assert.equal(validateUbuntuCandidateArtifact({
   target,
@@ -63,6 +101,10 @@ const source = readFileSync(new URL('./stage-ubuntu-vsix.mjs', import.meta.url),
 assert(
   source.indexOf('const candidate = validateUbuntuCandidateArtifact') < source.indexOf("execFileSync(code, ['--install-extension'"),
   'candidate bytes and manifest are validated before installation',
+);
+assert(
+  source.indexOf('const kpiEvidence = validateUbuntuKpiReceipt') < source.indexOf("execFileSync(code, ['--install-extension'"),
+  'candidate commit KPI binding is validated before installation',
 );
 assert.match(source, /reviewer-station\.json/);
 assert.match(source, /handoffReviewTarget/);
