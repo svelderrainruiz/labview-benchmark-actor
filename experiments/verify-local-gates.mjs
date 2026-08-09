@@ -2297,7 +2297,7 @@ check('mcp-server-surface-contract', () => {
   assert(ignore.includes('src/**'), '.vscodeignore must exclude src/**');
   assert(!ignore.some((l) => l === 'out/**' || l === 'out/'), '.vscodeignore must NOT exclude out/ (the MCP entrypoint must ship)');
   assert(ignore.includes('AGENTS.md'), '.vscodeignore must exclude the workspace-root AGENTS materialization');
-  assert(!ignore.includes('**/AGENTS.md'), '.vscodeignore must not exclude the packaged media/AGENTS.md canonical instructions');
+  assert(!ignore.includes('**/AGENTS.md'), '.vscodeignore must not recursively exclude packaged media/AGENTS.md');
   // #123 packaging-leak guard (static, every-PR half; the empirical `vsce ls` allow-set is the agent-last-gate's
   // vsix-allow-set check at release/staging). The heavy non-runtime trees -- above all the reviewer VM disk
   // behind the 14 GB leak -- MUST stay excluded from the .vsix, and this runs on both OS runners.
@@ -2307,6 +2307,9 @@ check('mcp-server-surface-contract', () => {
   const lastGate = readFileSync(join(pkgRoot, 'scripts', 'agent-last-gate.mjs'), 'utf8');
   for (const runtimeRoot of ['release-components', 'release-risk-baseline', 'standards-score-baseline']) {
     assert(lastGate.includes(`^${runtimeRoot}\\.json$`), `agent-last-gate must allow packaged ${runtimeRoot}.json`);
+  }
+  for (const embeddedAgentsFile of ['media/AGENTS.md', 'media/agents.manifest.json']) {
+    assert(lastGate.includes(embeddedAgentsFile), `agent-last-gate must require ${embeddedAgentsFile}`);
   }
   // The dynamic protocol round-trip is wired into npm test.
   assert(/test\/mcp-server\.mjs/.test(pkg.scripts?.test ?? ''), 'npm test must run test/mcp-server.mjs');
