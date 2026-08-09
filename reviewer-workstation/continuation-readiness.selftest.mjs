@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 import assert from 'node:assert/strict';
-import { classifyWorktreeState, findSecretBearingFields, receiptDigest, validateReceipt } from './continuation-readiness.mjs';
+import { capabilityProbeSpec, classifyWorktreeState, findSecretBearingFields, receiptDigest, validateReceipt } from './continuation-readiness.mjs';
 
 function makeReceipt(overrides = {}) {
   const base = {
@@ -32,11 +32,11 @@ function makeReceipt(overrides = {}) {
       manifestSha256: '02ce9b7b0f69dca6e0297b07940eafc3ffc90681668d590d472bb24dc2f717a9',
     },
     tools: {
-      node: { ok: true },
-      npm: { ok: true },
-      dotnet: { ok: true },
-      glab: { ok: true },
-      lbabus: { ok: true },
+      node: { ok: true, path: 'C:\\Program Files\\nodejs\\node.exe' },
+      npm: { ok: true, path: 'C:\\Program Files\\nodejs\\npm.cmd' },
+      dotnet: { ok: true, path: 'C:\\Program Files\\dotnet\\dotnet.exe' },
+      glab: { ok: true, path: 'C:\\Users\\user\\AppData\\Local\\Programs\\glab\\glab.exe' },
+      lbabus: { ok: true, path: 'C:\\lba-tools\\lbabus\\lbabus.exe' },
     },
     lbabus: {
       selfcheckOk: true,
@@ -61,12 +61,23 @@ function makeReceipt(overrides = {}) {
 
 const allGreen = makeReceipt();
 assert.equal(validateReceipt(allGreen).ok, true, 'all-green receipt should validate');
+assert.deepEqual(
+  capabilityProbeSpec('virtualbox'),
+  { mode: 'command', command: 'VBoxManage.exe', args: ['--version'] },
+  'VirtualBox capability probing must remain CLI-only',
+);
+assert.equal(capabilityProbeSpec('labview').mode, 'path', 'LabVIEW capability probing must not launch the GUI');
+assert.equal(capabilityProbeSpec('vipm').mode, 'path', 'VIPM capability probing must not launch the GUI');
+assert.deepEqual(capabilityProbeSpec('ffmpeg').args, ['-version']);
 
-const wrongVersions = makeReceipt({ tools: { node: { ok: false }, npm: { ok: false }, dotnet: { ok: true }, glab: { ok: true }, lbabus: { ok: false } } });
+const wrongVersions = makeReceipt({ tools: { node: { ok: false }, npm: { ok: false }, lbabus: { ok: false } } });
 assert.equal(validateReceipt(wrongVersions).ok, false, 'wrong versions should fail');
 
-const missingDotnetGlab = makeReceipt({ tools: { node: { ok: true }, npm: { ok: true }, dotnet: { ok: false }, glab: { ok: false }, lbabus: { ok: true } } });
+const missingDotnetGlab = makeReceipt({ tools: { dotnet: { ok: false }, glab: { ok: false } } });
 assert.equal(validateReceipt(missingDotnetGlab).ok, false, 'missing dotnet/glab should fail');
+
+const relativeToolPath = makeReceipt({ tools: { npm: { ok: true, path: 'npm.cmd' } } });
+assert.equal(validateReceipt(relativeToolPath).ok, false, 'required tool paths must be absolute');
 
 const agentsDrift = makeReceipt({ agents: { rootMaterialized: false, canonicalMatch: false, version: '0.3.12', sha256: 'deadbeef' } });
 assert.equal(validateReceipt(agentsDrift).ok, false, 'AGENTS drift should fail');

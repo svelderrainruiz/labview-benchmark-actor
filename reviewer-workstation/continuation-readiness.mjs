@@ -5,15 +5,7 @@ import { createHash } from 'node:crypto';
 import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
 import { dirname, isAbsolute, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-function spawnInvocation(command, args = []) {
-  const needsCmdShim = process.platform === 'win32' && /\.(cmd|bat)$/i.test(command);
-  if (!needsCmdShim) {
-    return { command, args };
-  }
-  const commandText = String(command).includes(' ') ? `"${command}"` : command;
-  const quotedArgs = args.map((arg) => (String(arg).includes(' ') ? `"${arg}"` : String(arg)));
-  return { command: 'cmd.exe', args: ['/d', '/s', '/c', [commandText, ...quotedArgs].join(' ')] };
-}
+import { spawnInvocation } from '../extension-tasks/process-command.mjs';
 import { verifyManifest as verifyAgentsManifest, agentsSha256, readManifest as readAgentsManifest, AGENTS_MD as EXTENSION_AGENTS_MD } from '../scripts/agentsManifest.mjs';
 import { parseCorrespondenceSummary, parseCoverageSummary, parseLocalGateSummary } from '../scripts/local-kpi-core.mjs';
 import { buildCloseout, closeoutDigest, validateCloseout } from './release-risk-closeout.mjs';
@@ -130,9 +122,7 @@ function runCommand(command, args, { cwd = ROOT, allowFailure = false } = {}) {
 }
 
 function resolveExecutablePath(command) {
-  if (/\.cmd$/i.test(command) || /\.bat$/i.test(command)) {
-    return command;
-  }
+  if (isAbsolute(command)) return existsSync(command) ? command : null;
   if (process.platform === 'win32') {
     const { stdout } = runCommand('where.exe', [command], { allowFailure: true });
     const first = (stdout || '').split(/\r?\n/).map((line) => line.trim()).filter(Boolean)[0];
@@ -142,11 +132,58 @@ function resolveExecutablePath(command) {
       const localApp = process.env.LOCALAPPDATA ? join(process.env.LOCALAPPDATA, 'Programs', 'glab', 'glab.exe') : null;
       if (localApp) fallbackCandidates.push(localApp);
     }
+    const programFiles = process.env.ProgramFiles || 'C:\\Program Files';
+    const programFilesX86 = process.env['ProgramFiles(x86)'] || 'C:\\Program Files (x86)';
+    if (/^vboxmanage(?:\.exe)?$/i.test(command)) fallbackCandidates.push(join(programFiles, 'Oracle', 'VirtualBox', 'VBoxManage.exe'));
+    if (/^labviewcli(?:\.exe)?$/i.test(command)) fallbackCandidates.push(join(programFilesX86, 'National Instruments', 'Shared', 'LabVIEW CLI', 'LabVIEWCLI.exe'));
+    if (/^labview(?:\.exe)?$/i.test(command)) {
+      fallbackCandidates.push(
+        join(programFiles, 'National Instruments', 'LabVIEW 2026', 'LabVIEW.exe'),
+        join(programFilesX86, 'National Instruments', 'LabVIEW 2026', 'LabVIEW.exe'),
+      );
+    }
+    if (/^vipm(?:\.exe)?$/i.test(command)) fallbackCandidates.push(join(programFiles, 'JKI', 'VI Package Manager', 'support', 'vipm.exe'));
+    if (/^(?:tvnserver|tightvnc)(?:\.exe)?$/i.test(command)) fallbackCandidates.push(join(programFiles, 'TightVNC', 'tvnserver.exe'));
     return fallbackCandidates.find((candidate) => existsSync(candidate)) || null;
   }
   const { stdout } = runCommand('which', [command], { allowFailure: true });
   const first = (stdout || '').split(/\r?\n/).map((line) => line.trim()).filter(Boolean)[0];
   return first || null;
+}
+
+function probePathCapability(name, commands) {
+  const path = commands.map((command) => resolveExecutablePath(command)).find(Boolean) || null;
+  return {
+    name,
+    command: commands[0],
+    args: [],
+    path,
+    available: path !== null,
+    version: null,
+    versionText: '',
+    expected: null,
+    minimum: false,
+    required: false,
+    ok: path !== null,
+    failure: path ? null : `${name} executable not found`,
+  };
+}
+
+export function capabilityProbeSpec(name) {
+  switch (name) {
+    case 'signing-key': return { mode: 'unavailable', reason: 'not evidenced in this host probe' };
+    case 'git': return { mode: 'command', command: 'git', args: ['--version'] };
+    case 'rg': return { mode: 'command', command: 'rg', args: ['--version'] };
+    case 'gh': return { mode: 'command', command: 'gh', args: ['--version'] };
+    case 'labview': return { mode: 'path', commands: ['labview.exe'] };
+    case 'labviewcli': return { mode: 'path', commands: ['labviewcli.exe'] };
+    case 'virtualbox': return { mode: 'command', command: 'VBoxManage.exe', args: ['--version'] };
+    case 'vmware': return { mode: 'command', command: 'vmrun', args: ['-v'] };
+    case 'tightvnc': return { mode: 'path', commands: ['tvnserver.exe', 'tightvnc.exe'] };
+    case 'vipm': return { mode: 'path', commands: ['vipm.exe'] };
+    case 'ffmpeg': return { mode: 'command', command: 'ffmpeg', args: ['-version'] };
+    default: return { mode: 'command', command: name, args: ['--version'] };
+  }
 }
 
 function probeCommand(command, args, { name, expectedVersion, minimum = false, required = true } = {}) {
@@ -336,31 +373,12 @@ export function buildReadinessReceipt(opts = {}) {
 
   const capabilityNames = ['docker', 'vagrant', 'virtualbox', 'vmware', 'tightvnc', 'labview', 'labviewcli', 'vipm', 'ffmpeg', 'git', 'rg', 'gh', 'signing-key'];
   const capabilityEntries = capabilityNames.map((name) => {
-    let probe;
-    if (name === 'signing-key') {
-      probe = { available: false, version: null, versionText: '', reason: 'not evidenced in this host probe' };
-    } else if (name === 'git') {
-      probe = probeCommand('git', ['--version'], { name, required: false });
-    } else if (name === 'rg') {
-      probe = probeCommand('rg', ['--version'], { name, required: false });
-    } else if (name === 'gh') {
-      probe = probeCommand('gh', ['--version'], { name, required: false });
-    } else if (name === 'labview') {
-      probe = probeCommand('labview.exe', ['--version'], { name, required: false });
-    } else if (name === 'labviewcli') {
-      probe = probeCommand('labviewcli.exe', ['--version'], { name, required: false });
-    } else if (name === 'virtualbox') {
-      probe = probeCommand('virtualbox', ['--help'], { name, required: false });
-    } else if (name === 'vmware') {
-      probe = probeCommand('vmrun', ['-v'], { name, required: false });
-    } else if (name === 'tightvnc') {
-      probe = probeCommand('tightvnc', ['--version'], { name, required: false });
-    } else if (name === 'signing-key') {
-      probe = { available: false, version: null, versionText: '', reason: 'not evidenced in this host probe' };
-    } else {
-      probe = probeCommand(name, ['--version'], { name, required: false });
+    const spec = capabilityProbeSpec(name);
+    if (spec.mode === 'unavailable') {
+      return { name, available: false, version: null, versionText: '', path: null, failure: spec.reason };
     }
-    return probe;
+    if (spec.mode === 'path') return probePathCapability(name, spec.commands);
+    return probeCommand(spec.command, spec.args, { name, required: false });
   });
   receipt.capabilities.available = capabilityEntries.filter((entry) => entry.available).map((entry) => ({ name: entry.name, path: entry.path, version: entry.version }));
   receipt.capabilities.unavailable = capabilityEntries.filter((entry) => !entry.available).map((entry) => ({ name: entry.name, reason: entry.failure || 'not available' }));
@@ -483,6 +501,9 @@ export function validateReceipt(receipt) {
   if (!receipt.tools?.dotnet?.ok) failures.push('.NET SDK probe must pass');
   if (!receipt.tools?.glab?.ok) failures.push('glab probe must pass');
   if (!receipt.tools?.lbabus?.ok) failures.push('lbabus version probe must pass');
+  for (const tool of ['node', 'npm', 'dotnet', 'glab', 'lbabus']) {
+    if (!isAbsolute(String(receipt.tools?.[tool]?.path || ''))) failures.push(`${tool} path must be absolute`);
+  }
   if (!receipt.lbabus?.selfcheckOk) failures.push('lbabus selfcheck must pass');
   if (!receipt.lbabus?.capabilitiesOk) failures.push('lbabus capabilities must pass');
   if (!receipt.trackedWorktreeClean) failures.push('tracked worktree must be clean');
