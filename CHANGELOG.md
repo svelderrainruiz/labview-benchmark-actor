@@ -6,6 +6,28 @@ follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project
 
 ## [Unreleased]
 
+## [1.4.10] - 2026-08-09
+
+### Added
+
+- **Ubuntu production golden bases preserve remote-automation proof.** The production Vagrant definition
+  revalidates current Git, SSH, and guest-utilities state plus the unattended first-boot receipt on every clone.
+  Package mode binds that receipt and exact definition metadata before any box deletion, VM halt, or packaging.
+- **Ubuntu is a first-class human visual-review station.** Fresh candidates can be staged and signed inside a
+  disposable graphical Ubuntu 24.04 reviewer VM as `UBUNTU_VM`, with exact candidate identity and public evidence.
+- **Embedded agent governance advances to 0.3.14 and `lbabus` to 0.15.9.** The candidate-time 1.4.10 risk overlay,
+  Ubuntu reviewer station contract, and fresh version/purpose-scoped reviewer keys are bound without changing the
+  human-task bundle.
+- **The Ubuntu 24.04 installation reference carries measured golden-base evidence.** Credential-safe screenshots,
+  a 15m 52.458405s VM-running-to-SSH-ready proof, exact hashes, and cleanup evidence are included while unsafe or
+  non-probative draft captures remain evidence-only.
+
+### Fixed
+
+- **Golden definition and screenshot evidence fail closed across platforms.** Text hashes use LF canonicalization,
+  ungoverned production Vagrantfile overrides are rejected before Vagrant runs, and proof validation reads each
+  committed screenshot and compares its actual bytes to the recorded SHA-256.
+
 ## [1.4.9] - 2026-08-08
 
 ### Fixed

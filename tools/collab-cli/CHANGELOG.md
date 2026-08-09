@@ -10,6 +10,13 @@ so the WIN and LINUX planes install the exact same pinned version and cannot dri
 
 ## [Unreleased]
 
+## [0.15.9] — 2026-08-09
+
+### Changed
+
+- Enroll distinct Ubuntu-generated visual and quorum reviewer keys scoped only to extension 1.4.10.
+- Recognize the governed `UBUNTU_VM` signed-review station through the extension release apparatus.
+
 ## [0.15.8] — 2026-08-08
 
 ### Changed
@@ -325,7 +332,8 @@ so the published release notes are self-complete.
 
 - Shared versioned .NET CLI (`lbabus`) for the WIN↔LINUX coordination bus (#6).
 
-[Unreleased]: https://github.com/LabVIEW-Community-CI-CD/labview-benchmark-actor/compare/collab-cli-v0.15.8...HEAD
+[Unreleased]: https://github.com/LabVIEW-Community-CI-CD/labview-benchmark-actor/compare/collab-cli-v0.15.9...HEAD
+[0.15.9]: https://github.com/LabVIEW-Community-CI-CD/labview-benchmark-actor/compare/collab-cli-v0.15.8...collab-cli-v0.15.9
 [0.15.8]: https://github.com/LabVIEW-Community-CI-CD/labview-benchmark-actor/compare/collab-cli-v0.15.7...collab-cli-v0.15.8
 [0.15.7]: https://github.com/LabVIEW-Community-CI-CD/labview-benchmark-actor/compare/collab-cli-v0.15.6...collab-cli-v0.15.7
 [0.15.6]: https://github.com/LabVIEW-Community-CI-CD/labview-benchmark-actor/compare/collab-cli-v0.15.5...collab-cli-v0.15.6

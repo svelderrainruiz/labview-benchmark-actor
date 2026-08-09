@@ -17,7 +17,7 @@ import crypto from 'node:crypto';
 export const REVIEWER_VERDICT_SCHEMA = 'labview-benchmark-actor/reviewer-verdict@1';
 export const SIGNOFF_SCHEMA = 'labview-benchmark-actor/acg-human-signoff-v1'; // the verdict maps to this
 export const VERDICTS = Object.freeze(['pass', 'fail', 'changes']);
-export const REVIEWER_STATIONS = Object.freeze(['WINDOWS_VM', 'LINUX_CODESPACE']);
+export const REVIEWER_STATIONS = Object.freeze(['WINDOWS_VM', 'UBUNTU_VM', 'LINUX_CODESPACE']);
 
 // Deterministic canonical JSON (recursively sorted keys) so a verdict's digest is stable regardless of key
 // order. INLINED (dependency-free, Node crypto only) so this module stages into the extension's media/ and

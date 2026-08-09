@@ -3004,6 +3004,11 @@ check('handoff-verdict', () => {
   return { schema: verdict.schema, verdict: verdict.verdict, signoffSchema: signed.schema, busType: busPost.type, selftest: 'reviewer-verdict 7/7' };
 });
 
+check('ubuntu-reviewer-candidate-staging', () => {
+  execFileSync(process.execPath, [join(here, '..', 'reviewer-workstation', 'stage-ubuntu-vsix.selftest.mjs')], { stdio: 'pipe' });
+  return { station: 'UBUNTU_VM', selftest: 'exact version/hash/installed-extension staging contract' };
+});
+
 // LBA-REQ-059 / ADR-0039: the host<->VM-agent CLOSED LOOP over lbabus net TCP. A pure parser self-test (no
 // network/VM), the committed live+loopback receipt, and the semantic verdict types on the net envelope (option A):
 // the host awaits the VM agent's correlated reply over TCP and the reviewer verdict announces as a first-class
