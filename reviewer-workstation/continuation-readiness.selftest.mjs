@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 import assert from 'node:assert/strict';
-import { capabilityProbeSpec, classifyRepositoryRelation, classifyWorktreeState, executableForProbe, findSecretBearingFields, receiptDigest, validateReceipt } from './continuation-readiness.mjs';
+import { assessVersionOutput, capabilityProbeSpec, classifyRepositoryRelation, classifyWorktreeState, executableForProbe, findSecretBearingFields, receiptDigest, validateReceipt, validateStoredReceipt } from './continuation-readiness.mjs';
 
 const absoluteToolPaths = process.platform === 'win32'
   ? {
@@ -77,6 +77,15 @@ function makeReceipt(overrides = {}) {
 
 const allGreen = makeReceipt();
 assert.equal(validateReceipt(allGreen).ok, true, 'all-green receipt should validate');
+assert.equal(
+  assessVersionOutput({ available: true, versionText: 'version unknown', expectedVersion: '1.2.3', name: 'tool' }).ok,
+  false,
+  'required version probes must fail when output has no parseable version',
+);
+assert.equal(
+  assessVersionOutput({ available: true, versionText: 'tool 1.2.3', expectedVersion: '1.2.3', name: 'tool' }).ok,
+  true,
+);
 assert.deepEqual(
   classifyRepositoryRelation({ head: 'a'.repeat(40), originDevelop: 'a'.repeat(40), mergeBase: 'a'.repeat(40) }),
   { headEqualsOriginDevelop: true, headIsAncestorOfOriginDevelop: true, originDevelopIsAncestorOfHead: true },
@@ -131,6 +140,8 @@ assert.equal(validateReceipt(failedKpi).ok, false, 'failed KPI should fail');
 const tampered = makeReceipt();
 const tamperedDigest = { ...tampered, receiptDigest: '0'.repeat(64) };
 assert.equal(validateReceipt(tamperedDigest).ok, false, 'tampered digest should fail');
+assert.equal(validateStoredReceipt(tamperedDigest, tampered).ok, false, '--check must reject a tampered stored receipt');
+assert.equal(validateStoredReceipt(tampered, tampered).ok, true, '--check should accept identical valid receipts');
 
 const secrets = makeReceipt({ capabilities: { available: [{ name: 'git', path: 'C:/git/git.exe' }], unavailable: [] }, releaseSigning: { status: 'closed', privateKeyPath: 'C:/secrets/key.pem' } });
 assert.equal(findSecretBearingFields(secrets).length > 0, true, 'secret-bearing fields should be detected');

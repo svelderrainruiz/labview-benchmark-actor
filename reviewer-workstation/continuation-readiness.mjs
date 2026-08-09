@@ -204,22 +204,37 @@ function probeCommand(command, args, { name, expectedVersion, minimum = false, r
   const probe = runCommand(executableForProbe(command, resolvedPath), args, { allowFailure: true });
   const available = !probe.error && probe.status === 0;
   const versionText = available ? stripAnsi((probe.stdout || probe.stderr || '').trim()) : '';
-  const extracted = versionText.match(/(\d+\.\d+(?:\.\d+)?)/);
-  const version = extracted ? extracted[1] : null;
-  const versionCheck = version && expectedVersion ? compareVersions(version, expectedVersion, { minimum }) : null;
+  const assessed = assessVersionOutput({ available, versionText, expectedVersion, minimum, name });
   return {
     name,
     command,
     args,
     path: available ? resolvedPath : null,
     available,
-    version,
+    version: assessed.version,
     versionText,
     expected: expectedVersion,
     minimum,
     required,
-    ok: available && (!expectedVersion || !versionCheck || versionCheck.ok),
-    failure: available && expectedVersion && versionCheck && !versionCheck.ok ? versionCheck.reason : available ? null : `${name} probe failed`,
+    ok: assessed.ok,
+    failure: assessed.failure,
+  };
+}
+
+export function assessVersionOutput({ available, versionText, expectedVersion, minimum = false, name = 'command' }) {
+  const extracted = versionText.match(/(\d+\.\d+(?:\.\d+)?)/);
+  const version = extracted ? extracted[1] : null;
+  const versionCheck = version && expectedVersion ? compareVersions(version, expectedVersion, { minimum }) : null;
+  return {
+    version,
+    ok: available && (!expectedVersion || (version !== null && versionCheck?.ok === true)),
+    failure: !available
+      ? `${name} probe failed`
+      : expectedVersion && version === null
+        ? `${name} returned no parseable version`
+        : expectedVersion && !versionCheck?.ok
+          ? versionCheck?.reason || `${name} version check failed`
+          : null,
   };
 }
 
@@ -531,6 +546,18 @@ export function validateReceipt(receipt) {
   return { ok: failures.length === 0, failures };
 }
 
+export function validateStoredReceipt(stored, current) {
+  const failures = [];
+  const storedValidation = validateReceipt(stored);
+  const currentValidation = validateReceipt(current);
+  failures.push(...storedValidation.failures.map((failure) => `stored receipt: ${failure}`));
+  failures.push(...currentValidation.failures.map((failure) => `current receipt: ${failure}`));
+  const storedJson = JSON.stringify(canonicalize(normalizeForComparison(stored)));
+  const currentJson = JSON.stringify(canonicalize(normalizeForComparison(current)));
+  if (storedJson !== currentJson) failures.push('receipt drift detected');
+  return { ok: failures.length === 0, failures };
+}
+
 function writeReceiptAtomically(receipt) {
   mkdirSync(CONTINUATION_DIR, { recursive: true });
   const content = `${JSON.stringify(receipt, null, 2)}\n`;
@@ -555,18 +582,10 @@ function main() {
     }
     const stored = JSON.parse(readFileSync(OUTPUT_PATH, 'utf8'));
     const current = buildReadinessReceipt();
-    const normalizedStored = normalizeForComparison(stored);
-    const normalizedCurrent = normalizeForComparison(current);
-    const currentJson = JSON.stringify(normalizedCurrent);
-    const storedJson = JSON.stringify(normalizedStored);
-    const validation = validateReceipt(current);
+    const validation = validateStoredReceipt(stored, current);
     if (!validation.ok) {
       console.error('continuation-readiness: receipt validation failed');
       for (const failure of validation.failures) console.error(`  - ${failure}`);
-      process.exit(1);
-    }
-    if (storedJson !== currentJson) {
-      console.error('continuation-readiness: receipt drift detected');
       process.exit(1);
     }
     console.log(`continuation-readiness: receipt OK ${OUTPUT_PATH}`);
