@@ -23,6 +23,7 @@ const SOURCES = {
   massCompileGolden: 'experiments/mass-compile/fixtures/mass-compile-benchmark-receipt.json',
   massCompileHost: 'experiments/benchmark-grid/fixtures/mass-compile-host.receipt.json',
   massCompileWin: 'experiments/benchmark-grid/fixtures/mass-compile-win.receipt.json',
+  massCompileScratchVm: 'experiments/benchmark-grid/fixtures/mass-compile-scratch-vm.receipt.json',
   pplBuild: 'experiments/ppl-build/fixtures/ppl-build-benchmark-receipt.json',
   lunitTest: 'experiments/lunit-test/fixtures/lunit-test-benchmark-receipt.json',
 };
@@ -44,6 +45,7 @@ export function buildObservatoryFromCommittedReceipts() {
     benchmarkFromViAnalyzerComparison(readJson(SOURCES.viAnalyzer)),
     benchmarkFromMassCompileReceipts([
       readJson(SOURCES.massCompileGolden), readJson(SOURCES.massCompileHost), readJson(SOURCES.massCompileWin),
+      readJson(SOURCES.massCompileScratchVm),
     ]),
     benchmarkFromPplBuild(readJson(SOURCES.pplBuild)),
     benchmarkFromLunitTest(readJson(SOURCES.lunitTest)),

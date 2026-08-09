@@ -13,6 +13,7 @@ import { RECEIPT_SCHEMA, computeResultHash, buildMassCompileReceipt, validateMas
 
 const here = dirname(fileURLToPath(import.meta.url));
 const receipt = JSON.parse(readFileSync(join(here, 'fixtures', 'mass-compile-benchmark-receipt.json'), 'utf8'));
+const scratchVmReceipt = JSON.parse(readFileSync(join(here, '..', 'benchmark-grid', 'fixtures', 'mass-compile-scratch-vm.receipt.json'), 'utf8'));
 let passed = 0;
 const ok = (m) => { console.log(`  PASS  ${m}`); passed += 1; };
 const clone = (o) => JSON.parse(JSON.stringify(o));
@@ -26,6 +27,17 @@ const clone = (o) => JSON.parse(JSON.stringify(o));
   assert.equal(receipt.badViCount, 0, '0 bad VIs');
   assert.ok(receipt.visInDirectory > 0, 'non-empty directory');
   ok(`committed benchmark valid: MassCompile ${receipt.source.directory} = ${receipt.visInDirectory} VIs/CTLs, ${receipt.badViCount} bad, succeeded (${receipt.timing.compileSeconds}s)`);
+}
+
+// 2. the scratch VM reproduced the exact benchmark identity with independent timing
+{
+  const r = validateMassCompileReceipt(scratchVmReceipt);
+  assert.ok(r.ok && r.benchmarkOk, `scratch VM receipt must validate: ${r.findings.join('; ')}`);
+  assert.equal(scratchVmReceipt.resultHash, receipt.resultHash, 'scratch VM resultHash matches the golden consensus');
+  assert.equal(scratchVmReceipt.visInDirectory, 307, 'scratch VM compiled the same 307 VIs/CTLs');
+  assert.equal(scratchVmReceipt.badViCount, 0, 'scratch VM reported 0 bad VIs');
+  assert.notEqual(scratchVmReceipt.timing.cliElapsedMs, receipt.timing.cliElapsedMs, 'timing remains substrate-specific');
+  ok(`scratch VM reproduced ${scratchVmReceipt.resultHash.slice(0, 16)}... in ${scratchVmReceipt.timing.compileSeconds}s`);
 }
 
 // 2. deterministic replay: rebuilding yields the identical digest + resultHash

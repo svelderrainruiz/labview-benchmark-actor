@@ -7,6 +7,7 @@
 ## Start here
 
 - **New?** → [Getting Started](./getting-started.md)
+- **Installing Ubuntu?** → [Ubuntu 24.04 + LabVIEW 2026 Installation](./ubuntu-24.04-labview-2026-installation.md)
 - **Joining the mesh?** → [Join the Mesh](./join-the-mesh.md)
 - **Looking up a command?** → [Command Reference](./command-reference.md)
 - **Stuck?** → [FAQ](./faq.md)
@@ -18,6 +19,7 @@
 | --- | --- | --- |
 | [Getting Started](./getting-started.md) | reach a first benchmark fast | community member |
 | [User Guide](./user-guide.md) | learn the review workflow in depth | community member |
+| [Ubuntu 24.04 + LabVIEW 2026 Installation](./ubuntu-24.04-labview-2026-installation.md) | reproduce the measured Linux VM installation and benchmark lane | user, agent, operator |
 | [Join the Mesh](./join-the-mesh.md) | contribute cross-plane results to the mesh | community member |
 | [Command Reference](./command-reference.md) | find any of the 21 commands | member, agent, maintainer |
 | [Glossary](./glossary.md) | define a domain term | all |

@@ -23,9 +23,10 @@ VIP=/usr/local/natinst/share/nilvcli/Examples/AddTwoNumbers/AddTwoNumbers.vi
 LVP=/usr/local/natinst/LabVIEW-2026-64/labview
 LVCLI=/usr/local/bin/LabVIEWCLI
 PROBE_OUT=/tmp/lba-activation-probe.out
+DISPLAY_MODE=unselected
 
 emit_capture() {
-  python3 - "$A" "$B" "$EXPECTED" "$1" "$2" "$VIP" "$LVP" "$PROBE_OUT" "$OUT" "$3" <<'PY'
+  python3 - "$A" "$B" "$EXPECTED" "$1" "$2" "$VIP" "$LVP" "$PROBE_OUT" "$OUT" "$3" "$DISPLAY_MODE" <<'PY'
 import json
 import os
 import platform
@@ -33,7 +34,7 @@ import socket
 import subprocess
 import sys
 
-a, b, expected, exit_code, wall_ms, probe_vi, labview_path, probe_out, destination, activation_challenge = sys.argv[1:]
+a, b, expected, exit_code, wall_ms, probe_vi, labview_path, probe_out, destination, activation_challenge, display_mode = sys.argv[1:]
 try:
     with open(probe_out, encoding="utf-8", errors="replace") as handle:
         output = handle.read()
@@ -54,6 +55,7 @@ record = {
     "exitCode": int(exit_code),
     "wallMs": int(wall_ms),
     "output": output,
+    "displayMode": display_mode,
     "host": {"os": platform.system().lower(), "hostname": socket.gethostname(), **({"bootId": boot_id} if boot_id else {})},
 }
 actor_fields = {
@@ -94,19 +96,32 @@ if [ -n "$ACTIVATION_CHALLENGE" ] && ! [[ "$ACTIVATION_CHALLENGE" =~ ^[a-f0-9]{3
   exit 2
 fi
 
-# Headless display :99 (isolated from any gdm :0 session); start only if not already up. LabVIEW SEGFAULTS
-# on a half-initialized display, so poll xdpyinfo (bounded ~30s) + a 1s settle before launching.
-if ! command -v xvfb-run >/dev/null 2>&1; then
-  printf '%s\n' 'xvfb-run is required for the headless activation probe; run provision-guest.sh first.' > "$PROBE_OUT"
-  emit_capture 127 0 ''
-  echo "activation capture -> $OUT (exit=127; missing headless display prerequisite)" >&2
-  cat "$PROBE_OUT"
-  exit 127
-fi
-
 run_probe() {
-  xvfb-run -a timeout 240 "$LVCLI" -LabVIEWPath "$LVP" -PortNumber 3363 \
-    -OperationName RunVI -VIPath "$VIP" "$A" "$B"
+  active_labview_pid="$(pgrep -o -x labview 2>/dev/null || true)"
+  if [ -n "$active_labview_pid" ] && [ -r "/proc/${active_labview_pid}/environ" ]; then
+    while IFS= read -r assignment; do
+      export "$assignment"
+    done < <(tr '\0' '\n' < "/proc/${active_labview_pid}/environ" |
+      grep -E '^(DISPLAY|XAUTHORITY|XDG_RUNTIME_DIR|DBUS_SESSION_BUS_ADDRESS)=' || true)
+  fi
+
+  if [ -n "${DISPLAY:-}" ] && xdpyinfo -display "$DISPLAY" >/dev/null 2>&1; then
+    DISPLAY_MODE=active-graphical-seat
+    timeout 240 "$LVCLI" -LabVIEWPath "$LVP" -PortNumber 3363 \
+      -OperationName RunVI -VIPath "$VIP" "$A" "$B"
+    return
+  fi
+
+  if command -v xvfb-run >/dev/null 2>&1; then
+    DISPLAY_MODE=xvfb
+    xvfb-run -a timeout 240 "$LVCLI" -LabVIEWPath "$LVP" -PortNumber 3363 \
+      -OperationName RunVI -VIPath "$VIP" "$A" "$B"
+    return
+  fi
+
+  DISPLAY_MODE=unavailable
+  printf '%s\n' 'no usable graphical seat or xvfb-run is available' >&2
+  return 127
 }
 
 t0=$(date +%s%N)

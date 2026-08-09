@@ -1,0 +1,263 @@
+# Ubuntu 24.04 + LabVIEW 2026 Installation Reference
+
+This is the canonical installation reference for the tested Ubuntu variant used by users, agents, and
+operators of `labview-benchmark-actor`.
+
+## Tested variant
+
+| Item | Tested value |
+| --- | --- |
+| Guest OS | Ubuntu 24.04.4 LTS desktop, 64-bit |
+| Hypervisor | Oracle VirtualBox 7.2.8 |
+| VM allocation | 12,288MB RAM, 6 vCPUs |
+| LabVIEW | 2026 Q1 Community Edition, 64-bit (`26.1.1.49170-0+f18`) |
+| LabVIEWCLI | `26.1.0.49328-0+f176` |
+| VIPM | `26.3.1-4017` |
+| Automation display | active graphical seat; Xvfb remains a fallback |
+| VI Server | TCP 3363 |
+
+The measurements below are observations from one disposable linked clone. They are not performance guarantees
+for other hosts.
+
+## 1. Create a disposable VM
+
+Keep the retained source VM powered off. Clone a proven snapshot rather than modifying the source.
+
+The measured baseline:
+
+- source VM: `lba-ubuntu2404-labview2026-scratch`;
+- source UUID: `6680988b-5eb3-434d-96c6-8cf22f3055b9`;
+- snapshot: `mass-compile-baseline-20260809-094107`;
+- snapshot UUID: `73913831-d37c-48ca-81a9-d9cf585e9767`.
+
+The snapshot booted to the graphical login screen:
+
+![Ubuntu graphical login](images/ubuntu-24.04-labview-2026/baseline-login.png)
+
+First-clone timing was unusually slow:
+
+| Milestone | Elapsed from VirtualBox running state |
+| --- | ---: |
+| Login screen captured | 15m 17.868s |
+| Desktop / first-login wizard visible | 17m 17.085s |
+| Terminal available | 19m 58.478s |
+| OpenSSH installation complete | 22m 27.047s |
+| SSH functional probe passed | 22m 57.767s |
+
+These timings include manual login, Ubuntu's first-login wizard, and installing OpenSSH. They are not warm-boot
+metrics.
+
+## 2. Establish remote automation
+
+The clean desktop image did not include OpenSSH. Open a terminal and install it:
+
+```bash
+sudo apt-get update
+sudo apt-get install -y openssh-server
+sudo systemctl enable --now ssh
+```
+
+![Terminal ready](images/ubuntu-24.04-labview-2026/terminal-ready.png)
+
+![OpenSSH installed](images/ubuntu-24.04-labview-2026/ssh-install.png)
+
+For reproducible automation:
+
+- forward the clone's guest port 22 to a collision-resistant host-loopback port;
+- do not expose SSH to a LAN;
+- never record the disposable password in logs, commands, screenshots, or receipts;
+- confirm SSH with a concrete command such as `id -u`, `hostname`, and `systemctl is-active ssh`.
+
+## 3. Run the maintained provisioner
+
+Upload these repository files to the clone:
+
+```text
+cleanroom/ubuntu-labview/provision-guest.sh
+cleanroom/ubuntu-labview/ni-labview-2026-noble-community.asc
+```
+
+Run:
+
+```bash
+sudo env PRIMARY_USER=actor PROVISION_REBOOT=0 \
+  bash /home/actor/lba-provision/provision-guest.sh
+```
+
+The measured provisioner run:
+
+| Metric | Measured value |
+| --- | ---: |
+| Monotonic duration | 164.532s |
+| Exit code | 0 |
+| LabVIEW package | `ni-labview-2026-community 26.1.1.49170-0+f18` |
+| LabVIEWCLI package | `ni-labview-command-line-interface 26.1.0.49328-0+f176` |
+| VIPM package | `26.3.1-4017` |
+
+The provisioner installs Xvfb and required libraries, configures VI Server TCP 3363 for both LabVIEW executable
+basenames, installs VIPM, and deliberately stops before NI-account activation.
+
+## 4. Reboot and verify prerequisites
+
+A post-install reboot is required. Measure reboot completion by:
+
+1. recording `/proc/sys/kernel/random/boot_id`;
+2. requesting reboot;
+3. reconnecting through SSH;
+4. requiring a changed boot ID and `systemctl is-active ssh`.
+
+Measured reboot request to verified SSH-ready:
+
+```text
+18.829s
+```
+
+The first connection failure occurred 0.110s after the request.
+
+![Post-reset login](images/ubuntu-24.04-labview-2026/reset-login.png)
+
+Run the maintained readiness check:
+
+```bash
+bash cleanroom/ubuntu-labview/activation-ready.sh --check
+```
+
+All prerequisite checks must pass:
+
+- LabVIEWCLI and LabVIEW binary;
+- NI AddTwoNumbers probe VI;
+- Python, Xvfb, and `xdpyinfo`;
+- VIPM package and command;
+- graphical target, display manager, and graphical console seat;
+- `labview.conf` and `labviewcommunity.conf`;
+- VI Server TCP 3363 and quoted wildcard access lists;
+- passwordless sudo for the disposable `actor` account.
+
+## 5. Complete human NI activation
+
+Launch LabVIEW interactively:
+
+```bash
+/usr/local/natinst/LabVIEW-2026-64/labview
+```
+
+The human operator signs into their NI account. Agents must not request, type, store, screenshot, or transmit NI
+credentials.
+
+After activation, LabVIEW opens normally:
+
+![Activated LabVIEW 2026 Community](images/ubuntu-24.04-labview-2026/labview-activated.png)
+
+The observed interval between the activation-boundary screenshot and activated-window screenshot was at most
+224.723s. This includes human interaction and is not an automated performance metric.
+
+## 6. Prove activation functionally
+
+A screenshot is not activation proof. Run the known-answer probe:
+
+```bash
+bash experiments/activation/probe-activation.sh 20 22 /tmp/lba-activation-capture.json
+```
+
+Expected:
+
+- exit code 0;
+- VI Server connection on port 3363;
+- operation output 42;
+- `RunVI operation succeeded`;
+- a fresh 32-hex activation challenge;
+- display mode recorded.
+
+Measured activation probe:
+
+| Metric | Measured value |
+| --- | ---: |
+| CLI wall time | 1,584ms |
+| Expected/actual | 42 / 42 |
+| Display mode | `active-graphical-seat` |
+
+On this Ubuntu build, Xvfb execution segfaulted. The maintained probe therefore reuses a valid active graphical
+LabVIEW seat first and retains Xvfb only as a fallback for previously validated hosts.
+
+## 7. Example performance proof: Mass Compile
+
+The measured workload used:
+
+- repository `ni/labview-icon-editor`;
+- commit `9545c483f2b947c71de68c7f70aedefaedadabf7`;
+- directory `resource`;
+- 307 VIs/CTLs;
+- zero bad VIs.
+
+Source preparation required Git 2.43.0:
+
+| Phase | Duration |
+| --- | ---: |
+| Install Git | 6.906s |
+| Clone and detach pinned source | 10.375s |
+
+Run:
+
+```bash
+LabVIEWCLI \
+  -LabVIEWPath /usr/local/natinst/LabVIEW-2026-64/labview \
+  -PortNumber 3363 \
+  -OperationName MassCompile \
+  -DirectoryToCompile /home/actor/labview-icon-editor/resource \
+  -MassCompileLogFile /home/actor/lba-provision/mass-compile.log \
+  -AppendToMassCompileLog FALSE
+```
+
+Measured result:
+
+| Metric | Measured value |
+| --- | ---: |
+| LabVIEW report interval | 60s |
+| CLI wall time | 60.582s |
+| Samples | 58 at 500ms |
+| Average LabVIEW process CPU | 92.70% |
+| Peak LabVIEW RSS | 397.55MB |
+| Minimum available guest memory | 10,286.29MB |
+| Disk read delta | 1,785,856 bytes |
+| Disk write delta | 44,752,896 bytes |
+| Maximum one-minute load | 1.20 |
+| Result hash | `bf722123ba07ac4611e41eadf605cf45b20d398d3229b2b837d3f5115d0a7966` |
+
+The result hash matches the existing host, golden-VM, and Windows measurements. Timing and resource usage are
+substrate-specific and are intentionally excluded from that identity.
+
+## Clock domains
+
+Host screenshot timestamps and guest LabVIEW timestamps are separate clock domains. The first boot accumulated
+VirtualBox timer catch-up stalls, so do not subtract host and guest wall clocks. Use monotonic durations measured
+within one domain.
+
+## Live evidence changelog requirement
+
+Agents updating this reference must append an entry as each live phase completes or materially changes. On a
+best-effort basis, pair every narrative with visual evidence captured near the event.
+
+Each entry must include:
+
+- UTC timestamp and monotonic elapsed time when available;
+- VM name/UUID and phase;
+- precise narrative of the visible transition;
+- screenshot path and SHA-256;
+- machine-readable log/receipt path and digest;
+- measured timing/performance;
+- outcome (`PASS`, `FAIL`, `BLOCKED`, or `IN_PROGRESS`);
+- uncertainty, sampling interval, or reason a safe screenshot was unavailable.
+
+Visual evidence must not be used to claim hidden state such as activation, package integrity, or command success;
+pair those claims with command output or receipts. Never capture credentials, account pages, tokens, computer IDs,
+private keys, or other secrets.
+
+## Cleanup
+
+After evidence extraction:
+
+- power off and delete only the disposable clone;
+- verify the retained source VM is powered off;
+- preserve or delete the source snapshot according to the operator's explicit decision;
+- retain raw logs/screenshots outside Git;
+- commit only normalized, non-secret receipts and safe documentation images.

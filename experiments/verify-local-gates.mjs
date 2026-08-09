@@ -439,7 +439,7 @@ check('vm-live-status-idle-analysis', () => {
 //     stale/tampered resultHash, forged verdict, inconsistent bad-VI list, or tampered digest.
 check('mass-compile-benchmark', () => {
   execFileSync(process.execPath, [join(here, 'mass-compile', 'verify-mass-compile-benchmark.selftest.mjs')], { stdio: 'pipe' });
-  return { standard: 'ADR-0023 Phase 1 (golden-VM benchmark)', selftest: 'verify-mass-compile-benchmark 7/7 (icon-editor MassCompile, cross-plane resultHash)' };
+  return { standard: 'ADR-0023 Phase 1 (golden-VM benchmark)', selftest: 'verify-mass-compile-benchmark 8/8 (icon-editor MassCompile, four-plane resultHash)' };
 });
 
 // 6u. Golden-VM provisioner headless-LabVIEW readiness (LBA-REQ-049, ADR-0023 Phase 1): the one-command
