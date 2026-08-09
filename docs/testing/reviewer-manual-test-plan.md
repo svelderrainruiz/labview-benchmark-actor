@@ -111,8 +111,9 @@ workspace root.
 - **Steps:**
   1. Run **LabVIEW Benchmark Actor: Poll Coordination Bus**.
 - **Expected:** the **"LabVIEW Benchmark Actor"** output channel shows the last ~10 bus messages
-  (the command runs `lbabus net poll --tail 10`); no error. If the CLI is missing, the channel
-  shows a clear error (record it).
+  (the configured-log path runs `lbabus net poll --log <path> --tail 10`); no error. If
+  `busNetLog` is empty, the extension omits `--log` and the CLI uses its documented default.
+  If the CLI is missing, the channel shows a clear error (record it).
 - **Result:** _____
 
 ### TC-05 — Post Coordination Note
