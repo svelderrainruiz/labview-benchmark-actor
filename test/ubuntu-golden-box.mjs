@@ -98,6 +98,8 @@ assert.equal(
 
 for (const marker of [
   'Assert-BaseBootstrapReceiptForPackage',
+  'systemctl is-active --quiet ssh.service',
+  'systemctl is-enabled --quiet virtualbox-guest-utils.service',
   'base bootstrap receipt validation failed; package is blocked',
   'baseBootstrapReceipt',
   'golden-production-package@2',

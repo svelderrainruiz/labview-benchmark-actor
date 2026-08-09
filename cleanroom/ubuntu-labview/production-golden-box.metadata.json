@@ -2,7 +2,7 @@
   "schema": "labview-benchmark-actor/ubuntu-production-golden-definition@1",
   "definition": {
     "path": "cleanroom/ubuntu-labview/production-golden-box.Vagrantfile",
-    "sha256": "40973bdb4ebe209663d657da8bdad9bb31b856c15596e52ae2df3ad8e869e2d3"
+    "sha256": "84f47663c116ef4f73090268793c918f0f45dcf1d24e1773fdcca7bd8688fe65"
   },
   "guest": {
     "os": "ubuntu-24.04",

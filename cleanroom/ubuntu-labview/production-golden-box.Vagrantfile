@@ -9,6 +9,13 @@ Vagrant.configure("2") do |config|
     set -euo pipefail
     receipt=/var/lib/lba-cleanroom/base-bootstrap-receipt.json
     test -r "$receipt"
+    test "$(command -v git)" = /usr/bin/git
+    test -x /usr/sbin/sshd
+    test -x /usr/sbin/VBoxService
+    systemctl is-active --quiet ssh.service
+    systemctl is-enabled --quiet ssh.service
+    systemctl is-active --quiet virtualbox-guest-utils.service
+    systemctl is-enabled --quiet virtualbox-guest-utils.service
     python3 - "$receipt" <<'PY'
     import json
     import pathlib

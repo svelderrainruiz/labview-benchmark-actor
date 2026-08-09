@@ -207,6 +207,8 @@ function Test-ConsoleReadinessReceipt {
 }
 
 function Assert-BaseBootstrapReceiptForPackage {
+  $currentStateCommand = 'test "$(command -v git)" = /usr/bin/git && test -x /usr/sbin/sshd && test -x /usr/sbin/VBoxService && systemctl is-active --quiet ssh.service && systemctl is-enabled --quiet ssh.service && systemctl is-active --quiet virtualbox-guest-utils.service && systemctl is-enabled --quiet virtualbox-guest-utils.service'
+  Invoke-Vagrant -Arguments @('ssh', $Vm, '-c', $currentStateCommand)
   Receive-GuestFile -Source '/var/lib/lba-cleanroom/base-bootstrap-receipt.json' -Destination $baseBootstrapReceipt
   & node $goldenBoxVerifier --base-receipt $baseBootstrapReceipt | Out-Host
   if ($LASTEXITCODE -ne 0) {

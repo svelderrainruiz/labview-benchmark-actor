@@ -76,6 +76,8 @@ export function validateGoldenBoxDefinition({ metadata, vagrantfile }) {
     'config.ssh.insert_key = true',
     'verify-lba-base',
     '/var/lib/lba-cleanroom/base-bootstrap-receipt.json',
+    'systemctl is-active --quiet ssh.service',
+    'systemctl is-enabled --quiet virtualbox-guest-utils.service',
     'LBA Ubuntu base receipt is missing or stale',
   ];
   for (const marker of requiredVagrantMarkers) {
