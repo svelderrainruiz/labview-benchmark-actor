@@ -78,6 +78,17 @@ assert.equal(
   verifyUbuntuBaseBootstrapContract({
     bootstrap,
     builder: builder.replace(
+      "grep -- '--post-install-template' >/dev/null",
+      "grep -q -- '--post-install-template'",
+    ),
+  }).ok,
+  false,
+  'hook detection must not SIGPIPE VBoxManage under pipefail',
+);
+assert.equal(
+  verifyUbuntuBaseBootstrapContract({
+    bootstrap,
+    builder: builder.replace(
       'SSH_HOST_PORT must be an integer from 1024 through 65535',
       'port validation unavailable',
     ),

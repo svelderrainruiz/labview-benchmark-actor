@@ -105,7 +105,7 @@ fi
 
 BOOTSTRAP_SOURCE="$(dirname "$(readlink -f "$0")")/base-bootstrap.sh"
 [ -f "$BOOTSTRAP_SOURCE" ] || { echo "[abort] missing unattended bootstrap template: $BOOTSTRAP_SOURCE" >&2; exit 1; }
-if [ "$DRY_RUN" = 0 ] && ! VBoxManage unattended install --help 2>&1 | grep -q -- '--post-install-template'; then
+if [ "$DRY_RUN" = 0 ] && ! VBoxManage unattended install --help 2>&1 | grep -- '--post-install-template' >/dev/null; then
   echo "[abort] this VBoxManage does not support unattended --post-install-template" >&2
   exit 1
 fi
