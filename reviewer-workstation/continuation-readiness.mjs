@@ -5,15 +5,14 @@ import { createHash } from 'node:crypto';
 import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
 import { dirname, isAbsolute, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-function spawnInvocation(command, args = [], options = {}) {
-  const invocation = { ...options, encoding: 'utf8', shell: false };
-  const needsCmdShim = process.platform === 'win32' && /\\.(cmd|bat)$/i.test(command);
+function spawnInvocation(command, args = []) {
+  const needsCmdShim = process.platform === 'win32' && /\.(cmd|bat)$/i.test(command);
   if (!needsCmdShim) {
-    return spawnSync(command, args, invocation);
+    return { command, args };
   }
-  const quotedCommand = `"${command}"`;
+  const commandText = String(command).includes(' ') ? `"${command}"` : command;
   const quotedArgs = args.map((arg) => (String(arg).includes(' ') ? `"${arg}"` : String(arg)));
-  return spawnSync('cmd.exe', ['/d', '/s', '/c', [quotedCommand, ...quotedArgs].join(' ')], invocation);
+  return { command: 'cmd.exe', args: ['/d', '/s', '/c', [commandText, ...quotedArgs].join(' ')] };
 }
 import { verifyManifest as verifyAgentsManifest, agentsSha256, readManifest as readAgentsManifest, AGENTS_MD as EXTENSION_AGENTS_MD } from '../scripts/agentsManifest.mjs';
 import { parseCorrespondenceSummary, parseCoverageSummary, parseLocalGateSummary } from '../scripts/local-kpi-core.mjs';
