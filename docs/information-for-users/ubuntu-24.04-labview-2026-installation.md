@@ -44,6 +44,10 @@ First-clone timing was unusually slow:
 | OpenSSH installation complete | 22m 27.047s |
 | SSH functional probe passed | 22m 57.767s |
 
+The first-login wizard was the visible boundary between successful desktop login and terminal setup:
+
+![Ubuntu first-login wizard](images/ubuntu-24.04-labview-2026/first-login-wizard.png)
+
 These timings include manual login, Ubuntu's first-login wizard, and installing OpenSSH. They are not warm-boot
 metrics.
 
@@ -136,6 +140,10 @@ Measured reboot request to verified SSH-ready:
 The first connection failure occurred 0.110s after the request.
 
 ![Post-reset login](images/ubuntu-24.04-labview-2026/reset-login.png)
+
+The later provisioner-required reboot reached the same credential-safe graphical login boundary:
+
+![Post-install reboot ready](images/ubuntu-24.04-labview-2026/post-reboot-ready.png)
 
 Run the maintained readiness check:
 
@@ -352,6 +360,14 @@ LabVIEW provisioning and activation were not attempted. Evidence is outside Git 
 
 Cleanup passed: only the disposable replay VM was unregistered, its residual folder and credentials were removed,
 and the retained source VM remained registered and untouched.
+
+### Draft screenshot disposition
+
+The historical draft named more captures than this public reference uses. The credential-safe, claim-relevant
+first-login and post-reboot images are now included above. The password-entry image, machine-specific activation
+boundary, blank provisioner capture, repeated splash frames, duplicate activated-window frame, and locked-screen
+Mass Compile sampler remain evidence-only because they are unsafe, duplicative, blank, or do not visibly support
+their associated machine claim.
 
 ## Cleanup
 

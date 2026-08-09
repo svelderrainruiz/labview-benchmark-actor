@@ -85,6 +85,14 @@ launch, or activate LabVIEW.
 
 VM creation or a completed installer alone is not readiness proof: automation must require the first-boot receipt's
 `outcome` to be `PASS`.
+
+The production golden definition in `production-golden-box.Vagrantfile` revalidates this same receipt on every
+Vagrant clone. `production-golden-box.metadata.json` binds the exact definition and required package guards.
+`golden-activation-cycle.ps1 -Mode Package` refuses to halt, replace, or package the VM until the base receipt,
+console acknowledgement, functional activation, identity freshness, and definition metadata all validate. Its v2
+package receipt binds the exact base receipt, embedded Vagrantfile, metadata, activation receipt, and local box
+bytes. The repository does not publish that personal box.
+
 Verify the OS-type id on your host with `VBoxManage list ostypes | grep -i ubuntu`.
 
 ## VMware (WIN plane) — the mirror
