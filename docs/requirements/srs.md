@@ -1736,9 +1736,10 @@ progressively.
   - The extension writes `capture-status.json` into the run dir at capture START and STOP (or
     FAILED on assembly error), best-effort (never perturbing the capture).
   - `Capture LabVIEW Launch` records the current Windows graphical seat with ffmpeg `gdigrab`
-    or the current Ubuntu graphical seat with ffmpeg `x11grab` at 12 FPS. Ubuntu requires the
-    inherited active `DISPLAY`, resolves the LabVIEW 2026 Linux executable, samples CPU/RAM
-    from `/proc`, and labels the assembled record `LINUX` / `ffmpeg-x11grab`.
+    or the current Ubuntu Xorg graphical seat with ffmpeg `x11grab` at 12 FPS. Ubuntu requires
+    `XDG_SESSION_TYPE=x11` and the inherited active `DISPLAY`, resolves the LabVIEW 2026 Linux
+    executable, samples CPU/RAM from `/proc`, and labels the assembled record
+    `LINUX` / `ffmpeg-x11grab`; Wayland fails closed.
   - `reviewer-workstation/await-handoff.sh` runs the guest poll ONCE and blocks until the
     beacon resolves (stopped|failed) or a timeout, printing the resolved payload -- the one
     sanctioned poll in the agentic flow.

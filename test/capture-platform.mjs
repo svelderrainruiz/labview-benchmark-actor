@@ -13,12 +13,16 @@ assert.equal(
   '/usr/local/natinst/LabVIEW-2026-64/labview',
 );
 assert.deepEqual(
-  ffmpegCaptureArgsForPlatform('linux', '/tmp/frame-%05d.png', { DISPLAY: ':0' }),
+  ffmpegCaptureArgsForPlatform('linux', '/tmp/frame-%05d.png', { DISPLAY: ':0', XDG_SESSION_TYPE: 'x11' }),
   ['-y', '-f', 'x11grab', '-framerate', '12', '-draw_mouse', '0', '-i', ':0', '/tmp/frame-%05d.png'],
 );
 assert.throws(
-  () => ffmpegCaptureArgsForPlatform('linux', '/tmp/frame.png', {}),
+  () => ffmpegCaptureArgsForPlatform('linux', '/tmp/frame.png', { XDG_SESSION_TYPE: 'x11' }),
   /requires DISPLAY/,
+);
+assert.throws(
+  () => ffmpegCaptureArgsForPlatform('linux', '/tmp/frame.png', { DISPLAY: ':0', XDG_SESSION_TYPE: 'wayland' }),
+  /requires an Xorg session/,
 );
 assert.deepEqual(
   captureMetadataForPlatform('linux'),

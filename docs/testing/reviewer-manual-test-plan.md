@@ -168,11 +168,12 @@ workspace root.
 - **Pre:** the reviewer's box has **licensed LabVIEW** (per the BYO docs).
 - **Steps:**
   1. Close all LabVIEW windows so the next process is a real launch transition.
-  2. Run **LabVIEW Benchmark Actor: Capture LabVIEW Launch**.
+  2. On Ubuntu, confirm `echo $XDG_SESSION_TYPE` is `x11` (an Ubuntu Xorg session), then run
+     **LabVIEW Benchmark Actor: Capture LabVIEW Launch**.
   3. Wait until the activated LabVIEW start screen is visible, then click **Stop LabVIEW Capture** in the status bar.
   4. Inspect the opened frame correlator and the retained `capture.json`.
 - **Expected:** LabVIEW launches successfully; the correlator contains real non-blank frames spanning the transition.
-  Windows records `plane=WIN`, `source=ffmpeg-gdigrab`; Ubuntu records `plane=LINUX`,
+  Windows records `plane=WIN`, `source=ffmpeg-gdigrab`; Ubuntu Xorg records `plane=LINUX`,
   `source=ffmpeg-x11grab`. The capture includes CPU/RAM samples and can be scrubbed.
 - **Result:** _____
 

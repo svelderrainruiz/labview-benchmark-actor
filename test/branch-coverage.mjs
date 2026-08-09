@@ -462,14 +462,15 @@ assert.deepEqual(captureMetadataForPlatform('win32'), {
   source: 'ffmpeg-gdigrab',
 });
 assert.deepEqual(
-  ffmpegCaptureArgsForPlatform('linux', '/tmp/frame.png', { DISPLAY: ':0' }),
+  ffmpegCaptureArgsForPlatform('linux', '/tmp/frame.png', { DISPLAY: ':0', XDG_SESSION_TYPE: 'x11' }),
   ['-y', '-f', 'x11grab', '-framerate', '12', '-draw_mouse', '0', '-i', ':0', '/tmp/frame.png'],
 );
 assert.deepEqual(
   ffmpegCaptureArgsForPlatform('win32', 'frame.png', {}),
   ['-y', '-f', 'gdigrab', '-framerate', '12', '-i', 'desktop', 'frame.png'],
 );
-throws(() => ffmpegCaptureArgsForPlatform('linux', 'frame.png', {}), /requires DISPLAY/);
+throws(() => ffmpegCaptureArgsForPlatform('linux', 'frame.png', { XDG_SESSION_TYPE: 'x11' }), /requires DISPLAY/);
+throws(() => ffmpegCaptureArgsForPlatform('linux', 'frame.png', { DISPLAY: ':0', XDG_SESSION_TYPE: 'wayland' }), /requires an Xorg session/);
 throws(() => ffmpegCaptureArgsForPlatform('darwin', 'frame.png', {}), /unsupported/);
 const linuxSampler = linuxSamplerScript("/tmp/res'ources.jsonl");
 assert.match(linuxSampler, /\/proc\/stat/);

@@ -38,6 +38,10 @@ export function ffmpegCaptureArgsForPlatform(
   if (platform === 'linux') {
     const display = String(env.DISPLAY || '').trim();
     if (!display) throw new Error('Linux LabVIEW capture requires DISPLAY from the active graphical session');
+    const sessionType = String(env.XDG_SESSION_TYPE || '').trim().toLowerCase();
+    if (sessionType !== 'x11') {
+      throw new Error('Ubuntu LabVIEW capture requires an Xorg session (XDG_SESSION_TYPE=x11); Wayland rootless Xwayland produces incomplete frames');
+    }
     return ['-y', '-f', 'x11grab', '-framerate', '12', '-draw_mouse', '0', '-i', display, framePattern];
   }
   throw new Error(`LabVIEW launch capture is unsupported on ${platform}`);
