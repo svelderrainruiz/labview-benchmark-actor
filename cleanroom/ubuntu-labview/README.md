@@ -93,6 +93,11 @@ console acknowledgement, functional activation, identity freshness, and definiti
 package receipt binds the exact base receipt, embedded Vagrantfile, metadata, activation receipt, and local box
 bytes. The repository does not publish that personal box.
 
+The normalized live base proof is `production-golden-base-proof.json`. It records a fresh stock-ISO VM reaching
+SSH-ready without graphical login in 952.458405s, with 5s bounded polling, Git/SSH/guest-utils PASS, zero recovery
+actions, and complete disposable-VM cleanup. This proof covers the pre-LabVIEW base boundary; it does not replace the
+separate activation and identity-freshness evidence required by `-Mode Package`.
+
 Verify the OS-type id on your host with `VBoxManage list ostypes | grep -i ubuntu`.
 
 ## VMware (WIN plane) — the mirror

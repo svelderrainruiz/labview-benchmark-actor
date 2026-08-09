@@ -1,0 +1,97 @@
+{
+  "schema": "labview-benchmark-actor/ubuntu-golden-base-proof@1",
+  "source": {
+    "commit": "dd942e162c2ea688bc1e0916a84b52cad0bab908",
+    "liveRunSha256": "4aefe67e5fae55234a2c7fb6fc9450407ca18b740b9d22da57a668973f641c7d"
+  },
+  "vm": {
+    "name": "lba-ubuntu-golden-proof-20260809T152012Z",
+    "uuid": "4751fa12-8f30-4ba2-8642-1920b5315bda",
+    "disposable": true
+  },
+  "graphicalLoginPerformed": false,
+  "natForward": {
+    "hostAddress": "127.0.0.1",
+    "hostPort": 50533,
+    "guestPort": 22
+  },
+  "polling": {
+    "intervalSeconds": 5,
+    "timeoutSeconds": 2700,
+    "sshConnectTimeoutSeconds": 5,
+    "probeCount": 180
+  },
+  "timings": {
+    "runningObservedWallTime": "2026-08-09T15:20:37.7180444Z",
+    "sshReadyWallTime": "2026-08-09T15:36:30.1892266Z",
+    "vmRunningToSshReadyNs": "952458405000",
+    "vmRunningToSshReadySeconds": 952.458405,
+    "hostMonotonicClockSource": "System.Diagnostics.Stopwatch",
+    "runningObservationUncertaintyMs": 100
+  },
+  "guest": {
+    "os": {
+      "name": "Ubuntu 24.04.4 LTS",
+      "version": "24.04"
+    },
+    "tools": {
+      "git": {
+        "path": "/usr/bin/git",
+        "version": "git version 2.43.0"
+      },
+      "sshd": {
+        "path": "/usr/sbin/sshd",
+        "version": "1:9.6p1-3ubuntu13.18"
+      },
+      "virtualBoxGuestService": {
+        "path": "/usr/sbin/VBoxService",
+        "version": "7.0.16_Ubuntur162802"
+      }
+    },
+    "services": {
+      "ssh": {
+        "activeState": "active",
+        "enabledState": "enabled"
+      },
+      "virtualBoxGuestUtils": {
+        "activeState": "active",
+        "enabledState": "enabled"
+      }
+    },
+    "timings": {
+      "install": {
+        "durationNs": "11933531027",
+        "monotonicClockSource": "python.time.monotonic_ns"
+      },
+      "firstBootValidation": {
+        "durationNs": "210814198",
+        "monotonicClockSource": "python.time.monotonic_ns"
+      }
+    }
+  },
+  "definition": {
+    "vagrantfileSha256": "84f47663c116ef4f73090268793c918f0f45dcf1d24e1773fdcca7bd8688fe65",
+    "metadataSha256": "83fc087de533167555c2276f20c3709c148cd7ba906277dfa5adcf7a2a7875f1"
+  },
+  "evidence": {
+    "baseBootstrapReceiptSha256": "c4df3ccc1b2cc16265c3a4f262598108d8bd3d2fd639ccf68f8dfbd7ba5f34bc",
+    "sshProofSha256": "1a9cfd984a038c41dd3e99788d45428a2f13fd113e240fd5886dd2193250cd42",
+    "liveRunSha256": "4aefe67e5fae55234a2c7fb6fc9450407ca18b740b9d22da57a668973f641c7d"
+  },
+  "screenshots": [
+    {
+      "path": "docs/information-for-users/images/ubuntu-24.04-labview-2026/golden-base-ready.png",
+      "wallTime": "2026-08-09T15:36:30.2725425Z",
+      "sha256": "2325b8a4d71b54de9ba94d171932a4da7b26517c1446cae3453ab695a7cbeb7e"
+    }
+  ],
+  "cleanup": {
+    "outcome": "PASS",
+    "vmUnregistered": true,
+    "residualVmPathRemoved": true,
+    "credentialArtifactsRemoved": true
+  },
+  "outcome": "PASS",
+  "failures": [],
+  "digest": "24964590e194f201f64b280597e0cd6dfcbcc84f69bb2422b4e7fadd0c56c428"
+}

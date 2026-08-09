@@ -361,6 +361,48 @@ LabVIEW provisioning and activation were not attempted. Evidence is outside Git 
 Cleanup passed: only the disposable replay VM was unregistered, its residual folder and credentials were removed,
 and the retained source VM remained registered and untouched.
 
+### Production golden-base proof: 2026-08-09
+
+The governed production definition was proven from the stock Ubuntu ISO at source commit
+`dd942e162c2ea688bc1e0916a84b52cad0bab908`. Disposable VM
+`lba-ubuntu-golden-proof-20260809T152012Z`
+(`4751fa12-8f30-4ba2-8642-1920b5315bda`) used Windows-loopback NAT
+`127.0.0.1:50533` to guest port 22. No graphical login, LabVIEW provisioning, activation, or Vagrant box publication
+occurred.
+
+The orchestrator observed the VM running and SSH readiness on one `System.Diagnostics.Stopwatch` clock:
+
+| Proof metric | Measured value |
+| --- | ---: |
+| VM-running to SSH-ready | 952.458405s (15m 52.458405s) |
+| Poll interval / bound | 5s / 2,700s |
+| SSH connect timeout | 5s |
+| Probe attempts | 180 |
+| Bootstrap package install | 11.933531027s monotonic |
+| First-boot receipt validation | 0.210814198s monotonic |
+| Controlled recovery actions | 0 |
+
+The SSH proof returned uid `1000`, hostname `actor`, Git `2.43.0`, active/enabled SSH, active/enabled
+`VBoxService 7.0.16_Ubuntur162802`, and the PASS receipt. The final credential-safe screenshot shows the graphical
+login boundary reached without logging in:
+
+![Production golden base ready](images/ubuntu-24.04-labview-2026/golden-base-ready.png)
+
+The normalized proof digest is
+`24964590e194f201f64b280597e0cd6dfcbcc84f69bb2422b4e7fadd0c56c428`. Raw evidence remains outside Git under
+`E:\lba-session-evidence\b31cca8a-ef61-4e1c-bd75-f5d5b4c4850a\lba-ubuntu-golden-proof-20260809T152012Z`:
+
+- `live-run.json` SHA-256 `4aefe67e5fae55234a2c7fb6fc9450407ca18b740b9d22da57a668973f641c7d`;
+- `base-bootstrap-receipt.json` SHA-256
+  `c4df3ccc1b2cc16265c3a4f262598108d8bd3d2fd639ccf68f8dfbd7ba5f34bc`;
+- `ssh-proof.txt` SHA-256 `1a9cfd984a038c41dd3e99788d45428a2f13fd113e240fd5886dd2193250cd42`;
+- 17 timestamped guest-console PNGs; the published final image SHA-256 is
+  `2325b8a4d71b54de9ba94d171932a4da7b26517c1446cae3453ab695a7cbeb7e`.
+
+Cleanup passed: the disposable VM was unregistered, its `E:\VirtualBox VMs` directory was removed, and its
+credential file was destroyed. A preceding attempt was invalidated without a readiness claim after an unrelated
+host capture exhausted `C:`; the successful run isolated its VM and evidence on `E:` with more than 180GB free.
+
 ### Draft screenshot disposition
 
 The historical draft named more captures than this public reference uses. The credential-safe, claim-relevant
