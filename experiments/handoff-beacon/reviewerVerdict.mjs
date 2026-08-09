@@ -125,21 +125,23 @@ export const reviewerVerdictDigest = (v) => bundleDigest(v);
  * A 'pass' verdict is an 'approve' decision; anything else is 'reject'. Mirrors acg-reviewer/sign-off.mjs so the
  * output is a first-class human sign-off.
  */
-export function signReviewerVerdict(verdict, { privateKeyPem, reviewer, station = 'WINDOWS_VM' } = {}) {
+export function signReviewerVerdict(verdict, { privateKeyPem, reviewer, station } = {}) {
   if (!privateKeyPem) throw new Error('signReviewerVerdict: privateKeyPem is required');
   if (!reviewer) throw new Error('signReviewerVerdict: reviewer is required');
-  if (!REVIEWER_STATIONS.includes(station)) throw new Error(`signReviewerVerdict: station must be one of ${REVIEWER_STATIONS.join('|')}`);
+  const resolvedStation = station ?? verdict?.station;
+  if (!REVIEWER_STATIONS.includes(resolvedStation)) throw new Error(`signReviewerVerdict: station must be one of ${REVIEWER_STATIONS.join('|')}`);
+  if (resolvedStation !== verdict?.station) throw new Error('signReviewerVerdict: sign-off station must match verdict station');
   const decision = verdict?.verdict === 'pass' ? 'approve' : 'reject';
   const priv = crypto.createPrivateKey(privateKeyPem);
   const publicKeyPem = crypto.createPublicKey(priv).export({ type: 'spki', format: 'pem' });
   const verdictDigest = reviewerVerdictDigest(verdict);
-  const signature = crypto.sign(null, signMessage(reviewer, decision, station, verdictDigest), priv).toString('base64');
+  const signature = crypto.sign(null, signMessage(reviewer, decision, resolvedStation, verdictDigest), priv).toString('base64');
   return {
     schema: SIGNOFF_SCHEMA,
-    subject: { verdictDigest, consensusVerdict: verdict?.verdict ?? null, target: verdict?.target ?? null },
+    subject: { verdictDigest, consensusVerdict: verdict.verdict, target: verdict.target },
     reviewer,
     decision,
-    station,
+    station: resolvedStation,
     algorithm: 'ed25519',
     publicKeyPem,
     signedAt: new Date().toISOString(),
@@ -157,6 +159,7 @@ export function verifyReviewerVerdict(verdict, signOff, { reviewerAllowlist = {}
   if (!signOff || signOff.schema !== SIGNOFF_SCHEMA) return { ok: false, reasons: ['not an acg-human-signoff-v1'] };
   if (signOff.algorithm !== 'ed25519') reasons.push(`unsupported algorithm ${signOff.algorithm}`);
   if (!REVIEWER_STATIONS.includes(signOff.station)) reasons.push(`unknown reviewer station ${signOff.station}`);
+  if (signOff.station !== verdict?.station) reasons.push('sign-off station does not match verdict station');
   const actualDigest = reviewerVerdictDigest(verdict);
   if (signOff.subject?.verdictDigest !== actualDigest) reasons.push('sign-off does not match this verdict');
   const enrollment = reviewerAllowlist[signOff.reviewer];

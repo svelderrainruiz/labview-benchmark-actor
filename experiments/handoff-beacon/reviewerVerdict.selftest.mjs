@@ -63,8 +63,13 @@ ok('signReviewerVerdict produces an acg-human-signoff-v1 bound to the verdict di
   assert.equal(s.subject.verdictDigest, reviewerVerdictDigest(v));
   assert.equal(s.algorithm, 'ed25519');
   const ubuntuVerdict = buildReviewerVerdict({ target, verdict: 'pass', reviewer, station: 'UBUNTU_VM' });
-  const ubuntuSignOff = signReviewerVerdict(ubuntuVerdict, { privateKeyPem, reviewer, station: 'UBUNTU_VM' });
+  const ubuntuSignOff = signReviewerVerdict(ubuntuVerdict, { privateKeyPem, reviewer });
+  assert.equal(ubuntuSignOff.station, 'UBUNTU_VM');
   assert.equal(verifyReviewerVerdict(ubuntuVerdict, ubuntuSignOff, { reviewerAllowlist: allowlist }).ok, true);
+  assert.throws(
+    () => signReviewerVerdict(ubuntuVerdict, { privateKeyPem, reviewer, station: 'WINDOWS_VM' }),
+    /must match verdict station/,
+  );
   assert.equal(signReviewerVerdict(buildReviewerVerdict({ target, verdict: 'fail', reviewer }), { privateKeyPem, reviewer }).decision, 'reject');
   assert.throws(() => signReviewerVerdict(v, { reviewer }), /privateKeyPem/);
   assert.throws(() => signReviewerVerdict(v, { privateKeyPem }), /reviewer/);
@@ -76,6 +81,10 @@ ok('verifyReviewerVerdict verifies a good sign-off + fails closed on tampering',
   const s = signReviewerVerdict(v, { privateKeyPem, reviewer });
   const other = generateEnrolledKeypair();
   assert.equal(verifyReviewerVerdict(v, s, { reviewerAllowlist: allowlist }).ok, true);
+  const mismatchedStation = { ...s, station: 'UBUNTU_VM' };
+  const mismatchedResult = verifyReviewerVerdict(v, mismatchedStation, { reviewerAllowlist: allowlist });
+  assert.equal(mismatchedResult.ok, false);
+  assert(mismatchedResult.reasons.some((reason) => /station does not match/.test(reason)));
   assert.equal(verifyReviewerVerdict(v, s, {
     reviewerAllowlist: { [reviewer]: [other.publicKeyPem, publicKeyPem] },
   }).ok, true);

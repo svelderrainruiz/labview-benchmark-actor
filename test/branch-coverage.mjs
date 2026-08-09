@@ -303,12 +303,10 @@ assert.equal(verifyReviewerVerdict(passVerdict, signOff, { reviewerAllowlist: { 
 assert.equal(verifyReviewerVerdict(passVerdict, { ...signOff, publicKeyPem: otherKey.publicKeyPem }, { reviewerAllowlist: allowlist }).ok, false);
 assert.equal(verifyReviewerVerdict(passVerdict, { ...signOff, signature: 'bad' }, { reviewerAllowlist: allowlist }).ok, false);
 assert.equal(verifyReviewerVerdict(passVerdict, { ...signOff, publicKeyPem: 'bad' }, { reviewerAllowlist: { r: ['bad'] } }).ok, false);
-const nullVerdictSignOff = signReviewerVerdict(null, {
-  privateKeyPem: key.privateKeyPem,
-  reviewer: 'r',
-});
-assert.equal(nullVerdictSignOff.subject.consensusVerdict, null);
-assert.equal(nullVerdictSignOff.subject.target, null);
+throws(
+  () => signReviewerVerdict(null, { privateKeyPem: key.privateKeyPem, reviewer: 'r' }),
+  /station/,
+);
 assert.equal(verifyReviewerVerdict(
   { ...passVerdict, target: undefined },
   { ...signOff, publicKeyPem: undefined, signature: '' },
@@ -319,7 +317,6 @@ const failVerdict = { ...passVerdict, verdict: 'changes' };
 const reject = signReviewerVerdict(failVerdict, {
   privateKeyPem: key.privateKeyPem,
   reviewer: 'r',
-  station: 'WINDOWS_VM',
 });
 assert.equal(gateVisualReview({ verdict: failVerdict, signOffs: [reject], reviewerAllowlist: allowlist }).publish, false);
 assert.equal(gateVisualReview({ verdict: passVerdict, signOffs: [null, reject], reviewerAllowlist: allowlist, minReviewers: 2 }).publish, false);

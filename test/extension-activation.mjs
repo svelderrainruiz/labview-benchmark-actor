@@ -1397,8 +1397,14 @@ try {
     assert(rv.validateReviewerVerdict(v).ok && !rv.validateReviewerVerdict({ ...v, verdict: 'z' }).ok && !rv.validateReviewerVerdict({ ...v, target: { version: '', commit: '' } }).ok && !rv.validateReviewerVerdict({ ...v, reviewer: '' }).ok && !rv.validateReviewerVerdict({ ...v, station: 'MARS' }).ok && !rv.validateReviewerVerdict(null).ok, 'validateReviewerVerdict fail-closed');
     const s = rv.signReviewerVerdict(v, { privateKeyPem: rvKeys.privateKeyPem, reviewer, station: 'WINDOWS_VM' });
     assert(s.schema === rv.SIGNOFF_SCHEMA && s.decision === 'approve' && s.subject.verdictDigest === rv.reviewerVerdictDigest(v), 'signReviewerVerdict -> acg-human-signoff-v1 bound to the digest');
+    const ubuntuVerdict = rv.buildReviewerVerdict({ target, verdict: 'pass', reviewer, station: 'UBUNTU_VM' });
+    const ubuntuSignOff = rv.signReviewerVerdict(ubuntuVerdict, { privateKeyPem: rvKeys.privateKeyPem, reviewer });
+    assert(ubuntuSignOff.station === 'UBUNTU_VM', 'signReviewerVerdict derives the sign-off station from the verdict');
+    let stationThrew = false; try { rv.signReviewerVerdict(ubuntuVerdict, { privateKeyPem: rvKeys.privateKeyPem, reviewer, station: 'WINDOWS_VM' }); } catch { stationThrew = true; }
+    assert(stationThrew, 'signReviewerVerdict rejects a station that differs from the verdict');
     assert(rv.signReviewerVerdict(rv.buildReviewerVerdict({ target, verdict: 'fail', reviewer }), { privateKeyPem: rvKeys.privateKeyPem, reviewer }).decision === 'reject', 'a fail verdict -> reject');
     assert(rv.verifyReviewerVerdict(v, s, { reviewerAllowlist: allow }).ok, 'verifyReviewerVerdict verifies a good sign-off');
+    assert(!rv.verifyReviewerVerdict(v, { ...s, station: 'UBUNTU_VM' }, { reviewerAllowlist: allow }).ok, 'verifyReviewerVerdict rejects a mismatched sign-off station');
     assert(!rv.verifyReviewerVerdict({ ...v, notes: 'x' }, s, { reviewerAllowlist: allow }).ok && !rv.verifyReviewerVerdict(v, s, { reviewerAllowlist: {} }).ok && !rv.verifyReviewerVerdict(v, { schema: 'no' }, { reviewerAllowlist: allow }).ok, 'verifyReviewerVerdict fail-closed');
     assert(rv.gateVisualReview({ verdict: v, signOffs: [s], reviewerAllowlist: allow, minReviewers: 1 }).publish === true, 'gateVisualReview publishes on pass + approval');
     assert(rv.gateVisualReview({ verdict: v, signOffs: [], reviewerAllowlist: allow }).publish === false && rv.gateVisualReview({ verdict: { ...v, verdict: 'fail' }, signOffs: [s], reviewerAllowlist: allow }).publish === false, 'gateVisualReview fail-closed');

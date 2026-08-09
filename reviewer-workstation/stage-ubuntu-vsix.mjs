@@ -7,6 +7,7 @@ import { basename, dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const EXTENSION_ID = 'svelderrainruiz.labview-benchmark-actor';
+const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 
 const sha256 = (bytes) => createHash('sha256').update(bytes).digest('hex');
 
@@ -46,11 +47,13 @@ export function validateUbuntuStageEvidence({ target, vsixBytes, manifest, insta
   };
 }
 
-export function validateUbuntuKpiReceipt({ target, kpi, vsixBytes }) {
+export function validateUbuntuKpiReceipt({ target, kpi, vsixBytes, coverageFloors }) {
   const failures = [];
   const candidate = kpi?.kpi?.candidate;
   const localGates = kpi?.kpi?.localGates;
   const pkg = kpi?.kpi?.package;
+  const coverage = kpi?.kpi?.coverage;
+  const correspondences = kpi?.kpi?.correspondences;
   const actualSha256 = sha256(vsixBytes);
   if (kpi?.schema !== 'labview-benchmark-actor/local-continuous-kpi@1'
       || kpi?.mode !== 'full'
@@ -78,6 +81,19 @@ export function validateUbuntuKpiReceipt({ target, kpi, vsixBytes }) {
       || String(pkg?.firstSha256 ?? '').toLowerCase() !== actualSha256
       || String(pkg?.secondSha256 ?? '').toLowerCase() !== actualSha256) {
     failures.push('candidate KPI must attest byte-identical packages for the target VSIX');
+  }
+  for (const metric of ['lines', 'statements', 'functions', 'branches']) {
+    const floor = coverageFloors?.[metric];
+    const percent = coverage?.[metric]?.percent;
+    if (!Number.isFinite(floor) || !Number.isFinite(percent) || percent < floor) {
+      failures.push(`candidate KPI ${metric} coverage does not meet the governed floor`);
+    }
+  }
+  if (!Number.isInteger(correspondences?.total)
+      || correspondences.total < 1
+      || correspondences?.passed !== correspondences.total
+      || correspondences?.graphConformant !== true) {
+    failures.push('candidate KPI correspondences must all pass with a conformant graph');
   }
   return { ok: failures.length === 0, failures, actualSha256 };
 }
@@ -144,13 +160,14 @@ function main() {
   const handoff = resolve(args.handoff);
   const target = JSON.parse(readFileSync(targetPath, 'utf8'));
   const kpi = JSON.parse(readFileSync(kpiPath, 'utf8'));
+  const coverageFloors = JSON.parse(readFileSync(join(ROOT, 'coverage-thresholds.json'), 'utf8')).floor;
   const targetShape = validateUbuntuReviewTarget(target);
   if (!targetShape.ok) throw new Error(targetShape.failures.join('; '));
   const vsixBytes = readFileSync(vsixPath);
   const manifest = JSON.parse(execFileSync('unzip', ['-p', vsixPath, 'extension/package.json'], { encoding: 'utf8' }));
   const candidate = validateUbuntuCandidateArtifact({ target, vsixBytes, manifest });
   if (!candidate.ok) throw new Error(candidate.failures.join('; '));
-  const kpiEvidence = validateUbuntuKpiReceipt({ target, kpi, vsixBytes });
+  const kpiEvidence = validateUbuntuKpiReceipt({ target, kpi, vsixBytes, coverageFloors });
   if (!kpiEvidence.ok) throw new Error(kpiEvidence.failures.join('; '));
   const vmIdentity = detectUbuntuVmIdentity();
   const vmEvidence = validateUbuntuVmIdentity({

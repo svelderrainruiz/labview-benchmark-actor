@@ -26,6 +26,7 @@ const manifest = {
   version,
 };
 const installedExtensions = [`svelderrainruiz.labview-benchmark-actor@${version}`];
+const coverageFloors = { lines: 95, statements: 95, functions: 96, branches: 95 };
 const kpi = {
   schema: 'labview-benchmark-actor/local-continuous-kpi@1',
   mode: 'full',
@@ -40,6 +41,10 @@ const kpi = {
       vsixSize: vsixBytes.length,
     },
     localGates: { passed: 210, total: 210 },
+    coverage: Object.fromEntries(
+      Object.entries(coverageFloors).map(([metric, percent]) => [metric, { percent }]),
+    ),
+    correspondences: { passed: 182, total: 182, graphConformant: true },
     package: {
       firstSha256: target.vsixSha256,
       secondSha256: target.vsixSha256,
@@ -57,11 +62,12 @@ assert.equal(validateUbuntuCandidateArtifact({
   vsixBytes,
   manifest,
 }).ok, false);
-assert.equal(validateUbuntuKpiReceipt({ target, kpi, vsixBytes }).ok, true);
+assert.equal(validateUbuntuKpiReceipt({ target, kpi, vsixBytes, coverageFloors }).ok, true);
 assert.equal(validateUbuntuKpiReceipt({
   target,
   kpi: { ...kpi, kpi: { ...kpi.kpi, candidate: { ...kpi.kpi.candidate, sourceCommit: 'b'.repeat(40) } } },
   vsixBytes,
+  coverageFloors,
 }).ok, false);
 const vmIdentity = {
   provider: 'oracle',
@@ -87,11 +93,25 @@ assert.equal(validateUbuntuKpiReceipt({
   target,
   kpi: { ...kpi, kpi: { ...kpi.kpi, candidate: { ...kpi.kpi.candidate, worktreeCleanAfter: false } } },
   vsixBytes,
+  coverageFloors,
 }).ok, false);
 assert.equal(validateUbuntuKpiReceipt({
   target,
   kpi: { ...kpi, kpi: { ...kpi.kpi, package: { ...kpi.kpi.package, identical: false } } },
   vsixBytes,
+  coverageFloors,
+}).ok, false);
+assert.equal(validateUbuntuKpiReceipt({
+  target,
+  kpi: { ...kpi, kpi: { ...kpi.kpi, coverage: undefined } },
+  vsixBytes,
+  coverageFloors,
+}).ok, false);
+assert.equal(validateUbuntuKpiReceipt({
+  target,
+  kpi: { ...kpi, kpi: { ...kpi.kpi, correspondences: { passed: 181, total: 182, graphConformant: false } } },
+  vsixBytes,
+  coverageFloors,
 }).ok, false);
 assert.equal(validateUbuntuCandidateArtifact({
   target,
