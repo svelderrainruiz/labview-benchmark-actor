@@ -10,7 +10,7 @@
 // Usage:
 //   node scripts/coverage.mjs           # run + enforce the current floors (the gate)
 //   node scripts/coverage.mjs --bump    # run + enforce, then ratchet the floors up toward measured
-import { readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -24,6 +24,8 @@ const require = createRequire(import.meta.url);
 const c8Cli = require.resolve('c8/bin/c8.js');
 const METRICS = ['lines', 'statements', 'functions', 'branches'];
 const bump = process.argv.includes('--bump');
+const coberturaPath = join(repo, 'coverage', 'cobertura-coverage.xml');
+const checkedOutCobertura = existsSync(coberturaPath) ? readFileSync(coberturaPath, 'utf8') : '';
 
 for (const m of METRICS) {
   if (typeof cfg.floor?.[m] !== 'number') {
@@ -50,9 +52,8 @@ if (run.status !== 0) {
 
 // c8 writes the current epoch and absolute checkout path into Cobertura output. Normalize both
 // provenance-neutral fields so the retained artifact is stable across worktrees and operating systems.
-const coberturaPath = join(repo, 'coverage', 'cobertura-coverage.xml');
 const cobertura = readFileSync(coberturaPath, 'utf8');
-const normalizedCobertura = coberturaWorkingTreeText(cobertura);
+const normalizedCobertura = coberturaWorkingTreeText(cobertura, checkedOutCobertura);
 if (normalizedCobertura !== cobertura) {
   writeFileSync(coberturaPath, normalizedCobertura);
 }

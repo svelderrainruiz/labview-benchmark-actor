@@ -171,7 +171,8 @@ receipt with wall and monotonic timing, and atomically stages the exact target p
 VirtualBox guest identity; physical Ubuntu, WSL, containers, and a different VM fail closed. Follow
 [the manual plan](../docs/testing/reviewer-manual-test-plan.md), then use **LabVIEW Benchmark Actor:
 Render Reviewer Verdict** inside VS Code. Linux verdict rendering fails closed without the staging
-marker; it no longer infers `UBUNTU_VM` from the operating system alone.
+marker or when the marker's provider/product/machine-id differs from the current host; it no longer
+infers `UBUNTU_VM` from the operating system alone.
 
 Extract the public record and raw non-secret review evidence before deleting the VM and private key.
 The quorum key is distinct and is used only for the later machine-quorum sign-off.

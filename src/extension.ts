@@ -607,6 +607,7 @@ export function readReviewTarget(
 export function readReviewerStationMarker(
   globalDir: string,
   target: { component: string; version: string; commit: string | null; vsixSha256: string | null },
+  currentIdentity?: { provider: string; machineId: string; productName: string },
 ): 'UBUNTU_VM' {
   const markerPath = path.join(handoffPaths(globalDir).root, 'reviewer-station.json');
   const targetCommit = target.commit ?? '';
@@ -626,15 +627,42 @@ export function readReviewerStationMarker(
     throw new Error(`Ubuntu reviewer station marker is unreadable: ${error instanceof Error ? error.message : String(error)}`);
   }
   const markerTarget = marker.target as Record<string, unknown> | undefined;
+  const markerVirtualization = marker.virtualization as Record<string, unknown> | undefined;
+  const markerIdentity = {
+    provider: String(markerVirtualization?.provider ?? ''),
+    machineId: String(markerVirtualization?.machineId ?? ''),
+    productName: String(markerVirtualization?.productName ?? ''),
+  };
   if (marker.schema !== 'labview-benchmark-actor/reviewer-station@1'
       || marker.station !== 'UBUNTU_VM'
       || markerTarget?.component !== target.component
       || markerTarget?.version !== target.version
       || String(markerTarget?.commit ?? '').toLowerCase() !== targetCommit.toLowerCase()
-      || String(markerTarget?.vsixSha256 ?? '').toLowerCase() !== targetVsixSha256.toLowerCase()) {
+      || String(markerTarget?.vsixSha256 ?? '').toLowerCase() !== targetVsixSha256.toLowerCase()
+      || markerIdentity.provider !== 'oracle'
+      || !/^[a-f0-9]{32}$/i.test(markerIdentity.machineId)
+      || markerIdentity.productName !== 'VirtualBox') {
     throw new Error('Ubuntu reviewer station marker does not match the exact review target');
   }
+  const activeIdentity = currentIdentity ?? detectCurrentReviewerVmIdentity();
+  if (activeIdentity.provider !== markerIdentity.provider
+      || activeIdentity.machineId.toLowerCase() !== markerIdentity.machineId.toLowerCase()
+      || activeIdentity.productName !== markerIdentity.productName) {
+    throw new Error('Ubuntu reviewer station marker does not match the current virtual machine');
+  }
   return 'UBUNTU_VM';
+}
+
+export function detectCurrentReviewerVmIdentity(): { provider: string; machineId: string; productName: string } {
+  const detected = spawnSync('systemd-detect-virt', ['--vm'], { encoding: 'utf8', timeout: 5000 });
+  if (detected.error || detected.status !== 0) {
+    throw new Error(`Ubuntu reviewer virtualization detection failed: ${detected.error?.message ?? `exit ${detected.status}`}`);
+  }
+  return {
+    provider: String(detected.stdout || '').trim(),
+    machineId: readFileSync('/etc/machine-id', 'utf8').trim(),
+    productName: readFileSync('/sys/class/dmi/id/product_name', 'utf8').trim(),
+  };
 }
 
 /** Build + sign a reviewer verdict via the loaded builder (pure orchestration): validate, then Ed25519-sign. */
@@ -1254,14 +1282,15 @@ async function captureLaunchCommand(context: vscode.ExtensionContext, output: vs
   }
   let x11VideoSize: string | undefined;
   if (process.platform === 'linux') {
+    let x11Display: string;
     try {
-      x11DisplayForCapture(process.env);
+      x11Display = x11DisplayForCapture(process.env);
     } catch (error) {
       reportUiError(output, 'Capture LabVIEW Launch (X11 session)', error);
       return;
     }
     try {
-      const { stdout } = await execFileAsync('xdpyinfo', ['-display', String(process.env.DISPLAY || '')], {
+      const { stdout } = await execFileAsync('xdpyinfo', ['-display', x11Display], {
         timeout: 5000,
         windowsHide: true,
       });

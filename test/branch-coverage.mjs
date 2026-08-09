@@ -440,10 +440,11 @@ assert.equal(
   '<coverage timestamp="0"><sources>\n    <source>.</source>\n  </sources></coverage>',
 );
 assert.equal(
-  coberturaWorkingTreeText(cobertura, 'win32'),
+  coberturaWorkingTreeText(cobertura, 'checked\r\nout'),
   '<coverage timestamp="0"><sources>\r\n    <source>.</source>\r\n  </sources></coverage>',
 );
-assert.equal(coberturaWorkingTreeText(cobertura, 'linux'), normalizeCoberturaXml(cobertura));
+assert.equal(coberturaWorkingTreeText(cobertura, 'checked\nout'), normalizeCoberturaXml(cobertura));
+assert.equal(coberturaWorkingTreeText(cobertura), normalizeCoberturaXml(cobertura));
 assert.equal(reviewerStationForEnvironment('win32', {}), 'WINDOWS_VM');
 assert.equal(reviewerStationForEnvironment('linux', {}, 'UBUNTU_VM'), 'UBUNTU_VM');
 assert.equal(reviewerStationForEnvironment('linux', { CODESPACES: 'true' }), 'LINUX_CODESPACE');

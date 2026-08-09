@@ -1418,48 +1418,53 @@ try {
     writeFileSync(join(vt, 'handoff', 'review-target.json'), JSON.stringify({ component: 'extension', version: '0.5.0', commit: 'c'.repeat(40), vsixSha256: 'd'.repeat(64), evidence: [{ kind: 'capture', ref: 'run-x' }] }));
     const t1 = ext.readReviewTarget(vt, '9.9.9');
     assert(t1.version === '0.5.0' && t1.commit.length === 40 && t1.evidence.length === 1, 'readReviewTarget reads the target file');
-    let markerThrew = false; try { ext.readReviewerStationMarker(vt, t1); } catch { markerThrew = true; }
+    const vmIdentity = { provider: 'oracle', machineId: '1'.repeat(32), productName: 'VirtualBox' };
+    const readStation = (target = t1, identity = vmIdentity) => ext.readReviewerStationMarker(vt, target, identity);
+    let markerThrew = false; try { readStation(); } catch { markerThrew = true; }
     assert(markerThrew, 'readReviewerStationMarker requires an explicit staged marker');
-    markerThrew = false; try { ext.readReviewerStationMarker(vt, { ...t1, commit: null }); } catch { markerThrew = true; }
+    markerThrew = false; try { readStation({ ...t1, commit: null }); } catch { markerThrew = true; }
     assert(markerThrew, 'readReviewerStationMarker requires a complete exact target');
-    markerThrew = false; try { ext.readReviewerStationMarker(vt, { ...t1, vsixSha256: null }); } catch { markerThrew = true; }
+    markerThrew = false; try { readStation({ ...t1, vsixSha256: null }); } catch { markerThrew = true; }
     assert(markerThrew, 'readReviewerStationMarker requires an exact VSIX digest');
     writeFileSync(join(vt, 'handoff', 'reviewer-station.json'), '{bad');
-    markerThrew = false; try { ext.readReviewerStationMarker(vt, t1); } catch { markerThrew = true; }
+    markerThrew = false; try { readStation(); } catch { markerThrew = true; }
     assert(markerThrew, 'readReviewerStationMarker rejects unreadable JSON');
     writeFileSync(join(vt, 'handoff', 'reviewer-station.json'), JSON.stringify({
       schema: 'labview-benchmark-actor/reviewer-station@1',
       station: 'UBUNTU_VM',
     }));
-    markerThrew = false; try { ext.readReviewerStationMarker(vt, t1); } catch { markerThrew = true; }
+    markerThrew = false; try { readStation(); } catch { markerThrew = true; }
     assert(markerThrew, 'readReviewerStationMarker requires marker target identity');
     writeFileSync(join(vt, 'handoff', 'reviewer-station.json'), JSON.stringify({
       schema: 'labview-benchmark-actor/reviewer-station@1',
       station: 'UBUNTU_VM',
       target: { component: t1.component, version: t1.version },
     }));
-    markerThrew = false; try { ext.readReviewerStationMarker(vt, t1); } catch { markerThrew = true; }
+    markerThrew = false; try { readStation(); } catch { markerThrew = true; }
     assert(markerThrew, 'readReviewerStationMarker requires marker commit identity');
     writeFileSync(join(vt, 'handoff', 'reviewer-station.json'), JSON.stringify({
       schema: 'labview-benchmark-actor/reviewer-station@1',
       station: 'UBUNTU_VM',
       target: { component: t1.component, version: t1.version, commit: t1.commit },
     }));
-    markerThrew = false; try { ext.readReviewerStationMarker(vt, t1); } catch { markerThrew = true; }
+    markerThrew = false; try { readStation(); } catch { markerThrew = true; }
     assert(markerThrew, 'readReviewerStationMarker requires marker VSIX identity');
     writeFileSync(join(vt, 'handoff', 'reviewer-station.json'), JSON.stringify({
       schema: 'labview-benchmark-actor/reviewer-station@1',
       station: 'UBUNTU_VM',
       target: { component: t1.component, version: t1.version, commit: 'f'.repeat(40), vsixSha256: t1.vsixSha256 },
     }));
-    markerThrew = false; try { ext.readReviewerStationMarker(vt, t1); } catch { markerThrew = true; }
+    markerThrew = false; try { readStation(); } catch { markerThrew = true; }
     assert(markerThrew, 'readReviewerStationMarker rejects a marker for another target');
     writeFileSync(join(vt, 'handoff', 'reviewer-station.json'), JSON.stringify({
       schema: 'labview-benchmark-actor/reviewer-station@1',
       station: 'UBUNTU_VM',
       target: { component: t1.component, version: t1.version, commit: t1.commit, vsixSha256: t1.vsixSha256 },
+      virtualization: vmIdentity,
     }));
-    assert(ext.readReviewerStationMarker(vt, t1) === 'UBUNTU_VM', 'readReviewerStationMarker accepts an exact target-bound Ubuntu marker');
+    assert(readStation() === 'UBUNTU_VM', 'readReviewerStationMarker accepts an exact target-bound Ubuntu marker');
+    markerThrew = false; try { readStation(t1, { ...vmIdentity, machineId: '2'.repeat(32) }); } catch { markerThrew = true; }
+    assert(markerThrew, 'readReviewerStationMarker rejects a marker copied from another VM');
     writeFileSync(join(vt, 'handoff', 'review-target.json'), JSON.stringify({
       component: 1,
       version: null,
@@ -1493,6 +1498,7 @@ try {
   }
 
   {
+    const restoreVerdictPlatform = setPlatform('win32');
     const savedInfo = mockVscode.window.showInformationMessage;
     const savedInput = mockVscode.window.showInputBox;
     const savedCfg = mockVscode.workspace.getConfiguration;
@@ -1565,6 +1571,7 @@ try {
     mockVscode.window.showInformationMessage = savedInfo;
     mockVscode.window.showInputBox = savedInput;
     mockVscode.workspace.getConfiguration = savedCfg;
+    restoreVerdictPlatform();
     rmSync(keyFile, { force: true });
     console.log('reviewer-verdict-command: PASS -- Render Reviewer Verdict -> Ed25519-signed verdict written + verifies');
   }

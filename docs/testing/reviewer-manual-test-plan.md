@@ -240,8 +240,9 @@ workspace root.
   3. Inspect the generated public signed record before extraction.
 - **Expected:** the record targets the exact component/version/40-hex commit/64-hex VSIX SHA-256, uses
   `UBUNTU_VM` on Ubuntu only when the exact target-bound station marker is present, or `WINDOWS_VM`
-  on Windows, and its Ed25519 signature verifies against the enrolled visual-purpose key. No private
-  key or credential appears in the public record.
+  on Windows; Ubuntu re-detects the current virtualization provider, DMI product, and machine-id and
+  requires them to match the marker. Its Ed25519 signature verifies against the enrolled visual-purpose
+  key. No private key or credential appears in the public record.
 - **Result:** _____
 
 ---

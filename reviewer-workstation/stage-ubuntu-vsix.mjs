@@ -233,7 +233,7 @@ if (process.argv[1] && fileURLToPath(import.meta.url) === resolve(process.argv[1
   try {
     main();
   } catch (error) {
-    console.error(`stage-ubuntu-vsix: ${error.message}`);
+    console.error(`stage-ubuntu-vsix: ${error instanceof Error ? error.message : String(error)}`);
     process.exitCode = 1;
   }
 }

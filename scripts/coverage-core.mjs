@@ -5,7 +5,7 @@ export function normalizeCoberturaXml(xml) {
     .replace(/<sources>[\s\S]*?<\/sources>/, '<sources>\n    <source>.</source>\n  </sources>');
 }
 
-export function coberturaWorkingTreeText(xml, platform = process.platform) {
+export function coberturaWorkingTreeText(xml, checkedOutText = '') {
   const normalized = normalizeCoberturaXml(xml);
-  return platform === 'win32' ? normalized.replace(/\n/g, '\r\n') : normalized;
+  return String(checkedOutText).includes('\r\n') ? normalized.replace(/\n/g, '\r\n') : normalized;
 }
