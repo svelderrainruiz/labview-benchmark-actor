@@ -1,0 +1,30 @@
+{
+  "schema": "labview-benchmark-actor/mass-compile-benchmark@1",
+  "vm": "vm:lba-ubuntu2404-labview2026-scratch",
+  "labview": {
+    "version": "2026",
+    "bitness": 64,
+    "edition": "Community"
+  },
+  "source": {
+    "repo": "ni/labview-icon-editor",
+    "repoHead": "9545c483f2b947c71de68c7f70aedefaedadabf7",
+    "directory": "resource"
+  },
+  "operation": "LabVIEWCLI -OperationName MassCompile",
+  "visInDirectory": 307,
+  "badViCount": 0,
+  "badVis": [],
+  "operationSucceeded": true,
+  "timing": {
+    "compileSeconds": 60,
+    "cliElapsedMs": 60582
+  },
+  "resultHash": "bf722123ba07ac4611e41eadf605cf45b20d398d3229b2b837d3f5115d0a7966",
+  "note": "Real MassCompile on the disposable Ubuntu 24.04 VirtualBox clone: LabVIEW report 60s; CLI wall 60582ms; 58 samples at 500ms; LabVIEW avg CPU 92.70%; peak RSS 397.55 MB; write delta 44752896 bytes.",
+  "verdict": {
+    "benchmarkOk": true,
+    "reason": "MassCompile of resource (307 VIs/CTLs, 0 bad) succeeded"
+  },
+  "digest": "25370b38ea184c9f51bc22f6212690084b79558421ff50052ca193c20d934043"
+}

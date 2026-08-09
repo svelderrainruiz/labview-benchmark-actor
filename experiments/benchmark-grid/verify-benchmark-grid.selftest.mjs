@@ -36,6 +36,12 @@ const ok = (m) => { n++; console.log(`ok ${n} - ${m}`); };
   assert.equal(vi.consensusHash.slice(0, 8), '0419a449', 'VI Analyzer consensus hash');
   assert.equal(mc.identityAgrees, true, 'Mass Compile identity agrees across planes');
   assert.equal(mc.consensusHash.slice(0, 8), 'bf722123', 'Mass Compile consensus hash');
+  assert.equal(mc.planeCount, 4, 'Mass Compile spans four agreeing planes');
+  assert.equal(
+    mc.planes.find((plane) => plane.planeId === 'vm:lba-ubuntu2404-labview2026-scratch')?.performance.value,
+    60,
+    'scratch VM Mass Compile timing is folded into the grid',
+  );
   assert.equal(grid.summary.crossPlaneProvenCount, 2, 'both benchmarks cross-plane-proven');
   assert.equal(grid.summary.violationCount, 0, 'no determinism violations');
   ok('grid derives from committed receipts, validates, and is cross-plane OK (2/2 proven)');

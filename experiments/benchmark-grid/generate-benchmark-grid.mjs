@@ -22,6 +22,7 @@ const SOURCES = {
   massCompileGolden: 'experiments/mass-compile/fixtures/mass-compile-benchmark-receipt.json',
   massCompileHost: 'experiments/benchmark-grid/fixtures/mass-compile-host.receipt.json',
   massCompileWin: 'experiments/benchmark-grid/fixtures/mass-compile-win.receipt.json',
+  massCompileScratchVm: 'experiments/benchmark-grid/fixtures/mass-compile-scratch-vm.receipt.json',
 };
 const readJson = (rel) => JSON.parse(readFileSync(join(repoRoot, rel), 'utf8'));
 
@@ -32,13 +33,14 @@ export function buildGridFromCommittedReceipts() {
     readJson(SOURCES.massCompileGolden),
     readJson(SOURCES.massCompileHost),
     readJson(SOURCES.massCompileWin),
+    readJson(SOURCES.massCompileScratchVm),
   ]);
   return buildBenchmarkGrid([viAnalyzer, massCompile]);
 }
 
 export function renderCommittedGrid() {
   return renderBenchmarkGridMarkdown(buildGridFromCommittedReceipts(), {
-    sources: [SOURCES.viAnalyzer, SOURCES.massCompileGolden, SOURCES.massCompileHost, SOURCES.massCompileWin],
+    sources: [SOURCES.viAnalyzer, SOURCES.massCompileGolden, SOURCES.massCompileHost, SOURCES.massCompileWin, SOURCES.massCompileScratchVm],
   });
 }
 

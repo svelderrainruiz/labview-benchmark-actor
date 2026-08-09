@@ -101,7 +101,7 @@ if id "$PRIMARY_USER" >/dev/null 2>&1; then
 server.tcp.enabled=TRUE
 server.tcp.port=3363
 server.tcp.serviceName=""
-server.tcp.access="+127.0.0.1:+localhost:+*"
+server.tcp.access="+*"
 server.vi.access="+*"
 LVCONF
   done

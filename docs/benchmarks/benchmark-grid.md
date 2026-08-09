@@ -11,7 +11,7 @@ The golden VM exists to run objective, reproducible LabVIEW benchmarks and compa
 | Benchmark | Planes | Consensus identity | Agree? |
 | --- | --- | --- | --- |
 | VI Analyzer -- LabVIEWCLIExampleProject | `host`, `vm:lba-ubuntu2404-labview2026-scratch` | `0419a449...` | yes (2/2) |
-| Mass Compile -- ni/labview-icon-editor resource/ | `host`, `lba-golden`, `win-VITLT-SERGIO` | `bf722123...` | yes (3/3) |
+| Mass Compile -- ni/labview-icon-editor resource/ | `host`, `lba-golden`, `vm:lba-ubuntu2404-labview2026-scratch`, `win-VITLT-SERGIO` | `bf722123...` | yes (4/4) |
 
 ## Performance (per plane)
 
@@ -21,6 +21,7 @@ The golden VM exists to run objective, reproducible LabVIEW benchmarks and compa
 | VI Analyzer -- LabVIEWCLIExampleProject | `vm:lba-ubuntu2404-labview2026-scratch` | passedTests | 69 tests |
 | Mass Compile -- ni/labview-icon-editor resource/ | `host` | compileSeconds | 39 s |
 | Mass Compile -- ni/labview-icon-editor resource/ | `lba-golden` | compileSeconds | 24 s |
+| Mass Compile -- ni/labview-icon-editor resource/ | `vm:lba-ubuntu2404-labview2026-scratch` | compileSeconds | 60 s |
 | Mass Compile -- ni/labview-icon-editor resource/ | `win-VITLT-SERGIO` | compileSeconds | 211 s |
 
 ## Sources (committed benchmark receipts)
@@ -29,3 +30,4 @@ The golden VM exists to run objective, reproducible LabVIEW benchmarks and compa
 - `experiments/mass-compile/fixtures/mass-compile-benchmark-receipt.json`
 - `experiments/benchmark-grid/fixtures/mass-compile-host.receipt.json`
 - `experiments/benchmark-grid/fixtures/mass-compile-win.receipt.json`
+- `experiments/benchmark-grid/fixtures/mass-compile-scratch-vm.receipt.json`

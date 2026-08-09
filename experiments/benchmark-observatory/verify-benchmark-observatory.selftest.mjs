@@ -47,11 +47,13 @@ const ok = (m) => { n++; console.log(`ok ${n} - ${m}`); };
   ok('observatory build is deterministic (stable digest)');
 }
 
-// 3. the coverage matrix is faithfully derived: mass-compile spans 3 planes, lba-golden carries 2 benchmarks
+// 3. the coverage matrix is faithfully derived: mass-compile spans 4 planes, lba-golden carries 2 benchmarks
 {
   const obs = buildObservatoryFromCommittedReceipts();
   const mc = obs.matrix.rows.find((r) => r.benchmarkId === 'mass-compile-icon-editor-resource');
-  assert.equal(mc.filledPlanes.length, 3, 'mass-compile ran on 3 planes');
+  assert.equal(mc.filledPlanes.length, 4, 'mass-compile ran on 4 planes');
+  assert.equal(obs.summary.filledCellCount, 8, '8 of 20 benchmark-plane cells are measured');
+  assert.equal(obs.summary.frontierCount, 12, '12 benchmark-plane cells remain on the frontier');
   const onGolden = obs.matrix.rows.filter((r) => r.filledPlanes.includes('lba-golden')).map((r) => r.benchmarkId).sort();
   assert.deepEqual(onGolden, ['lunit-test-icon-editor', 'mass-compile-icon-editor-resource'], 'lba-golden carries both mass-compile + lunit-test');
   assert.equal(obs.summary.filledCellCount, obs.matrix.rows.reduce((s, r) => s + r.filledPlanes.length, 0), 'filled-cell count matches the matrix');
@@ -63,7 +65,7 @@ const ok = (m) => { n++; console.log(`ok ${n} - ${m}`); };
   const obs = buildObservatoryFromCommittedReceipts();
   const mc = obs.benchmarks.find((b) => b.benchmarkId === 'mass-compile-icon-editor-resource');
   const ppl = obs.benchmarks.find((b) => b.benchmarkId === 'ppl-build-icon-editor');
-  assert.equal(mc.identityAgrees, true, 'mass-compile identity agrees across its 3 planes');
+  assert.equal(mc.identityAgrees, true, 'mass-compile identity agrees across its 4 planes');
   assert.equal(ppl.identityAgrees, null, 'ppl-build is single-plane (pending), not a violation');
   ok('determinism ledger is faithfully derived (proven vs pending)');
 }
