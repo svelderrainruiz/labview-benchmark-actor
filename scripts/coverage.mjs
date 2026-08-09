@@ -15,7 +15,7 @@ import { spawnSync } from 'node:child_process';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createRequire } from 'node:module';
-import { normalizeCoberturaXml } from './coverage-core.mjs';
+import { coberturaWorkingTreeText } from './coverage-core.mjs';
 
 const repo = join(dirname(fileURLToPath(import.meta.url)), '..');
 const cfgPath = join(repo, 'coverage-thresholds.json');
@@ -52,7 +52,7 @@ if (run.status !== 0) {
 // provenance-neutral fields so the retained artifact is stable across worktrees and operating systems.
 const coberturaPath = join(repo, 'coverage', 'cobertura-coverage.xml');
 const cobertura = readFileSync(coberturaPath, 'utf8');
-const normalizedCobertura = normalizeCoberturaXml(cobertura);
+const normalizedCobertura = coberturaWorkingTreeText(cobertura);
 if (normalizedCobertura !== cobertura) {
   writeFileSync(coberturaPath, normalizedCobertura);
 }
