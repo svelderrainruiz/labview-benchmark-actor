@@ -33,3 +33,4 @@ coverage/**
 .lba/**
 .c8rc.json
 coverage-thresholds.json
+release-risk-closeout.json
