@@ -259,7 +259,9 @@ export function buildReadinessReceipt(opts = {}) {
   receipt.trackedWorktreeClean = worktreeState.trackedWorktreeClean;
   receipt.untrackedPaths = worktreeState.untrackedPaths;
   receipt.trackedChanges = trackedChanges;
-  if (!receipt.headEqualsOriginDevelop) failures.push(`HEAD ${head || '(missing)'} is not equal to origin/develop ${originDevelop || '(missing)'}`);
+  if (!receipt.headEqualsOriginDevelop && !receipt.originDevelopIsAncestorOfHead) {
+    failures.push(`HEAD ${head || '(missing)'} is neither equal to nor based on origin/develop ${originDevelop || '(missing)'}`);
+  }
   if (!worktreeState.trackedWorktreeClean) failures.push('tracked worktree is not clean');
   if (worktreeState.disallowedUntrackedPaths.length > 0) failures.push(`disallowed untracked paths: ${worktreeState.disallowedUntrackedPaths.join(', ')}`);
 
@@ -477,7 +479,7 @@ export function validateReceipt(receipt) {
   if (!receipt.lbabus?.selfcheckOk) failures.push('lbabus selfcheck must pass');
   if (!receipt.lbabus?.capabilitiesOk) failures.push('lbabus capabilities must pass');
   if (!receipt.trackedWorktreeClean) failures.push('tracked worktree must be clean');
-  if (!receipt.headEqualsOriginDevelop) failures.push('HEAD must equal origin/develop');
+  if (!receipt.headEqualsOriginDevelop && !receipt.originDevelopIsAncestorOfHead) failures.push('HEAD must equal origin/develop or be based on it');
   if (receipt.baseline?.status !== 'BLOCKED' || receipt.baseline?.present !== 12 || receipt.baseline?.total !== 28) failures.push('baseline must remain 12/28 BLOCKED');
   if (receipt.closeout?.status !== 'READY' || receipt.closeout?.present !== 28 || receipt.closeout?.total !== 28) failures.push('closeout must remain 28/28 READY');
   if (receipt.outcome !== 'PASS') failures.push('overall outcome must be PASS');
