@@ -793,6 +793,81 @@
               "signature": "tHnrqJaIHoreSyJ+M3tG6kR8eb5ngOOyZO7jLYNU8mRTFrMk+437Y58NJ9JANIgSshdCBmT6gINbNh0G0rTjDw=="
             }
           }
+        },
+        "1.4.10": {
+          "summary": "Extension 1.4.10 candidate blocked by an enrolled signed Ubuntu visual FAIL.",
+          "signoffs": {
+            "WIN": {
+              "agreed": false,
+              "reviewedCommit": "8ad7665a9ed32f7ff5b7c7ecdf2030a70dbdf9db",
+              "at": "2026-08-09T18:09:03.334Z",
+              "note": "Hosted Windows witnesses and VSIX byte-identity checks passed, but release agreement is withheld because the enrolled human visual verdict is FAIL."
+            },
+            "LINUX": {
+              "agreed": false,
+              "reviewedCommit": "8ad7665a9ed32f7ff5b7c7ecdf2030a70dbdf9db",
+              "at": "2026-08-09T18:09:03.334Z",
+              "note": "Ubuntu 22.04/24.04 witnesses and the Ubuntu reviewer substrate passed machine checks, but release agreement is withheld because the exact candidate received a signed visual FAIL."
+            }
+          },
+          "visualReview": {
+            "verdict": {
+              "schema": "labview-benchmark-actor/reviewer-verdict@1",
+              "target": {
+                "component": "extension",
+                "version": "1.4.10",
+                "commit": "8ad7665a9ed32f7ff5b7c7ecdf2030a70dbdf9db",
+                "vsixSha256": "3218be2fa43e34fce1d449148a7b3301394bf1ef0452ab331b8c4cb318d8c2dd"
+              },
+              "verdict": "fail",
+              "reviewer": "reviewer@vi-tech.nl",
+              "station": "UBUNTU_VM",
+              "notes": "The exact Ubuntu-reviewed candidate did not meet the required visual/manual acceptance criteria.",
+              "evidence": [
+                {
+                  "kind": "stage",
+                  "ref": "ubuntu-review-stage.json"
+                },
+                {
+                  "kind": "kpi",
+                  "ref": "local-kpi.json"
+                },
+                {
+                  "kind": "activation",
+                  "ref": "activation-receipt.json"
+                },
+                {
+                  "kind": "lbabus",
+                  "ref": "lbabus-gate-suite-receipt.json"
+                },
+                {
+                  "kind": "hosted",
+                  "ref": "PR #28: 19/19 final-head checks pass"
+                }
+              ],
+              "renderedAt": "2026-08-09T18:09:03.329Z"
+            },
+            "signOff": {
+              "schema": "labview-benchmark-actor/acg-human-signoff-v1",
+              "subject": {
+                "verdictDigest": "979a8c01409788bd90aed489ae70ea2cbf8b7509333b8e281f9f8a0b8092636f",
+                "consensusVerdict": "fail",
+                "target": {
+                  "component": "extension",
+                  "version": "1.4.10",
+                  "commit": "8ad7665a9ed32f7ff5b7c7ecdf2030a70dbdf9db",
+                  "vsixSha256": "3218be2fa43e34fce1d449148a7b3301394bf1ef0452ab331b8c4cb318d8c2dd"
+                }
+              },
+              "reviewer": "reviewer@vi-tech.nl",
+              "decision": "reject",
+              "station": "UBUNTU_VM",
+              "algorithm": "ed25519",
+              "publicKeyPem": "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEAX9zyavOuiwchv39AAJZCbfVhzF0hNEVDkuyHJMvBIIw=\n-----END PUBLIC KEY-----\n",
+              "signedAt": "2026-08-09T18:09:03.334Z",
+              "signature": "8F/B6oWOHw7Xd1VCoIOO/9A4Hla0B5QD484Dz8f0ejlVZnnNMpUj2C4OoKGoKsvf5l0rbuONrdxo/0JywhlsDg=="
+            }
+          }
         }
       }
     }
