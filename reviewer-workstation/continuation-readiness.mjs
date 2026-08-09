@@ -7,8 +7,8 @@ import { dirname, isAbsolute, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { spawnInvocation } from '../extension-tasks/process-command.mjs';
 import { verifyManifest as verifyAgentsManifest, agentsSha256, readManifest as readAgentsManifest, AGENTS_MD as EXTENSION_AGENTS_MD } from '../scripts/agentsManifest.mjs';
-import { parseCorrespondenceSummary, parseCoverageSummary, parseLocalGateSummary } from '../scripts/local-kpi-core.mjs';
-import { buildCloseout, closeoutDigest, validateCloseout } from './release-risk-closeout.mjs';
+import { parseCorrespondenceSummary } from '../scripts/local-kpi-core.mjs';
+import { closeoutDigest, validateCloseout } from './release-risk-closeout.mjs';
 
 export const SCHEMA = 'labview-benchmark-actor/continuation-readiness@1';
 const HERE = dirname(fileURLToPath(import.meta.url));
