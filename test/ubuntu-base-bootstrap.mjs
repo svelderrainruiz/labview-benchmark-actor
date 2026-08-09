@@ -77,6 +77,17 @@ assert.equal(
 assert.equal(
   verifyUbuntuBaseBootstrapContract({
     bootstrap,
+    builder: builder.replace(
+      'SSH_HOST_PORT must be an integer from 1024 through 65535',
+      'port validation unavailable',
+    ),
+  }).ok,
+  false,
+  'invalid SSH ports must fail before VM creation',
+);
+assert.equal(
+  verifyUbuntuBaseBootstrapContract({
+    bootstrap,
     builder: `${builder}\nVBoxManage unattended install --user-password=unsafe`,
   }).ok,
   false,

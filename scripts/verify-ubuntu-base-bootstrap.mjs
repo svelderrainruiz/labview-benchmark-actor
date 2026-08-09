@@ -70,8 +70,14 @@ export function verifyUbuntuBaseBootstrapContract({ bootstrap, builder }) {
     failures.push('SSH NAT forwarding must bind to host loopback');
   }
   if (/--natpf1[^]*0\.0\.0\.0/.test(builder)) failures.push('SSH NAT forwarding must not bind to all interfaces');
-  if (builder.indexOf('missing unattended bootstrap template') > builder.indexOf('VBoxManage createvm')
-      || builder.indexOf('does not support unattended --post-install-template') > builder.indexOf('VBoxManage createvm')) {
+  const createIndex = builder.indexOf('VBoxManage createvm');
+  const preflightMarkers = [
+    'missing unattended bootstrap template',
+    'does not support unattended --post-install-template',
+    'SSH_HOST_PORT must be an integer',
+    'SSH_HOST_PORT must be from 1024',
+  ];
+  if (preflightMarkers.some((marker) => builder.indexOf(marker) < 0 || builder.indexOf(marker) > createIndex)) {
     failures.push('bootstrap mechanism preflight must run before VM creation');
   }
   return { ok: failures.length === 0, failures };

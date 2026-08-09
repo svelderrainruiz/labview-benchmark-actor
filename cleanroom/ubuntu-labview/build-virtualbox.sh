@@ -109,6 +109,13 @@ if [ "$DRY_RUN" = 0 ] && ! VBoxManage unattended install --help 2>&1 | grep -q -
   echo "[abort] this VBoxManage does not support unattended --post-install-template" >&2
   exit 1
 fi
+if [ -n "$SSH_HOST_PORT" ]; then
+  case "$SSH_HOST_PORT" in
+    *[!0-9]*|'') echo "[abort] SSH_HOST_PORT must be an integer from 1024 through 65535" >&2; exit 1 ;;
+  esac
+  [ "$SSH_HOST_PORT" -ge 1024 ] && [ "$SSH_HOST_PORT" -le 65535 ] ||
+    { echo "[abort] SSH_HOST_PORT must be from 1024 through 65535" >&2; exit 1; }
+fi
 
 VM_DIR="$BASEFOLDER/$VM_NAME"
 DISK="$VM_DIR/$VM_NAME.vdi"
@@ -126,11 +133,6 @@ run VBoxManage modifyvm "$VM_NAME" \
   --memory "$MEM_MB" --cpus "$CPUS" --vram "$VRAM_MB" --graphicscontroller vmsvga \
   --chipset piix3 --firmware bios --ioapic on --rtcuseutc on --nic1 nat
 if [ -n "$SSH_HOST_PORT" ]; then
-  case "$SSH_HOST_PORT" in
-    *[!0-9]*|'') echo "[abort] SSH_HOST_PORT must be an integer from 1024 through 65535" >&2; exit 1 ;;
-  esac
-  [ "$SSH_HOST_PORT" -ge 1024 ] && [ "$SSH_HOST_PORT" -le 65535 ] ||
-    { echo "[abort] SSH_HOST_PORT must be from 1024 through 65535" >&2; exit 1; }
   run VBoxManage modifyvm "$VM_NAME" --natpf1 "lba-ssh,tcp,127.0.0.1,$SSH_HOST_PORT,,22"
 fi
 
