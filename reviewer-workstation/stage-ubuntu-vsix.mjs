@@ -82,6 +82,34 @@ export function validateUbuntuKpiReceipt({ target, kpi, vsixBytes }) {
   return { ok: failures.length === 0, failures, actualSha256 };
 }
 
+export function validateUbuntuVmIdentity({ identity, expectedProvider, expectedMachineId }) {
+  const failures = [];
+  if (expectedProvider !== 'oracle') failures.push('Ubuntu reviewer VM provider must be oracle');
+  if (!/^[a-f0-9]{32}$/i.test(expectedMachineId ?? '')) failures.push('expected Ubuntu reviewer machine id must be 32-hex');
+  if (identity?.provider !== expectedProvider) failures.push('detected virtualization provider does not match expected provider');
+  if (String(identity?.machineId ?? '').toLowerCase() !== String(expectedMachineId ?? '').toLowerCase()) {
+    failures.push('detected Ubuntu reviewer machine id does not match expected machine id');
+  }
+  if (!/^VirtualBox$/i.test(String(identity?.productName ?? '').trim())) {
+    failures.push('detected Ubuntu reviewer product must be VirtualBox');
+  }
+  return { ok: failures.length === 0, failures };
+}
+
+function detectUbuntuVmIdentity() {
+  let provider;
+  try {
+    provider = execFileSync('systemd-detect-virt', ['--vm'], { encoding: 'utf8' }).trim();
+  } catch {
+    throw new Error('Ubuntu reviewer staging requires a detected virtual machine');
+  }
+  return {
+    provider,
+    machineId: readFileSync('/etc/machine-id', 'utf8').trim(),
+    productName: readFileSync('/sys/class/dmi/id/product_name', 'utf8').trim(),
+  };
+}
+
 function writeJsonAtomic(file, value) {
   const temporary = `${file}.${process.pid}.tmp`;
   writeFileSync(temporary, `${JSON.stringify(value, null, 2)}\n`, { encoding: 'utf8', mode: 0o600 });
@@ -104,7 +132,7 @@ function parseArgs(argv) {
 function main() {
   if (process.platform !== 'linux') throw new Error('Ubuntu candidate staging must run inside the Linux reviewer VM');
   const args = parseArgs(process.argv.slice(2));
-  for (const name of ['vsix', 'target', 'kpi', 'workspace', 'receipt', 'handoff']) {
+  for (const name of ['vsix', 'target', 'kpi', 'workspace', 'receipt', 'handoff', 'vm-provider', 'vm-id']) {
     if (!args[name]) throw new Error(`--${name} is required`);
   }
   const code = args.code || 'code';
@@ -124,6 +152,13 @@ function main() {
   if (!candidate.ok) throw new Error(candidate.failures.join('; '));
   const kpiEvidence = validateUbuntuKpiReceipt({ target, kpi, vsixBytes });
   if (!kpiEvidence.ok) throw new Error(kpiEvidence.failures.join('; '));
+  const vmIdentity = detectUbuntuVmIdentity();
+  const vmEvidence = validateUbuntuVmIdentity({
+    identity: vmIdentity,
+    expectedProvider: args['vm-provider'],
+    expectedMachineId: args['vm-id'],
+  });
+  if (!vmEvidence.ok) throw new Error(vmEvidence.failures.join('; '));
   mkdirSync(workspace, { recursive: true, mode: 0o700 });
   mkdirSync(dirname(receiptPath), { recursive: true, mode: 0o700 });
   mkdirSync(handoff, { recursive: true, mode: 0o700 });
@@ -154,6 +189,7 @@ function main() {
       vsixSha256: evidence.actualSha256,
     },
     stagedAt: new Date().toISOString(),
+    virtualization: vmIdentity,
   };
   writeJsonAtomic(stagedMarker, stationMarker);
   writeJsonAtomic(handoffTarget, target);
@@ -169,6 +205,7 @@ function main() {
     platform: {
       os: process.platform,
       arch: process.arch,
+      virtualization: vmIdentity,
     },
     artifacts: {
       vsix: stagedVsix,

@@ -27,6 +27,16 @@ export function captureMetadataForPlatform(platform: NodeJS.Platform): CaptureMe
   return { workload: 'labview-launch', plane: 'WIN', source: 'ffmpeg-gdigrab' };
 }
 
+export function x11DisplayForCapture(env: NodeJS.ProcessEnv = process.env): string {
+  const display = String(env.DISPLAY || '').trim();
+  if (!display) throw new Error('Linux LabVIEW capture requires DISPLAY from the active graphical session');
+  const sessionType = String(env.XDG_SESSION_TYPE || '').trim().toLowerCase();
+  if (sessionType !== 'x11') {
+    throw new Error('Ubuntu LabVIEW capture requires an Xorg session (XDG_SESSION_TYPE=x11); Wayland rootless Xwayland produces incomplete frames');
+  }
+  return display;
+}
+
 export function ffmpegCaptureArgsForPlatform(
   platform: NodeJS.Platform,
   framePattern: string,
@@ -37,12 +47,7 @@ export function ffmpegCaptureArgsForPlatform(
     return ['-y', '-f', 'gdigrab', '-framerate', '12', '-i', 'desktop', framePattern];
   }
   if (platform === 'linux') {
-    const display = String(env.DISPLAY || '').trim();
-    if (!display) throw new Error('Linux LabVIEW capture requires DISPLAY from the active graphical session');
-    const sessionType = String(env.XDG_SESSION_TYPE || '').trim().toLowerCase();
-    if (sessionType !== 'x11') {
-      throw new Error('Ubuntu LabVIEW capture requires an Xorg session (XDG_SESSION_TYPE=x11); Wayland rootless Xwayland produces incomplete frames');
-    }
+    const display = x11DisplayForCapture(env);
     const videoSize = String(x11VideoSize ?? '');
     if (!/^[1-9]\d*x[1-9]\d*$/.test(videoSize)) {
       throw new Error('Ubuntu LabVIEW capture requires the active X11 desktop dimensions');
@@ -103,8 +108,8 @@ export function linuxSamplerScript(outFile: string): string {
     '    [ "$read_delta" -ge 0 ] || read_delta=0',
     '    [ "$write_delta" -ge 0 ] || write_delta=0',
     '    [ "$io_delta" -ge 0 ] || io_delta=0',
-    "    read_mbs=$(awk -v s=\"$read_delta\" -v e=\"$elapsed\" 'BEGIN { printf \"%.3f\", s*512*1000/e/1048576 }')",
-    "    write_mbs=$(awk -v s=\"$write_delta\" -v e=\"$elapsed\" 'BEGIN { printf \"%.3f\", s*512*1000/e/1048576 }')",
+    "    read_mbs=$(awk -v s=\"$read_delta\" -v e=\"$elapsed\" 'BEGIN { printf \"%.3f\", s*512*1000/e/1000000 }')",
+    "    write_mbs=$(awk -v s=\"$write_delta\" -v e=\"$elapsed\" 'BEGIN { printf \"%.3f\", s*512*1000/e/1000000 }')",
     "    util=$(awk -v i=\"$io_delta\" -v e=\"$elapsed\" 'BEGIN { v=100*i/e; if(v>100)v=100; printf \"%.1f\", v }')",
     "    disk_pct=$(awk -v a=\"$disk_pct\" -v b=\"$util\" 'BEGIN { print (b>a ? b : a) }')",
     "    disks=\"${disks}${separator}{\\\"name\\\":\\\"${name}\\\",\\\"writeMBs\\\":${write_mbs},\\\"readMBs\\\":${read_mbs}}\"",

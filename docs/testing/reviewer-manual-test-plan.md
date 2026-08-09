@@ -232,7 +232,8 @@ workspace root.
 ### TC-12 — Render signed reviewer verdict
 - **Pre:** complete TC-00 through TC-11 as applicable; the exact `review-target.json` and target-bound
   `reviewer-station.json` are staged in the extension handoff directory; reviewer id and the fresh
-  version-scoped visual private key are configured in this disposable VM.
+  version-scoped visual private key are configured in this disposable VM. The station marker records
+  the verified VirtualBox provider, DMI product, and host-observed guest machine-id.
 - **Steps:**
   1. Run **LabVIEW Benchmark Actor: Render Reviewer Verdict**.
   2. Select the verdict that matches the completed manual review and enter concise notes.

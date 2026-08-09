@@ -9,6 +9,7 @@ import {
   labviewCandidatesForPlatform,
   linuxSamplerScript,
   parseX11DisplaySize,
+  x11DisplayForCapture,
 } from '../out/capturePlatform.js';
 import {
   buildBenchmarkPanelHtml,
@@ -452,6 +453,7 @@ assert.deepEqual(labviewCandidatesForPlatform('linux'), [
   '/usr/local/natinst/LabVIEW-2026-64/labview',
   '/usr/local/natinst/LabVIEW-2026-64/labview64',
 ]);
+assert.match(labviewCandidatesForPlatform('win32')[0], /Program Files/);
 assert.equal(labviewCandidatesForPlatform('darwin').length, 0);
 assert.deepEqual(captureMetadataForPlatform('linux'), {
   workload: 'labview-launch',
@@ -477,6 +479,9 @@ throws(() => ffmpegCaptureArgsForPlatform('linux', 'frame.png', { DISPLAY: ':0',
 throws(() => ffmpegCaptureArgsForPlatform('darwin', 'frame.png', {}), /unsupported/);
 assert.equal(parseX11DisplaySize('dimensions: 800x600 pixels'), '800x600');
 throws(() => parseX11DisplaySize('no dimensions'), /did not report/);
+assert.equal(x11DisplayForCapture({ DISPLAY: ':1', XDG_SESSION_TYPE: 'X11' }), ':1');
+throws(() => x11DisplayForCapture({}), /requires DISPLAY/);
+throws(() => x11DisplayForCapture({ DISPLAY: ':1' }), /requires an Xorg session/);
 const linuxSampler = linuxSamplerScript("/tmp/res'ources.jsonl");
 assert.match(linuxSampler, /\/proc\/stat/);
 assert.match(linuxSampler, /MemAvailable/);

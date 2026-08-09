@@ -16,6 +16,7 @@ import {
   labviewCandidatesForPlatform,
   linuxSamplerScript,
   parseX11DisplaySize,
+  x11DisplayForCapture,
 } from './capturePlatform';
 
 const execFileAsync = promisify(execFile);
@@ -1253,6 +1254,12 @@ async function captureLaunchCommand(context: vscode.ExtensionContext, output: vs
   }
   let x11VideoSize: string | undefined;
   if (process.platform === 'linux') {
+    try {
+      x11DisplayForCapture(process.env);
+    } catch (error) {
+      reportUiError(output, 'Capture LabVIEW Launch (X11 session)', error);
+      return;
+    }
     try {
       const { stdout } = await execFileAsync('xdpyinfo', ['-display', String(process.env.DISPLAY || '')], {
         timeout: 5000,

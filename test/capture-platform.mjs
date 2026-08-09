@@ -7,6 +7,7 @@ import {
   labviewCandidatesForPlatform,
   linuxSamplerScript,
   parseX11DisplaySize,
+  x11DisplayForCapture,
 } from '../src/capturePlatform.ts';
 
 assert.equal(
@@ -14,6 +15,9 @@ assert.equal(
   '/usr/local/natinst/LabVIEW-2026-64/labview',
 );
 assert.match(labviewCandidatesForPlatform('win32')[0], /Program Files/);
+assert.equal(x11DisplayForCapture({ DISPLAY: ':0', XDG_SESSION_TYPE: 'x11' }), ':0');
+assert.throws(() => x11DisplayForCapture({ XDG_SESSION_TYPE: 'x11' }), /requires DISPLAY/);
+assert.throws(() => x11DisplayForCapture({ DISPLAY: ':0', XDG_SESSION_TYPE: 'wayland' }), /requires an Xorg session/);
 assert.deepEqual(
   ffmpegCaptureArgsForPlatform('linux', '/tmp/frame-%05d.png', { DISPLAY: ':0', XDG_SESSION_TYPE: 'x11' }, '1920x1080'),
   ['-y', '-f', 'x11grab', '-framerate', '12', '-video_size', '1920x1080', '-draw_mouse', '0', '-i', ':0', '/tmp/frame-%05d.png'],
@@ -47,6 +51,8 @@ assert.match(sampler, /"cpuPct"/);
 assert.match(sampler, /"ramMb"/);
 assert.match(sampler, /\/proc\/diskstats/);
 assert.match(sampler, /writeMBs/);
+assert.match(sampler, /\/1000000/);
+assert.doesNotMatch(sampler, /\/1048576/);
 assert.doesNotMatch(sampler, /"diskPct":0/);
 
 console.log('capture-platform: PASS');

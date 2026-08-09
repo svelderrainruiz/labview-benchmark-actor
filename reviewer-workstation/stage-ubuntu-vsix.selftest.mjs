@@ -7,6 +7,7 @@ import {
   validateUbuntuKpiReceipt,
   validateUbuntuReviewTarget,
   validateUbuntuStageEvidence,
+  validateUbuntuVmIdentity,
 } from './stage-ubuntu-vsix.mjs';
 
 const version = JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8')).version;
@@ -62,6 +63,26 @@ assert.equal(validateUbuntuKpiReceipt({
   kpi: { ...kpi, kpi: { ...kpi.kpi, candidate: { ...kpi.kpi.candidate, sourceCommit: 'b'.repeat(40) } } },
   vsixBytes,
 }).ok, false);
+const vmIdentity = {
+  provider: 'oracle',
+  machineId: 'c'.repeat(32),
+  productName: 'VirtualBox',
+};
+assert.equal(validateUbuntuVmIdentity({
+  identity: vmIdentity,
+  expectedProvider: 'oracle',
+  expectedMachineId: vmIdentity.machineId,
+}).ok, true);
+assert.equal(validateUbuntuVmIdentity({
+  identity: { ...vmIdentity, provider: 'wsl', productName: 'Physical Machine' },
+  expectedProvider: 'oracle',
+  expectedMachineId: vmIdentity.machineId,
+}).ok, false);
+assert.equal(validateUbuntuVmIdentity({
+  identity: vmIdentity,
+  expectedProvider: 'wsl',
+  expectedMachineId: 'wrong',
+}).ok, false);
 assert.equal(validateUbuntuKpiReceipt({
   target,
   kpi: { ...kpi, kpi: { ...kpi.kpi, candidate: { ...kpi.kpi.candidate, worktreeCleanAfter: false } } },
@@ -105,6 +126,10 @@ assert(
 assert(
   source.indexOf('const kpiEvidence = validateUbuntuKpiReceipt') < source.indexOf("execFileSync(code, ['--install-extension'"),
   'candidate commit KPI binding is validated before installation',
+);
+assert(
+  source.indexOf('const vmEvidence = validateUbuntuVmIdentity') < source.indexOf("execFileSync(code, ['--install-extension'"),
+  'reviewer virtualization identity is validated before installation',
 );
 assert.match(source, /reviewer-station\.json/);
 assert.match(source, /handoffReviewTarget/);

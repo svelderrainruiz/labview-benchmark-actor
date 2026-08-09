@@ -156,7 +156,9 @@ node reviewer-workstation/stage-ubuntu-vsix.mjs \
   --kpi /home/actor/lba-review/local-kpi.json \
   --workspace /home/actor/lba-review/workspace \
   --receipt /home/actor/lba-review/ubuntu-review-stage.json \
-  --handoff "$HOME/.config/Code/User/globalStorage/svelderrainruiz.labview-benchmark-actor/handoff"
+  --handoff "$HOME/.config/Code/User/globalStorage/svelderrainruiz.labview-benchmark-actor/handoff" \
+  --vm-provider oracle \
+  --vm-id '<host-observed /etc/machine-id>'
 ```
 
 The command runs only on Linux and binds the candidate's version, 40-hex commit, 64-hex SHA-256, and
@@ -164,7 +166,9 @@ bytes to a passing full local-KPI receipt, then verifies the VSIX manifest **bef
 anything. It then installs with `code --install-extension --force`,
 requires the exact `svelderrainruiz.labview-benchmark-actor@<version>` identity, writes a non-secret
 receipt with wall and monotonic timing, and atomically stages the exact target plus a target-bound
-`UBUNTU_VM` marker where the extension reads them. Follow
+`UBUNTU_VM` marker where the extension reads them. The marker is emitted only after
+`systemd-detect-virt --vm`, `/etc/machine-id`, and the DMI product name prove the expected
+VirtualBox guest identity; physical Ubuntu, WSL, containers, and a different VM fail closed. Follow
 [the manual plan](../docs/testing/reviewer-manual-test-plan.md), then use **LabVIEW Benchmark Actor:
 Render Reviewer Verdict** inside VS Code. Linux verdict rendering fails closed without the staging
 marker; it no longer infers `UBUNTU_VM` from the operating system alone.
