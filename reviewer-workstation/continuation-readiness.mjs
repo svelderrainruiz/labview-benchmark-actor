@@ -244,7 +244,7 @@ export function buildReadinessReceipt(opts = {}) {
   const originDevelop = runCommand('git', ['rev-parse', '--verify', 'origin/develop'], { allowFailure: true }).stdout.trim();
   const mergeBase = originDevelop ? runCommand('git', ['merge-base', 'HEAD', 'origin/develop'], { allowFailure: true }).stdout.trim() : null;
   const upstream = runCommand('git', ['rev-parse', '--abbrev-ref', '--symbolic-full-name', '@{upstream}'], { allowFailure: true }).stdout.trim();
-  const statusLines = gitStatus.stdout.split(/\r?\n/).filter(Boolean);
+  const statusLines = gitStatus.stdout.split(/\r?\n/).filter(Boolean).filter((line) => !line.startsWith('## '));
   const trackedChanges = statusLines.filter((line) => !line.startsWith('?? '));
   const untrackedPaths = statusLines.filter((line) => line.startsWith('?? ')).map((line) => line.replace(/^\?\?\s+/, ''));
   const worktreeState = classifyWorktreeState({ trackedChanges, untrackedPaths });
