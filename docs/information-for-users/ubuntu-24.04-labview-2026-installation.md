@@ -47,26 +47,47 @@ First-clone timing was unusually slow:
 These timings include manual login, Ubuntu's first-login wizard, and installing OpenSSH. They are not warm-boot
 metrics.
 
-## 2. Establish remote automation
+## 2. Establish remote automation during unattended installation
 
-The clean desktop image did not include OpenSSH. Open a terminal and install it:
+New cleanroom bases use VirtualBox 7.2.8's unattended post-install template before the first reboot. No graphical
+login is required. Keep the disposable password in a mode-0600 file and select an operator-owned, collision-free
+host-loopback port:
 
 ```bash
-sudo apt-get update
-sudo apt-get install -y openssh-server
-sudo systemctl enable --now ssh
+chmod 600 /safe/local/path/actor-password
+ISO=/path/to/ubuntu-24.04.4-desktop-amd64.iso \
+VM_NAME=lba-ubuntu2404-base-proof-YYYYMMDDTHHMMSSZ \
+GUEST_PASSWORD_FILE=/safe/local/path/actor-password \
+SSH_HOST_PORT=2222 \
+cleanroom/ubuntu-labview/build-virtualbox.sh --run
 ```
 
-![Terminal ready](images/ubuntu-24.04-labview-2026/terminal-ready.png)
+The builder passes the maintained `base-bootstrap.sh` through `--post-install-template`. Before first login it:
 
-![OpenSSH installed](images/ubuntu-24.04-labview-2026/ssh-install.png)
+- installs `openssh-server`, Git, and `virtualbox-guest-utils`;
+- enables SSH and guest utilities;
+- enables a first-boot validator;
+- writes `/var/lib/lba-cleanroom/base-bootstrap-receipt.json`.
 
-For reproducible automation:
+The receipt fails closed unless SSH, Git, and the supported VirtualBox guest service are present and active. It
+contains OS/version, exact VM name/UUID, absolute tool paths and versions, service states, wall-clock and monotonic
+timings, failures, and outcome, with no credential fields. The builder also fails before installation if its
+bootstrap template is missing or the installed `VBoxManage` lacks the supported post-install hook.
 
-- forward the clone's guest port 22 to a collision-resistant host-loopback port;
+SSH forwarding is never implicit:
+
+- set `SSH_HOST_PORT` to create a `127.0.0.1`-only VirtualBox NAT forward to guest port 22;
 - do not expose SSH to a LAN;
 - never record the disposable password in logs, commands, screenshots, or receipts;
 - confirm SSH with a concrete command such as `id -u`, `hostname`, and `systemctl is-active ssh`.
+
+The screenshots `terminal-ready.png` and `ssh-install.png` document the historical manual bootstrap measured in
+section 1. That path required a graphical login and is retained as baseline evidence, not as the maintained build
+procedure:
+
+![Historical terminal-ready baseline](images/ubuntu-24.04-labview-2026/terminal-ready.png)
+
+![Historical manual OpenSSH installation](images/ubuntu-24.04-labview-2026/ssh-install.png)
 
 ## 3. Run the maintained provisioner
 
@@ -248,9 +269,43 @@ Each entry must include:
 - outcome (`PASS`, `FAIL`, `BLOCKED`, or `IN_PROGRESS`);
 - uncertainty, sampling interval, or reason a safe screenshot was unavailable.
 
+For unattended-base runs, the entry must additionally state whether any graphical login occurred, the exact
+VM-running-to-SSH-ready duration from the host monotonic clock, the bounded polling timeout/interval, the NAT
+host-loopback port, the bootstrap receipt hash, and the cleanup result for only the disposable VM. If boot
+screenshots are captured, list every retained screenshot path and SHA-256; if capture is unavailable, record the
+failed best-effort attempt rather than inventing visual proof.
+
 Visual evidence must not be used to claim hidden state such as activation, package integrity, or command success;
 pair those claims with command output or receipts. Never capture credentials, account pages, tokens, computer IDs,
 private keys, or other secrets.
+
+### Live evidence entry: unattended base automation
+
+At `2026-08-09T12:53:04.360Z`, VirtualBox entered the running state for disposable VM
+`lba-ubuntu-base-proof-20260809T125300Z` (`2ed1afd2-a896-4dad-b045-f09dbc57074b`). SSH and the bootstrap receipt
+passed at `2026-08-09T13:14:00.402254600Z`: **1,256.0422546s (20m 56.0422546s)** from running state, with
+five-second bounded polling and no graphical login. The stock-ISO install completed, but NAT remained unavailable
+after its first reboot; one controlled reset at `2026-08-09T13:13:42.7556767Z` recovered the known VirtualBox
+cold-boot stall. The elapsed result includes that reset.
+
+The SSH proof returned uid `1000`, hostname `actor`, Git `2.43.0`, active SSH, active VirtualBox guest utilities,
+and a PASS bootstrap receipt. The receipt records OpenSSH server package `1:9.6p1-3ubuntu13.18`,
+`VBoxService 7.0.16_Ubuntur162802`, enabled service states, and no failures. LabVIEW provisioning and activation
+were not attempted.
+
+Evidence was retained outside Git under
+`C:\Users\sveld\.copilot\session-state\af313f92-0145-44da-8d0a-cac86b86eae7\files\lba-ubuntu-base-proof-20260809T125300Z`:
+
+- `base-bootstrap-receipt.json` SHA-256 `9cae56975a2d54b794844042445a1c4208ff7213718ac6ea62cd09169a41881c`;
+- `live-proof-receipt.json` SHA-256 `4a438d16d4c1d0a00fc64cb4394d3e301f097b376689a115ef2d61352a8985b9`;
+- `controlled-reset.json` SHA-256 `79c592259b3e896048bc83f04504b2c21d3040b563438ff93ea5a49b0439bb47`;
+- `ssh-proof.txt` SHA-256 `000170447c0581eec580761e1cc8f93e86bcb0eeabe734a9a3baad62dd0c0fc8`;
+- 21 timestamped PNGs under `screenshots\`, indexed with individual SHA-256 values in the live receipt. The first
+  image hash is `37c484cbfc93b8ba23d34b312e841d4003b4fd1aed9144d0c5b6cfe7c756f0d6`; the final pre-reset image hash is
+  `3ea4975b2bed64e2e1b7e8b41e788a61c5ac3dba57e12544dafb1e7b7d384cbe`.
+
+The sampling uncertainty is less than or equal to the five-second polling interval. Cleanup passed: only this
+disposable VM was unregistered and its residual VM folder removed; the retained source VM was not mutated.
 
 ## Cleanup
 
