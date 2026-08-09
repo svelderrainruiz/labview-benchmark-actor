@@ -41,6 +41,9 @@ function Get-JsonFromOutput([object[]]$Output, [string]$Label) {
 
 $experimentRoot = $PSScriptRoot
 $repoRoot = (Resolve-Path (Join-Path $experimentRoot '..\..')).Path
+$releaseComponents = Get-Content (Join-Path $repoRoot 'release-components.json') -Raw | ConvertFrom-Json
+$expectedLbabusVersion = [string]$releaseComponents.lbabus
+if ($expectedLbabusVersion -notmatch '^\d+\.\d+\.\d+$') { throw 'release-components.json has no valid lbabus version.' }
 $vsixPath = if ($Vsix) {
   (Resolve-Path -LiteralPath $Vsix).Path
 } else {
@@ -173,7 +176,7 @@ Invoke-Native 'vagrant' @(
 ) $logPath | Out-Null
 $proofResult = Invoke-Native 'vagrant' @(
   'winrm', 'default', '-c',
-  'powershell.exe -NoLogo -NoProfile -NonInteractive -ExecutionPolicy Bypass -File C:\lba-provision\vm-vsix-proof.ps1'
+  "powershell.exe -NoLogo -NoProfile -NonInteractive -ExecutionPolicy Bypass -File C:\lba-provision\vm-vsix-proof.ps1 -ExpectedLbabusVersion $expectedLbabusVersion"
 ) $logPath
 $guestProof = Get-JsonFromOutput $proofResult.Output 'Guest VSIX proof'
 if (-not $guestProof.checklistPresent -or $guestProof.profile -ne 'interactive') {
@@ -182,7 +185,7 @@ if (-not $guestProof.checklistPresent -or $guestProof.profile -ne 'interactive')
 if ($guestProof.candidateSha256 -ne $sourceVsixSha256) {
   throw 'Guest-staged VSIX SHA-256 differs from the exact host candidate.'
 }
-if ($guestProof.lbabusVersion -ne '0.15.8') {
+if ($guestProof.lbabusVersion -ne $expectedLbabusVersion) {
   throw 'Guest reviewer did not prove the staged lbabus version.'
 }
 $packageVersion = (Get-Content (Join-Path $repoRoot 'package.json') -Raw | ConvertFrom-Json).version

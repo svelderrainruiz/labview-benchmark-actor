@@ -40,12 +40,12 @@ function makeReceipt(overrides = {}) {
     agents: {
       rootMaterialized: true,
       canonicalMatch: true,
-      version: '0.3.13',
-      sha256: '02ce9b7b0f69dca6e0297b07940eafc3ffc90681668d590d472bb24dc2f717a9',
-      expectedVersion: '0.3.13',
-      expectedSha256: '02ce9b7b0f69dca6e0297b07940eafc3ffc90681668d590d472bb24dc2f717a9',
-      manifestVersion: '0.3.13',
-      manifestSha256: '02ce9b7b0f69dca6e0297b07940eafc3ffc90681668d590d472bb24dc2f717a9',
+      version: '0.3.14',
+      sha256: '47d74af0fa1dff3e178878187738b4448cbbd64a60ce1ecbfdefb0a03481c455',
+      expectedVersion: '0.3.14',
+      expectedSha256: '47d74af0fa1dff3e178878187738b4448cbbd64a60ce1ecbfdefb0a03481c455',
+      manifestVersion: '0.3.14',
+      manifestSha256: '47d74af0fa1dff3e178878187738b4448cbbd64a60ce1ecbfdefb0a03481c455',
     },
     tools: {
       node: { ok: true, path: absoluteToolPaths.node },
