@@ -106,25 +106,33 @@ workspace root.
 - **Result:** _____
 
 ### TC-04 — Poll Coordination Bus
-- **Pre:** `lbabus` on PATH; an active `lbabus net listen --log <path>` receive-log; set
-  `labviewBenchmarkActor.busNetLog` to that path.
+- **Pre:** `lbabus` on PATH; run a reachable reviewer-side
+  `lbabus net listen --log <reviewer-log>`; set `labviewBenchmarkActor.busNetLog` to
+  `<reviewer-log>`.
 - **Steps:**
-  1. Run **LabVIEW Benchmark Actor: Poll Coordination Bus**.
+  1. From a test peer, send a marked inbound frame to the reviewer listener, for example
+     `lbabus net send --hosts <reviewer-host> --type NOTE --message "NOTE reviewer poll smoke test"`.
+  2. Run **LabVIEW Benchmark Actor: Poll Coordination Bus**.
 - **Expected:** the **"LabVIEW Benchmark Actor"** output channel shows the last ~10 bus messages
-  (the configured-log path runs `lbabus net poll --log <path> --tail 10`); no error. If
+  including the marked inbound NOTE (the configured-log path runs
+  `lbabus net poll --log <reviewer-log> --tail 10`); no error. If
   `busNetLog` is empty, the extension omits `--log` and the CLI uses its documented default.
+  If no frame has arrived, the missing/empty receive-log exits 0 with a "nothing heard yet" hint,
+  but that does not satisfy this positive test.
   If the CLI is missing, the channel shows a clear error (record it).
 - **Result:** _____
 
 ### TC-05 — Post Coordination Note
-- **Pre:** `lbabus` on PATH; set `labviewBenchmarkActor.busNetHosts` to the live test peer(s).
-  Use a clearly-marked test note.
+- **Pre:** `lbabus` on PATH; run `lbabus net listen --log <peer-log>` on a reachable test
+  peer and set `labviewBenchmarkActor.busNetHosts` to that peer. Use a clearly-marked test note.
 - **Steps:**
   1. Run **LabVIEW Benchmark Actor: Post Coordination Note**.
   2. At the prompt, enter an ASCII note, e.g. `NOTE reviewer VM smoke test`.
+  3. On the receiving peer, run `lbabus net poll --log <peer-log> --type NOTE --tail 10`.
 - **Expected:** the note is announced with `lbabus net send --hosts <peers> --type NOTE`; the output
-  channel confirms it, and polling (TC-04) shows it after the peer routes it to the configured receive-log.
-  Empty input cancels with no send. With no peer configured, the command exits as a documented graceful no-op.
+  channel confirms it, and the receiving peer's poll shows the exact note. The sender's local
+  `busNetLog` is not expected to contain its outbound NOTE. Empty input cancels with no send. With
+  no peer configured, the command exits as a documented graceful no-op.
 - **Result:** _____
 
 ### TC-06 — Open Benchmark Viewer
