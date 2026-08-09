@@ -2,7 +2,7 @@
 <!DOCTYPE coverage SYSTEM "http://cobertura.sourceforge.net/xml/coverage-04.dtd">
 <coverage lines-valid="4758" lines-covered="4569" line-rate="0.9601999999999999" branches-valid="1573" branches-covered="1502" branch-rate="0.9548000000000001" timestamp="0" complexity="0" version="0.1">
   <sources>
-    <source>C:\dev\gh\labview-benchmark-actor.worktrees\continue-labview-benchmark-actor</source>
+    <source>.</source>
   </sources>
   <packages>
     <package name="media" line-rate="1" branch-rate="0.9904999999999999">

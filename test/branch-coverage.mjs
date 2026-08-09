@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 
 import assert from 'node:assert/strict';
+import { normalizeCoberturaXml } from '../scripts/coverage-core.mjs';
 import {
   buildBenchmarkPanelHtml,
   buildCrossPlaneResourcePanelHtml,
@@ -419,5 +420,15 @@ assert.match(buildFrameCorrelatorHtml({
 throws(() => counterBitmap(-1), /non-negative/);
 assert.equal(counterBitmap(0).width, 3);
 assert.match(counterSvg(1, { minDigits: 1, cellPx: 1, on: 'red', off: 'blue', pad: 0 }), /fill="blue"/);
+
+const cobertura = '<coverage timestamp="123"><sources><source>C:\\repo</source></sources></coverage>';
+assert.equal(
+  normalizeCoberturaXml(cobertura),
+  '<coverage timestamp="0"><sources>\n    <source>.</source>\n  </sources></coverage>',
+);
+assert.equal(
+  normalizeCoberturaXml('<coverage timestamp="456"><sources>\n<source>/home/repo</source>\n</sources></coverage>'),
+  '<coverage timestamp="0"><sources>\n    <source>.</source>\n  </sources></coverage>',
+);
 
 console.log('branch-coverage: PASS');
