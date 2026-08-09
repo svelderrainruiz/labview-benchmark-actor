@@ -35,7 +35,7 @@ jobs:
       - name: Set up Node.js
         uses: actions/setup-node@v5
         with:
-          node-version: '20'
+          node-version: '24'
 
       - name: Run local verification gate
         run: node experiments/verify-local-gates.mjs
@@ -67,4 +67,3 @@ jobs:
 
       - name: Run extension test suite
         run: npm test
-

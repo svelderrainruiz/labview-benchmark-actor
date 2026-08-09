@@ -6,7 +6,7 @@ import {
   ffmpegCaptureArgsForPlatform,
   labviewCandidatesForPlatform,
   linuxSamplerScript,
-} from '../out/capturePlatform.js';
+} from '../src/capturePlatform.ts';
 
 assert.equal(
   labviewCandidatesForPlatform('linux')[0],
