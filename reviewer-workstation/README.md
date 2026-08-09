@@ -147,8 +147,8 @@ surface, and the benchmark viewer. Nothing is published until the reviewer appro
 The governed Ubuntu visual-review lane uses a fresh graphical Ubuntu 24.04 VM built from the stock
 ISO. Provision LabVIEW without activation, let the operator activate in the VM console, and then copy
 the exact candidate VSIX, `review-target.json`, repository checkout, and fresh version-scoped visual
-private key into the disposable guest. Fully close every VS Code window (`pgrep -x code` must return
-no PID), then inside the guest run:
+private key into the disposable guest. Fully close every window/process for the selected Code client,
+then inside the guest run:
 
 ```bash
 node reviewer-workstation/stage-ubuntu-vsix.mjs \

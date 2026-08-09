@@ -6,8 +6,7 @@ export function reviewerStationForEnvironment(
   stagedStation?: unknown,
 ): ReviewerStation {
   if (platform === 'linux' && String(env.CODESPACES || '').toLowerCase() === 'true') {
-    if (stagedStation === 'LINUX_CODESPACE') return 'LINUX_CODESPACE';
-    throw new Error('Codespaces reviewer verdicts require independently staged LINUX_CODESPACE identity');
+    throw new Error('In-extension Codespaces verdict rendering is disabled until independently attested identity is staged');
   }
   if (platform === 'linux') {
     if (stagedStation === 'UBUNTU_VM') return 'UBUNTU_VM';

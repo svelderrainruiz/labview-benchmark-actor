@@ -2,7 +2,7 @@
 
 import { createHash } from 'node:crypto';
 import { execFileSync } from 'node:child_process';
-import { copyFileSync, mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
+import { copyFileSync, existsSync, mkdirSync, readFileSync, readdirSync, readlinkSync, realpathSync, renameSync, writeFileSync } from 'node:fs';
 import { basename, dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -145,13 +145,30 @@ export function validateUbuntuKpiInventories({ kpi, localGateOutput, corresponde
   };
 }
 
-function runningCodeProcessIds() {
-  try {
-    return execFileSync('pgrep', ['-u', String(process.getuid()), '-x', 'code'], { encoding: 'utf8' }).trim();
-  } catch (error) {
-    if (error instanceof Error && 'status' in error && error.status === 1) return '';
-    throw error;
+function selectedCodeExecutables(codeCommand) {
+  const commandPath = codeCommand.includes('/')
+    ? realpathSync(resolve(codeCommand))
+    : realpathSync(execFileSync('which', [codeCommand], { encoding: 'utf8' }).trim());
+  const executables = new Set([commandPath]);
+  if (basename(dirname(commandPath)) === 'bin') {
+    const productExecutable = join(dirname(dirname(commandPath)), basename(commandPath));
+    if (existsSync(productExecutable)) executables.add(realpathSync(productExecutable));
   }
+  return executables;
+}
+
+function runningCodeProcessIds(codeCommand) {
+  const executables = selectedCodeExecutables(codeCommand);
+  return readdirSync('/proc')
+    .filter((entry) => /^\d+$/.test(entry) && Number(entry) !== process.pid)
+    .filter((entry) => {
+      try {
+        return executables.has(readlinkSync(join('/proc', entry, 'exe')));
+      } catch {
+        return false;
+      }
+    })
+    .join('\n');
 }
 
 function detectUbuntuVmIdentity() {
@@ -230,7 +247,7 @@ function main() {
     expectedMachineId: args['vm-id'],
   });
   if (!vmEvidence.ok) throw new Error(vmEvidence.failures.join('; '));
-  const hostEvidence = validateUbuntuStageHost({ runningCodePids: runningCodeProcessIds() });
+  const hostEvidence = validateUbuntuStageHost({ runningCodePids: runningCodeProcessIds(code) });
   if (!hostEvidence.ok) throw new Error(hostEvidence.failures.join('; '));
   mkdirSync(workspace, { recursive: true, mode: 0o700 });
   mkdirSync(dirname(receiptPath), { recursive: true, mode: 0o700 });

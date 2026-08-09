@@ -176,6 +176,8 @@ assert(
   source.indexOf('const hostEvidence = validateUbuntuStageHost') < source.indexOf("execFileSync(code, ['--install-extension'"),
   'the extension host is proven stopped before installation',
 );
+assert.match(source, /runningCodeProcessIds\(code\)/);
+assert.match(source, /readlinkSync\(join\('\/proc', entry, 'exe'\)\)/);
 assert(
   source.indexOf('const inventoryEvidence = validateUbuntuKpiInventories') < source.indexOf("execFileSync(code, ['--install-extension'"),
   'exact gate and correspondence inventories are rerun before installation',
