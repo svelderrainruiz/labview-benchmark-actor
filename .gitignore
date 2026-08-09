@@ -56,4 +56,4 @@ coverage/coverage-final.json
 
 # .NET "runfile discovery" tooling cache the C# extension writes into the workspace root (codespace/cleanroom noise)
 /dotnet/
-.lba/local-ci/
+.lba/

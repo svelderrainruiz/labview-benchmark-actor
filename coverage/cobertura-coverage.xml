@@ -1,8 +1,8 @@
 <?xml version="1.0" ?>
 <!DOCTYPE coverage SYSTEM "http://cobertura.sourceforge.net/xml/coverage-04.dtd">
-<coverage lines-valid="4758" lines-covered="4569" line-rate="0.9601999999999999" branches-valid="1586" branches-covered="1523" branch-rate="0.9601999999999999" timestamp="0" complexity="0" version="0.1">
+<coverage lines-valid="4758" lines-covered="4569" line-rate="0.9601999999999999" branches-valid="1573" branches-covered="1502" branch-rate="0.9548000000000001" timestamp="0" complexity="0" version="0.1">
   <sources>
-    <source>C:\dev\gh\labview-benchmark-actor.worktrees\windows-docker-tightvnc-labview-experiment</source>
+    <source>C:\dev\gh\labview-benchmark-actor.worktrees\continue-labview-benchmark-actor</source>
   </sources>
   <packages>
     <package name="media" line-rate="1" branch-rate="0.9904999999999999">
@@ -2782,18 +2782,18 @@
         </class>
       </classes>
     </package>
-    <package name="src" line-rate="0.9084" branch-rate="0.9059999999999999">
+    <package name="src" line-rate="0.9084" branch-rate="0.887">
       <classes>
-        <class name="extension.ts" filename="src\extension.ts" line-rate="0.9047" branch-rate="0.905">
+        <class name="extension.ts" filename="src\extension.ts" line-rate="0.9047" branch-rate="0.8852">
           <methods>
-            <method name="probeCommand" hits="10" signature="()V">
+            <method name="probeCommand" hits="5" signature="()V">
               <lines>
-                <line number="22" hits="10"/>
+                <line number="22" hits="5"/>
               </lines>
             </method>
-            <method name="nativeHostCapabilities" hits="2" signature="()V">
+            <method name="nativeHostCapabilities" hits="1" signature="()V">
               <lines>
-                <line number="34" hits="2"/>
+                <line number="34" hits="1"/>
               </lines>
             </method>
             <method name="getOutput" hits="7" signature="()V">
@@ -3329,44 +3329,44 @@
             <line number="19" hits="1" branch="false"/>
             <line number="20" hits="1" branch="false"/>
             <line number="21" hits="1" branch="false"/>
-            <line number="22" hits="10" branch="true" condition-coverage="100% (1/1)"/>
-            <line number="23" hits="10" branch="false"/>
-            <line number="24" hits="10" branch="false"/>
-            <line number="25" hits="10" branch="false"/>
-            <line number="26" hits="10" branch="false"/>
-            <line number="27" hits="10" branch="false"/>
-            <line number="28" hits="10" branch="true" condition-coverage="33.33333333333333% (1/3)"/>
-            <line number="29" hits="10" branch="true" condition-coverage="100% (1/1)"/>
+            <line number="22" hits="5" branch="true" condition-coverage="100% (1/1)"/>
+            <line number="23" hits="5" branch="false"/>
+            <line number="24" hits="5" branch="false"/>
+            <line number="25" hits="5" branch="false"/>
+            <line number="26" hits="5" branch="false"/>
+            <line number="27" hits="5" branch="false"/>
+            <line number="28" hits="5" branch="true" condition-coverage="0% (0/2)"/>
+            <line number="29" hits="5" branch="false"/>
             <line number="30" hits="5" branch="false"/>
             <line number="31" hits="5" branch="false"/>
-            <line number="32" hits="10" branch="false"/>
+            <line number="32" hits="5" branch="false"/>
             <line number="33" hits="1" branch="false"/>
-            <line number="34" hits="2" branch="true" condition-coverage="100% (1/1)"/>
-            <line number="35" hits="2" branch="false"/>
-            <line number="36" hits="2" branch="false"/>
-            <line number="37" hits="2" branch="false"/>
-            <line number="38" hits="2" branch="false"/>
-            <line number="39" hits="2" branch="false"/>
-            <line number="40" hits="2" branch="false"/>
-            <line number="41" hits="2" branch="false"/>
-            <line number="42" hits="2" branch="false"/>
-            <line number="43" hits="2" branch="true" condition-coverage="100% (3/3)"/>
-            <line number="44" hits="2" branch="true" condition-coverage="100% (3/3)"/>
-            <line number="45" hits="2" branch="true" condition-coverage="100% (4/4)"/>
-            <line number="46" hits="2" branch="true" condition-coverage="100% (4/4)"/>
-            <line number="47" hits="2" branch="false"/>
-            <line number="48" hits="2" branch="false"/>
-            <line number="49" hits="2" branch="false"/>
-            <line number="50" hits="2" branch="false"/>
-            <line number="51" hits="2" branch="false"/>
-            <line number="52" hits="2" branch="false"/>
-            <line number="53" hits="2" branch="true" condition-coverage="0% (0/2)"/>
-            <line number="54" hits="2" branch="true" condition-coverage="0% (0/2)"/>
-            <line number="55" hits="2" branch="true" condition-coverage="100% (4/4)"/>
-            <line number="56" hits="2" branch="false"/>
-            <line number="57" hits="2" branch="false"/>
-            <line number="58" hits="2" branch="false"/>
-            <line number="59" hits="2" branch="false"/>
+            <line number="34" hits="1" branch="true" condition-coverage="100% (1/1)"/>
+            <line number="35" hits="1" branch="false"/>
+            <line number="36" hits="1" branch="false"/>
+            <line number="37" hits="1" branch="false"/>
+            <line number="38" hits="1" branch="false"/>
+            <line number="39" hits="1" branch="false"/>
+            <line number="40" hits="1" branch="false"/>
+            <line number="41" hits="1" branch="false"/>
+            <line number="42" hits="1" branch="false"/>
+            <line number="43" hits="1" branch="true" condition-coverage="0% (0/1)"/>
+            <line number="44" hits="1" branch="true" condition-coverage="0% (0/1)"/>
+            <line number="45" hits="1" branch="true" condition-coverage="0% (0/2)"/>
+            <line number="46" hits="1" branch="true" condition-coverage="0% (0/2)"/>
+            <line number="47" hits="1" branch="false"/>
+            <line number="48" hits="1" branch="false"/>
+            <line number="49" hits="1" branch="false"/>
+            <line number="50" hits="1" branch="false"/>
+            <line number="51" hits="1" branch="false"/>
+            <line number="52" hits="1" branch="false"/>
+            <line number="53" hits="1" branch="true" condition-coverage="0% (0/2)"/>
+            <line number="54" hits="1" branch="true" condition-coverage="0% (0/2)"/>
+            <line number="55" hits="1" branch="true" condition-coverage="0% (0/2)"/>
+            <line number="56" hits="1" branch="false"/>
+            <line number="57" hits="1" branch="false"/>
+            <line number="58" hits="1" branch="false"/>
+            <line number="59" hits="1" branch="false"/>
             <line number="60" hits="1" branch="false"/>
             <line number="61" hits="7" branch="true" condition-coverage="100% (1/1)"/>
             <line number="62" hits="7" branch="false"/>
@@ -3381,25 +3381,25 @@
             <line number="71" hits="9" branch="true" condition-coverage="100% (2/2)"/>
             <line number="72" hits="1" branch="false"/>
             <line number="73" hits="1" branch="false"/>
-            <line number="74" hits="3" branch="true" condition-coverage="100% (1/1)"/>
-            <line number="75" hits="3" branch="false"/>
+            <line number="74" hits="4" branch="true" condition-coverage="100% (1/1)"/>
+            <line number="75" hits="4" branch="false"/>
             <line number="76" hits="9" branch="true" condition-coverage="100% (1/1)"/>
-            <line number="77" hits="6" branch="true" condition-coverage="100% (2/2)"/>
-            <line number="78" hits="2" branch="false"/>
-            <line number="79" hits="2" branch="true" condition-coverage="100% (1/1)"/>
-            <line number="80" hits="2" branch="false"/>
-            <line number="81" hits="2" branch="false"/>
-            <line number="82" hits="2" branch="false"/>
-            <line number="83" hits="2" branch="false"/>
-            <line number="84" hits="2" branch="false"/>
-            <line number="85" hits="2" branch="false"/>
-            <line number="86" hits="6" branch="true" condition-coverage="100% (3/3)"/>
-            <line number="87" hits="6" branch="false"/>
-            <line number="88" hits="6" branch="false"/>
-            <line number="89" hits="6" branch="false"/>
-            <line number="90" hits="6" branch="false"/>
-            <line number="91" hits="6" branch="false"/>
-            <line number="92" hits="6" branch="false"/>
+            <line number="77" hits="5" branch="true" condition-coverage="100% (2/2)"/>
+            <line number="78" hits="1" branch="false"/>
+            <line number="79" hits="1" branch="true" condition-coverage="100% (1/1)"/>
+            <line number="80" hits="1" branch="false"/>
+            <line number="81" hits="1" branch="false"/>
+            <line number="82" hits="1" branch="false"/>
+            <line number="83" hits="1" branch="false"/>
+            <line number="84" hits="1" branch="false"/>
+            <line number="85" hits="1" branch="false"/>
+            <line number="86" hits="5" branch="true" condition-coverage="100% (3/3)"/>
+            <line number="87" hits="5" branch="false"/>
+            <line number="88" hits="5" branch="false"/>
+            <line number="89" hits="5" branch="false"/>
+            <line number="90" hits="5" branch="false"/>
+            <line number="91" hits="5" branch="false"/>
+            <line number="92" hits="5" branch="false"/>
             <line number="93" hits="9" branch="false"/>
             <line number="94" hits="1" branch="false"/>
             <line number="95" hits="1" branch="false"/>
@@ -5307,7 +5307,7 @@
             <line number="56" hits="5" branch="false"/>
           </lines>
         </class>
-        <class name="lbabusPath.ts" filename="src\lbabusPath.ts" line-rate="1" branch-rate="0.9166">
+        <class name="lbabusPath.ts" filename="src\lbabusPath.ts" line-rate="1" branch-rate="0.909">
           <methods>
             <method name="resolveLbabusExecutable" hits="20" signature="()V">
               <lines>
@@ -5328,15 +5328,15 @@
             <line number="10" hits="20" branch="true" condition-coverage="100% (2/2)"/>
             <line number="11" hits="20" branch="true" condition-coverage="100% (2/2)"/>
             <line number="12" hits="18" branch="false"/>
-            <line number="13" hits="18" branch="true" condition-coverage="100% (2/2)"/>
-            <line number="14" hits="18" branch="true" condition-coverage="0% (0/1)"/>
+            <line number="13" hits="18" branch="true" condition-coverage="100% (1/1)"/>
+            <line number="14" hits="18" branch="true" condition-coverage="50% (1/2)"/>
             <line number="15" hits="18" branch="true" condition-coverage="100% (1/1)"/>
-            <line number="16" hits="17" branch="false"/>
-            <line number="17" hits="17" branch="true" condition-coverage="100% (1/1)"/>
-            <line number="18" hits="17" branch="false"/>
+            <line number="16" hits="1" branch="false"/>
+            <line number="17" hits="1" branch="false"/>
+            <line number="18" hits="1" branch="false"/>
             <line number="19" hits="18" branch="false"/>
-            <line number="20" hits="17" branch="true" condition-coverage="100% (1/1)"/>
-            <line number="21" hits="17" branch="false"/>
+            <line number="20" hits="1" branch="true" condition-coverage="100% (1/1)"/>
+            <line number="21" hits="1" branch="false"/>
           </lines>
         </class>
       </classes>

@@ -82,10 +82,13 @@ if (skipTests) {
   const ls = runShell('npx vsce ls');
   const files = String(ls.stdout || '').split(/\r?\n/).map((s) => s.trim()).filter(Boolean);
   const strays = files.filter((f) => !ALLOW_SET.some((rx) => rx.test(f)));
-  const ok = ls.status === 0 && files.length > 0 && strays.length === 0;
+  const missingRuntimeFiles = ['media/AGENTS.md', 'media/agents.manifest.json'].filter((file) => !files.includes(file));
+  const ok = ls.status === 0 && files.length > 0 && strays.length === 0 && missingRuntimeFiles.length === 0;
   record('vsix-allow-set', ok,
-    ok ? `${files.length} files, all within the runtime allow-set`
-       : (ls.status !== 0 ? `vsce ls failed: ${lastLine(ls.stderr)}` : `stray non-runtime files: ${strays.join(', ')}`));
+    ok ? `${files.length} files, all within the runtime allow-set; embedded AGENTS contract present`
+       : (ls.status !== 0
+           ? `vsce ls failed: ${lastLine(ls.stderr)}`
+           : [`stray non-runtime files: ${strays.join(', ')}`, `missing runtime files: ${missingRuntimeFiles.join(', ')}`].filter((part) => !part.endsWith(': ')).join('; ')));
 }
 
 // --- 4. packaged size (fail closed above the ceiling -- catches a VM-disk/node_modules leak) ---
