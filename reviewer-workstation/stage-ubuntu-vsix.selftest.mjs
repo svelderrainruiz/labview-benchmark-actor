@@ -180,6 +180,7 @@ assert(
   source.indexOf('const inventoryEvidence = validateUbuntuKpiInventories') < source.indexOf("execFileSync(code, ['--install-extension'"),
   'exact gate and correspondence inventories are rerun before installation',
 );
+assert.equal((source.match(/\{ cwd: ROOT, encoding: 'utf8' \}/g) ?? []).length, 2, 'inventory reruns are rooted in the exact checkout');
 assert.match(source, /reviewer-station\.json/);
 assert.match(source, /handoffReviewTarget/);
 

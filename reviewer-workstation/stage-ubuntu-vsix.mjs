@@ -214,12 +214,12 @@ function main() {
   const localGateOutput = execFileSync(
     process.execPath,
     [join(ROOT, 'experiments', 'verify-local-gates.mjs')],
-    { encoding: 'utf8' },
+    { cwd: ROOT, encoding: 'utf8' },
   );
   const correspondenceOutput = execFileSync(
     process.execPath,
     [join(ROOT, 'experiments', 'reqs-coverage', 'verify-correspondences.mjs')],
-    { encoding: 'utf8' },
+    { cwd: ROOT, encoding: 'utf8' },
   );
   const inventoryEvidence = validateUbuntuKpiInventories({ kpi, localGateOutput, correspondenceOutput });
   if (!inventoryEvidence.ok) throw new Error(inventoryEvidence.failures.join('; '));
