@@ -32,6 +32,17 @@ const POST_RELEASE_CLOSEOUT = {
   digest: '44211071bf94c637c82e1b9571c4bee174a4d076bba2c5742153a8b7d1cac36a',
 };
 
+function stripRuntimeTimingData(value) {
+  if (Array.isArray(value)) return value.map(stripRuntimeTimingData);
+  if (!value || typeof value !== 'object') return value;
+  const result = {};
+  for (const [key, child] of Object.entries(value)) {
+    if (['startedWallTime', 'finishedWallTime', 'durationNs'].includes(key)) continue;
+    result[key] = stripRuntimeTimingData(child);
+  }
+  return result;
+}
+
 function canonicalize(value) {
   if (Array.isArray(value)) return value.map(canonicalize);
   if (!value || typeof value !== 'object') return value;
@@ -39,14 +50,8 @@ function canonicalize(value) {
 }
 
 export function receiptDigest(receipt) {
-  const body = JSON.parse(JSON.stringify(receipt));
+  const body = stripRuntimeTimingData(JSON.parse(JSON.stringify(receipt)));
   delete body.receiptDigest;
-  delete body.startedWallTime;
-  delete body.finishedWallTime;
-  delete body.durationNs;
-  if (Array.isArray(body.events)) {
-    body.events = body.events.map((event) => ({ ...event, durationNs: undefined }));
-  }
   return createHash('sha256').update(JSON.stringify(canonicalize(body))).digest('hex');
 }
 
@@ -63,14 +68,8 @@ export function classifyWorktreeState({ trackedChanges = [], untrackedPaths = []
 }
 
 function normalizeForComparison(receipt) {
-  const body = JSON.parse(JSON.stringify(receipt));
+  const body = stripRuntimeTimingData(JSON.parse(JSON.stringify(receipt)));
   delete body.receiptDigest;
-  delete body.startedWallTime;
-  delete body.finishedWallTime;
-  delete body.durationNs;
-  if (Array.isArray(body.events)) {
-    body.events = body.events.map((event) => ({ ...event, durationNs: undefined }));
-  }
   return body;
 }
 
