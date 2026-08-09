@@ -15,6 +15,7 @@ import { spawnSync } from 'node:child_process';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createRequire } from 'node:module';
+import { normalizeCoberturaXml } from './coverage-core.mjs';
 
 const repo = join(dirname(fileURLToPath(import.meta.url)), '..');
 const cfgPath = join(repo, 'coverage-thresholds.json');
@@ -47,12 +48,11 @@ if (run.status !== 0) {
   process.exit(run.status ?? 1);
 }
 
-// c8 writes the current epoch into Cobertura's root `timestamp`, which makes the retained artifact dirty even
-// when source + coverage are unchanged. Pin only that provenance-neutral field so a full local KPI can prove its
-// post-run worktree is still the exact candidate it certified.
+// c8 writes the current epoch and absolute checkout path into Cobertura output. Normalize both
+// provenance-neutral fields so the retained artifact is stable across worktrees and operating systems.
 const coberturaPath = join(repo, 'coverage', 'cobertura-coverage.xml');
 const cobertura = readFileSync(coberturaPath, 'utf8');
-const normalizedCobertura = cobertura.replace(/ timestamp="[^"]*"/, ' timestamp="0"');
+const normalizedCobertura = normalizeCoberturaXml(cobertura);
 if (normalizedCobertura !== cobertura) {
   writeFileSync(coberturaPath, normalizedCobertura);
 }
