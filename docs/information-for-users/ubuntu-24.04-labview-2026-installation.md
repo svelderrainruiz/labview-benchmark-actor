@@ -307,6 +307,52 @@ Evidence was retained outside Git under
 The sampling uncertainty is less than or equal to the five-second polling interval. Cleanup passed: only this
 disposable VM was unregistered and its residual VM folder removed; the retained source VM was not mutated.
 
+### Merged-head replay: 2026-08-09
+
+A fresh stock-ISO replay started from `origin/develop`
+`07f8e3329750393508bab47b85db774ec96f1a52`. The merged guest bootstrap was unchanged; replay setup found and
+fixed one host-only interoperability defect where `grep -q` plus `pipefail` could make supported VirtualBox 7.2.8
+appear to lack `--post-install-template` when its help producer received `SIGPIPE`.
+
+Disposable VM `lba-ubuntu-base-replay-20260809T140500Z`
+(`7ca81b5c-45a8-42a5-a6cc-a481b6331155`) entered running state at
+`2026-08-09T13:54:15.868Z`. No graphical login occurred. The guest bootstrap receipt passed with:
+
+- OpenSSH server `1:9.6p1-3ubuntu13.18`, active and enabled;
+- Git `2.43.0`;
+- `VBoxService 7.0.16_Ubuntur162802`, active and enabled;
+- monotonic install duration `10.926017658s`;
+- monotonic first-boot validation duration `0.300449402s`.
+
+The first boot again accumulated a VirtualBox timer/NAT stall. A controlled reset at
+`2026-08-09T14:16:05.2758831Z` did not restore progress; one controlled power cycle at
+`2026-08-09T14:18:07.2787897Z` did. The bootstrap receipt completed at
+`2026-08-09T14:18:54.921224159Z`. Host-loopback SSH proof was observed at
+`2026-08-09T14:22:15.1713096Z`, **1,679.3033096s (27m 59.3033096s)** after the original running state. This is a
+conservative observed upper bound. The NAT rule mapped Windows `127.0.0.1:22523` to guest port `22`. This replay
+did not use one fixed-interval readiness loop with an overall timeout: operator probes followed bounded waits of
+300, 600, 120, 90, 90, 5, and 120 seconds, and the final host SSH invocation used a five-second connection timeout.
+Early WSL probes targeted WSL's own loopback and could not reach the Windows-loopback-only NAT rule; final proof
+used host Git SSH without broadening the `127.0.0.1` bind. Therefore no single polling interval defines sampling
+uncertainty for this replay; the earlier first proof remains the canonical five-second bounded-poll measurement.
+
+The SSH proof returned uid `1000`, hostname `actor`, Git, active SSH, active guest utilities, and the PASS receipt.
+LabVIEW provisioning and activation were not attempted. Evidence is outside Git under
+`C:\Users\sveld\.copilot\session-state\af313f92-0145-44da-8d0a-cac86b86eae7\files\lba-ubuntu-base-replay-20260809T140500Z`:
+
+- `replay-receipt.json` SHA-256 `45ae1535e0913a1db611e19b1d31228e9ed624f967004d203d24b7dada3ec7d7`;
+- `base-bootstrap-receipt.json` SHA-256 `e0290c9f119eb156d78012ee0965a70258078eb40aa8d13b33f8c91778365257`;
+- `ssh-proof-host.txt` SHA-256 `0f10bbe53cd8642820473cb199882712a3f9395d964143cf0438536c2d065d08`;
+- `controlled-reset.json` SHA-256 `01ee9e352a72c75c635ca35918176eafb24982b8d1ae447da69113e485bbcc5d`;
+- `controlled-power-cycle.json` SHA-256
+  `592eff863673a1dc167fb775674cebdc8cb09b14d742c36a163542ca22430c43`;
+- 28 timestamped PNGs indexed in the replay receipt; first hash
+  `970f44a78b3a39cae5b61c271b8d66a8938d87ecd67a8d566fae42db9b591c35`, final hash
+  `aaa4748c28864d12df45b9088fd7f5efb52aa61bd23d454054a450debc87393c`.
+
+Cleanup passed: only the disposable replay VM was unregistered, its residual folder and credentials were removed,
+and the retained source VM remained registered and untouched.
+
 ## Cleanup
 
 After evidence extraction:

@@ -47,6 +47,9 @@ export function verifyUbuntuBaseBootstrapContract({ bootstrap, builder }) {
   }
 
   if (!/--post-install-template/.test(builder)) failures.push('builder must use the unattended post-install template');
+  if (/grep -q -- '--post-install-template'/.test(builder)) {
+    failures.push('unattended hook detection must consume help output under pipefail');
+  }
   if (!/missing unattended bootstrap template/.test(builder)) failures.push('missing bootstrap template must fail closed');
   if (!/does not support unattended --post-install-template/.test(builder)) {
     failures.push('unsupported VBoxManage bootstrap hook must fail closed');
