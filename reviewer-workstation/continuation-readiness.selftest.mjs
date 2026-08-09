@@ -3,6 +3,22 @@
 import assert from 'node:assert/strict';
 import { capabilityProbeSpec, classifyRepositoryRelation, classifyWorktreeState, executableForProbe, findSecretBearingFields, receiptDigest, validateReceipt } from './continuation-readiness.mjs';
 
+const absoluteToolPaths = process.platform === 'win32'
+  ? {
+      node: 'C:\\Program Files\\nodejs\\node.exe',
+      npm: 'C:\\Program Files\\nodejs\\npm.cmd',
+      dotnet: 'C:\\Program Files\\dotnet\\dotnet.exe',
+      glab: 'C:\\Users\\user\\AppData\\Local\\Programs\\glab\\glab.exe',
+      lbabus: 'C:\\lba-tools\\lbabus\\lbabus.exe',
+    }
+  : {
+      node: '/opt/node/bin/node',
+      npm: '/opt/node/bin/npm',
+      dotnet: '/usr/bin/dotnet',
+      glab: '/usr/bin/glab',
+      lbabus: '/opt/lba/lbabus',
+    };
+
 function makeReceipt(overrides = {}) {
   const base = {
     schema: 'labview-benchmark-actor/continuation-readiness@1',
@@ -32,11 +48,11 @@ function makeReceipt(overrides = {}) {
       manifestSha256: '02ce9b7b0f69dca6e0297b07940eafc3ffc90681668d590d472bb24dc2f717a9',
     },
     tools: {
-      node: { ok: true, path: 'C:\\Program Files\\nodejs\\node.exe' },
-      npm: { ok: true, path: 'C:\\Program Files\\nodejs\\npm.cmd' },
-      dotnet: { ok: true, path: 'C:\\Program Files\\dotnet\\dotnet.exe' },
-      glab: { ok: true, path: 'C:\\Users\\user\\AppData\\Local\\Programs\\glab\\glab.exe' },
-      lbabus: { ok: true, path: 'C:\\lba-tools\\lbabus\\lbabus.exe' },
+      node: { ok: true, path: absoluteToolPaths.node },
+      npm: { ok: true, path: absoluteToolPaths.npm },
+      dotnet: { ok: true, path: absoluteToolPaths.dotnet },
+      glab: { ok: true, path: absoluteToolPaths.glab },
+      lbabus: { ok: true, path: absoluteToolPaths.lbabus },
     },
     lbabus: {
       selfcheckOk: true,
