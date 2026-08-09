@@ -9,6 +9,7 @@ import * as path from 'node:path';
 import { registerBenchmarkActorMcpServerProvider } from './mcp/benchmarkActorMcpServerProvider';
 import { registerHumanTasks } from './humanTasks';
 import { resolveLbabusExecutable } from './lbabusPath';
+import { reviewerStationForEnvironment } from './reviewerStation';
 
 const execFileAsync = promisify(execFile);
 
@@ -788,7 +789,16 @@ async function renderReviewerVerdictCommand(context: vscode.ExtensionContext, ou
   try {
     const builder = await loadHandoffVerdictBuilder(context.extensionUri);
     const privateKeyPem = readFileSync(keyPath, 'utf8');
-    const record = buildSignedVerdict(builder, { target, verdict, reviewer, station: 'WINDOWS_VM', notes: notes || '', evidence: target.evidence, privateKeyPem, renderedAt: new Date().toISOString() });
+    const record = buildSignedVerdict(builder, {
+      target,
+      verdict,
+      reviewer,
+      station: reviewerStationForEnvironment(),
+      notes: notes || '',
+      evidence: target.evidence,
+      privateKeyPem,
+      renderedAt: new Date().toISOString(),
+    });
     const dir = verdictsDir(globalDir);
     mkdirSync(dir, { recursive: true });
     const file = path.join(dir, `${target.component}-${target.version}.json`);

@@ -2,6 +2,7 @@
 
 import assert from 'node:assert/strict';
 import { coberturaWorkingTreeText, normalizeCoberturaXml } from '../scripts/coverage-core.mjs';
+import { reviewerStationForEnvironment } from '../out/reviewerStation.js';
 import {
   buildBenchmarkPanelHtml,
   buildCrossPlaneResourcePanelHtml,
@@ -435,5 +436,9 @@ assert.equal(
   '<coverage timestamp="0"><sources>\r\n    <source>.</source>\r\n  </sources></coverage>',
 );
 assert.equal(coberturaWorkingTreeText(cobertura, 'linux'), normalizeCoberturaXml(cobertura));
+assert.equal(reviewerStationForEnvironment('win32', {}), 'WINDOWS_VM');
+assert.equal(reviewerStationForEnvironment('linux', {}), 'UBUNTU_VM');
+assert.equal(reviewerStationForEnvironment('linux', { CODESPACES: 'true' }), 'LINUX_CODESPACE');
+assert.equal(reviewerStationForEnvironment('darwin', {}), 'WINDOWS_VM');
 
 console.log('branch-coverage: PASS');
