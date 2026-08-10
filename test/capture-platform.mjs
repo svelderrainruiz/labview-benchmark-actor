@@ -2,13 +2,21 @@
 
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import ts from 'typescript';
 
-const source = readFileSync(new URL('../src/capturePlatform.ts', import.meta.url), 'utf8');
-const compiled = ts.transpileModule(source, {
-  compilerOptions: { module: ts.ModuleKind.ES2022, target: ts.ScriptTarget.ES2022 },
-  fileName: 'capturePlatform.ts',
-}).outputText;
+const sourceUrl = new URL('../src/capturePlatform.ts', import.meta.url);
+let capturePlatform;
+try {
+  capturePlatform = await import(sourceUrl.href);
+} catch (error) {
+  if (error?.code !== 'ERR_UNKNOWN_FILE_EXTENSION') throw error;
+  const { default: ts } = await import('typescript');
+  const source = readFileSync(sourceUrl, 'utf8');
+  const compiled = ts.transpileModule(source, {
+    compilerOptions: { module: ts.ModuleKind.ES2022, target: ts.ScriptTarget.ES2022 },
+    fileName: 'capturePlatform.ts',
+  }).outputText;
+  capturePlatform = await import(`data:text/javascript;base64,${Buffer.from(compiled).toString('base64')}`);
+}
 const {
   captureMetadataForPlatform,
   ffmpegCaptureArgsForPlatform,
@@ -17,7 +25,7 @@ const {
   linuxSamplerScript,
   parseX11DisplaySize,
   x11DisplayForCapture,
-} = await import(`data:text/javascript;base64,${Buffer.from(compiled).toString('base64')}`);
+} = capturePlatform;
 
 assert.equal(
   labviewCandidatesForPlatform('linux')[0],
