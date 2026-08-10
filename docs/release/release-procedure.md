@@ -85,12 +85,11 @@ attestation is proven included in that log.
    the signed `.vsix` (+ `.sigstore` / `.pem` / `.sig`) at creation keeps the
    release immutable-safe. The retained `push: tags: ext-v*` trigger is dormant
    under branch protection; `workflow_dispatch` is the live build/stage path.
-9. **Publish the secondary Marketplace prerelease.** Only after the canonical GitHub
+9. **Publish the secondary stable Marketplace release.** Only after the canonical GitHub
    Release exists, dispatch `extension-release.yml` from `ext-vX.Y.Z` with
    `publish_marketplace=true`.
    The workflow downloads the release VSIX, proves its SHA-256 equals the staged VSIX,
-   and invokes `vsce publish --pre-release` on that downloaded canonical asset. Stable
-   Marketplace publication is not a governed path.
+   and invokes stable `vsce publish` on that downloaded canonical asset.
 10. **Verify before install (LBA-REQ-031).** Consumers admit a release only after
    `experiments/acg-transparency/verify-release-inclusion.mjs` proves at least the
    quorum minimum of enrolled-witness attestations are each included in the signed

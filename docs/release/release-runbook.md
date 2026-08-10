@@ -180,8 +180,7 @@ key material). Then:
    `-f version=X.Y.Z -f publish_marketplace=true --ref ext-vX.Y.Z`. The job is pinned to the
    release tag, downloads the canonical
    release VSIX, requires its SHA-256 to equal the staged VSIX, then publishes it with
-   `vsce publish --pre-release` directly from the downloaded release asset. There is no stable
-   Marketplace path.
+   stable `vsce publish` directly from the downloaded release asset.
 
 ## 8. Close out
 

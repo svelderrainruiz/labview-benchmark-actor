@@ -50,7 +50,7 @@ import { stagedOk } from '../reviewer-workstation/release-with-review-drive.mjs'
 import { buildReleaseStage } from '../reviewer-workstation/record-release-stage.mjs';
 import { enrolledReviewerPublicKeys } from '../experiments/handoff-beacon/reviewerVerdict.mjs';
 
-export const ITERATION = 20; // bump when you refine this tool (see the banner above)
+export const ITERATION = 21; // bump when you refine this tool (see the banner above)
 
 const here = dirname(fileURLToPath(import.meta.url));
 export const repoRoot = resolve(here, '..');
@@ -207,7 +207,7 @@ export function releasePlan(version) {
     { id: 10, key: 'record-agreement', kind: 'auto', exec: 'auto', dependsOn: [9], title: 'record WIN+LINUX agreed + visualReview in release-agreement.json', command: 'node tools/collab-cli/record-release-agreement.mjs … (#419)' },
     { id: 11, key: 'merge-main', kind: 'auto', exec: 'irreversible', dependsOn: [10], title: `merge release/${v} -> main (--no-ff)`, command: `gh pr merge <n> --merge  (release/${v} -> main, --no-ff)` },
     { id: 12, key: 'cut-gh-release', kind: 'operator', exec: 'irreversible', dependsOn: [11], title: 'tag + workflow_dispatch extension-release.yml + cut the immutable GitHub Release', command: `gh workflow run extension-release.yml  ->  lba release-cut-github ${v} --run <id> --create (#412)` },
-    { id: 13, key: 'publish-backmerge', kind: 'operator', exec: 'irreversible', dependsOn: [12], title: 'vsce publish + back-merge to develop (--no-ff), then confirm the Marketplace', command: `vsce publish  ->  git merge --no-ff release/${v} into develop (#417)  ->  lba release-verify-published ${v} (#412)` },
+    { id: 13, key: 'publish-backmerge', kind: 'operator', exec: 'irreversible', dependsOn: [12], title: 'publish to the stable Marketplace channel + back-merge to develop (--no-ff), then confirm the Marketplace', command: `vsce publish --packagePath <canonical-release.vsix>  ->  git merge --no-ff release/${v} into develop (#417)  ->  lba release-verify-published ${v} (#412)` },
   ];
   return { version: v, phases };
 }

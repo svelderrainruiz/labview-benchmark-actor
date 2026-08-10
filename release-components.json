@@ -1,12 +1,12 @@
 {
   "schema": "labview-benchmark-actor/release-components@1",
-  "extension": "1.4.13",
+  "extension": "1.4.14",
   "agents": "0.3.17",
   "lbabus": "0.15.12",
   "humanTasks": "1.0.6",
   "experimentGovernance": "1.0.1",
   "canonicalDistribution": "github-release",
-  "marketplaceChannel": "prerelease",
+  "marketplaceChannel": "stable",
   "governance": {
     "standardsReviewVersion": "0.2.19",
     "standardsReviewCommit": "d44f210ded557cda6d4598cdaffe938da51d873e",

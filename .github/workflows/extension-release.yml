@@ -27,7 +27,7 @@ on:
         required: false
         default: ''
       publish_marketplace:
-        description: Publish the already-created canonical GitHub Release artifact to the Marketplace prerelease channel.
+        description: Publish the already-created canonical GitHub Release artifact to the stable Marketplace channel.
         required: false
         default: false
         type: boolean
@@ -264,4 +264,4 @@ jobs:
             echo "::error::Canonical GitHub Release VSIX differs from the staged Marketplace candidate." >&2
             exit 1
           fi
-          npx vsce publish --pre-release --packagePath "$release_dir/labview-benchmark-actor-${{ steps.ver.outputs.version }}.vsix" -p "$VSCE_PAT"
+          npx vsce publish --packagePath "$release_dir/labview-benchmark-actor-${{ steps.ver.outputs.version }}.vsix" -p "$VSCE_PAT"
