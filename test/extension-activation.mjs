@@ -289,8 +289,12 @@ try {
       `generated AGENTS.md documents contributed command: ${contribution.title}`,
     );
   }
+  const governedComponents = JSON.parse(readFileSync(join(repoRoot, 'release-components.json'), 'utf8'));
+  assert(
+    generatedAgents.includes(`exactly \`${governedComponents.lbabus}\` for this extension build`),
+    'generated AGENTS.md pins the governed lbabus prerequisite',
+  );
   for (const prerequisite of [
-    /lbabus[^]*0\.15\.10/,
     /Node\.js[^]*24\.19\.0/,
     /\.NET runtime[^]*>=8\.0/,
     /Git \/ Git for Windows[^]*>=2\.30/,
