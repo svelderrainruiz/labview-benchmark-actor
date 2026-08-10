@@ -159,14 +159,16 @@ node reviewer-workstation/stage-ubuntu-vsix.mjs \
   --receipt /home/actor/lba-review/ubuntu-review-stage.json \
   --handoff "$HOME/.config/Code/User/globalStorage/svelderrainruiz.labview-benchmark-actor/handoff" \
   --vm-provider oracle \
-  --vm-id '<host-observed /etc/machine-id>'
+  --vm-id '<host-observed /etc/machine-id>' \
+  --lbabus /usr/local/bin/lbabus
 ```
 
 The command runs only on Linux and binds the candidate's version, 40-hex commit, 64-hex SHA-256,
 bytes, clean state, coverage floors, correspondence graph, local gates, and duplicate packages to a
 passing full local-KPI receipt, reruns the exact local-gate and correspondence inventories and
 requires their totals to match the receipt, then verifies the VSIX manifest **before** installing
-anything. It then installs with `code --install-extension --force`,
+anything. It also requires the exact `release-components.json` lbabus version, passing selfcheck,
+and non-empty capabilities before it installs with `code --install-extension --force`,
 requires the exact `svelderrainruiz.labview-benchmark-actor@<version>` identity, writes a non-secret
 receipt with wall and monotonic timing, and atomically stages the exact target plus a target-bound
 `UBUNTU_VM` marker where the extension reads them. The marker is emitted only after

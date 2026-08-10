@@ -128,6 +128,14 @@ export function validateUbuntuCheckout({ target, checkoutCommit }) {
   return { ok: failures.length === 0, failures };
 }
 
+export function validateUbuntuLbabus({ expectedVersion, versionOutput, selfcheckOutput, capabilitiesOutput }) {
+  const failures = [];
+  if (String(versionOutput ?? '').trim() !== expectedVersion) failures.push('lbabus version does not match release-components');
+  if (!/selfcheck:\s*PASS/i.test(String(selfcheckOutput ?? ''))) failures.push('lbabus selfcheck did not pass');
+  if (!String(capabilitiesOutput ?? '').trim()) failures.push('lbabus capabilities output is empty');
+  return { ok: failures.length === 0, failures };
+}
+
 export function validateUbuntuKpiInventories({ kpi, localGateOutput, correspondenceOutput }) {
   const failures = [];
   const gateSummary = /(\d+)\/(\d+) checks passed/.exec(String(localGateOutput ?? ''));
@@ -226,7 +234,7 @@ function parseArgs(argv) {
 function main() {
   if (process.platform !== 'linux') throw new Error('Ubuntu candidate staging must run inside the Linux reviewer VM');
   const args = parseArgs(process.argv.slice(2));
-  for (const name of ['vsix', 'target', 'kpi', 'workspace', 'receipt', 'handoff', 'vm-provider', 'vm-id']) {
+  for (const name of ['vsix', 'target', 'kpi', 'workspace', 'receipt', 'handoff', 'vm-provider', 'vm-id', 'lbabus']) {
     if (!args[name]) throw new Error(`--${name} is required`);
   }
   const code = args.code || 'code';
@@ -236,8 +244,10 @@ function main() {
   const workspace = resolve(args.workspace);
   const receiptPath = resolve(args.receipt);
   const handoff = resolve(args.handoff);
+  const lbabus = resolve(args.lbabus);
   const target = JSON.parse(readFileSync(targetPath, 'utf8'));
   const kpi = JSON.parse(readFileSync(kpiPath, 'utf8'));
+  const releaseComponents = JSON.parse(readFileSync(join(ROOT, 'release-components.json'), 'utf8'));
   const coverageFloors = JSON.parse(readFileSync(join(ROOT, 'coverage-thresholds.json'), 'utf8')).floor;
   const targetShape = validateUbuntuReviewTarget(target);
   if (!targetShape.ok) throw new Error(targetShape.failures.join('; '));
@@ -250,6 +260,16 @@ function main() {
   const checkoutCommit = execFileSync('git', ['-C', ROOT, 'rev-parse', 'HEAD'], { encoding: 'utf8' }).trim();
   const checkoutEvidence = validateUbuntuCheckout({ target, checkoutCommit });
   if (!checkoutEvidence.ok) throw new Error(checkoutEvidence.failures.join('; '));
+  const lbabusVersion = execFileSync(lbabus, ['version'], { encoding: 'utf8' });
+  const lbabusSelfcheck = execFileSync(lbabus, ['selfcheck'], { encoding: 'utf8' });
+  const lbabusCapabilities = execFileSync(lbabus, ['capabilities'], { encoding: 'utf8' });
+  const lbabusEvidence = validateUbuntuLbabus({
+    expectedVersion: releaseComponents.lbabus,
+    versionOutput: lbabusVersion,
+    selfcheckOutput: lbabusSelfcheck,
+    capabilitiesOutput: lbabusCapabilities,
+  });
+  if (!lbabusEvidence.ok) throw new Error(lbabusEvidence.failures.join('; '));
   const localGateOutput = execFileSync(
     process.execPath,
     [join(ROOT, 'experiments', 'verify-local-gates.mjs')],
@@ -335,6 +355,12 @@ function main() {
       handoffReviewerStation: handoffMarker,
     },
     installedExtension: evidence.expectedInstalled,
+    lbabus: {
+      path: lbabus,
+      version: lbabusVersion.trim(),
+      selfcheck: 'PASS',
+      capabilities: lbabusCapabilities.trim(),
+    },
     verifiedInventories: {
       localGates: inventoryEvidence.expectedGateTotal,
       correspondences: inventoryEvidence.expectedCorrespondenceTotal,

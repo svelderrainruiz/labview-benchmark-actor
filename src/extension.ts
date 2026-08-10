@@ -1358,7 +1358,7 @@ async function captureLaunchCommand(context: vscode.ExtensionContext, output: vs
 
   // 2) CPU/RAM/disk sampler.
   const sampler = process.platform === 'linux'
-    ? spawn('bash', ['-lc', linuxSamplerScript(resourcesFile)], { stdio: 'ignore' })
+    ? spawn('bash', ['-c', linuxSamplerScript(resourcesFile)], { stdio: 'ignore' })
     : spawn(
       'powershell',
       ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-Command', samplerScript(resourcesFile)],

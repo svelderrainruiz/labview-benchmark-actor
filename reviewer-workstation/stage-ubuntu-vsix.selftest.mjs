@@ -7,6 +7,7 @@ import {
   validateUbuntuCheckout,
   validateUbuntuKpiReceipt,
   validateUbuntuKpiInventories,
+  validateUbuntuLbabus,
   validateUbuntuReviewTarget,
   validateUbuntuStageHost,
   validateUbuntuStageEvidence,
@@ -91,6 +92,18 @@ assert.equal(validateUbuntuStageHost({ runningCodePids: '' }).ok, true);
 assert.equal(validateUbuntuStageHost({ runningCodePids: '123\n456' }).ok, false);
 assert.equal(validateUbuntuCheckout({ target, checkoutCommit: target.commit.toUpperCase() }).ok, true);
 assert.equal(validateUbuntuCheckout({ target, checkoutCommit: 'b'.repeat(40) }).ok, false);
+assert.equal(validateUbuntuLbabus({
+  expectedVersion: '0.15.11',
+  versionOutput: '0.15.11\n',
+  selfcheckOutput: 'selfcheck: PASS\n',
+  capabilitiesOutput: '{"schema":"capabilities"}\n',
+}).ok, true);
+assert.equal(validateUbuntuLbabus({
+  expectedVersion: '0.15.11',
+  versionOutput: '0.15.10',
+  selfcheckOutput: 'selfcheck: FAIL',
+  capabilitiesOutput: '',
+}).ok, false);
 const localGateOutput = '210/210 checks passed on linux-x64 (node v24.19.0)';
 const correspondenceOutput = [
   'correspondences: requirements=97 governed-tests=182 ADRs=80 information-items=16 dod-outcomes=7',
@@ -189,6 +202,10 @@ assert(
 assert(
   source.indexOf('const checkoutEvidence = validateUbuntuCheckout') < source.indexOf('const localGateOutput = execFileSync'),
   'the exact checkout commit is verified before inventory reruns',
+);
+assert(
+  source.indexOf('const lbabusEvidence = validateUbuntuLbabus') < source.indexOf("execFileSync(code, ['--install-extension'"),
+  'the exact governed lbabus is verified before installation',
 );
 assert.equal((source.match(/\{ cwd: ROOT, encoding: 'utf8' \}/g) ?? []).length, 2, 'inventory reruns are rooted in the exact checkout');
 assert.match(source, /execFileSync\(code, \['--install-extension', stagedVsix, '--force'\]/);

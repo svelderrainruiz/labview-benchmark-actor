@@ -442,6 +442,10 @@ assert.equal(
 );
 assert.equal(coberturaWorkingTreeText(cobertura, 'checked\nout'), normalizeCoberturaXml(cobertura));
 assert.equal(coberturaWorkingTreeText(cobertura), normalizeCoberturaXml(cobertura));
+assert.equal(
+  normalizeCoberturaXml('<class filename="src\\capturePlatform.ts"></class>'),
+  '<class filename="src/capturePlatform.ts"></class>',
+);
 assert.equal(reviewerStationForEnvironment('win32', {}), 'WINDOWS_VM');
 assert.equal(reviewerStationForEnvironment('linux', {}, 'UBUNTU_VM'), 'UBUNTU_VM');
 throws(() => reviewerStationForEnvironment('linux', { CODESPACES: 'true' }), /disabled/);
