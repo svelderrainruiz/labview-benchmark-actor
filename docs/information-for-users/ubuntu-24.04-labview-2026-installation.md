@@ -173,6 +173,14 @@ Launch LabVIEW interactively:
 The human operator signs into their NI account. Agents must not request, type, store, screenshot, or transmit NI
 credentials.
 
+Use the native VirtualBox console for this handoff. On the validated Ubuntu 26.04 host, enabling the VBoxVNC VRDE
+extension caused a host-side `VBoxHeadless` `SIGSEGV`; the guest disks remained intact, but VRDE is not part of the
+validated activation path.
+
+The activation dialog can remain stale after the browser sign-in completes. If its activate button no longer
+advances, close LabVIEW and launch it once more in the same graphical seat. Continue only when the functional probe
+in the next section passes; the reopened window alone is not activation evidence.
+
 After activation, LabVIEW opens normally:
 
 ![Activated LabVIEW 2026 Community](images/ubuntu-24.04-labview-2026/labview-activated.png)

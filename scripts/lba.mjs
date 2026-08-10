@@ -35,6 +35,7 @@
 //   signing-status               discover + report an enrolled visual or quorum key + where each sign-off runs
 //   capture-preflight            report native LabVIEW launch-capture readiness + selected Linux display mode
 //   actor-service-check          run the signed protocol + persistent service + lbabus daemon selftests
+//   provision-linux-actor       install one persistent autonomous actor through verified SSH access
 //   selftest                     self-check this tool (run by the `agent-tooling-selftest` gate)
 
 import { mkdirSync, readFileSync, writeFileSync, existsSync, readdirSync, rmSync } from 'node:fs';
@@ -52,7 +53,7 @@ import { buildReleaseStage } from '../reviewer-workstation/record-release-stage.
 import { enrolledReviewerPublicKeys } from '../experiments/handoff-beacon/reviewerVerdict.mjs';
 import { validateLbabusProvisioningPin } from './verify-ubuntu-golden-box.mjs';
 
-export const ITERATION = 25; // bump when you refine this tool (see the banner above)
+export const ITERATION = 27; // bump when you refine this tool (see the banner above)
 
 const here = dirname(fileURLToPath(import.meta.url));
 export const repoRoot = resolve(here, '..');
@@ -834,6 +835,10 @@ export const COMMANDS = {
       console.log('\n✓ autonomous actor protocol + service + daemon checks complete');
     },
   },
+  'provision-linux-actor': {
+    desc: 'install one persistent autonomous Linux actor through verified SSH access',
+    run: (args) => execFileSync('bash', [join(repoRoot, 'scripts/provision-autonomous-linux-actor.sh'), ...args], { stdio: 'inherit' }),
+  },
   selftest: {
     desc: 'self-check this tool (run by the agent-tooling-selftest gate)',
     run: () => runSelftest(),
@@ -883,6 +888,11 @@ export const COMMANDS = {
 const SELFTEST = [
   ['every pipeline script exists', () => PIPELINE.every(([, rel]) => existsSync(join(repoRoot, rel)))],
   ['every autonomous-actor focused-check script exists', () => AUTONOMOUS_ACTOR_SELFTESTS.every((rel) => existsSync(join(repoRoot, rel)))],
+  ['autonomous Linux actor avoids a multi-user/graphical target ordering cycle', () => {
+    const provisioner = read('scripts/provision-autonomous-linux-actor.sh');
+    return provisioner.includes('After=network-online.target\nWants=network-online.target') && !provisioner.includes('After=network-online.target graphical.target');
+  }],
+  ['LabVIEW known-answer adapter requires the validated activated verdict', () => read('experiments/mesh-fulfillment/runLabviewKnownAnswer.mjs').includes('if (!validation.activated)')],
   ['every governance-surface file exists', () => GOVERNANCE_SURFACES.every((s) => existsSync(join(repoRoot, s.file)))],
   ['Ubuntu golden lbabus source defaults match the cleanroom manifest', () => validateLbabusProvisioningPin({
     manifest: JSON.parse(read('cleanroom/ubuntu-labview/cleanroom-manifest.json')),
