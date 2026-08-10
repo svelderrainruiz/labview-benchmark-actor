@@ -4,6 +4,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import {
   validateUbuntuCandidateArtifact,
+  validateUbuntuCheckout,
   validateUbuntuKpiReceipt,
   validateUbuntuKpiInventories,
   validateUbuntuReviewTarget,
@@ -88,6 +89,8 @@ assert.equal(validateUbuntuVmIdentity({
 }).ok, false);
 assert.equal(validateUbuntuStageHost({ runningCodePids: '' }).ok, true);
 assert.equal(validateUbuntuStageHost({ runningCodePids: '123\n456' }).ok, false);
+assert.equal(validateUbuntuCheckout({ target, checkoutCommit: target.commit.toUpperCase() }).ok, true);
+assert.equal(validateUbuntuCheckout({ target, checkoutCommit: 'b'.repeat(40) }).ok, false);
 const localGateOutput = '210/210 checks passed on linux-x64 (node v24.19.0)';
 const correspondenceOutput = [
   'correspondences: requirements=97 governed-tests=182 ADRs=80 information-items=16 dod-outcomes=7',
@@ -178,11 +181,18 @@ assert(
 );
 assert.match(source, /runningCodeProcessIds\(code\)/);
 assert.match(source, /readlinkSync\(join\('\/proc', entry, 'exe'\)\)/);
+assert.match(source, /Snap Code launchers are not supported/);
 assert(
   source.indexOf('const inventoryEvidence = validateUbuntuKpiInventories') < source.indexOf("execFileSync(code, ['--install-extension'"),
   'exact gate and correspondence inventories are rerun before installation',
 );
+assert(
+  source.indexOf('const checkoutEvidence = validateUbuntuCheckout') < source.indexOf('const localGateOutput = execFileSync'),
+  'the exact checkout commit is verified before inventory reruns',
+);
 assert.equal((source.match(/\{ cwd: ROOT, encoding: 'utf8' \}/g) ?? []).length, 2, 'inventory reruns are rooted in the exact checkout');
+assert.match(source, /execFileSync\(code, \['--install-extension', stagedVsix, '--force'\]/);
+assert.match(source, /const stagedCandidate = validateUbuntuCandidateArtifact/);
 assert.match(source, /reviewer-station\.json/);
 assert.match(source, /handoffReviewTarget/);
 

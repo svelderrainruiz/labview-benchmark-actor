@@ -2,7 +2,7 @@
 
 import { createHash } from 'node:crypto';
 import { execFileSync } from 'node:child_process';
-import { copyFileSync, existsSync, mkdirSync, readFileSync, readdirSync, readlinkSync, realpathSync, renameSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, readdirSync, readlinkSync, realpathSync, renameSync, writeFileSync } from 'node:fs';
 import { basename, dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -120,6 +120,14 @@ export function validateUbuntuStageHost({ runningCodePids }) {
   return { ok: failures.length === 0, failures };
 }
 
+export function validateUbuntuCheckout({ target, checkoutCommit }) {
+  const failures = [];
+  if (String(checkoutCommit ?? '').toLowerCase() !== String(target?.commit ?? '').toLowerCase()) {
+    failures.push('staging checkout commit does not match the exact review target');
+  }
+  return { ok: failures.length === 0, failures };
+}
+
 export function validateUbuntuKpiInventories({ kpi, localGateOutput, correspondenceOutput }) {
   const failures = [];
   const gateSummary = /(\d+)\/(\d+) checks passed/.exec(String(localGateOutput ?? ''));
@@ -149,10 +157,21 @@ function selectedCodeExecutables(codeCommand) {
   const commandPath = codeCommand.includes('/')
     ? realpathSync(resolve(codeCommand))
     : realpathSync(execFileSync('which', [codeCommand], { encoding: 'utf8' }).trim());
+  if (basename(commandPath) === 'snap') {
+    throw new Error('Snap Code launchers are not supported for governed staging; pass the real product executable with --code');
+  }
   const executables = new Set([commandPath]);
   if (basename(dirname(commandPath)) === 'bin') {
     const productExecutable = join(dirname(dirname(commandPath)), basename(commandPath));
-    if (existsSync(productExecutable)) executables.add(realpathSync(productExecutable));
+    if (!existsSync(productExecutable)) {
+      throw new Error(`cannot resolve the selected Code product executable from ${commandPath}`);
+    }
+    executables.add(realpathSync(productExecutable));
+  } else {
+    const header = readFileSync(commandPath).subarray(0, 4);
+    if (!header.equals(Buffer.from([0x7f, 0x45, 0x4c, 0x46]))) {
+      throw new Error(`selected Code command is an unresolved wrapper: ${commandPath}`);
+    }
   }
   return executables;
 }
@@ -228,6 +247,9 @@ function main() {
   if (!candidate.ok) throw new Error(candidate.failures.join('; '));
   const kpiEvidence = validateUbuntuKpiReceipt({ target, kpi, vsixBytes, coverageFloors });
   if (!kpiEvidence.ok) throw new Error(kpiEvidence.failures.join('; '));
+  const checkoutCommit = execFileSync('git', ['-C', ROOT, 'rev-parse', 'HEAD'], { encoding: 'utf8' }).trim();
+  const checkoutEvidence = validateUbuntuCheckout({ target, checkoutCommit });
+  if (!checkoutEvidence.ok) throw new Error(checkoutEvidence.failures.join('; '));
   const localGateOutput = execFileSync(
     process.execPath,
     [join(ROOT, 'experiments', 'verify-local-gates.mjs')],
@@ -252,23 +274,30 @@ function main() {
   mkdirSync(workspace, { recursive: true, mode: 0o700 });
   mkdirSync(dirname(receiptPath), { recursive: true, mode: 0o700 });
   mkdirSync(handoff, { recursive: true, mode: 0o700 });
+  const stagedVsix = join(workspace, basename(vsixPath));
+  const installBytes = readFileSync(vsixPath);
+  const installManifest = JSON.parse(execFileSync('unzip', ['-p', vsixPath, 'extension/package.json'], { encoding: 'utf8' }));
+  const installCandidate = validateUbuntuCandidateArtifact({ target, vsixBytes: installBytes, manifest: installManifest });
+  if (!installCandidate.ok) throw new Error(installCandidate.failures.join('; '));
+  writeFileSync(stagedVsix, installBytes, { mode: 0o600 });
+  const stagedBytes = readFileSync(stagedVsix);
+  const stagedCandidate = validateUbuntuCandidateArtifact({ target, vsixBytes: stagedBytes, manifest: installManifest });
+  if (!stagedCandidate.ok) throw new Error(stagedCandidate.failures.join('; '));
   const startedAt = new Date().toISOString();
   const startedNs = process.hrtime.bigint();
-  execFileSync(code, ['--install-extension', vsixPath, '--force'], { stdio: 'inherit' });
+  execFileSync(code, ['--install-extension', stagedVsix, '--force'], { stdio: 'inherit' });
   const installedExtensions = execFileSync(code, ['--list-extensions', '--show-versions'], { encoding: 'utf8' })
     .split(/\r?\n/)
     .filter(Boolean);
-  const evidence = validateUbuntuStageEvidence({ target, vsixBytes, manifest, installedExtensions });
+  const evidence = validateUbuntuStageEvidence({ target, vsixBytes: stagedBytes, manifest: installManifest, installedExtensions });
   if (!evidence.ok) throw new Error(evidence.failures.join('; '));
-  const stagedVsix = join(workspace, basename(vsixPath));
   const stagedTarget = join(workspace, 'review-target.json');
   const stagedKpi = join(workspace, 'local-kpi.json');
   const stagedMarker = join(workspace, 'reviewer-station.json');
   const handoffTarget = join(handoff, 'review-target.json');
   const handoffMarker = join(handoff, 'reviewer-station.json');
-  copyFileSync(vsixPath, stagedVsix);
-  copyFileSync(targetPath, stagedTarget);
-  copyFileSync(kpiPath, stagedKpi);
+  writeJsonAtomic(stagedTarget, target);
+  writeJsonAtomic(stagedKpi, kpi);
   const stationMarker = {
     schema: 'labview-benchmark-actor/reviewer-station@1',
     station: 'UBUNTU_VM',
