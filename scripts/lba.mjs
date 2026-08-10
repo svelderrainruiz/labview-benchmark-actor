@@ -34,6 +34,7 @@
 //   release-cut-github <X.Y.Z> --run <id>  verify the publish-workflow run artifact + cut the immutable ext-v* release (#412)
 //   signing-status               discover + report an enrolled visual or quorum key + where each sign-off runs
 //   capture-preflight            report native LabVIEW launch-capture readiness + selected Linux display mode
+//   actor-service-check          run the signed protocol + persistent service + lbabus daemon selftests
 //   selftest                     self-check this tool (run by the `agent-tooling-selftest` gate)
 
 import { mkdirSync, readFileSync, writeFileSync, existsSync, readdirSync, rmSync } from 'node:fs';
@@ -51,7 +52,7 @@ import { buildReleaseStage } from '../reviewer-workstation/record-release-stage.
 import { enrolledReviewerPublicKeys } from '../experiments/handoff-beacon/reviewerVerdict.mjs';
 import { validateLbabusProvisioningPin } from './verify-ubuntu-golden-box.mjs';
 
-export const ITERATION = 23; // bump when you refine this tool (see the banner above)
+export const ITERATION = 25; // bump when you refine this tool (see the banner above)
 
 const here = dirname(fileURLToPath(import.meta.url));
 export const repoRoot = resolve(here, '..');
@@ -66,6 +67,12 @@ export const PIPELINE = [
   ['regen compliance scorecard', 'experiments/compliance/verify-compliance-posture.mjs'],
   ['verify correspondences', 'experiments/reqs-coverage/verify-correspondences.mjs'],
   ['verify local gates', 'experiments/verify-local-gates.mjs'],
+];
+
+export const AUTONOMOUS_ACTOR_SELFTESTS = [
+  'experiments/mesh-fulfillment/autonomousActorProtocol.selftest.mjs',
+  'experiments/mesh-fulfillment/autonomousActorService.selftest.mjs',
+  'experiments/mesh-fulfillment/autonomousActorDaemon.selftest.mjs',
 ];
 
 // ---- the governance surfaces a Proven requirement must appear in ---------------------------------
@@ -820,6 +827,13 @@ export const COMMANDS = {
       if (!result.ok) process.exit(1);
     },
   },
+  'actor-service-check': {
+    desc: 'run the signed actor protocol + persistent service + lbabus daemon selftests',
+    run: () => {
+      for (const rel of AUTONOMOUS_ACTOR_SELFTESTS) runScript('autonomous actor', rel);
+      console.log('\n✓ autonomous actor protocol + service + daemon checks complete');
+    },
+  },
   selftest: {
     desc: 'self-check this tool (run by the agent-tooling-selftest gate)',
     run: () => runSelftest(),
@@ -868,6 +882,7 @@ export const COMMANDS = {
 // ---- selftest (extend me) -----------------------------------------------------------------------
 const SELFTEST = [
   ['every pipeline script exists', () => PIPELINE.every(([, rel]) => existsSync(join(repoRoot, rel)))],
+  ['every autonomous-actor focused-check script exists', () => AUTONOMOUS_ACTOR_SELFTESTS.every((rel) => existsSync(join(repoRoot, rel)))],
   ['every governance-surface file exists', () => GOVERNANCE_SURFACES.every((s) => existsSync(join(repoRoot, s.file)))],
   ['Ubuntu golden lbabus source defaults match the cleanroom manifest', () => validateLbabusProvisioningPin({
     manifest: JSON.parse(read('cleanroom/ubuntu-labview/cleanroom-manifest.json')),

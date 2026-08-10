@@ -125,6 +125,8 @@ progressively.
 | LBA-REQ-095 | The system shall bind extension, AGENTS, `lbabus`, and human-task SemVer to one release definition, emit deterministic noninteractive task receipts, and admit a stable Marketplace release only after its bytes match the canonical GitHub Release, so review chronology and released system identity cannot drift. | Signed 1.4.1 review rejected unindexed task output, ambiguous clocks, independent internal versions, and Marketplace-first publication. | `release-components.json` is checked by a repository precommit hook and local gate; tasks use dedicated terminals and indexed UTC/monotonic receipt events; the publish workflow requires and hashes the existing GitHub Release VSIX before stable `vsce publish`. | `test/human-task-runner.mjs`, `test/release-components.mjs`, and the `release-component-versioning` local gate prove clock/index receipts, drift rejection, final staged metadata, target-main release cutting, and GitHub-first stable publication. |
 | LBA-REQ-096 | The generated agent contract shall preserve the exact standards-workbench score and conservatively overlay every `-` Missing Proof cell with evidence-counted candidate risk and artifact-dependent forward actions, so a static PASS cannot be mistaken for release readiness. | repo-standards-review correctly found the repository artifacts mature, but its six `-` cells did not represent human, hosted, cross-plane, immutable-release, Marketplace, or experiment-lifecycle proof. | `standards-score-baseline.json` and `release-risk-baseline.json` retain both score layers; a pure evaluator derives 12/28 BLOCKED, requires committed artifacts for present proof, and fails on drift; Governance Review and AGENTS expose all six risks/actions. | `test/release-risk.mjs` plus `standards-release-risk-baseline` prove score derivation, artifact resolution, gate completeness, exact workbench identity, AGENTS awareness, and receipt wiring. |
 | LBA-REQ-097 | The system shall classify every experiment lifecycle and continuously verify before verdict that prohibited experiments do not reach production and the local CHANGELOG/system-version/test/gate/correspondence/package KPI is current, so prototypes cannot silently become active implementations. | Historical and exploratory directories outlive their learning; without lifecycle and production boundaries they can be reused accidentally, while end-loaded release checks allow incremental documentation drift. | RTM paths govern active experiments; an override manifest classifies the remainder; a pure verifier rejects gaps/references; quick/full local KPI scripts retain machine receipts and AGENTS states numeric targets. | `test/experiment-governance.mjs` plus `experiment-lifecycle-local-kpi` prove full inventory, prohibited-reference rejection, superseded replacement, KPI wiring, and agent guidance. |
+| LBA-REQ-098 | The system shall gate autonomous actor benchmark execution through an enrolled-signer protocol that binds freshness, target plane, allowlisted workload, exact candidate identity, replay state, plus an actor-signed outcome to one request digest. | The governed mesh binds dispatch through fulfillment, but host-driven SSH and hypervisor controls cannot prove that an actor independently authorized the task or prevent a captured request from being replayed against another candidate. | `autonomousActorProtocol.mjs` builds and validates Ed25519-signed request/response envelopes over the existing bounded `bus-msg@1` transport, requiring a short expiry, requester nonce, candidate commit/tree/bundle SHA-256, local workload allowlist, one-task concurrency, content-addressed artifacts, and bounded failure codes. | `node experiments/mesh-fulfillment/autonomousActorProtocol.selftest.mjs` proves an authorized request plus signed success/BUSY outcomes while rejecting expiry, replay, unallowlisted work, tampering, un-enrolled requesters, request rebinding, and unbounded failures; gated by `mesh-autonomous-actor-protocol`. |
+| LBA-REQ-099 | The system shall run each autonomous actor as a persistent cross-platform `lbabus` service that durably admits one fixed local workload per signed nonce, stores bounded artifacts in guest-local content-addressed storage, and retries cached actor-signed outcomes without re-execution. | A signed protocol alone does not own live delivery, restart state, one-task concurrency, constrained subprocess invocation, or response loss; SSH-per-task would retain the host as the execution plane. | `autonomousActorService.mjs` owns exact-candidate admission, atomic nonce/outcome/active state, fixed shell-free adapters, one-task scheduling, interruption recovery, and CAS; `autonomousActorDaemon.mjs` binds `bus-msg@1` metadata, tails `lbabus net listen --log`, advances a durable cursor only after `net send --message-file`, and safely retries cached outcomes. | `node scripts/lba.mjs actor-service-check` runs 11 protocol, 10 service, and 7 daemon cases, including restart replay, BUSY concurrency, interrupted recovery, bounded output, fixed argv, partial JSONL, failed-send retry, config/key paths, and listener lifecycle; gated by `mesh-autonomous-actor-service`. |
 
 ---
 
@@ -3022,6 +3024,47 @@ progressively.
     explicit coverage, gate, and correspondence counters.
   - Generated AGENTS states numeric targets and distinguishes local KPI PASS from release readiness.
 
+### LBA-REQ-098: Signed autonomous actor protocol
+
+- Status: Proven
+- Area: Deployment / security / operation (ADR-0081)
+- Statement: The system shall gate autonomous actor benchmark execution through an enrolled-signer protocol that
+  binds freshness, target plane, allowlisted workload, exact candidate identity, replay state, plus an actor-signed
+  outcome to one request digest.
+- Rationale: Existing live mesh runners depend on host SSH or hypervisor control. A production actor must decide
+  locally whether one bus-delivered task is authorized, current, intended for its plane, and bound to exact code.
+- Acceptance Criteria:
+  - Requests carry an enrolled requester signature, dispatch/task identity, target plane, nonce, issued/expiry
+    timestamps, an allowlisted workload, and candidate source commit/tree/bundle SHA-256.
+  - Validation rejects an un-enrolled or forged signer, wrong plane, expiry, a lifetime over 15 minutes, replayed
+    requester/nonce, candidate mutation, or workload outside the local allowlist.
+  - Responses bind the request digest, actor identity, plane, status, timestamps, bounded artifact metadata, and an
+    enrolled actor signature.
+  - Success requires a result with no failure; rejection, busy, or failure requires a bounded failure code.
+  - The protocol stays dependency-free and fits within the existing one-MiB `bus-msg@1` TCP frame.
+
+### LBA-REQ-099: Persistent lbabus autonomous actor service
+
+- Status: Proven
+- Area: Deployment / security / operation (ADR-0082)
+- Statement: The system shall run each autonomous actor as a persistent cross-platform `lbabus` service that
+  durably admits one fixed local workload per signed nonce, stores bounded artifacts in guest-local content-addressed
+  storage, and retries cached actor-signed outcomes without re-execution.
+- Rationale: The signed protocol needs an actor-owned process that survives duplicate delivery, response loss, and
+  restart while preventing request-controlled command execution and concurrent LabVIEW workloads.
+- Acceptance Criteria:
+  - The daemon launches `lbabus net listen --log` and accepts only `bus-msg@1` `CLAIM` frames whose sender and task
+    metadata bind to the signed request.
+  - Nonce, signed outcome, and active-task state are atomically persisted; restart does not execute an accepted
+    request twice and turns an interrupted active task into a signed bounded failure.
+  - Exactly one fixed local adapter executes at a time without a shell or request-derived argv; another valid request
+    receives an actor-signed `BUSY` outcome.
+  - The actor requires its configured candidate commit, tree, and bundle SHA-256 to equal the signed request.
+  - Results are at most 64 KiB; each artifact is at most 16 MiB and stored guest-locally by SHA-256 while only bounded
+    metadata crosses the bus.
+  - The receive-log cursor advances only after `lbabus net send --message-file` succeeds; retries return the cached
+    actor-signed outcome without re-executing.
+
 ## Traceability (requirement → architecture view / test)
 
 | Requirement | Architecture view | Test items |
@@ -3123,3 +3166,5 @@ progressively.
 | LBA-REQ-095 | Configuration management / operation / release (system SemVer and canonical distribution) | T-095 |
 | LBA-REQ-096 | Assurance / operation / release (standards scorecard release-risk overlay) | T-096 |
 | LBA-REQ-097 | Configuration management / assurance / operation (experiment lifecycle and local KPI) | T-097 |
+| LBA-REQ-098 | Deployment / security / operation (signed autonomous actor protocol) | T-098 |
+| LBA-REQ-099 | Deployment / security / operation (persistent lbabus autonomous actor service) | T-099 |

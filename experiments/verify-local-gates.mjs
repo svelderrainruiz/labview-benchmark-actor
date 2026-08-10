@@ -2203,6 +2203,23 @@ check('mesh-cross-plane-corroborate', () => {
   return { selftest: 'meshCorroborate 8/8', corroborated: 'committed LINUX+WIN collection', requirement: 'LBA-REQ-092', adr: 'ADR-0075' };
 });
 
+// LBA-REQ-098 / ADR-0081: an autonomous actor accepts only an enrolled-requester signed, short-lived,
+// replay-resistant, plane/workload/candidate-bound request and emits an enrolled actor-signed outcome bound to the
+// exact request digest. The protocol selftest covers authorized success + BUSY and nine fail-closed mutations.
+check('mesh-autonomous-actor-protocol', () => {
+  const dir = join(here, 'mesh-fulfillment');
+  execFileSync(process.execPath, [join(dir, 'autonomousActorProtocol.selftest.mjs')], { stdio: 'pipe' });
+  return { selftest: 'autonomousActorProtocol 11/11', requirement: 'LBA-REQ-098', adr: 'ADR-0081' };
+});
+
+// LBA-REQ-099 / ADR-0082: the persistent cross-platform autonomous actor owns durable nonce/outcome/active state,
+// one fixed shell-free workload, exact-candidate admission, bounded guest-local CAS, interruption recovery, and
+// lbabus JSONL cursor-after-send delivery. Failed response sends retry cached signed outcomes without re-execution.
+check('mesh-autonomous-actor-service', () => {
+  execFileSync(process.execPath, [join(pkgRoot, 'scripts', 'lba.mjs'), 'actor-service-check'], { stdio: 'pipe' });
+  return { selftests: 'protocol 11/11 + service 10/10 + daemon 7/7', requirement: 'LBA-REQ-099', adr: 'ADR-0082' };
+});
+
 // LBA-REQ-077 / ADR-0058: the opt-in VERIFIED TIER -- each returned actor receipt is SIGNED by the actor's
 // ENROLLED Ed25519 key (reusing the ADR-0016 acg-provenance attestation engine), and a verified-receipt-collection@1
 // admits a receipt only when it carries a valid attestation from its declared, enrolled actor. Asserts the
