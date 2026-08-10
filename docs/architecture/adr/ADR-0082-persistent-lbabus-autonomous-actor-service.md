@@ -13,7 +13,10 @@ SSH command per task would leave the host as the execution plane and would not s
 
 ## Decision
 
-- A dependency-free Node daemon launches `lbabus net listen --log` and consumes its canonical append-only JSONL.
+- Linux actors use the dependency-free Node 24 daemon under systemd. Windows actors use native Windows PowerShell 5
+  under the activated desktop user's Startup session; Node is not part of the Windows guest execution path.
+- Both daemons launch `lbabus net listen --log`, consume its canonical append-only JSONL, and preserve the exact
+  ADR-0081 request/response and attestation schemas.
 - Only `bus-msg@1` `CLAIM` frames whose bus sender/task equal the signed requester/task enter the protocol service.
 - The cursor advances atomically only after every eligible response in the complete JSONL batch is sent. A failed
   send leaves the cursor unchanged; the persisted outcome is retransmitted without executing the workload again.
@@ -26,19 +29,26 @@ SSH command per task would leave the host as the execution plane and would not s
   content-addressed storage, and represented on the bus only by name, digest, and byte count.
 - Responses use `lbabus net send --message-file`; private actor keys and requester allowlists are read from local
   paths and private material is never placed in the bus envelope.
+- The Windows daemon implements recursively sorted canonical JSON and SHA-256 in PowerShell and uses the fixed Git
+  OpenSSL executable for Ed25519 only. Its fixed workload invokes LabVIEWCLI through
+  `C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe`; request data never becomes command text or argv.
+- Windows provisioning preserves the guest-local key, binds the exact candidate, installs a narrow inbound TCP rule,
+  and launches from the activated user's Startup folder so the actor survives reboot without a host-owned task.
 
 ## Consequences
 
 - Duplicate log delivery and peer outages are idempotent: execution remains exactly once per accepted nonce while
   signed delivery can retry.
-- The service is cross-platform and shell-free, but it must run as the already activated desktop user when the fixed
-  adapter requires that user's LabVIEW/VIPM licenses.
-- VM service installation, dual LabVIEW/VIPM functional enrollment, and live signed N=3 evidence remain subsequent
-  governed increments; this decision proves the persistent execution mechanism offline.
+- The service is cross-platform and request-shell-free, but it must run as the already activated desktop user when
+  the fixed adapter requires that user's LabVIEW/VIPM licenses.
+- Offline tests prove 31 protocol/service/daemon/PowerShell cases. Live Windows evidence proves native PowerShell 5
+  reboot persistence, signed request admission, fixed LabVIEW result `3`, and a protocol-valid actor-signed response.
+- Parent synchronization remains blocked until the resealed final candidate passes the complete live signed N=3 gate.
 
 ## References
 
 - Realizes: LBA-REQ-099 (`docs/requirements/srs.md`, `docs/requirements/rtm.csv`, test `T-099`)
 - Service: `experiments/mesh-fulfillment/autonomousActorService.mjs`
-- Daemon: `experiments/mesh-fulfillment/autonomousActorDaemon.mjs`
+- Daemons: `experiments/mesh-fulfillment/autonomousActorDaemon.mjs`, `experiments/mesh-fulfillment/autonomousActorDaemon.ps1`
+- Windows provisioner: `scripts/provision-autonomous-windows-actor.ps1`
 - Focused command: `node scripts/lba.mjs actor-service-check`

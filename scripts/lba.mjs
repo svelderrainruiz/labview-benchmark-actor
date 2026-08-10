@@ -36,6 +36,7 @@
 //   capture-preflight            report native LabVIEW launch-capture readiness + selected Linux display mode
 //   actor-service-check          run the signed protocol + persistent service + lbabus daemon selftests
 //   provision-linux-actor       install one persistent autonomous actor through verified SSH access
+//   provision-windows-actor     install one native PowerShell 5 actor from an elevated Windows guest console
 //   selftest                     self-check this tool (run by the `agent-tooling-selftest` gate)
 
 import { mkdirSync, readFileSync, writeFileSync, existsSync, readdirSync, rmSync } from 'node:fs';
@@ -53,7 +54,7 @@ import { buildReleaseStage } from '../reviewer-workstation/record-release-stage.
 import { enrolledReviewerPublicKeys } from '../experiments/handoff-beacon/reviewerVerdict.mjs';
 import { validateLbabusProvisioningPin } from './verify-ubuntu-golden-box.mjs';
 
-export const ITERATION = 27; // bump when you refine this tool (see the banner above)
+export const ITERATION = 28; // bump when you refine this tool (see the banner above)
 
 const here = dirname(fileURLToPath(import.meta.url));
 export const repoRoot = resolve(here, '..');
@@ -74,6 +75,7 @@ export const AUTONOMOUS_ACTOR_SELFTESTS = [
   'experiments/mesh-fulfillment/autonomousActorProtocol.selftest.mjs',
   'experiments/mesh-fulfillment/autonomousActorService.selftest.mjs',
   'experiments/mesh-fulfillment/autonomousActorDaemon.selftest.mjs',
+  'experiments/mesh-fulfillment/autonomousActorPowerShell.selftest.mjs',
 ];
 
 // ---- the governance surfaces a Proven requirement must appear in ---------------------------------
@@ -839,6 +841,10 @@ export const COMMANDS = {
     desc: 'install one persistent autonomous Linux actor through verified SSH access',
     run: (args) => execFileSync('bash', [join(repoRoot, 'scripts/provision-autonomous-linux-actor.sh'), ...args], { stdio: 'inherit' }),
   },
+  'provision-windows-actor': {
+    desc: 'install one native PowerShell 5 actor from an elevated Windows guest console',
+    run: (args) => execFileSync('powershell.exe', ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', join(repoRoot, 'scripts/provision-autonomous-windows-actor.ps1'), ...args], { stdio: 'inherit' }),
+  },
   selftest: {
     desc: 'self-check this tool (run by the agent-tooling-selftest gate)',
     run: () => runSelftest(),
@@ -891,6 +897,13 @@ const SELFTEST = [
   ['autonomous Linux actor avoids a multi-user/graphical target ordering cycle', () => {
     const provisioner = read('scripts/provision-autonomous-linux-actor.sh');
     return provisioner.includes('After=network-online.target\nWants=network-online.target') && !provisioner.includes('After=network-online.target graphical.target');
+  }],
+  ['autonomous Windows actor requires native PowerShell 5 and never provisions Node', () => {
+    const provisioner = read('scripts/provision-autonomous-windows-actor.ps1');
+    return provisioner.includes("$PSVersionTable.PSEdition -ne 'Desktop'")
+      && provisioner.includes('$PSVersionTable.PSVersion.Major -ne 5')
+      && provisioner.includes('WindowsPowerShell\\v1.0\\powershell.exe')
+      && !/node(?:\.exe)?/i.test(provisioner);
   }],
   ['LabVIEW known-answer adapter requires the validated activated verdict', () => read('experiments/mesh-fulfillment/runLabviewKnownAnswer.mjs').includes('if (!validation.activated)')],
   ['every governance-surface file exists', () => GOVERNANCE_SURFACES.every((s) => existsSync(join(repoRoot, s.file)))],
