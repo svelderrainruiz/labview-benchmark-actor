@@ -6,6 +6,15 @@ follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project
 
 ## [Unreleased]
 
+## [1.4.13] - 2026-08-10
+
+### Changed
+
+- **Immutable failed dependency tag advances honestly.** Extension 1.4.13 advances AGENTS to 0.3.17 and
+  `lbabus` to 0.15.12 after immutable `collab-cli-v0.15.11` failed its requirements harness; that tag is retained.
+- **Requirements evidence is complete.** The missing T-066 test-plan definition now makes the Proven RTM claim
+  executable in the collab-cli release harness, with fresh visual/quorum keys scoped only to 1.4.13.
+
 ## [1.4.12] - 2026-08-10
 
 ### Changed
