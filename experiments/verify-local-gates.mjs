@@ -1586,7 +1586,7 @@ check('release-component-versioning', () => {
   assert(agentsManifest.version === versions.agents, 'AGENTS version drifted');
   assert(lbabus.includes(`<Version>${versions.lbabus}</Version>`), 'lbabus version drifted');
   assert(tasks.includes(`HUMAN_TASKS_VERSION = '${versions.humanTasks}'`), 'human task version drifted');
-  assert(versions.canonicalDistribution === 'github-release' && versions.marketplaceChannel === 'prerelease', 'distribution policy drifted');
+  assert(versions.canonicalDistribution === 'github-release' && versions.marketplaceChannel === 'stable', 'distribution policy drifted');
   assert(/^[0-9a-f]{40}$/.test(versions.governance.standardsReviewCommit), 'standards-review commit is not pinned');
   assert(/^sha256:[0-9a-f]{64}$/.test(versions.governance.workbenchDigest), 'governance workbench digest is not pinned');
   assert(versions.governance.standardsReviewVersion === '0.2.19', 'standards-review version is not pinned');
@@ -1600,8 +1600,8 @@ check('release-component-versioning', () => {
   assert(
     workflow.includes('inputs.publish_marketplace')
       && workflow.includes('gh release download')
-      && workflow.includes('vsce publish --pre-release --packagePath "$release_dir/'),
-    'GitHub-first Marketplace prerelease policy drifted',
+      && workflow.includes('vsce publish --packagePath "$release_dir/'),
+    'GitHub-first stable Marketplace policy drifted',
   );
   assert(releaseCli.includes("'--target', 'main'"), 'GitHub release target-main control drifted');
   assert(releaseComponentsSource.includes("fromHead('experiments/governance-overrides.json')"), 'first-introduction fallback omits experiment-governance version');

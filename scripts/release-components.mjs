@@ -50,8 +50,8 @@ export function verifyReleaseComponents(input) {
   if (components.canonicalDistribution !== 'github-release') {
     reasons.push('GitHub Release must be the canonical distribution');
   }
-  if (components.marketplaceChannel !== 'prerelease') {
-    reasons.push('Marketplace must use the prerelease channel');
+  if (components.marketplaceChannel !== 'stable') {
+    reasons.push('Marketplace must use the stable channel');
   }
   if (!/^[0-9a-f]{40}$/.test(components.governance?.standardsReviewCommit || '')) {
     reasons.push('governance standards-review commit must be an exact Git commit');
@@ -118,11 +118,11 @@ export function verifyReleaseComponents(input) {
   if (!changelog.includes(`## [${components.extension}]`)) {
     reasons.push('CHANGELOG.md has no section for the extension version');
   }
-  if (!packageJson.scripts?.package?.includes('vsce package --pre-release')) {
-    reasons.push('canonical package command does not produce a Marketplace prerelease VSIX');
+  if (!packageJson.scripts?.package?.includes('vsce package --out')) {
+    reasons.push('canonical package command does not produce a stable Marketplace VSIX');
   }
-  if (!releaseWorkflow.includes('vsce publish --pre-release')) {
-    reasons.push('Marketplace workflow does not publish through the prerelease channel');
+  if (!releaseWorkflow.includes('vsce publish --packagePath')) {
+    reasons.push('Marketplace workflow does not publish through the stable channel');
   }
   if (!releaseCli.includes("'--target', 'main'")) {
     reasons.push('release-cut-github does not target main explicitly');
