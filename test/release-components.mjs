@@ -6,16 +6,11 @@ import { verifyReleaseComponents, verifyStagedReleaseMetadata } from '../scripts
 
 const releaseRiskBaseline = JSON.parse(readFileSync(new URL('../release-risk-baseline.json', import.meta.url), 'utf8'));
 const standardsScoreBaseline = JSON.parse(readFileSync(new URL('../standards-score-baseline.json', import.meta.url), 'utf8'));
+const releaseComponents = JSON.parse(readFileSync(new URL('../release-components.json', import.meta.url), 'utf8'));
+const extensionVersion = releaseRiskBaseline.releaseVersion;
 const base = {
   components: {
-    schema: 'labview-benchmark-actor/release-components@1',
-    extension: '1.4.9',
-    agents: '0.3.13',
-    lbabus: '0.15.8',
-    humanTasks: '1.0.6',
-    experimentGovernance: '1.0.1',
-    canonicalDistribution: 'github-release',
-    marketplaceChannel: 'prerelease',
+    ...releaseComponents,
     governance: {
       standardsReviewVersion: releaseRiskBaseline.source.workbenchVersion,
       standardsReviewCommit: releaseRiskBaseline.source.standardsReviewCommit,
@@ -25,21 +20,21 @@ const base = {
       releaseRisk: { present: 12, total: 28, status: 'BLOCKED' },
     },
   },
-  packageJson: { version: '1.4.9', scripts: { package: 'vsce package --pre-release --out labview-benchmark-actor.vsix' } },
-  packageLock: { version: '1.4.9', packages: { '': { version: '1.4.9' } } },
-  agentsManifest: { version: '0.3.13' },
-  agentsText: 'exactly `0.15.8` for this extension build\nbundle v1.0.6',
-  lbabusProject: '<Version>0.15.8</Version>',
-  humanTasksSource: "HUMAN_TASKS_VERSION = '1.0.6'",
-  humanTaskRunner: "HUMAN_TASKS_VERSION = '1.0.6'",
-  changelog: '## [1.4.9]',
+  packageJson: { version: extensionVersion, scripts: { package: 'vsce package --pre-release --out labview-benchmark-actor.vsix' } },
+  packageLock: { version: extensionVersion, packages: { '': { version: extensionVersion } } },
+  agentsManifest: { version: releaseComponents.agents },
+  agentsText: `exactly \`${releaseComponents.lbabus}\` for this extension build\nbundle v${releaseComponents.humanTasks}`,
+  lbabusProject: `<Version>${releaseComponents.lbabus}</Version>`,
+  humanTasksSource: `HUMAN_TASKS_VERSION = '${releaseComponents.humanTasks}'`,
+  humanTaskRunner: `HUMAN_TASKS_VERSION = '${releaseComponents.humanTasks}'`,
+  changelog: `## [${extensionVersion}]`,
   releaseWorkflow: 'vsce publish --pre-release',
   releaseCli: "['--target', 'main']",
   releaseRiskBaseline,
   standardsScoreBaseline,
   artifactExists: () => true,
-  experimentGovernanceManifest: { version: '1.0.1' },
-  experimentGovernanceSource: "EXPERIMENT_GOVERNANCE_VERSION = '1.0.1'",
+  experimentGovernanceManifest: { version: releaseComponents.experimentGovernance },
+  experimentGovernanceSource: `EXPERIMENT_GOVERNANCE_VERSION = '${releaseComponents.experimentGovernance}'`,
 };
 
 assert.equal(verifyReleaseComponents(base).ok, true);
@@ -118,5 +113,19 @@ assert.equal(verifyStagedReleaseMetadata({
   previous: base.components,
   current: base.components,
 }).ok, false);
+assert.equal(verifyStagedReleaseMetadata({
+  staged: ['extension-tasks/release-risk.mjs'],
+  unstaged: [],
+  previous: base.components,
+  current: base.components,
+}).ok, false);
+for (const stagedMediaTask of ['media/process-command.mjs', 'media/release-risk.mjs']) {
+  assert.equal(verifyStagedReleaseMetadata({
+    staged: [stagedMediaTask],
+    unstaged: [],
+    previous: base.components,
+    current: base.components,
+  }).ok, false);
+}
 
 console.log('release-components: PASS');

@@ -90,6 +90,42 @@
       "validFrom": "1.4.9",
       "validThrough": "1.4.9",
       "purposes": ["quorum"]
+    },
+    {
+      "publicKeyPem": "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEAX9zyavOuiwchv39AAJZCbfVhzF0hNEVDkuyHJMvBIIw=\n-----END PUBLIC KEY-----\n",
+      "validFrom": "1.4.10",
+      "validThrough": "1.4.10",
+      "purposes": ["visual"]
+    },
+    {
+      "publicKeyPem": "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEAX3s4/Y2z33hq+aw4vvSpTCRPqh+vrrOscscNBXHL2F8=\n-----END PUBLIC KEY-----\n",
+      "validFrom": "1.4.10",
+      "validThrough": "1.4.10",
+      "purposes": ["quorum"]
+    },
+    {
+      "publicKeyPem": "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEAnKY070tmFMUAQJpClSwLfRp1xGZNMUq9uTtEtns+UOk=\n-----END PUBLIC KEY-----\n",
+      "validFrom": "1.4.11",
+      "validThrough": "1.4.11",
+      "purposes": ["visual"]
+    },
+    {
+      "publicKeyPem": "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEABRJ0oaCpM58qXvhUDDN9oxjJzFUbomX7RMzj0LPhvPg=\n-----END PUBLIC KEY-----\n",
+      "validFrom": "1.4.11",
+      "validThrough": "1.4.11",
+      "purposes": ["quorum"]
+    },
+    {
+      "publicKeyPem": "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEASfJb5PJovFnp0q+i6G4ZUko3jgFZtOBkyIElyezIHg4=\n-----END PUBLIC KEY-----\n",
+      "validFrom": "1.4.12",
+      "validThrough": "1.4.12",
+      "purposes": ["visual"]
+    },
+    {
+      "publicKeyPem": "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEAiBBPiAVQzibs3I1y/p2VJKmDletOaq3rvaVSg8iZKlA=\n-----END PUBLIC KEY-----\n",
+      "validFrom": "1.4.12",
+      "validThrough": "1.4.12",
+      "purposes": ["quorum"]
     }
   ]
 }

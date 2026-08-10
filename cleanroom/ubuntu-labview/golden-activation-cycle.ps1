@@ -51,7 +51,11 @@ $readinessBuilder = Join-Path $repoRoot 'experiments\provisioner-readiness\golde
 $activationProbe = Join-Path $repoRoot 'experiments\activation\probe-activation.sh'
 $activationBuilder = Join-Path $repoRoot 'experiments\activation\buildActivationReceipt.mjs'
 $registrationScript = Join-Path $repoRoot 'experiments\activation\registerMeshActor.mjs'
+$goldenBoxVerifier = Join-Path $repoRoot 'scripts\verify-ubuntu-golden-box.mjs'
+$governedProductionVagrantfile = Join-Path $PSScriptRoot 'production-golden-box.Vagrantfile'
+$productionMetadata = Join-Path $PSScriptRoot 'production-golden-box.metadata.json'
 $artifactDir = Join-Path $VagrantRoot '.vagrant'
+$baseBootstrapReceipt = Join-Path $artifactDir "golden-$Vm-base-bootstrap-receipt.json"
 $readinessCapture = Join-Path $artifactDir "golden-$Vm-readiness-capture.json"
 $readinessReceipt = Join-Path $artifactDir "golden-$Vm-readiness-receipt.json"
 $activationCapture = Join-Path $artifactDir "golden-$Vm-activation-capture.json"
@@ -203,6 +207,34 @@ function Test-ConsoleReadinessReceipt {
   }
 }
 
+function Assert-BaseBootstrapReceiptForPackage {
+  $currentStateCommand = 'test "$(command -v git)" = /usr/bin/git && test -x /usr/sbin/sshd && test -x /usr/sbin/VBoxService && systemctl is-active --quiet ssh.service && systemctl is-enabled --quiet ssh.service && systemctl is-active --quiet virtualbox-guest-utils.service && systemctl is-enabled --quiet virtualbox-guest-utils.service'
+  Invoke-Vagrant -Arguments @('ssh', $Vm, '-c', $currentStateCommand)
+  Receive-GuestFile -Source '/var/lib/lba-cleanroom/base-bootstrap-receipt.json' -Destination $baseBootstrapReceipt
+  & node $goldenBoxVerifier --base-receipt $baseBootstrapReceipt | Out-Host
+  if ($LASTEXITCODE -ne 0) {
+    throw 'base bootstrap receipt validation failed; package is blocked'
+  }
+  return Get-Content -LiteralPath $baseBootstrapReceipt -Raw | ConvertFrom-Json
+}
+
+function Assert-GovernedProductionDefinition {
+  if (-not (Test-Path -LiteralPath $governedProductionVagrantfile -PathType Leaf)) {
+    throw "governed production Vagrantfile is missing: $governedProductionVagrantfile"
+  }
+  if (-not (Test-Path -LiteralPath $ProductionVagrantfile -PathType Leaf)) {
+    throw "production Vagrantfile is missing: $ProductionVagrantfile"
+  }
+  if ((Resolve-Path -LiteralPath $ProductionVagrantfile).Path -ne (Resolve-Path -LiteralPath $governedProductionVagrantfile).Path) {
+    throw 'ProductionVagrantfile overrides are not permitted for governed production packaging'
+  }
+  if (-not (Test-Path -LiteralPath $productionMetadata -PathType Leaf)) {
+    throw "production metadata is missing: $productionMetadata"
+  }
+  & node $goldenBoxVerifier | Out-Host
+  if ($LASTEXITCODE -ne 0) { throw 'production golden definition validation failed; package is blocked' }
+}
+
 function Assert-ActivatedReceiptForPackage {
   Assert-EnrollmentIdentity
   if (-not (Test-ConsoleReadinessReceipt)) { throw 'operator desktop-unlock confirmation is missing or stale; run ConsoleReady and Confirm before packaging' }
@@ -226,13 +258,25 @@ function Assert-ActivatedReceiptForPackage {
 }
 
 function Write-ProductionPackageReceipt {
-  param([Parameter(Mandatory = $true)]$ActivationReceipt)
+  param(
+    [Parameter(Mandatory = $true)]$ActivationReceipt,
+    [Parameter(Mandatory = $true)]$BaseBootstrapReceipt
+  )
 
   $receipt = [pscustomobject][ordered]@{
-    schema = 'labview-benchmark-actor/golden-production-package@1'
+    schema = 'labview-benchmark-actor/golden-production-package@2'
     vm = $Vm
     actor = $ActivationReceipt.actor
     activationReceiptDigest = $ActivationReceipt.digest
+    baseBootstrap = [pscustomobject][ordered]@{
+      schema = $BaseBootstrapReceipt.schema
+      vm = $BaseBootstrapReceipt.vm
+      receiptSha256 = ((Get-FileHash -LiteralPath $baseBootstrapReceipt -Algorithm SHA256).Hash).ToLowerInvariant()
+    }
+    definition = [pscustomobject][ordered]@{
+      vagrantfileSha256 = ((Get-FileHash -LiteralPath $ProductionVagrantfile -Algorithm SHA256).Hash).ToLowerInvariant()
+      metadataSha256 = ((Get-FileHash -LiteralPath $productionMetadata -Algorithm SHA256).Hash).ToLowerInvariant()
+    }
     boxPath = (Resolve-Path -LiteralPath $ProductionBoxPath).Path
     boxSha256 = ((Get-FileHash -LiteralPath $ProductionBoxPath -Algorithm SHA256).Hash).ToLowerInvariant()
     packagedAt = [DateTime]::UtcNow.ToString('o')
@@ -316,6 +360,10 @@ function Confirm-Activation {
   $identityVerified = $null -ne $receipt.actor -and $receipt.actor.actorId -eq $ActorId -and $receipt.actor.hostname -eq $ActorHostname -and $receipt.actor.ip -eq $ActorIp
   $freshnessVerified = $null -ne $receipt.PSObject.Properties['freshness'] -and $null -ne $receipt.freshness.PSObject.Properties['challenge'] -and $receipt.freshness.challenge -eq $activationChallenge
   return [pscustomobject]@{ ProbeExit = $probeExit; Receipt = $receipt; IdentityVerified = $identityVerified; FreshnessVerified = $freshnessVerified }
+}
+
+if ($Mode -eq 'Package') {
+  Assert-GovernedProductionDefinition
 }
 
 Push-Location $VagrantRoot
@@ -409,8 +457,8 @@ try {
       exit 1
     }
     'Package' {
+      $baseBootstrap = Assert-BaseBootstrapReceiptForPackage
       $activation = Assert-ActivatedReceiptForPackage
-      if (-not (Test-Path -LiteralPath $ProductionVagrantfile -PathType Leaf)) { throw "production Vagrantfile is missing: $ProductionVagrantfile" }
       if (Test-Path -LiteralPath $ProductionBoxPath -PathType Leaf) {
         if (-not $OverwriteProductionBox) { throw "production box already exists: $ProductionBoxPath (use -OverwriteProductionBox to replace it)" }
         Remove-Item -LiteralPath $ProductionBoxPath -Force
@@ -420,7 +468,7 @@ try {
       Invoke-Vagrant -Arguments @('halt', $Vm)
       Write-Output "packaging confirmed golden actor '$Vm' -> $ProductionBoxPath"
       Invoke-Vagrant -Arguments @('package', $Vm, '--output', $ProductionBoxPath, '--vagrantfile', $ProductionVagrantfile)
-      $package = Write-ProductionPackageReceipt -ActivationReceipt $activation
+      $package = Write-ProductionPackageReceipt -ActivationReceipt $activation -BaseBootstrapReceipt $baseBootstrap
       Write-Output "production golden package complete: $($package.boxPath)"
       Write-Output "production package receipt: $packageReceipt"
       exit 0

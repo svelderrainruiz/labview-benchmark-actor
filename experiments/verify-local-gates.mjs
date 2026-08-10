@@ -130,6 +130,12 @@ function parseCsvLine(line) {
   return fields;
 }
 
+// Continuation-host readiness receipt selftest (pure validation only; no live host execution).
+check('continuation-readiness-selftest', () => {
+  execFileSync(process.execPath, [join(here, '..', 'reviewer-workstation', 'continuation-readiness.selftest.mjs')], { stdio: 'pipe' });
+  return { selftest: 'continuation-readiness pure validation' };
+});
+
 // 1. Bus-prototype receipt is green (LBA-REQ-006/007, T-007).
 check('bus-prototype-receipt-green', () => {
   const receipt = readJson('experiments/bus-prototype/receipt.json');
@@ -397,6 +403,23 @@ check('provisioner-installs-labview-and-vipm', () => {
   return { standard: 'ADR-0023 Phase 1', selftest: 'verify-provisioner-labview-vipm 4/4 (LabVIEW + VIPM)' };
 });
 
+// 6p2. The Ubuntu cleanroom base must be remotely automatable before LabVIEW provisioning or human login.
+//      The unattended hook installs OpenSSH, Git, and supported VirtualBox guest utilities, records first-boot
+//      state, keeps the disposable credential out of CLI values and diagnostics, and exposes SSH only on an
+//      explicitly selected host-loopback NAT forward. Missing or unsupported bootstrap mechanisms fail closed.
+check('ubuntu-base-bootstrap-prerequisites', () => {
+  execFileSync(process.execPath, [join(here, '..', 'test', 'ubuntu-base-bootstrap.mjs')], { stdio: 'pipe' });
+  return { standard: 'LBA-REQ-044 remotely automatable Ubuntu base', selftest: 'ubuntu-base-bootstrap (packages, services, receipt, secret safety, fail-closed hook)' };
+});
+
+// 6p3. A production Ubuntu golden box must preserve the proven base contract. The embedded Vagrant definition
+//      validates the receipt on every clone, while production packaging binds the exact base receipt and definition
+//      only after the independent console, activation, and identity-freshness guards have passed.
+check('ubuntu-production-golden-box', () => {
+  execFileSync(process.execPath, [join(here, '..', 'test', 'ubuntu-golden-box.mjs')], { stdio: 'pipe' });
+  return { standard: 'LBA-REQ-033/044 production golden continuity', selftest: 'ubuntu-golden-box (definition, receipt, proof, package guards)' };
+});
+
 // 6q. Human-assisted VM bridge (LBA-REQ-045, ADR-0032): the shared-tmux bridge (tools/vm-bridge/vm-bridge.sh)
 //     lets an automation agent drive the golden VM's interactive shell while a HUMAN types any password/token
 //     directly on the VM -- credentials never transit the agent or the model. Fail-closed if the bridge could
@@ -433,7 +456,7 @@ check('vm-live-status-idle-analysis', () => {
 //     stale/tampered resultHash, forged verdict, inconsistent bad-VI list, or tampered digest.
 check('mass-compile-benchmark', () => {
   execFileSync(process.execPath, [join(here, 'mass-compile', 'verify-mass-compile-benchmark.selftest.mjs')], { stdio: 'pipe' });
-  return { standard: 'ADR-0023 Phase 1 (golden-VM benchmark)', selftest: 'verify-mass-compile-benchmark 7/7 (icon-editor MassCompile, cross-plane resultHash)' };
+  return { standard: 'ADR-0023 Phase 1 (golden-VM benchmark)', selftest: 'verify-mass-compile-benchmark 8/8 (icon-editor MassCompile, four-plane resultHash)' };
 });
 
 // 6u. Golden-VM provisioner headless-LabVIEW readiness (LBA-REQ-049, ADR-0023 Phase 1): the one-command
@@ -2290,6 +2313,8 @@ check('mcp-server-surface-contract', () => {
   const ignore = readFileSync(join(pkgRoot, '.vscodeignore'), 'utf8').split(/\r?\n/).map((l) => l.trim());
   assert(ignore.includes('src/**'), '.vscodeignore must exclude src/**');
   assert(!ignore.some((l) => l === 'out/**' || l === 'out/'), '.vscodeignore must NOT exclude out/ (the MCP entrypoint must ship)');
+  assert(ignore.includes('AGENTS.md'), '.vscodeignore must exclude the workspace-root AGENTS materialization');
+  assert(!ignore.includes('**/AGENTS.md'), '.vscodeignore must not recursively exclude packaged media/AGENTS.md');
   // #123 packaging-leak guard (static, every-PR half; the empirical `vsce ls` allow-set is the agent-last-gate's
   // vsix-allow-set check at release/staging). The heavy non-runtime trees -- above all the reviewer VM disk
   // behind the 14 GB leak -- MUST stay excluded from the .vsix, and this runs on both OS runners.
@@ -2299,6 +2324,9 @@ check('mcp-server-surface-contract', () => {
   const lastGate = readFileSync(join(pkgRoot, 'scripts', 'agent-last-gate.mjs'), 'utf8');
   for (const runtimeRoot of ['release-components', 'release-risk-baseline', 'standards-score-baseline']) {
     assert(lastGate.includes(`^${runtimeRoot}\\.json$`), `agent-last-gate must allow packaged ${runtimeRoot}.json`);
+  }
+  for (const embeddedAgentsFile of ['media/AGENTS.md', 'media/agents.manifest.json']) {
+    assert(lastGate.includes(embeddedAgentsFile), `agent-last-gate must require ${embeddedAgentsFile}`);
   }
   // The dynamic protocol round-trip is wired into npm test.
   assert(/test\/mcp-server\.mjs/.test(pkg.scripts?.test ?? ''), 'npm test must run test/mcp-server.mjs');
@@ -2976,6 +3004,21 @@ check('handoff-verdict', () => {
   return { schema: verdict.schema, verdict: verdict.verdict, signoffSchema: signed.schema, busType: busPost.type, selftest: 'reviewer-verdict 7/7' };
 });
 
+check('ubuntu-reviewer-candidate-staging', () => {
+  execFileSync(process.execPath, [join(here, '..', 'reviewer-workstation', 'stage-ubuntu-vsix.selftest.mjs')], { stdio: 'pipe' });
+  return { station: 'UBUNTU_VM', selftest: 'exact version/hash/installed-extension staging contract' };
+});
+
+check('ubuntu-native-labview-capture', () => {
+  execFileSync(process.execPath, [join(here, '..', 'test', 'capture-platform.mjs')], { stdio: 'pipe' });
+  return { platform: 'Ubuntu graphical seat', source: 'ffmpeg-x11grab', fps: 12 };
+});
+
+check('reviewer-version-contract', () => {
+  execFileSync(process.execPath, [join(here, '..', 'reviewer-workstation', 'reviewer-version-contract.selftest.mjs')], { stdio: 'pipe' });
+  return { source: 'release-components.json', scope: 'Windows/Ubuntu reviewer staging + continuation readiness' };
+});
+
 // LBA-REQ-059 / ADR-0039: the host<->VM-agent CLOSED LOOP over lbabus net TCP. A pure parser self-test (no
 // network/VM), the committed live+loopback receipt, and the semantic verdict types on the net envelope (option A):
 // the host awaits the VM agent's correlated reply over TCP and the reviewer verdict announces as a first-class
@@ -3603,6 +3646,10 @@ check('acg-cross-plane-corroboration-workflow-wired', () => {
   assert(linuxSubstrates.length >= 2, 'must build on >= 2 concrete LINUX substrates (e.g. ubuntu-22.04 + ubuntu-24.04)');
   assert(windowsSubstrates.length >= 2, 'must build on >= 2 concrete WINDOWS substrates (e.g. windows-2022 + windows-2025)');
   assert(/produce-witness\.mjs/.test(t), 'each substrate must produce its witness via produce-witness.mjs');
+  assert(
+    (t.match(/github\.event\.pull_request\.head\.sha \|\| github\.sha/g) || []).length >= 3,
+    'PR witnesses, checkout, and corroboration must bind the reviewed head SHA rather than the synthetic merge SHA',
+  );
   assert(/corroborate-planes\.mjs/.test(t), 'the corroborate job must run corroborate-planes.mjs (the quorum) over ALL substrates');
   assert(/witnesses\/\*\/\*\.bundle\.json/.test(t), 'the corroborate job must ingest ALL substrate witnesses (glob)');
   assert(/npm test/.test(t), 'each substrate must run the extension gate (npm test) for its verdict');

@@ -30,7 +30,7 @@ jobs:
 
       - uses: actions/setup-node@v5
         with:
-          node-version: '24'
+          node-version-file: .nvmrc
 
       - name: Validate the mesh-run dispatch request (fail-closed)
         # On a repository_dispatch the mesh-run-dispatch@1 request is the client_payload (the repo IS the queue);

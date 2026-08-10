@@ -1,0 +1,24 @@
+{
+  "schema": "labview-benchmark-actor/ubuntu-production-golden-definition@1",
+  "definition": {
+    "path": "cleanroom/ubuntu-labview/production-golden-box.Vagrantfile",
+    "sha256": "7f7cd12c8d19f7cbd1e7a9b495b93f6f57b359eb3b1188d486edb3a7d1e30f1a"
+  },
+  "guest": {
+    "os": "ubuntu-24.04",
+    "communicator": "ssh",
+    "username": "actor",
+    "insertKey": true,
+    "bootTimeoutSeconds": 1800
+  },
+  "bootstrap": {
+    "receiptPath": "/var/lib/lba-cleanroom/base-bootstrap-receipt.json",
+    "receiptSchema": "labview-benchmark-actor/ubuntu-base-bootstrap@1"
+  },
+  "packageGuards": [
+    "baseBootstrap",
+    "consoleReadiness",
+    "activation",
+    "identityFreshness"
+  ]
+}

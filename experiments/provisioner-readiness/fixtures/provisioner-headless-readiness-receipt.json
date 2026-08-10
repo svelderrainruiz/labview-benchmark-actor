@@ -24,7 +24,7 @@
     },
     {
       "name": "vi-server-access-quoted",
-      "description": "quotes the VI Server access lists (LabVIEW ignores unquoted lists)",
+      "description": "quotes the wildcard VI Server access lists expected by activation readiness",
       "present": true
     },
     {

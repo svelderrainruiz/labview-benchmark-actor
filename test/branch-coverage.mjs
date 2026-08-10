@@ -1,6 +1,16 @@
 #!/usr/bin/env node
 
 import assert from 'node:assert/strict';
+import { coberturaWorkingTreeText, normalizeCoberturaXml } from '../scripts/coverage-core.mjs';
+import { reviewerStationForEnvironment } from '../out/reviewerStation.js';
+import {
+  captureMetadataForPlatform,
+  ffmpegCaptureArgsForPlatform,
+  labviewCandidatesForPlatform,
+  linuxSamplerScript,
+  parseX11DisplaySize,
+  x11DisplayForCapture,
+} from '../out/capturePlatform.js';
 import {
   buildBenchmarkPanelHtml,
   buildCrossPlaneResourcePanelHtml,
@@ -293,12 +303,10 @@ assert.equal(verifyReviewerVerdict(passVerdict, signOff, { reviewerAllowlist: { 
 assert.equal(verifyReviewerVerdict(passVerdict, { ...signOff, publicKeyPem: otherKey.publicKeyPem }, { reviewerAllowlist: allowlist }).ok, false);
 assert.equal(verifyReviewerVerdict(passVerdict, { ...signOff, signature: 'bad' }, { reviewerAllowlist: allowlist }).ok, false);
 assert.equal(verifyReviewerVerdict(passVerdict, { ...signOff, publicKeyPem: 'bad' }, { reviewerAllowlist: { r: ['bad'] } }).ok, false);
-const nullVerdictSignOff = signReviewerVerdict(null, {
-  privateKeyPem: key.privateKeyPem,
-  reviewer: 'r',
-});
-assert.equal(nullVerdictSignOff.subject.consensusVerdict, null);
-assert.equal(nullVerdictSignOff.subject.target, null);
+throws(
+  () => signReviewerVerdict(null, { privateKeyPem: key.privateKeyPem, reviewer: 'r' }),
+  /station/,
+);
 assert.equal(verifyReviewerVerdict(
   { ...passVerdict, target: undefined },
   { ...signOff, publicKeyPem: undefined, signature: '' },
@@ -309,7 +317,6 @@ const failVerdict = { ...passVerdict, verdict: 'changes' };
 const reject = signReviewerVerdict(failVerdict, {
   privateKeyPem: key.privateKeyPem,
   reviewer: 'r',
-  station: 'WINDOWS_VM',
 });
 assert.equal(gateVisualReview({ verdict: failVerdict, signOffs: [reject], reviewerAllowlist: allowlist }).publish, false);
 assert.equal(gateVisualReview({ verdict: passVerdict, signOffs: [null, reject], reviewerAllowlist: allowlist, minReviewers: 2 }).publish, false);
@@ -419,5 +426,69 @@ assert.match(buildFrameCorrelatorHtml({
 throws(() => counterBitmap(-1), /non-negative/);
 assert.equal(counterBitmap(0).width, 3);
 assert.match(counterSvg(1, { minDigits: 1, cellPx: 1, on: 'red', off: 'blue', pad: 0 }), /fill="blue"/);
+
+const cobertura = '<coverage timestamp="123"><sources><source>C:\\repo</source></sources></coverage>';
+assert.equal(
+  normalizeCoberturaXml(cobertura),
+  '<coverage timestamp="0"><sources>\n    <source>.</source>\n  </sources></coverage>',
+);
+assert.equal(
+  normalizeCoberturaXml('<coverage timestamp="456"><sources>\n<source>/home/repo</source>\n</sources></coverage>'),
+  '<coverage timestamp="0"><sources>\n    <source>.</source>\n  </sources></coverage>',
+);
+assert.equal(
+  coberturaWorkingTreeText(cobertura, 'checked\r\nout'),
+  '<coverage timestamp="0"><sources>\r\n    <source>.</source>\r\n  </sources></coverage>',
+);
+assert.equal(coberturaWorkingTreeText(cobertura, 'checked\nout'), normalizeCoberturaXml(cobertura));
+assert.equal(coberturaWorkingTreeText(cobertura), normalizeCoberturaXml(cobertura));
+assert.equal(
+  normalizeCoberturaXml('<class filename="src\\capturePlatform.ts"></class>'),
+  '<class filename="src/capturePlatform.ts"></class>',
+);
+assert.equal(reviewerStationForEnvironment('win32', {}), 'WINDOWS_VM');
+assert.equal(reviewerStationForEnvironment('linux', {}, 'UBUNTU_VM'), 'UBUNTU_VM');
+throws(() => reviewerStationForEnvironment('linux', { CODESPACES: 'true' }), /disabled/);
+throws(() => reviewerStationForEnvironment('linux', { CODESPACES: 'true' }, 'LINUX_CODESPACE'), /disabled/);
+throws(() => reviewerStationForEnvironment('linux', {}), /staging marker/);
+throws(() => reviewerStationForEnvironment('darwin', {}), /unsupported/);
+assert.deepEqual(labviewCandidatesForPlatform('linux'), [
+  '/usr/local/natinst/LabVIEW-2026-64/labview',
+  '/usr/local/natinst/LabVIEW-2026-64/labview64',
+]);
+assert.match(labviewCandidatesForPlatform('win32')[0], /Program Files/);
+assert.equal(labviewCandidatesForPlatform('darwin').length, 0);
+assert.deepEqual(captureMetadataForPlatform('linux'), {
+  workload: 'labview-launch',
+  plane: 'LINUX',
+  source: 'ffmpeg-x11grab',
+});
+assert.deepEqual(captureMetadataForPlatform('win32'), {
+  workload: 'labview-launch',
+  plane: 'WIN',
+  source: 'ffmpeg-gdigrab',
+});
+assert.deepEqual(
+  ffmpegCaptureArgsForPlatform('linux', '/tmp/frame.png', { DISPLAY: ':0', XDG_SESSION_TYPE: 'x11' }, '1280x800'),
+  ['-y', '-f', 'x11grab', '-framerate', '12', '-video_size', '1280x800', '-draw_mouse', '0', '-i', ':0', '/tmp/frame.png'],
+);
+assert.deepEqual(
+  ffmpegCaptureArgsForPlatform('win32', 'frame.png', {}),
+  ['-y', '-f', 'gdigrab', '-framerate', '12', '-i', 'desktop', 'frame.png'],
+);
+throws(() => ffmpegCaptureArgsForPlatform('linux', 'frame.png', { XDG_SESSION_TYPE: 'x11' }), /requires DISPLAY/);
+throws(() => ffmpegCaptureArgsForPlatform('linux', 'frame.png', { DISPLAY: ':0', XDG_SESSION_TYPE: 'wayland' }), /requires an Xorg session/);
+throws(() => ffmpegCaptureArgsForPlatform('linux', 'frame.png', { DISPLAY: ':0', XDG_SESSION_TYPE: 'x11' }), /desktop dimensions/);
+throws(() => ffmpegCaptureArgsForPlatform('darwin', 'frame.png', {}), /unsupported/);
+assert.equal(parseX11DisplaySize('dimensions: 800x600 pixels'), '800x600');
+throws(() => parseX11DisplaySize('no dimensions'), /did not report/);
+assert.equal(x11DisplayForCapture({ DISPLAY: ':1', XDG_SESSION_TYPE: 'X11' }), ':1');
+throws(() => x11DisplayForCapture({}), /requires DISPLAY/);
+throws(() => x11DisplayForCapture({ DISPLAY: ':1' }), /requires an Xorg session/);
+const linuxSampler = linuxSamplerScript("/tmp/res'ources.jsonl");
+assert.match(linuxSampler, /\/proc\/stat/);
+assert.match(linuxSampler, /MemAvailable/);
+assert.match(linuxSampler, /\/proc\/diskstats/);
+assert.match(linuxSampler, /res'\\''ources\.jsonl/);
 
 console.log('branch-coverage: PASS');

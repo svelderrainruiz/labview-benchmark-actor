@@ -41,8 +41,8 @@ export const REQUIRED_CHECKS = [
   },
   {
     name: 'vi-server-access-quoted',
-    description: 'quotes the VI Server access lists (LabVIEW ignores unquoted lists)',
-    test: (t) => /server\.tcp\.access\s*=\s*"/.test(t) && /server\.vi\.access\s*=\s*"/.test(t),
+    description: 'quotes the wildcard VI Server access lists expected by activation readiness',
+    test: (t) => /server\.tcp\.access\s*=\s*"\+\*"/.test(t) && /server\.vi\.access\s*=\s*"\+\*"/.test(t),
   },
   {
     name: 'post-install-reboot',

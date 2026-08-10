@@ -1,7 +1,7 @@
 {
   "schema": "labview-benchmark-actor/release-risk-baseline@1",
-  "releaseVersion": "1.4.9",
-  "assessedAt": "2026-08-08T13:40:00.000Z",
+  "releaseVersion": "1.4.12",
+  "assessedAt": "2026-08-10T03:41:00.000Z",
   "source": {
     "workbenchVersion": "0.2.19",
     "scoreSchema": "1.2.0",
@@ -63,7 +63,7 @@
       "risk": "Requirement correspondence is proven locally, but the new behavior has no signed human acceptance.",
       "action": "Stage the exact VSIX on the disposable reviewer and retain a signed verdict that explicitly covers the risk scorecard and AGENTS guidance.",
       "proofs": [
-        { "id": "governed-requirements", "status": "present", "evidence": "LBA-REQ-001 through LBA-REQ-096 with RTM", "artifacts": ["docs/requirements/srs.md", "docs/requirements/rtm.csv"] },
+        { "id": "governed-requirements", "status": "present", "evidence": "LBA-REQ-001 through LBA-REQ-097 with RTM", "artifacts": ["docs/requirements/srs.md", "docs/requirements/rtm.csv"] },
         { "id": "requirements-workbench", "status": "present", "evidence": "Pinned req gate PASS/High baseline", "artifacts": ["standards-score-baseline.json"] },
         { "id": "signed-human-acceptance", "status": "missing", "evidence": null }
       ]
@@ -73,7 +73,7 @@
       "risk": "The decisions and correspondence graph are current, but the release architecture change is not human-accepted.",
       "action": "Review ADR-0078/ADR-0079 in the exact candidate and bind approval or requested changes to the signed verdict.",
       "proofs": [
-        { "id": "architecture-decisions", "status": "present", "evidence": "79 registered ADR baseline with current overview mapping", "artifacts": ["docs/architecture/adr/README.md", "docs/architecture/overview.md", "docs/architecture/adr/ADR-0079-standards-release-risk-overlay.md"] },
+        { "id": "architecture-decisions", "status": "present", "evidence": "80 registered ADR baseline with current overview mapping", "artifacts": ["docs/architecture/adr/README.md", "docs/architecture/overview.md", "docs/architecture/adr/ADR-0079-standards-release-risk-overlay.md"] },
         { "id": "architecture-workbench", "status": "present", "evidence": "Pinned arch gate PASS/High baseline", "artifacts": ["standards-score-baseline.json"] },
         { "id": "signed-architecture-acceptance", "status": "missing", "evidence": null }
       ]

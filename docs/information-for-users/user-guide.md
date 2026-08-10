@@ -29,6 +29,10 @@ Codespace or a Vagrant golden VM, optionally across multiple VMs.
 
 The **same artifact** installs on both targets (LBA-REQ-002).
 
+For the measured Ubuntu 24.04 VirtualBox procedure, package versions, activation boundary, screenshots, and
+installation/benchmark timings, see
+[Ubuntu 24.04 + LabVIEW 2026 Installation Reference](ubuntu-24.04-labview-2026-installation.md).
+
 ## 2. Run a benchmark
 
 1. Start a benchmark run from the extension.

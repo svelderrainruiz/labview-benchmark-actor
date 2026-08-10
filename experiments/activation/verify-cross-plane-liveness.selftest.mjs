@@ -11,6 +11,7 @@ import { buildLivenessReceipt, validateLiveness, LIVENESS_SCHEMA } from './cross
 
 const here = dirname(fileURLToPath(import.meta.url));
 const receipt = JSON.parse(readFileSync(join(here, 'fixtures', 'cross-plane-liveness-receipt.json'), 'utf8'));
+const probeScript = readFileSync(join(here, 'probe-activation.sh'), 'utf8');
 let passed = 0;
 const ok = (m) => { console.log(`  PASS  ${m}`); passed += 1; };
 const clone = () => JSON.parse(JSON.stringify(receipt));
@@ -63,6 +64,15 @@ const clone = () => JSON.parse(JSON.stringify(receipt));
   const notLive = clone(); notLive.allActivated = false;
   assert.equal(validateLiveness(notLive).ok, false, 'allActivated=false is rejected');
   ok('fail-closed: wrong answer / single plane / shared host / not-all-activated all rejected');
+}
+
+// 5. the live probe reuses an active graphical LabVIEW seat before falling back to Xvfb
+{
+  assert.match(probeScript, /pgrep -o -x labview/, 'probe discovers an active LabVIEW process');
+  assert.match(probeScript, /DISPLAY_MODE=active-graphical-seat/, 'probe records active graphical-seat execution');
+  assert.match(probeScript, /DISPLAY_MODE=xvfb/, 'probe retains the previously validated Xvfb fallback');
+  assert.match(probeScript, /displayMode/, 'capture records the selected display mode');
+  ok('activation probe selects active graphical seat before Xvfb fallback');
 }
 
 console.log(`\nverify-cross-plane-liveness.selftest: ${passed}/${passed} checks passed`);

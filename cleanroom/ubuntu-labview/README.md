@@ -51,15 +51,55 @@ cd cleanroom/ubuntu-labview
 # 1) Preview the exact VBoxManage commands (safe — creates nothing):
 ./build-virtualbox.sh
 
-# 2) Build for real from the stock ISO (unattended Ubuntu install + Guest Additions):
-ISO=/path/to/ubuntu-24.04-desktop-amd64.iso ./build-virtualbox.sh --run
+# 2) Build for real. Keep the disposable credential in a private file and explicitly
+#    select a collision-free host-loopback port for NAT forwarding:
+chmod 600 /safe/local/path/actor-password
+ISO=/path/to/ubuntu-24.04-desktop-amd64.iso \
+GUEST_PASSWORD_FILE=/safe/local/path/actor-password \
+SSH_HOST_PORT=2222 \
+./build-virtualbox.sh --run
 ```
 
 The builder is **safe by default** (dry-run) and **refuses to touch an existing VM** of the same name
 (so it can never clobber `lba-ubuntu2404-labview2026`). The guest defaults to the **`actor`** identity
 (user `actor`, hostname `actor`, passwordless sudo via `provision-guest.sh`) for cross-plane parity with
 the Windows cleanroom. Override the spec via env vars —
-`VM_NAME DISK_GB MEM_MB CPUS VRAM_MB OSTYPE_ID BASEFOLDER GUEST_USER GUEST_FULLNAME GUEST_HOSTNAME GUEST_PASSWORD`.
+`VM_NAME DISK_GB MEM_MB CPUS VRAM_MB OSTYPE_ID BASEFOLDER GUEST_USER GUEST_FULLNAME GUEST_HOSTNAME`.
+There is no credential default: `--run` requires `GUEST_PASSWORD_FILE`, and the file content is never placed in
+arguments, output, receipts, or source. `SSH_HOST_PORT` is optional and, when set, creates only a
+`127.0.0.1:<port>` NAT forward to guest port 22; the builder never exposes SSH to the LAN.
+
+VirtualBox 7.2.8's supported unattended `--post-install-template` hook runs
+`base-bootstrap.sh` in the installed target before the first reboot. It installs and enables OpenSSH, Git, and
+Ubuntu's `virtualbox-guest-utils`, then enables a fail-closed first-boot validator. The final non-secret receipt is:
+
+```text
+/var/lib/lba-cleanroom/base-bootstrap-receipt.json
+```
+
+The receipt records Ubuntu and VM identity, absolute tool paths and versions, SSH and guest-utils active states,
+wall-clock and monotonic phase timings, failures, and the outcome. A missing template, unsupported VirtualBox hook,
+wrong OS, non-VirtualBox guest, missing package, or inactive required service fails closed. This base bootstrap is
+deliberately separate from `provision-guest.sh`: it makes the fresh OS remotely automatable but does not install,
+launch, or activate LabVIEW.
+
+VM creation or a completed installer alone is not readiness proof: automation must require the first-boot receipt's
+`outcome` to be `PASS`.
+
+The production golden definition in `production-golden-box.Vagrantfile` revalidates this same receipt on every
+Vagrant clone. `production-golden-box.metadata.json` binds the exact definition and required package guards.
+`golden-activation-cycle.ps1 -Mode Package` refuses to halt, replace, or package the VM until the base receipt,
+console acknowledgement, functional activation, identity freshness, and definition metadata all validate. Its v2
+package receipt binds the exact base receipt, embedded Vagrantfile, metadata, activation receipt, and local box
+bytes. Governed production packaging rejects `-ProductionVagrantfile` overrides; change the tracked definition and
+metadata together instead. The repository does not publish that personal box.
+
+The normalized live base proof is `production-golden-base-proof.json`. It records a fresh stock-ISO VM reaching
+SSH-ready without graphical login in 952.458405s, with 5s bounded polling, Git/SSH/guest-utils PASS, zero recovery
+actions, and complete disposable-VM cleanup. Text definition hashes are canonicalized to LF so the same proof
+validates on Windows and Linux checkouts. This proof covers the pre-LabVIEW base boundary; it does not replace the
+separate activation and identity-freshness evidence required by `-Mode Package`.
+
 Verify the OS-type id on your host with `VBoxManage list ostypes | grep -i ubuntu`.
 
 ## VMware (WIN plane) — the mirror
@@ -71,8 +111,8 @@ the guest spec + `provision-guest.sh` are identical, which is the whole parity c
    128 MB display**, a single **NVMe or SCSI** system disk (VMware's default; the AHCI/NVMe controller
    choice is the one benign VMware-vs-VBox divergence), NAT networking, attach the **stock Ubuntu 24.04
    ISO** to the virtual optical drive.
-2. Use VMware's **Easy Install / autoinstall** (or a manual Ubuntu install) to install Ubuntu 24.04 +
-   `open-vm-tools` (VMware's Guest-Additions equivalent — the per-provider guest-tools seam).
+2. Use VMware's **Easy Install / autoinstall** (or a manual Ubuntu install) to install Ubuntu 24.04, OpenSSH,
+   Git, and `open-vm-tools` (VMware's Guest-Additions equivalent — the per-provider guest-tools seam).
 3. In the guest, run the **identical** `provision-guest.sh` to install LabVIEW 2026 Community (unactivated).
 4. Snapshot `labview2026-installed-preactivation`, then **flag the operator** "ready for activation".
 

@@ -32,6 +32,13 @@ export function buildCloseout(input) {
   return closeout;
 }
 
+export function selectCloseoutBaseline(closeout, currentBaseline, historicalBaselines = {}) {
+  if (closeout?.releaseVersion === currentBaseline?.releaseVersion) return currentBaseline;
+  const historical = historicalBaselines[closeout?.releaseVersion];
+  if (!historical) throw new Error(`no candidate-time baseline retained for release ${closeout?.releaseVersion ?? ''}`);
+  return historical;
+}
+
 export function validateCloseout(closeout, baseline, { root = process.cwd() } = {}) {
   const findings = [];
   const expected = missingProofIds(baseline).sort();
@@ -74,14 +81,18 @@ export function validateCloseout(closeout, baseline, { root = process.cwd() } = 
 const here = dirname(fileURLToPath(import.meta.url));
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
   const root = join(here, '..');
-  const baselinePath = join(root, 'release-risk-baseline.json');
   const closeoutPath = join(root, 'release-risk-closeout.json');
-  const baseline = JSON.parse(readFileSync(baselinePath, 'utf8'));
+  const currentBaseline = JSON.parse(readFileSync(join(root, 'release-risk-baseline.json'), 'utf8'));
   if (process.argv.includes('--seal')) {
     const draft = JSON.parse(readFileSync(closeoutPath, 'utf8'));
     writeFileSync(closeoutPath, `${JSON.stringify(buildCloseout(draft), null, 2)}\n`);
   }
   const closeout = JSON.parse(readFileSync(closeoutPath, 'utf8'));
+  const historicalPath = join(here, 'release-risk-baselines', `${closeout.releaseVersion}.json`);
+  const historicalBaselines = existsSync(historicalPath)
+    ? { [closeout.releaseVersion]: JSON.parse(readFileSync(historicalPath, 'utf8')) }
+    : {};
+  const baseline = selectCloseoutBaseline(closeout, currentBaseline, historicalBaselines);
   const result = validateCloseout(closeout, baseline, { root });
   if (!result.ok) {
     for (const finding of result.findings) console.error(`release-risk-closeout: ${finding}`);

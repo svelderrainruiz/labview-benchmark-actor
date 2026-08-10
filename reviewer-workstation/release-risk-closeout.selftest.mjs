@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 import assert from 'node:assert/strict';
-import { buildCloseout, validateCloseout } from './release-risk-closeout.mjs';
+import { buildCloseout, selectCloseoutBaseline, validateCloseout } from './release-risk-closeout.mjs';
 
 const baseline = {
   releaseVersion: '1.2.3',
@@ -19,6 +19,10 @@ const input = {
   lineage: { shared: true },
 };
 const closeout = buildCloseout(input);
+assert.equal(selectCloseoutBaseline(closeout, baseline), baseline);
+const currentBaseline = { ...baseline, releaseVersion: '1.2.4' };
+assert.equal(selectCloseoutBaseline(closeout, currentBaseline, { '1.2.3': baseline }), baseline);
+assert.throws(() => selectCloseoutBaseline(closeout, currentBaseline), /no candidate-time baseline retained/);
 assert.equal(validateCloseout(closeout, baseline).ok, true);
 assert.equal(validateCloseout({ ...closeout, digest: '0'.repeat(64) }, baseline).ok, false);
 assert.equal(validateCloseout(buildCloseout({ ...input, resolutions: [] }), baseline).ok, false);

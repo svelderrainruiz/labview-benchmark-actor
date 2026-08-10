@@ -793,6 +793,77 @@
               "signature": "tHnrqJaIHoreSyJ+M3tG6kR8eb5ngOOyZO7jLYNU8mRTFrMk+437Y58NJ9JANIgSshdCBmT6gINbNh0G0rTjDw=="
             }
           }
+        },
+        "1.4.12": {
+          "summary": "extension 1.4.12 release agreement",
+          "signoffs": {
+            "WIN": {
+              "agreed": true,
+              "reviewedCommit": "ebcda914daee5609183f7622ef4fafdaf0d5feb8",
+              "at": "2026-08-10T05:12:49.189Z",
+              "note": "Windows 2022/2025 witnesses and correlated WIN TCP DONE staging agree on the exact candidate."
+            },
+            "LINUX": {
+              "agreed": true,
+              "reviewedCommit": "ebcda914daee5609183f7622ef4fafdaf0d5feb8",
+              "at": "2026-08-10T05:12:49.189Z",
+              "note": "Ubuntu Xorg reviewer signed exact PASS; Ubuntu 22.04/24.04 witnesses agree."
+            }
+          },
+          "visualReview": {
+            "verdict": {
+              "schema": "labview-benchmark-actor/reviewer-verdict@1",
+              "target": {
+                "component": "extension",
+                "version": "1.4.12",
+                "commit": "ebcda914daee5609183f7622ef4fafdaf0d5feb8",
+                "vsixSha256": "f272310866c02440bfb6f9acfafca2d0c00dfe48062b8259cf281d2bc6e3a638"
+              },
+              "verdict": "pass",
+              "reviewer": "reviewer@vi-tech.nl",
+              "station": "UBUNTU_VM",
+              "notes": "",
+              "evidence": [
+                {
+                  "kind": "kpi",
+                  "ref": "local-kpi.json"
+                },
+                {
+                  "kind": "capture",
+                  "ref": "native-ubuntu-capture.json"
+                },
+                {
+                  "kind": "activation",
+                  "ref": "activation-receipt.json"
+                },
+                {
+                  "kind": "lbabus",
+                  "ref": "lbabus-gate-suite-receipt.json"
+                }
+              ],
+              "renderedAt": "2026-08-10T04:54:36.921Z"
+            },
+            "signOff": {
+              "schema": "labview-benchmark-actor/acg-human-signoff-v1",
+              "subject": {
+                "verdictDigest": "0d6a1f738c5dc0fa3997b1e1260a9292055b168189c9b5126235410255f14402",
+                "consensusVerdict": "pass",
+                "target": {
+                  "component": "extension",
+                  "version": "1.4.12",
+                  "commit": "ebcda914daee5609183f7622ef4fafdaf0d5feb8",
+                  "vsixSha256": "f272310866c02440bfb6f9acfafca2d0c00dfe48062b8259cf281d2bc6e3a638"
+                }
+              },
+              "reviewer": "reviewer@vi-tech.nl",
+              "decision": "approve",
+              "station": "UBUNTU_VM",
+              "algorithm": "ed25519",
+              "publicKeyPem": "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEASfJb5PJovFnp0q+i6G4ZUko3jgFZtOBkyIElyezIHg4=\n-----END PUBLIC KEY-----\n",
+              "signedAt": "2026-08-10T04:54:36.923Z",
+              "signature": "Xz6HSeT+3r7M4s9YG3oQHmD42PzjwaEGGp9f3IpBSn9HOMeSBGPfTak/Q9xzf24WcsJvu/B7ygUYPExZ5ktXBg=="
+            }
+          }
         }
       }
     }

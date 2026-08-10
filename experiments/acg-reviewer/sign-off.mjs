@@ -12,7 +12,7 @@ import crypto from 'node:crypto';
 import { bundleDigest, generateEnrolledKeypair } from '../acg-provenance/attest.mjs';
 import { enrolledReviewerPublicKeys } from '../handoff-beacon/reviewerVerdict.mjs';
 
-export const REVIEWER_STATIONS = ['WINDOWS_VM', 'LINUX_CODESPACE'];
+export const REVIEWER_STATIONS = ['WINDOWS_VM', 'UBUNTU_VM', 'LINUX_CODESPACE'];
 const SIGNOFF_SCHEMA = 'labview-benchmark-actor/acg-human-signoff-v1';
 const normPem = (p) => String(p || '').replace(/\s+/g, '');
 // The bytes a reviewer signs: reviewer + decision + station bound to the digest of the exact quorum verdict.

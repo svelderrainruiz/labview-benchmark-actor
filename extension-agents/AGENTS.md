@@ -16,8 +16,9 @@ Treat this as an executable agent preflight, not optional human setup prose. Run
 | Tool | Required/validated version | Agent action |
 | --- | --- | --- |
 | VS Code | `>=1.101.0` | Required for the extension and contributed MCP server. |
-| `lbabus` | **exactly `0.15.8` for this extension build** | Run `lbabus version`. Reviewer staging installs this version at `C:\lba-tools\lbabus\lbabus.exe`; extension commands, MCP, and human tasks resolve that path explicitly so a stale Explorer/VS Code PATH cannot hide it. Else install with `dotnet tool install --global LabVIEWBenchmarkActor.CollabBus --version 0.15.8`. |
+| `lbabus` | **exactly `0.15.11` for this extension build** | Run `lbabus version`. Windows reviewer staging installs this version at `C:\lba-tools\lbabus\lbabus.exe`; Ubuntu reviewers use `/usr/local/bin/lbabus`. Extension commands, MCP, and human tasks require the exact binary. Else install with `dotnet tool install --global LabVIEWBenchmarkActor.CollabBus --version 0.15.11`. |
 | Node.js | **exactly `24.19.0` for source-checkout repository/release work** | Match the repository `.nvmrc`; packaging is Node-version-bound. Evidence-only reviewer workspaces use VS Code's bundled runtime and do not require a separate Node installation. |
+| `ffmpeg` | distribution package on Ubuntu; Gyan/WinGet or configured path on Windows | Required by **Capture LabVIEW Launch**. Ubuntu uses native `x11grab` on the active graphical seat; Windows uses `gdigrab`. |
 | .NET runtime | `>=8.0` | Required to execute the framework-dependent `lbabus` payload. |
 | .NET SDK | `>=8.0` when building/staging `lbabus` | Required for `dotnet build/publish`; runtime-only hosts can consume but not rebuild it. |
 | Git / Git for Windows | `>=2.30` | Required for provenance, worktrees, release lineage, and patch evidence. |
@@ -108,8 +109,8 @@ npm run ci:local
 
 The full KPI is acceptable only when system version + CHANGELOG PASS, experiments are **62/62 governed** with
 **0 ungoverned** and **0 forbidden production references**, line/statement coverage is at least **95%**, function
-coverage is at least **96%**, branch coverage is at least **95%**, and **203/203** local gates pass,
-**179/179** correspondences pass, and two normalized VSIX hashes match. Its receipt is
+coverage is at least **96%**, branch coverage is at least **95%**, and **210/210** local gates pass,
+**182/182** correspondences pass, and two normalized VSIX hashes match. Its receipt is
 `.lba/local-ci/latest.json`; collect it with the pre-verdict evidence. Release evidence may still be BLOCKED, in which
 case follow the detailed missing-proof actions above rather than treating local CI as a release verdict.
 
