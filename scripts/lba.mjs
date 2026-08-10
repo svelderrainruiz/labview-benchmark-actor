@@ -32,7 +32,7 @@
 //   release <X.Y.Z> --dry-run    print the full governed-release phase plan (ordering + deps + the 2 signings) + preflight
 //   release-verify-published <X.Y.Z>  confirm the VS Code Marketplace listing shows the version live after publish (#412)
 //   release-cut-github <X.Y.Z> --run <id>  verify the publish-workflow run artifact + cut the immutable ext-v* release (#412)
-//   signing-status               discover + report the enrolled reviewer key location + where each sign-off runs
+//   signing-status               discover + report an enrolled visual or quorum key + where each sign-off runs
 //   capture-preflight            report native LabVIEW launch-capture readiness + selected Linux display mode
 //   selftest                     self-check this tool (run by the `agent-tooling-selftest` gate)
 
@@ -51,7 +51,7 @@ import { buildReleaseStage } from '../reviewer-workstation/record-release-stage.
 import { enrolledReviewerPublicKeys } from '../experiments/handoff-beacon/reviewerVerdict.mjs';
 import { validateLbabusProvisioningPin } from './verify-ubuntu-golden-box.mjs';
 
-export const ITERATION = 22; // bump when you refine this tool (see the banner above)
+export const ITERATION = 23; // bump when you refine this tool (see the banner above)
 
 const here = dirname(fileURLToPath(import.meta.url));
 export const repoRoot = resolve(here, '..');
@@ -465,10 +465,10 @@ export function readReviewerAllowlist() {
 }
 
 // The exact quorum + visual sign commands, BOUND to the station where the key lives.
-export function signingCommands({ station, reviewerId, reviewerKeyPath, version } = {}) {
+export function signingCommands({ station, reviewerId, reviewerKeyPath, version, purpose = 'quorum' } = {}) {
   const ver = version || 'X.Y.Z';
   const id = reviewerId || '<reviewer-id>';
-  const keyPath = reviewerKeyPath || '<enrolled-key.pem>';
+  const keyPath = purpose === 'visual' ? '<enrolled-quorum-key.pem>' : reviewerKeyPath || '<enrolled-quorum-key.pem>';
   // The visual verdict is ALWAYS rendered + signed in the VM (the extension reads reviewerKeyPath there).
   const visual = `LBA_VM_PASS=… reviewer-workstation/render-verdict.sh set-target --version ${ver} --commit <sha> --vsix-sha256 <sha256>  →  run "Render Reviewer Verdict" in the VM  →  reviewer-workstation/render-verdict.sh collect --version ${ver} --out ~/lba-vm-share/visual-verdict-${ver}.json`;
   let quorum;
@@ -485,11 +485,12 @@ export function signingCommands({ station, reviewerId, reviewerKeyPath, version 
 
 // Pure signing-status report: given the discovered {reviewerId, reviewerKeyPath, keyExists, station} + the
 // enrolled public key (from the allowlist) and optionally the presented public key, decide fail-closed problems.
-export function signingStatus({ reviewerId, reviewerKeyPath, keyExists, station, enrolledPublicKey, presentedPublicKey, version } = {}) {
+export function signingStatus({ reviewerId, reviewerKeyPath, keyExists, station, enrolledPublicKey, presentedPublicKey, version, purpose = 'quorum' } = {}) {
   const problems = [];
   const id = String(reviewerId || '').trim();
   const st = station || STATIONS.UNKNOWN;
-  const enrolledKeys = enrolledReviewerPublicKeys(enrolledPublicKey, { version, purpose: 'quorum' })
+  const selectedPurpose = purpose === 'visual' ? 'visual' : 'quorum';
+  const enrolledKeys = enrolledReviewerPublicKeys(enrolledPublicKey, { version, purpose: selectedPurpose })
     .filter((key) => typeof key === 'string' && key.trim());
   const enrolled = enrolledKeys.length > 0;
   const norm = (k) => String(k || '').replace(/-----(BEGIN|END) PUBLIC KEY-----/g, '').replace(/\s+/g, '');
@@ -501,16 +502,17 @@ export function signingStatus({ reviewerId, reviewerKeyPath, keyExists, station,
   if (!id) problems.push('no reviewerId configured (set labviewBenchmarkActor.reviewerId in the reviewer VM)');
   if (st === STATIONS.UNKNOWN) problems.push('could not locate the signing station or the enrolled key (VM not reachable and no host key configured)');
   else if (keyExists === false) problems.push(`enrolled key not found at ${reviewerKeyPath || '<unset>'} on ${st}`);
-  if (id && !enrolled) problems.push(`reviewer ${id} has no quorum key enrolled for version ${version || '<missing>'}`);
+  if (id && !enrolled) problems.push(`reviewer ${id} has no ${selectedPurpose} key enrolled for version ${version || '<missing>'}`);
   if (enrolled && keyExists === true && presentedPublicKey == null) problems.push('configured key public identity could not be verified');
   if (keyMatch === 'mismatch') problems.push(`the presented public key does not match the enrolled allowlist entry for ${id}`);
 
-  const commands = signingCommands({ station: st, reviewerId: id, reviewerKeyPath, version });
+  const commands = signingCommands({ station: st, reviewerId: id, reviewerKeyPath, version, purpose: selectedPurpose });
   return {
     reviewerId: id,
     reviewerKeyPath: reviewerKeyPath || null,
     keyExists: keyExists === undefined ? null : keyExists,
     station: st,
+    purpose: selectedPurpose,
     enrolled,
     keyMatch,
     commands,
@@ -758,19 +760,22 @@ export const COMMANDS = {
     },
   },
   'signing-status': {
-    desc: 'discover + report the enrolled reviewer key location + WHERE each release sign-off must run (#414)',
+    desc: 'discover + report an enrolled reviewer key by purpose + WHERE each release sign-off must run (#414)',
     run: (args) => {
       const opt = {};
       for (let i = 0; i < args.length; i += 1) if (args[i].startsWith('--')) opt[args[i].slice(2)] = args[i + 1] && !args[i + 1].startsWith('--') ? args[(i += 1)] : true;
       const version = typeof opt.version === 'string' ? opt.version : undefined;
+      const purpose = typeof opt.purpose === 'string' ? opt.purpose : 'quorum';
+      if (!['visual', 'quorum'].includes(purpose)) { console.error('usage: lba signing-status [--version X.Y.Z] [--purpose visual|quorum]'); process.exit(2); }
       const disc = discoverSigningStation();
       const allow = readReviewerAllowlist();
-      const s = signingStatus({ ...disc, enrolledPublicKey: disc.reviewerId ? allow[disc.reviewerId] : null, version });
-      console.log('signing status (#414) — the two operator Ed25519 sign-offs run WHERE the enrolled key lives:\n');
+      const s = signingStatus({ ...disc, enrolledPublicKey: disc.reviewerId ? allow[disc.reviewerId] : null, version, purpose });
+      console.log(`signing status (#414) — validating the ${purpose} key; sign-offs run WHERE their enrolled key lives:\n`);
       console.log(`  reviewerId    : ${s.reviewerId || '(none)'}`);
       console.log(`  reviewerKey   : ${s.reviewerKeyPath || '(unknown)'}`);
       console.log(`  keyExists     : ${s.keyExists === null ? '(unknown)' : s.keyExists}`);
       console.log(`  station       : ${s.station}  (${disc.source})`);
+      console.log(`  purpose       : ${s.purpose}`);
       console.log(`  enrolled      : ${s.enrolled ? 'yes' : 'no'}${s.keyMatch !== 'unknown' ? ` (public-key ${s.keyMatch})` : ''}  [tools/collab-cli/reviewer-allowlist.json]`);
       console.log(`\n  quorum sign-off (machine consensus) — run on ${s.station === STATIONS.VM ? 'the reviewer VM' : s.station === STATIONS.HOST ? 'this host' : 'the station where the key lives'}:\n    ${s.commands.quorum}`);
       console.log(`\n  visual verdict (human PASS) — always rendered + signed in the reviewer VM:\n    ${s.commands.visual}`);
@@ -1040,7 +1045,7 @@ const SELFTEST = [
     const s = signingStatus({ reviewerId: 'reviewer@vi-tech.nl', reviewerKeyPath: '/k.pem', keyExists: true, station: STATIONS.HOST, enrolledPublicKey: enrolled, presentedPublicKey: presented, version: selectedVersion });
     return s.ok && s.enrolled === true && s.keyMatch === 'match';
   }],
-  ['signing-status selects only the requested version quorum key and rejects a visual key (#414)', () => {
+  ['signing-status selects only the requested version and purpose key (#414)', () => {
     const quorum = '-----BEGIN PUBLIC KEY-----\nQUORUM\n-----END PUBLIC KEY-----\n';
     const visual = '-----BEGIN PUBLIC KEY-----\nVISUAL\n-----END PUBLIC KEY-----\n';
     const enrolled = [
@@ -1055,6 +1060,10 @@ const SELFTEST = [
       reviewerId: 'reviewer@example.com', reviewerKeyPath: '/v.pem', keyExists: true,
       station: STATIONS.HOST, enrolledPublicKey: enrolled, presentedPublicKey: visual, version: '2.0.0',
     });
+    const visualGood = signingStatus({
+      reviewerId: 'reviewer@example.com', reviewerKeyPath: '/v.pem', keyExists: true,
+      station: STATIONS.HOST, enrolledPublicKey: enrolled, presentedPublicKey: visual, version: '2.0.0', purpose: 'visual',
+    });
     const outOfRange = signingStatus({
       reviewerId: 'reviewer@example.com', reviewerKeyPath: '/q.pem', keyExists: true,
       station: STATIONS.HOST, enrolledPublicKey: enrolled, presentedPublicKey: quorum, version: '2.0.1',
@@ -1065,6 +1074,7 @@ const SELFTEST = [
     });
     return good.ok && good.keyMatch === 'match'
       && !wrongPurpose.ok && wrongPurpose.keyMatch === 'mismatch'
+      && visualGood.ok && visualGood.keyMatch === 'match' && visualGood.purpose === 'visual'
       && !outOfRange.ok && /no quorum key enrolled/.test(outOfRange.problems.join())
       && !unverified.ok && /public identity/.test(unverified.problems.join());
   }],
