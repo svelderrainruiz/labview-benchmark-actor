@@ -6,6 +6,16 @@ follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project
 
 ## [Unreleased]
 
+## [1.4.12] - 2026-08-10
+
+### Changed
+
+- **Fresh governed reviewer identity.** Extension 1.4.12 advances AGENTS to 0.3.16 and `lbabus` to 0.15.11,
+  enrolls fresh visual/quorum keys scoped only to 1.4.12, and supersedes 1.4.11 before any human verdict.
+- **Ubuntu review provenance is fail-closed.** Exact KPI/gate/correspondence inventories, stopped extension-host
+  staging, VirtualBox identity, active extension version, Xorg full-desktop capture, and verdict/sign-off station
+  parity are now required before a reviewer record can authorize publication.
+
 ## [1.4.11] - 2026-08-09
 
 ### Added
