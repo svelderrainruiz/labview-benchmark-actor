@@ -26,7 +26,7 @@ jobs:
       - name: Set up Node.js
         uses: actions/setup-node@v5
         with:
-          node-version: '20'
+          node-version-file: .nvmrc
 
       - name: Enforce the Definition of Done (local gate suite must be green)
         run: node experiments/verify-local-gates.mjs

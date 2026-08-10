@@ -10,11 +10,12 @@
 // Usage:
 //   node scripts/coverage.mjs           # run + enforce the current floors (the gate)
 //   node scripts/coverage.mjs --bump    # run + enforce, then ratchet the floors up toward measured
-import { readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createRequire } from 'node:module';
+import { coberturaWorkingTreeText } from './coverage-core.mjs';
 
 const repo = join(dirname(fileURLToPath(import.meta.url)), '..');
 const cfgPath = join(repo, 'coverage-thresholds.json');
@@ -23,6 +24,8 @@ const require = createRequire(import.meta.url);
 const c8Cli = require.resolve('c8/bin/c8.js');
 const METRICS = ['lines', 'statements', 'functions', 'branches'];
 const bump = process.argv.includes('--bump');
+const coberturaPath = join(repo, 'coverage', 'cobertura-coverage.xml');
+const checkedOutCobertura = existsSync(coberturaPath) ? readFileSync(coberturaPath, 'utf8') : '';
 
 for (const m of METRICS) {
   if (typeof cfg.floor?.[m] !== 'number') {
@@ -47,12 +50,10 @@ if (run.status !== 0) {
   process.exit(run.status ?? 1);
 }
 
-// c8 writes the current epoch into Cobertura's root `timestamp`, which makes the retained artifact dirty even
-// when source + coverage are unchanged. Pin only that provenance-neutral field so a full local KPI can prove its
-// post-run worktree is still the exact candidate it certified.
-const coberturaPath = join(repo, 'coverage', 'cobertura-coverage.xml');
+// c8 writes the current epoch and absolute checkout path into Cobertura output. Normalize both
+// provenance-neutral fields so the retained artifact is stable across worktrees and operating systems.
 const cobertura = readFileSync(coberturaPath, 'utf8');
-const normalizedCobertura = cobertura.replace(/ timestamp="[^"]*"/, ' timestamp="0"');
+const normalizedCobertura = coberturaWorkingTreeText(cobertura, checkedOutCobertura);
 if (normalizedCobertura !== cobertura) {
   writeFileSync(coberturaPath, normalizedCobertura);
 }

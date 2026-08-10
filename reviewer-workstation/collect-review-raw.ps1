@@ -7,6 +7,10 @@ param(
 )
 
 $ErrorActionPreference = 'Stop'
+$repoRoot = Split-Path $PSScriptRoot -Parent
+$releaseComponents = Get-Content (Join-Path $repoRoot 'release-components.json') -Raw | ConvertFrom-Json
+$expectedLbabusVersion = [string]$releaseComponents.lbabus
+if ($expectedLbabusVersion -notmatch '^\d+\.\d+\.\d+$') { throw 'release-components.json has no valid lbabus version.' }
 New-Item -ItemType Directory -Path $OutDir -Force | Out-Null
 
 function Copy-GuestFile([string]$Source, [string]$Destination, [switch]$AllowMissing) {
@@ -143,7 +147,7 @@ $raw = [ordered]@{
     sha256 = (Get-FileHash $agentsPath -Algorithm SHA256).Hash.ToLowerInvariant()
   }
   lbabus = [ordered]@{
-    version = '0.15.8'
+    version = $expectedLbabusVersion
     capabilitiesTimedOut = $capabilitiesTimedOut
     capabilitiesExitCode = if ($capabilitiesTimedOut) { $null } else { $capabilitiesProcess.ExitCode }
     capabilitiesFile = $capabilitiesOut

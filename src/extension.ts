@@ -9,6 +9,15 @@ import * as path from 'node:path';
 import { registerBenchmarkActorMcpServerProvider } from './mcp/benchmarkActorMcpServerProvider';
 import { registerHumanTasks } from './humanTasks';
 import { resolveLbabusExecutable } from './lbabusPath';
+import { reviewerStationForEnvironment } from './reviewerStation';
+import {
+  captureMetadataForPlatform,
+  ffmpegCaptureArgsForPlatform,
+  labviewCandidatesForPlatform,
+  linuxSamplerScript,
+  parseX11DisplaySize,
+  x11DisplayForCapture,
+} from './capturePlatform';
 
 const execFileAsync = promisify(execFile);
 
@@ -595,6 +604,67 @@ export function readReviewTarget(
   }
 }
 
+export function readReviewerStationMarker(
+  globalDir: string,
+  target: { component: string; version: string; commit: string | null; vsixSha256: string | null },
+  currentIdentity?: { provider: string; machineId: string; productName: string },
+): 'UBUNTU_VM' {
+  const markerPath = path.join(handoffPaths(globalDir).root, 'reviewer-station.json');
+  const targetCommit = target.commit ?? '';
+  const targetVsixSha256 = target.vsixSha256 ?? '';
+  if (!/^[a-f0-9]{40}$/i.test(targetCommit)
+      || !/^[a-f0-9]{64}$/i.test(targetVsixSha256)
+      || !/^\d+\.\d+\.\d+$/.test(target.version)) {
+    throw new Error('Ubuntu reviewer station requires an exact version, commit, and VSIX SHA-256 target');
+  }
+  if (!existsSync(markerPath)) {
+    throw new Error('Ubuntu reviewer station marker is missing; restage the exact candidate before rendering a verdict');
+  }
+  let marker: Record<string, unknown>;
+  try {
+    marker = JSON.parse(readFileSync(markerPath, 'utf8')) as Record<string, unknown>;
+  } catch (error) {
+    throw new Error(`Ubuntu reviewer station marker is unreadable: ${error instanceof Error ? error.message : String(error)}`);
+  }
+  const markerTarget = marker.target as Record<string, unknown> | undefined;
+  const markerVirtualization = marker.virtualization as Record<string, unknown> | undefined;
+  const markerIdentity = {
+    provider: String(markerVirtualization?.provider ?? ''),
+    machineId: String(markerVirtualization?.machineId ?? ''),
+    productName: String(markerVirtualization?.productName ?? ''),
+  };
+  if (marker.schema !== 'labview-benchmark-actor/reviewer-station@1'
+      || marker.station !== 'UBUNTU_VM'
+      || markerTarget?.component !== target.component
+      || markerTarget?.version !== target.version
+      || String(markerTarget?.commit ?? '').toLowerCase() !== targetCommit.toLowerCase()
+      || String(markerTarget?.vsixSha256 ?? '').toLowerCase() !== targetVsixSha256.toLowerCase()
+      || markerIdentity.provider !== 'oracle'
+      || !/^[a-f0-9]{32}$/i.test(markerIdentity.machineId)
+      || markerIdentity.productName !== 'VirtualBox') {
+    throw new Error('Ubuntu reviewer station marker does not match the exact review target');
+  }
+  const activeIdentity = currentIdentity ?? detectCurrentReviewerVmIdentity();
+  if (activeIdentity.provider !== markerIdentity.provider
+      || activeIdentity.machineId.toLowerCase() !== markerIdentity.machineId.toLowerCase()
+      || activeIdentity.productName !== markerIdentity.productName) {
+    throw new Error('Ubuntu reviewer station marker does not match the current virtual machine');
+  }
+  return 'UBUNTU_VM';
+}
+
+export function detectCurrentReviewerVmIdentity(): { provider: string; machineId: string; productName: string } {
+  const detected = spawnSync('systemd-detect-virt', ['--vm'], { encoding: 'utf8', timeout: 5000 });
+  if (detected.error || detected.status !== 0) {
+    throw new Error(`Ubuntu reviewer virtualization detection failed: ${detected.error?.message ?? `exit ${detected.status}`}`);
+  }
+  return {
+    provider: String(detected.stdout || '').trim(),
+    machineId: readFileSync('/etc/machine-id', 'utf8').trim(),
+    productName: readFileSync('/sys/class/dmi/id/product_name', 'utf8').trim(),
+  };
+}
+
 /** Build + sign a reviewer verdict via the loaded builder (pure orchestration): validate, then Ed25519-sign. */
 export function buildSignedVerdict(
   builder: HandoffVerdictBuilder,
@@ -779,6 +849,24 @@ async function renderReviewerVerdictCommand(context: vscode.ExtensionContext, ou
   }
   const extVersion = String((context.extension?.packageJSON as { version?: string } | undefined)?.version ?? '0.0.0');
   const target = readReviewTarget(globalDir, extVersion);
+  if (target.version !== extVersion) {
+    reportUiError(
+      output,
+      'Render reviewer verdict',
+      new Error(`Review target version ${target.version} does not match active extension version ${extVersion}; fully restart VS Code after staging`),
+    );
+    return;
+  }
+  let station: ReturnType<typeof reviewerStationForEnvironment>;
+  try {
+    const stagedStation = process.platform === 'linux' && String(process.env.CODESPACES || '').toLowerCase() !== 'true'
+      ? readReviewerStationMarker(globalDir, target)
+      : undefined;
+    station = reviewerStationForEnvironment(process.platform, process.env, stagedStation);
+  } catch (err) {
+    reportUiError(output, 'Render reviewer verdict', err);
+    return;
+  }
   const choice = await vscode.window.showInformationMessage(`Reviewer visual verdict for ${target.component} ${target.version}?`, 'Pass', 'Request changes', 'Fail');
   if (!choice) {
     return;
@@ -788,7 +876,16 @@ async function renderReviewerVerdictCommand(context: vscode.ExtensionContext, ou
   try {
     const builder = await loadHandoffVerdictBuilder(context.extensionUri);
     const privateKeyPem = readFileSync(keyPath, 'utf8');
-    const record = buildSignedVerdict(builder, { target, verdict, reviewer, station: 'WINDOWS_VM', notes: notes || '', evidence: target.evidence, privateKeyPem, renderedAt: new Date().toISOString() });
+    const record = buildSignedVerdict(builder, {
+      target,
+      verdict,
+      reviewer,
+      station,
+      notes: notes || '',
+      evidence: target.evidence,
+      privateKeyPem,
+      renderedAt: new Date().toISOString(),
+    });
     const dir = verdictsDir(globalDir);
     mkdirSync(dir, { recursive: true });
     const file = path.join(dir, `${target.component}-${target.version}.json`);
@@ -899,10 +996,7 @@ function resolveLabview(): string | null {
   // Validate a configured labviewPath actually exists (mirrors resolveFfmpegChecked's runnable check): a bogus
   // path would otherwise pass the guard and start a doomed capture (ffmpeg + sampler) that can never launch LabVIEW.
   if (configured) return existsSync(configured) ? configured : null;
-  const candidates = [
-    'C:\\Program Files (x86)\\National Instruments\\LabVIEW 2026\\LabVIEW.exe',
-    'C:\\Program Files\\National Instruments\\LabVIEW 2026\\LabVIEW.exe',
-  ];
+  const candidates = labviewCandidatesForPlatform(process.platform);
   return candidates.find((c) => existsSync(c)) || null;
 }
 
@@ -985,6 +1079,25 @@ export function resetFfmpegInstallPendingForTest(): void {
 }
 
 async function promptInstallFfmpeg(output: vscode.OutputChannel): Promise<void> {
+  if (process.platform === 'linux') {
+    const INSTALL = 'Install ffmpeg (apt)';
+    const SET_PATH = 'Set ffmpeg path\u2026';
+    const choice = await vscode.window.showErrorMessage(
+      'ffmpeg is required to capture the active Ubuntu LabVIEW desktop. Install the distribution package or point the extension at an existing ffmpeg binary.',
+      { modal: true },
+      INSTALL,
+      SET_PATH,
+    );
+    if (choice === INSTALL) {
+      const term = vscode.window.createTerminal('Install ffmpeg');
+      term.show(true);
+      term.sendText('sudo apt-get update && sudo apt-get install -y ffmpeg');
+    } else if (choice === SET_PATH) {
+      void vscode.commands.executeCommand('workbench.action.openSettings', 'labviewBenchmarkActor.ffmpegPath');
+    }
+    output.appendLine('capture aborted: ffmpeg not found (prompted apt install / set-path).');
+    return;
+  }
   const INSTALL = 'Install ffmpeg (winget)';
   const DOWNLOAD = 'Download ffmpeg\u2026';
   const SET_PATH = 'Set ffmpeg path\u2026';
@@ -1130,10 +1243,10 @@ async function captureLaunchCommand(context: vscode.ExtensionContext, output: vs
     void vscode.window.showWarningMessage('A LabVIEW capture is already running. Stop it first.');
     return;
   }
-  if (process.platform !== 'win32') {
+  if (!['win32', 'linux'].includes(process.platform)) {
     const RUN_MPRR = 'Run mprr capture';
     const choice = await vscode.window.showErrorMessage(
-      'Capture LabVIEW Launch is Windows-only (gdigrab + LabVIEW.exe). On Linux/macOS, use "Capture LabVIEW Launch (mprr, cross-platform VM)".',
+      `Capture LabVIEW Launch is not supported on ${process.platform}. Use "Capture LabVIEW Launch (mprr, cross-platform VM)".`,
       RUN_MPRR
     );
     if (choice === RUN_MPRR) {
@@ -1144,7 +1257,9 @@ async function captureLaunchCommand(context: vscode.ExtensionContext, output: vs
   const labview = resolveLabview();
   if (!labview) {
     void vscode.window.showErrorMessage(
-      'LabVIEW.exe not found. Set "labviewBenchmarkActor.labviewPath" to your LabVIEW 2026 LabVIEW.exe.'
+      process.platform === 'linux'
+        ? 'LabVIEW not found. Set "labviewBenchmarkActor.labviewPath" to the LabVIEW 2026 Linux executable.'
+        : 'LabVIEW.exe not found. Set "labviewBenchmarkActor.labviewPath" to your LabVIEW 2026 LabVIEW.exe.'
     );
     return;
   }
@@ -1173,7 +1288,40 @@ async function captureLaunchCommand(context: vscode.ExtensionContext, output: vs
     await promptInstallFfmpeg(output);
     return;
   }
+  let x11VideoSize: string | undefined;
+  if (process.platform === 'linux') {
+    let x11Display: string;
+    try {
+      x11Display = x11DisplayForCapture(process.env);
+    } catch (error) {
+      reportUiError(output, 'Capture LabVIEW Launch (X11 session)', error);
+      return;
+    }
+    try {
+      const { stdout } = await execFileAsync('xdpyinfo', ['-display', x11Display], {
+        timeout: 5000,
+        windowsHide: true,
+      });
+      x11VideoSize = parseX11DisplaySize(stdout);
+    } catch (error) {
+      const reason = error instanceof Error ? error.message : String(error);
+      reportUiError(
+        output,
+        'Capture LabVIEW Launch (X11 desktop size)',
+        new Error(`Unable to resolve the full X11 desktop dimensions (${reason}). Install x11-utils and retry.`),
+      );
+      return;
+    }
+  }
   const dir = path.join(capturesRoot(context), `run-${Date.now()}`);
+  const framePattern = path.join(dir, 'frame-%05d.png');
+  let ffmpegArgs: string[];
+  try {
+    ffmpegArgs = ffmpegCaptureArgsForPlatform(process.platform, framePattern, process.env, x11VideoSize);
+  } catch (error) {
+    reportUiError(output, 'Capture LabVIEW Launch (ffmpeg arguments)', error);
+    return;
+  }
   try {
     mkdirSync(dir, { recursive: true });
   } catch (err) {
@@ -1183,15 +1331,18 @@ async function captureLaunchCommand(context: vscode.ExtensionContext, output: vs
   // Handoff beacon: mark the capture in flight so the agent's poll knows one is running (LBA-REQ-055).
   const startedAt = new Date().toISOString();
   void writeCaptureStatusBeacon(context.extensionUri, dir, (b) => b.buildCapturingStatus({ runDir: dir, startedAt }), output);
-  const framePattern = path.join(dir, 'frame-%05d.png');
   const resourcesFile = path.join(dir, 'resources.jsonl');
+  writeFileSync(
+    path.join(dir, 'capture-meta.json'),
+    `${JSON.stringify(captureMetadataForPlatform(process.platform), null, 2)}\n`,
+  );
 
   // 1) ffmpeg screen capture at 12 fps (stdin kept open so we can 'q' it for a clean finalize on stop).
   let ffmpegProc: ChildProcess;
   try {
     ffmpegProc = spawn(
       ffmpeg,
-      ['-y', '-f', 'gdigrab', '-framerate', '12', '-i', 'desktop', framePattern],
+      ffmpegArgs,
       { windowsHide: true, stdio: ['pipe', 'ignore', 'pipe'] }
     );
   } catch (err) {
@@ -1206,11 +1357,13 @@ async function captureLaunchCommand(context: vscode.ExtensionContext, output: vs
   });
 
   // 2) CPU/RAM/disk sampler.
-  const sampler = spawn(
-    'powershell',
-    ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-Command', samplerScript(resourcesFile)],
-    { windowsHide: true, stdio: 'ignore' }
-  );
+  const sampler = process.platform === 'linux'
+    ? spawn('bash', ['-c', linuxSamplerScript(resourcesFile)], { stdio: 'ignore' })
+    : spawn(
+      'powershell',
+      ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-Command', samplerScript(resourcesFile)],
+      { windowsHide: true, stdio: 'ignore' }
+    );
 
   // 3) launch LabVIEW itself.
   try {
@@ -1227,7 +1380,7 @@ async function captureLaunchCommand(context: vscode.ExtensionContext, output: vs
   status.show();
 
   activeCapture = { dir, ffmpeg: ffmpegProc, sampler, status, startedAt };
-  output.appendLine(`capture started: ${dir} (ffmpeg 12fps + CPU/RAM/disk; LabVIEW launching)`);
+  output.appendLine(`capture started: ${dir} (${captureMetadataForPlatform(process.platform).source} 12fps + CPU/RAM/disk; LabVIEW launching)`);
   void vscode.window
     .showInformationMessage(
       'Capturing the LabVIEW launch at 12 fps. Click "Stop LabVIEW Capture" in the status bar when the IDE is up.',
@@ -1329,12 +1482,22 @@ export function assembleCaptureFromDir(dir: string, builder: CaptureBuilder): La
       }
     }
   }
+  let meta = captureMetadataForPlatform('win32');
+  const metaFile = path.join(dir, 'capture-meta.json');
+  if (existsSync(metaFile)) {
+    const parsed = JSON.parse(readFileSync(metaFile, 'utf8')) as Partial<typeof meta>;
+    if (parsed.workload === 'labview-launch'
+      && ['WIN', 'LINUX'].includes(String(parsed.plane))
+      && ['ffmpeg-gdigrab', 'ffmpeg-x11grab'].includes(String(parsed.source))) {
+      meta = parsed as typeof meta;
+    }
+  }
   const record = builder.buildLaunchCapture({
     frames,
     resourceSamples,
     startMs: firstFrameMs,
     fps: 12,
-    meta: { workload: 'labview-launch', plane: 'WIN', source: 'ffmpeg-gdigrab' },
+    meta,
   });
   writeFileSync(path.join(dir, 'capture.json'), `${JSON.stringify(record, null, 2)}\n`);
   return record;

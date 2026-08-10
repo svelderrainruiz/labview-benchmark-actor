@@ -6,6 +6,62 @@ follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project
 
 ## [Unreleased]
 
+## [1.4.13] - 2026-08-10
+
+### Changed
+
+- **Immutable failed dependency tag advances honestly.** Extension 1.4.13 advances AGENTS to 0.3.17 and
+  `lbabus` to 0.15.12 after immutable `collab-cli-v0.15.11` failed its requirements harness; that tag is retained.
+- **Requirements evidence is complete.** The missing T-066 test-plan definition now makes the Proven RTM claim
+  executable in the collab-cli release harness, with fresh visual/quorum keys scoped only to 1.4.13.
+
+## [1.4.12] - 2026-08-10
+
+### Changed
+
+- **Fresh governed reviewer identity.** Extension 1.4.12 advances AGENTS to 0.3.16 and `lbabus` to 0.15.11,
+  enrolls fresh visual/quorum keys scoped only to 1.4.12, and supersedes 1.4.11 before any human verdict.
+- **Ubuntu review provenance is fail-closed.** Exact KPI/gate/correspondence inventories, stopped extension-host
+  staging, VirtualBox identity, active extension version, Xorg full-desktop capture, and verdict/sign-off station
+  parity are now required before a reviewer record can authorize publication.
+
+## [1.4.11] - 2026-08-09
+
+### Added
+
+- **Ubuntu actors capture LabVIEW launches natively.** `Capture LabVIEW Launch` now uses ffmpeg `x11grab` on the
+  active graphical seat, launches the normal Linux LabVIEW 2026 executable, records 12 FPS PNG evidence, samples
+  Linux CPU/RAM, and labels the assembled record `LINUX` / `ffmpeg-x11grab`.
+- **Ubuntu review acceptance is explicit.** The manual plan requires a real native LabVIEW capture and an
+  exact-candidate signed verdict rendered inside the extension as `UBUNTU_VM`.
+
+### Changed
+
+- **Fresh governed identities.** Extension 1.4.11 advances AGENTS to 0.3.15 and lbabus to 0.15.10. Historical
+  1.4.10 signed FAIL evidence and its scoped public keys remain immutable and cannot authorize this candidate.
+
+## [1.4.10] - 2026-08-09
+
+### Added
+
+- **Ubuntu production golden bases preserve remote-automation proof.** The production Vagrant definition
+  revalidates current Git, SSH, and guest-utilities state plus the unattended first-boot receipt on every clone.
+  Package mode binds that receipt and exact definition metadata before any box deletion, VM halt, or packaging.
+- **Ubuntu is a first-class human visual-review station.** Fresh candidates can be staged and signed inside a
+  disposable graphical Ubuntu 24.04 reviewer VM as `UBUNTU_VM`, with exact candidate identity and public evidence.
+- **Embedded agent governance advances to 0.3.14 and `lbabus` to 0.15.9.** The candidate-time 1.4.10 risk overlay,
+  Ubuntu reviewer station contract, and fresh version/purpose-scoped reviewer keys are bound without changing the
+  human-task bundle.
+- **The Ubuntu 24.04 installation reference carries measured golden-base evidence.** Credential-safe screenshots,
+  a 15m 52.458405s VM-running-to-SSH-ready proof, exact hashes, and cleanup evidence are included while unsafe or
+  non-probative draft captures remain evidence-only.
+
+### Fixed
+
+- **Golden definition and screenshot evidence fail closed across platforms.** Text hashes use LF canonicalization,
+  ungoverned production Vagrantfile overrides are rejected before Vagrant runs, and proof validation reads each
+  committed screenshot and compares its actual bytes to the recorded SHA-256.
+
 ## [1.4.9] - 2026-08-08
 
 ### Fixed

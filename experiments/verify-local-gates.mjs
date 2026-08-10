@@ -3004,6 +3004,21 @@ check('handoff-verdict', () => {
   return { schema: verdict.schema, verdict: verdict.verdict, signoffSchema: signed.schema, busType: busPost.type, selftest: 'reviewer-verdict 7/7' };
 });
 
+check('ubuntu-reviewer-candidate-staging', () => {
+  execFileSync(process.execPath, [join(here, '..', 'reviewer-workstation', 'stage-ubuntu-vsix.selftest.mjs')], { stdio: 'pipe' });
+  return { station: 'UBUNTU_VM', selftest: 'exact version/hash/installed-extension staging contract' };
+});
+
+check('ubuntu-native-labview-capture', () => {
+  execFileSync(process.execPath, [join(here, '..', 'test', 'capture-platform.mjs')], { stdio: 'pipe' });
+  return { platform: 'Ubuntu graphical seat', source: 'ffmpeg-x11grab', fps: 12 };
+});
+
+check('reviewer-version-contract', () => {
+  execFileSync(process.execPath, [join(here, '..', 'reviewer-workstation', 'reviewer-version-contract.selftest.mjs')], { stdio: 'pipe' });
+  return { source: 'release-components.json', scope: 'Windows/Ubuntu reviewer staging + continuation readiness' };
+});
+
 // LBA-REQ-059 / ADR-0039: the host<->VM-agent CLOSED LOOP over lbabus net TCP. A pure parser self-test (no
 // network/VM), the committed live+loopback receipt, and the semantic verdict types on the net envelope (option A):
 // the host awaits the VM agent's correlated reply over TCP and the reviewer verdict announces as a first-class
@@ -3631,6 +3646,10 @@ check('acg-cross-plane-corroboration-workflow-wired', () => {
   assert(linuxSubstrates.length >= 2, 'must build on >= 2 concrete LINUX substrates (e.g. ubuntu-22.04 + ubuntu-24.04)');
   assert(windowsSubstrates.length >= 2, 'must build on >= 2 concrete WINDOWS substrates (e.g. windows-2022 + windows-2025)');
   assert(/produce-witness\.mjs/.test(t), 'each substrate must produce its witness via produce-witness.mjs');
+  assert(
+    (t.match(/github\.event\.pull_request\.head\.sha \|\| github\.sha/g) || []).length >= 3,
+    'PR witnesses, checkout, and corroboration must bind the reviewed head SHA rather than the synthetic merge SHA',
+  );
   assert(/corroborate-planes\.mjs/.test(t), 'the corroborate job must run corroborate-planes.mjs (the quorum) over ALL substrates');
   assert(/witnesses\/\*\/\*\.bundle\.json/.test(t), 'the corroborate job must ingest ALL substrate witnesses (glob)');
   assert(/npm test/.test(t), 'each substrate must run the extension gate (npm test) for its verdict');

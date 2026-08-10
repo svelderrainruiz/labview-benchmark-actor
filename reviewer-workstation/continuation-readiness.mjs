@@ -8,7 +8,7 @@ import { fileURLToPath } from 'node:url';
 import { spawnInvocation } from '../extension-tasks/process-command.mjs';
 import { verifyManifest as verifyAgentsManifest, agentsSha256, readManifest as readAgentsManifest, AGENTS_MD as EXTENSION_AGENTS_MD } from '../scripts/agentsManifest.mjs';
 import { parseCorrespondenceSummary } from '../scripts/local-kpi-core.mjs';
-import { closeoutDigest, validateCloseout } from './release-risk-closeout.mjs';
+import { closeoutDigest, selectCloseoutBaseline, validateCloseout } from './release-risk-closeout.mjs';
 
 export const SCHEMA = 'labview-benchmark-actor/continuation-readiness@1';
 const HERE = dirname(fileURLToPath(import.meta.url));
@@ -17,13 +17,15 @@ const CONTINUATION_DIR = join(ROOT, '.lba', 'continuation');
 const OUTPUT_PATH = join(CONTINUATION_DIR, 'readiness.json');
 const TEMP_OUTPUT_PATH = join(CONTINUATION_DIR, 'readiness.json.tmp');
 const LBABUS_PATH = 'C:\\lba-tools\\lbabus\\lbabus.exe';
+const RELEASE_COMPONENTS = JSON.parse(readFileSync(join(ROOT, 'release-components.json'), 'utf8'));
+const AGENTS_MANIFEST = readAgentsManifest();
 const EXPECTED_NODE = '24.19.0';
 const EXPECTED_NPM = '11.17.0';
 const EXPECTED_DOTNET = '8.0';
 const EXPECTED_GLAB = '1.25';
-const EXPECTED_LBABUS = '0.15.8';
-const EXPECTED_AGENTS_VERSION = '0.3.13';
-const EXPECTED_AGENTS_SHA256 = '02ce9b7b0f69dca6e0297b07940eafc3ffc90681668d590d472bb24dc2f717a9';
+const EXPECTED_LBABUS = RELEASE_COMPONENTS.lbabus;
+const EXPECTED_AGENTS_VERSION = RELEASE_COMPONENTS.agents;
+const EXPECTED_AGENTS_SHA256 = AGENTS_MANIFEST.sha256;
 const BASELINE_CLOSEOUT_SUMMARY = { present: 12, total: 28, status: 'BLOCKED' };
 const POST_RELEASE_CLOSEOUT = {
   present: 28,
@@ -409,10 +411,14 @@ export function buildReadinessReceipt(opts = {}) {
   receipt.capabilities.available = capabilityEntries.filter((entry) => entry.available).map((entry) => ({ name: entry.name, path: entry.path, version: entry.version }));
   receipt.capabilities.unavailable = capabilityEntries.filter((entry) => !entry.available).map((entry) => ({ name: entry.name, reason: entry.failure || 'not available' }));
 
-  const baselinePath = join(ROOT, 'release-risk-baseline.json');
   const closeoutPath = join(ROOT, 'release-risk-closeout.json');
-  const baseline = JSON.parse(readFileSync(baselinePath, 'utf8'));
+  const currentBaseline = JSON.parse(readFileSync(join(ROOT, 'release-risk-baseline.json'), 'utf8'));
   const closeout = JSON.parse(readFileSync(closeoutPath, 'utf8'));
+  const historicalPath = join(HERE, 'release-risk-baselines', `${closeout.releaseVersion}.json`);
+  const historicalBaselines = existsSync(historicalPath)
+    ? { [closeout.releaseVersion]: JSON.parse(readFileSync(historicalPath, 'utf8')) }
+    : {};
+  const baseline = selectCloseoutBaseline(closeout, currentBaseline, historicalBaselines);
   const closeoutResult = validateCloseout(closeout, baseline, { root: ROOT });
   const closeoutDigestValue = closeoutDigest(closeout);
   if (!closeoutResult.ok) failures.push(...closeoutResult.findings.map((finding) => `release closeout: ${finding}`));

@@ -8,7 +8,7 @@
 // Usage: npm test   (== npm run compile && node test/extension-activation.mjs)
 
 import Module, { createRequire } from 'node:module';
-import { existsSync, readFileSync, mkdirSync, writeFileSync, rmSync, statSync, copyFileSync, chmodSync } from 'node:fs';
+import { existsSync, readFileSync, readdirSync, mkdirSync, writeFileSync, rmSync, statSync, copyFileSync, chmodSync } from 'node:fs';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { dirname, join } from 'node:path';
 import { tmpdir } from 'node:os';
@@ -198,6 +198,7 @@ const mockVscode = {
 // captureLaunchMprr spawns a real `node` run of the mprr runner; this mock lets the test drive its
 // success / non-zero-exit / spawn-error branches deterministically (the test sets `spawnMode`).
 let spawnMode = { code: 0 };
+const spawnCalls = [];
 let execFileHandler = () => {
   throw Object.assign(new Error('spawn lbabus ENOENT'), { code: 'ENOENT' });
 };
@@ -219,6 +220,7 @@ const childProcessMock = {
   spawnSync: (...args) => spawnSyncHandler(...args),
   execFile: execFileMock,
   spawn: (_file, _args, opts) => {
+    spawnCalls.push({ file: _file, args: _args });
     const mkStream = () => ({ on(event, cb) { if (event === 'data') { cb(Buffer.from('[mprr] run\n')); } return this; } });
     const handlers = {};
     const proc = { stdout: mkStream(), stderr: mkStream(), on(event, cb) { handlers[event] = cb; return this; } };
@@ -287,8 +289,12 @@ try {
       `generated AGENTS.md documents contributed command: ${contribution.title}`,
     );
   }
+  const governedComponents = JSON.parse(readFileSync(join(repoRoot, 'release-components.json'), 'utf8'));
+  assert(
+    generatedAgents.includes(`exactly \`${governedComponents.lbabus}\` for this extension build`),
+    'generated AGENTS.md pins the governed lbabus prerequisite',
+  );
   for (const prerequisite of [
-    /lbabus[^]*0\.15\.8/,
     /Node\.js[^]*24\.19\.0/,
     /\.NET runtime[^]*>=8\.0/,
     /Git \/ Git for Windows[^]*>=2\.30/,
@@ -562,11 +568,16 @@ try {
       join(capDir, 'resources.jsonl'),
       '{"ms":1,"cpuPct":10,"ramMb":2000,"diskPct":1,"disks":[{"name":"0 C:","writeMBs":0,"readMBs":0}]}\n\n{bad partial line\n{"ms":2,"cpuPct":12,"ramMb":2010,"diskPct":2,"disks":[{"name":"0 C:","writeMBs":11.4,"readMBs":0.2}]}\n'
     );
+    writeFileSync(
+      join(capDir, 'capture-meta.json'),
+      '{"workload":"labview-launch","plane":"LINUX","source":"ffmpeg-x11grab"}\n',
+    );
     const rec = ext.assembleCaptureFromDir(capDir, capBuilder);
     assert(Array.isArray(rec.frames) && rec.frames.length === 2, `assembleCaptureFromDir builds a 2-frame record, got ${rec.frames && rec.frames.length}`);
     assert(existsSync(join(capDir, 'capture.json')), 'assembleCaptureFromDir writes capture.json alongside the frames');
     assert(Array.isArray(rec.diskNames) && rec.diskNames.includes('0 C:'), 'assembleCaptureFromDir exposes the per-physical-disk names');
     assert(rec.frames[1].disks && rec.frames[1].disks[0].writeMBs === 11.4, 'assembleCaptureFromDir carries per-disk write throughput onto frames');
+    assert(rec.plane === 'LINUX' && rec.source === 'ffmpeg-x11grab', 'assembleCaptureFromDir preserves the native Ubuntu capture source');
 
     // empty dir -> fails closed (no frames were captured).
     const capEmpty = join(tmpdir(), 'lba-test-capture-empty-xyz');
@@ -733,29 +744,29 @@ try {
     assert(sentCommands.length === sentBeforeInvalid, 'createCleanroom aborts (sends no cloner command) when any input fails validation');
   }
 
-  // captureLaunch non-Windows guard (issue #423): must fail FAST with a Windows-only redirect to the
-  // cross-platform mprr capture command. Force a non-win32 platform so this is deterministic on any CI host.
+  // captureLaunch unsupported-platform guard: Linux has a native x11grab path; macOS still redirects to the
+  // cross-platform mprr VM capture.
   {
-    const restorePlatform = setPlatform('linux');
+    const restorePlatform = setPlatform('darwin');
     try {
       const errsBeforeCapture = errorMessages.length;
       const executedBeforeCapture = executedCommands.length;
       errorResponseQueue.push('Run mprr capture');
       await registered.find((r) => r.id === 'labviewBenchmarkActor.captureLaunch').handler();
       assert(
-        errorMessages.slice(errsBeforeCapture).some((m) => /Windows-only/.test(m) && /mprr/.test(m)),
-        'captureLaunch redirects non-Windows hosts to the mprr capture command'
+        errorMessages.slice(errsBeforeCapture).some((m) => /not supported on darwin/.test(m) && /mprr/.test(m)),
+        'captureLaunch redirects unsupported hosts to the mprr capture command'
       );
       assert(
         executedCommands.slice(executedBeforeCapture).includes('labviewBenchmarkActor.captureLaunchMprr'),
         'captureLaunch can jump directly to captureLaunchMprr from the non-Windows guard'
       );
-      // ...and the dismissed branch: closing the Windows-only dialog does NOT jump to mprr.
+      // ...and the dismissed branch does NOT jump to mprr.
       const executedBeforeDismiss = executedCommands.length;
       await registered.find((r) => r.id === 'labviewBenchmarkActor.captureLaunch').handler();
       assert(
         !executedCommands.slice(executedBeforeDismiss).includes('labviewBenchmarkActor.captureLaunchMprr'),
-        'captureLaunch non-Windows guard does nothing when the redirect prompt is dismissed'
+        'captureLaunch unsupported-platform guard does nothing when the redirect prompt is dismissed'
       );
     } finally {
       restorePlatform();
@@ -883,6 +894,87 @@ try {
     } finally {
       delete configStore.labviewPath;
       restorePlatform();
+    }
+    // Linux body reaches its native LabVIEW resolution guard instead of redirecting to the VM-only mprr command.
+    {
+      const restorePlatform = setPlatform('linux');
+      try {
+        const errsBeforeNoLv = errorMessages.length;
+        const executedBeforeNoLv = executedCommands.length;
+        configStore.labviewPath = join(tmpdir(), 'lba-no-linux-labview-here-xyz', 'labview');
+        await registered.find((r) => r.id === 'labviewBenchmarkActor.captureLaunch').handler();
+        delete configStore.labviewPath;
+        assert(
+          errorMessages.slice(errsBeforeNoLv).some((m) => /LabVIEW not found/.test(m) && /Linux executable/.test(m)),
+          'captureLaunch reports a missing Linux LabVIEW executable',
+        );
+        assert(
+          !executedCommands.slice(executedBeforeNoLv).includes('labviewBenchmarkActor.captureLaunchMprr'),
+          'native Linux capture does not redirect to the VM-only mprr command',
+        );
+      } finally {
+        delete configStore.labviewPath;
+        restorePlatform();
+      }
+    }
+    {
+      const restorePlatform = setPlatform('linux');
+      const savedDisplay = process.env.DISPLAY;
+      const savedSessionType = process.env.XDG_SESSION_TYPE;
+      const savedExecFileHandler = execFileHandler;
+      try {
+        process.env.DISPLAY = ':0';
+        process.env.XDG_SESSION_TYPE = 'wayland';
+        configStore.labviewPath = process.execPath;
+        configStore.ffmpegPath = process.execPath;
+        execFileHandler = (file) => file === 'xdpyinfo'
+          ? { stdout: '  dimensions:    1280x800 pixels (338x211 millimeters)\n' }
+          : { stdout: '' };
+        const captureRoot = join(gsRoot, 'captures');
+        const dirsBefore = existsSync(captureRoot) ? readdirSync(captureRoot).length : 0;
+        const spawnsBefore = spawnCalls.length;
+        const errorsBefore = errorMessages.length;
+        await registered.find((r) => r.id === 'labviewBenchmarkActor.captureLaunch').handler();
+        const dirsAfter = existsSync(captureRoot) ? readdirSync(captureRoot).length : 0;
+        assert(
+          errorMessages.slice(errorsBefore).some((m) => /requires an Xorg session/.test(m)),
+          'native Linux capture reports the Xorg requirement',
+        );
+        assert(dirsAfter === dirsBefore, 'Xorg validation fails before creating a capture or beacon directory');
+        assert(spawnCalls.length === spawnsBefore, 'Xorg validation fails before spawning ffmpeg or the sampler');
+
+        delete process.env.DISPLAY;
+        process.env.XDG_SESSION_TYPE = 'x11';
+        const missingDisplayErrors = errorMessages.length;
+        await registered.find((r) => r.id === 'labviewBenchmarkActor.captureLaunch').handler();
+        assert(
+          errorMessages.slice(missingDisplayErrors).some((m) => /requires DISPLAY/.test(m)),
+          'native Linux capture validates DISPLAY before creating a capture beacon',
+        );
+        assert((existsSync(captureRoot) ? readdirSync(captureRoot).length : 0) === dirsBefore, 'missing DISPLAY leaves no stale capture directory');
+
+        process.env.DISPLAY = ':0';
+        execFileHandler = () => { throw 'xdpyinfo unavailable'; };
+        const xdpyErrors = errorMessages.length;
+        await registered.find((r) => r.id === 'labviewBenchmarkActor.captureLaunch').handler();
+        assert(
+          errorMessages.slice(xdpyErrors).some((m) => /Unable to resolve the full X11 desktop dimensions/.test(m)),
+          'native Linux capture reports xdpyinfo failure before creating a capture beacon',
+        );
+        assert((existsSync(captureRoot) ? readdirSync(captureRoot).length : 0) === dirsBefore, 'xdpyinfo failure leaves no stale capture directory');
+        assert(spawnCalls.length === spawnsBefore, 'all X11 preflight failures occur before child process launch');
+
+        execFileHandler = () => { throw new Error('xdpyinfo failed'); };
+        await registered.find((r) => r.id === 'labviewBenchmarkActor.captureLaunch').handler();
+        assert((existsSync(captureRoot) ? readdirSync(captureRoot).length : 0) === dirsBefore, 'Error-shaped xdpyinfo failure also leaves no stale capture directory');
+      } finally {
+        delete configStore.labviewPath;
+        delete configStore.ffmpegPath;
+        execFileHandler = savedExecFileHandler;
+        if (savedDisplay === undefined) delete process.env.DISPLAY; else process.env.DISPLAY = savedDisplay;
+        if (savedSessionType === undefined) delete process.env.XDG_SESSION_TYPE; else process.env.XDG_SESSION_TYPE = savedSessionType;
+        restorePlatform();
+      }
     }
   }
   await registered.find((r) => r.id === 'labviewBenchmarkActor.stopCapture').handler();
@@ -1309,8 +1401,14 @@ try {
     assert(rv.validateReviewerVerdict(v).ok && !rv.validateReviewerVerdict({ ...v, verdict: 'z' }).ok && !rv.validateReviewerVerdict({ ...v, target: { version: '', commit: '' } }).ok && !rv.validateReviewerVerdict({ ...v, reviewer: '' }).ok && !rv.validateReviewerVerdict({ ...v, station: 'MARS' }).ok && !rv.validateReviewerVerdict(null).ok, 'validateReviewerVerdict fail-closed');
     const s = rv.signReviewerVerdict(v, { privateKeyPem: rvKeys.privateKeyPem, reviewer, station: 'WINDOWS_VM' });
     assert(s.schema === rv.SIGNOFF_SCHEMA && s.decision === 'approve' && s.subject.verdictDigest === rv.reviewerVerdictDigest(v), 'signReviewerVerdict -> acg-human-signoff-v1 bound to the digest');
+    const ubuntuVerdict = rv.buildReviewerVerdict({ target, verdict: 'pass', reviewer, station: 'UBUNTU_VM' });
+    const ubuntuSignOff = rv.signReviewerVerdict(ubuntuVerdict, { privateKeyPem: rvKeys.privateKeyPem, reviewer });
+    assert(ubuntuSignOff.station === 'UBUNTU_VM', 'signReviewerVerdict derives the sign-off station from the verdict');
+    let stationThrew = false; try { rv.signReviewerVerdict(ubuntuVerdict, { privateKeyPem: rvKeys.privateKeyPem, reviewer, station: 'WINDOWS_VM' }); } catch { stationThrew = true; }
+    assert(stationThrew, 'signReviewerVerdict rejects a station that differs from the verdict');
     assert(rv.signReviewerVerdict(rv.buildReviewerVerdict({ target, verdict: 'fail', reviewer }), { privateKeyPem: rvKeys.privateKeyPem, reviewer }).decision === 'reject', 'a fail verdict -> reject');
     assert(rv.verifyReviewerVerdict(v, s, { reviewerAllowlist: allow }).ok, 'verifyReviewerVerdict verifies a good sign-off');
+    assert(!rv.verifyReviewerVerdict(v, { ...s, station: 'UBUNTU_VM' }, { reviewerAllowlist: allow }).ok, 'verifyReviewerVerdict rejects a mismatched sign-off station');
     assert(!rv.verifyReviewerVerdict({ ...v, notes: 'x' }, s, { reviewerAllowlist: allow }).ok && !rv.verifyReviewerVerdict(v, s, { reviewerAllowlist: {} }).ok && !rv.verifyReviewerVerdict(v, { schema: 'no' }, { reviewerAllowlist: allow }).ok, 'verifyReviewerVerdict fail-closed');
     assert(rv.gateVisualReview({ verdict: v, signOffs: [s], reviewerAllowlist: allow, minReviewers: 1 }).publish === true, 'gateVisualReview publishes on pass + approval');
     assert(rv.gateVisualReview({ verdict: v, signOffs: [], reviewerAllowlist: allow }).publish === false && rv.gateVisualReview({ verdict: { ...v, verdict: 'fail' }, signOffs: [s], reviewerAllowlist: allow }).publish === false, 'gateVisualReview fail-closed');
@@ -1330,6 +1428,53 @@ try {
     writeFileSync(join(vt, 'handoff', 'review-target.json'), JSON.stringify({ component: 'extension', version: '0.5.0', commit: 'c'.repeat(40), vsixSha256: 'd'.repeat(64), evidence: [{ kind: 'capture', ref: 'run-x' }] }));
     const t1 = ext.readReviewTarget(vt, '9.9.9');
     assert(t1.version === '0.5.0' && t1.commit.length === 40 && t1.evidence.length === 1, 'readReviewTarget reads the target file');
+    const vmIdentity = { provider: 'oracle', machineId: '1'.repeat(32), productName: 'VirtualBox' };
+    const readStation = (target = t1, identity = vmIdentity) => ext.readReviewerStationMarker(vt, target, identity);
+    let markerThrew = false; try { readStation(); } catch { markerThrew = true; }
+    assert(markerThrew, 'readReviewerStationMarker requires an explicit staged marker');
+    markerThrew = false; try { readStation({ ...t1, commit: null }); } catch { markerThrew = true; }
+    assert(markerThrew, 'readReviewerStationMarker requires a complete exact target');
+    markerThrew = false; try { readStation({ ...t1, vsixSha256: null }); } catch { markerThrew = true; }
+    assert(markerThrew, 'readReviewerStationMarker requires an exact VSIX digest');
+    writeFileSync(join(vt, 'handoff', 'reviewer-station.json'), '{bad');
+    markerThrew = false; try { readStation(); } catch { markerThrew = true; }
+    assert(markerThrew, 'readReviewerStationMarker rejects unreadable JSON');
+    writeFileSync(join(vt, 'handoff', 'reviewer-station.json'), JSON.stringify({
+      schema: 'labview-benchmark-actor/reviewer-station@1',
+      station: 'UBUNTU_VM',
+    }));
+    markerThrew = false; try { readStation(); } catch { markerThrew = true; }
+    assert(markerThrew, 'readReviewerStationMarker requires marker target identity');
+    writeFileSync(join(vt, 'handoff', 'reviewer-station.json'), JSON.stringify({
+      schema: 'labview-benchmark-actor/reviewer-station@1',
+      station: 'UBUNTU_VM',
+      target: { component: t1.component, version: t1.version },
+    }));
+    markerThrew = false; try { readStation(); } catch { markerThrew = true; }
+    assert(markerThrew, 'readReviewerStationMarker requires marker commit identity');
+    writeFileSync(join(vt, 'handoff', 'reviewer-station.json'), JSON.stringify({
+      schema: 'labview-benchmark-actor/reviewer-station@1',
+      station: 'UBUNTU_VM',
+      target: { component: t1.component, version: t1.version, commit: t1.commit },
+    }));
+    markerThrew = false; try { readStation(); } catch { markerThrew = true; }
+    assert(markerThrew, 'readReviewerStationMarker requires marker VSIX identity');
+    writeFileSync(join(vt, 'handoff', 'reviewer-station.json'), JSON.stringify({
+      schema: 'labview-benchmark-actor/reviewer-station@1',
+      station: 'UBUNTU_VM',
+      target: { component: t1.component, version: t1.version, commit: 'f'.repeat(40), vsixSha256: t1.vsixSha256 },
+    }));
+    markerThrew = false; try { readStation(); } catch { markerThrew = true; }
+    assert(markerThrew, 'readReviewerStationMarker rejects a marker for another target');
+    writeFileSync(join(vt, 'handoff', 'reviewer-station.json'), JSON.stringify({
+      schema: 'labview-benchmark-actor/reviewer-station@1',
+      station: 'UBUNTU_VM',
+      target: { component: t1.component, version: t1.version, commit: t1.commit, vsixSha256: t1.vsixSha256 },
+      virtualization: vmIdentity,
+    }));
+    assert(readStation() === 'UBUNTU_VM', 'readReviewerStationMarker accepts an exact target-bound Ubuntu marker');
+    markerThrew = false; try { readStation(t1, { ...vmIdentity, machineId: '2'.repeat(32) }); } catch { markerThrew = true; }
+    assert(markerThrew, 'readReviewerStationMarker rejects a marker copied from another VM');
     writeFileSync(join(vt, 'handoff', 'review-target.json'), JSON.stringify({
       component: 1,
       version: null,
@@ -1363,6 +1508,7 @@ try {
   }
 
   {
+    const restoreVerdictPlatform = setPlatform('win32');
     const savedInfo = mockVscode.window.showInformationMessage;
     const savedInput = mockVscode.window.showInputBox;
     const savedCfg = mockVscode.workspace.getConfiguration;
@@ -1385,17 +1531,41 @@ try {
     // (3) configured + a Pass choice + notes -> a signed verdict written that verifies against the enrolled key.
     mockVscode.workspace.getConfiguration = () => ({ get: (k, d) => (k === 'reviewerId' ? reviewer : k === 'reviewerKeyPath' ? keyFile : d) });
     mkdirSync(join(gsRoot, 'handoff'), { recursive: true });
-    writeFileSync(join(gsRoot, 'handoff', 'review-target.json'), JSON.stringify({ component: 'extension', version: '0.5.0', commit: 'e'.repeat(40), vsixSha256: 'f'.repeat(64), evidence: [{ kind: 'capture', ref: 'run-live' }] }));
+    writeFileSync(join(gsRoot, 'handoff', 'review-target.json'), JSON.stringify({
+      component: 'extension',
+      version: '9.9.9',
+      commit: 'e'.repeat(40),
+      vsixSha256: 'f'.repeat(64),
+      evidence: [],
+    }));
+    const versionErrors = errorMessages.length;
+    await render();
+    assert(
+      errorMessages.slice(versionErrors).some((m) => /does not match active extension version/.test(m)),
+      'renderReviewerVerdict rejects a target for a different active extension version',
+    );
+    const liveTarget = { component: 'extension', version: '0.1.0', commit: 'e'.repeat(40), vsixSha256: 'f'.repeat(64), evidence: [{ kind: 'capture', ref: 'run-live' }] };
+    writeFileSync(join(gsRoot, 'handoff', 'review-target.json'), JSON.stringify(liveTarget));
+    writeFileSync(join(gsRoot, 'handoff', 'reviewer-station.json'), JSON.stringify({
+      schema: 'labview-benchmark-actor/reviewer-station@1',
+      station: 'UBUNTU_VM',
+      target: {
+        component: liveTarget.component,
+        version: liveTarget.version,
+        commit: liveTarget.commit,
+        vsixSha256: liveTarget.vsixSha256,
+      },
+    }));
     mockVscode.window.showInformationMessage = () => 'Pass';
     mockVscode.window.showInputBox = async () => 'looks right end to end';
     const savedPath = process.env.PATH;
     process.env.PATH = ''; // the command's best-effort lbabus bus post must not shell a REAL post during the test
     await render();
     process.env.PATH = savedPath;
-    const verdictFile = join(gsRoot, 'handoff', 'verdicts', 'extension-0.5.0.json');
+    const verdictFile = join(gsRoot, 'handoff', 'verdicts', 'extension-0.1.0.json');
     assert(existsSync(verdictFile), 'renderReviewerVerdict wrote the signed verdict');
     const rec = JSON.parse(readFileSync(verdictFile, 'utf8'));
-    assert(rec.verdict.verdict === 'pass' && rec.verdict.target.version === '0.5.0' && rec.signOff.schema === rv.SIGNOFF_SCHEMA && rec.signOff.decision === 'approve' && rec.signOff.reviewer === reviewer, 'the signed verdict records pass + approve + the reviewer');
+    assert(rec.verdict.verdict === 'pass' && rec.verdict.target.version === '0.1.0' && rec.signOff.schema === rv.SIGNOFF_SCHEMA && rec.signOff.decision === 'approve' && rec.signOff.reviewer === reviewer, 'the signed verdict records pass + approve + the reviewer');
     assert(rv.verifyReviewerVerdict(rec.verdict, rec.signOff, { reviewerAllowlist: { [reviewer]: rvKeys.publicKeyPem } }).ok, 'the extension-signed verdict verifies against the enrolled key');
 
     // (4) Request changes with dismissed notes and a bare bus failure -> conservative signed reject, no throw.
@@ -1424,6 +1594,7 @@ try {
     mockVscode.window.showInformationMessage = savedInfo;
     mockVscode.window.showInputBox = savedInput;
     mockVscode.workspace.getConfiguration = savedCfg;
+    restoreVerdictPlatform();
     rmSync(keyFile, { force: true });
     console.log('reviewer-verdict-command: PASS -- Render Reviewer Verdict -> Ed25519-signed verdict written + verifies');
   }

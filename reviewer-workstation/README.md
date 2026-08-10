@@ -142,6 +142,47 @@ by listing extensions, and drops `C:\lba-review\REVIEW-CHECKLIST.txt` for the re
 Code in the VM and inspect the Extensions-view README page (the Marketplace listing), the command
 surface, and the benchmark viewer. Nothing is published until the reviewer approves.
 
+### Stage an exact candidate on Ubuntu 24.04
+
+The governed Ubuntu visual-review lane uses a fresh graphical Ubuntu 24.04 VM built from the stock
+ISO. Provision LabVIEW without activation, let the operator activate in the VM console, and then copy
+the exact candidate VSIX, `review-target.json`, repository checkout, and fresh version-scoped visual
+private key into the disposable guest. Fully close every window/process for the selected Code client,
+then inside the guest run:
+
+```bash
+node reviewer-workstation/stage-ubuntu-vsix.mjs \
+  --vsix /home/actor/lba-review/labview-benchmark-actor.vsix \
+  --target /home/actor/lba-review/review-target.json \
+  --kpi /home/actor/lba-review/local-kpi.json \
+  --workspace /home/actor/lba-review/workspace \
+  --receipt /home/actor/lba-review/ubuntu-review-stage.json \
+  --handoff "$HOME/.config/Code/User/globalStorage/svelderrainruiz.labview-benchmark-actor/handoff" \
+  --vm-provider oracle \
+  --vm-id '<host-observed /etc/machine-id>' \
+  --lbabus /usr/local/bin/lbabus
+```
+
+The command runs only on Linux and binds the candidate's version, 40-hex commit, 64-hex SHA-256,
+bytes, clean state, coverage floors, correspondence graph, local gates, and duplicate packages to a
+passing full local-KPI receipt, reruns the exact local-gate and correspondence inventories and
+requires their totals to match the receipt, then verifies the VSIX manifest **before** installing
+anything. It also requires the exact `release-components.json` lbabus version, passing selfcheck,
+and non-empty capabilities before it installs with `code --install-extension --force`,
+requires the exact `svelderrainruiz.labview-benchmark-actor@<version>` identity, writes a non-secret
+receipt with wall and monotonic timing, and atomically stages the exact target plus a target-bound
+`UBUNTU_VM` marker where the extension reads them. The marker is emitted only after
+`systemd-detect-virt --vm`, `/etc/machine-id`, and the DMI product name prove the expected
+VirtualBox guest identity; physical Ubuntu, WSL, containers, and a different VM fail closed. Follow
+[the manual plan](../docs/testing/reviewer-manual-test-plan.md), then use **LabVIEW Benchmark Actor:
+Render Reviewer Verdict** inside VS Code. Linux verdict rendering fails closed without the staging
+marker or when the marker's provider/product/machine-id differs from the current host; it no longer
+infers `UBUNTU_VM` from the operating system alone. Launch VS Code only after staging completes; the
+verdict command also requires the active extension version to equal the staged target version.
+
+Extract the public record and raw non-secret review evidence before deleting the VM and private key.
+The quorum key is distinct and is used only for the later machine-quorum sign-off.
+
 ## Validate a release on the WIN plane (auth-free, native Windows)
 
 The bidirectional release-agreement gate

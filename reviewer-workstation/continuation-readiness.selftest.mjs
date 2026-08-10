@@ -1,7 +1,11 @@
 #!/usr/bin/env node
 
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import { assessVersionOutput, capabilityProbeSpec, classifyRepositoryRelation, classifyWorktreeState, executableForProbe, findSecretBearingFields, receiptDigest, validateReceipt, validateStoredReceipt } from './continuation-readiness.mjs';
+
+const releaseComponents = JSON.parse(readFileSync(new URL('../release-components.json', import.meta.url), 'utf8'));
+const agentsManifest = JSON.parse(readFileSync(new URL('../extension-agents/agents.manifest.json', import.meta.url), 'utf8'));
 
 const absoluteToolPaths = process.platform === 'win32'
   ? {
@@ -40,12 +44,12 @@ function makeReceipt(overrides = {}) {
     agents: {
       rootMaterialized: true,
       canonicalMatch: true,
-      version: '0.3.13',
-      sha256: '02ce9b7b0f69dca6e0297b07940eafc3ffc90681668d590d472bb24dc2f717a9',
-      expectedVersion: '0.3.13',
-      expectedSha256: '02ce9b7b0f69dca6e0297b07940eafc3ffc90681668d590d472bb24dc2f717a9',
-      manifestVersion: '0.3.13',
-      manifestSha256: '02ce9b7b0f69dca6e0297b07940eafc3ffc90681668d590d472bb24dc2f717a9',
+      version: releaseComponents.agents,
+      sha256: agentsManifest.sha256,
+      expectedVersion: releaseComponents.agents,
+      expectedSha256: agentsManifest.sha256,
+      manifestVersion: agentsManifest.version,
+      manifestSha256: agentsManifest.sha256,
     },
     tools: {
       node: { ok: true, path: absoluteToolPaths.node },

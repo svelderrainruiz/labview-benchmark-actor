@@ -34,6 +34,8 @@ jobs:
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v5
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
       - uses: actions/setup-node@v5
         with:
           node-version-file: .nvmrc
@@ -45,7 +47,7 @@ jobs:
         run: |
           mkdir -p witness
           plane="ACTIONS-${{ matrix.os }}"
-          node experiments/acg-quorum/produce-witness.mjs --plane "$plane" --verdict pass --commit "${{ github.sha }}" > "witness/${{ matrix.os }}.bundle.json"
+          node experiments/acg-quorum/produce-witness.mjs --plane "$plane" --verdict pass --commit "${{ github.event.pull_request.head.sha || github.sha }}" > "witness/${{ matrix.os }}.bundle.json"
           echo "--- ${{ matrix.os }} witness ---"; cat "witness/${{ matrix.os }}.bundle.json"
       - uses: actions/upload-artifact@v4
         with:
@@ -58,6 +60,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
       - uses: actions/setup-node@v5
         with:
           node-version-file: .nvmrc
