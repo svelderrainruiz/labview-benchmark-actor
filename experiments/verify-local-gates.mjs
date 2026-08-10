@@ -2220,6 +2220,14 @@ check('mesh-autonomous-actor-service', () => {
   return { selftests: 'protocol 11/11 + service 10/10 + daemon 7/7', requirement: 'LBA-REQ-099', adr: 'ADR-0082' };
 });
 
+// LBA-REQ-100 / ADR-0083: the controller revalidates the complete enrolled-signed cross-plane N>=3 response set,
+// exact actor/task/plane/request/candidate bindings, and the fixed known answer before emitting consume:true.
+check('mesh-autonomous-n3-controller', () => {
+  const dir = join(here, 'mesh-fulfillment');
+  execFileSync(process.execPath, [join(dir, 'autonomousN3Controller.selftest.mjs')], { stdio: 'pipe' });
+  return { selftest: 'autonomousN3Controller 10/10', requirement: 'LBA-REQ-100', adr: 'ADR-0083' };
+});
+
 // LBA-REQ-077 / ADR-0058: the opt-in VERIFIED TIER -- each returned actor receipt is SIGNED by the actor's
 // ENROLLED Ed25519 key (reusing the ADR-0016 acg-provenance attestation engine), and a verified-receipt-collection@1
 // admits a receipt only when it carries a valid attestation from its declared, enrolled actor. Asserts the

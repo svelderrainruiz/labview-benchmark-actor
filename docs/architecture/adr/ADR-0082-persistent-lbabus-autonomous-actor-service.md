@@ -43,7 +43,8 @@ SSH command per task would leave the host as the execution plane and would not s
   the fixed adapter requires that user's LabVIEW/VIPM licenses.
 - Offline tests prove 31 protocol/service/daemon/PowerShell cases. Live Windows evidence proves native PowerShell 5
   reboot persistence, signed request admission, fixed LabVIEW result `3`, and a protocol-valid actor-signed response.
-- Parent synchronization remains blocked until the resealed final candidate passes the complete live signed N=3 gate.
+- The resealed candidate `654ed516b6b146489b7f4b5079ab191accea45be` passed the complete live signed N=3
+  gate after actor reboot (`consume:true`) and was then fast-forward synchronized directly to the parent `develop`.
 
 ## References
 

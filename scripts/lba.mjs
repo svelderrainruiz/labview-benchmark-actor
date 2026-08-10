@@ -35,6 +35,7 @@
 //   signing-status               discover + report an enrolled visual or quorum key + where each sign-off runs
 //   capture-preflight            report native LabVIEW launch-capture readiness + selected Linux display mode
 //   actor-service-check          run the signed protocol + persistent service + lbabus daemon selftests
+//   actor-n3-decide              reduce signed actor responses to a fail-closed N>=3 consume decision
 //   provision-linux-actor       install one persistent autonomous actor through verified SSH access
 //   provision-windows-actor     install one native PowerShell 5 actor from an elevated Windows guest console
 //   selftest                     self-check this tool (run by the `agent-tooling-selftest` gate)
@@ -53,8 +54,9 @@ import { stagedOk } from '../reviewer-workstation/release-with-review-drive.mjs'
 import { buildReleaseStage } from '../reviewer-workstation/record-release-stage.mjs';
 import { enrolledReviewerPublicKeys } from '../experiments/handoff-beacon/reviewerVerdict.mjs';
 import { validateLbabusProvisioningPin } from './verify-ubuntu-golden-box.mjs';
+import { decideAutonomousN3 } from '../experiments/mesh-fulfillment/autonomousN3Controller.mjs';
 
-export const ITERATION = 29; // bump when you refine this tool (see the banner above)
+export const ITERATION = 30; // bump when you refine this tool (see the banner above)
 
 const here = dirname(fileURLToPath(import.meta.url));
 export const repoRoot = resolve(here, '..');
@@ -76,6 +78,7 @@ export const AUTONOMOUS_ACTOR_SELFTESTS = [
   'experiments/mesh-fulfillment/autonomousActorService.selftest.mjs',
   'experiments/mesh-fulfillment/autonomousActorDaemon.selftest.mjs',
   'experiments/mesh-fulfillment/autonomousActorPowerShell.selftest.mjs',
+  'experiments/mesh-fulfillment/autonomousN3Controller.selftest.mjs',
 ];
 
 // ---- the governance surfaces a Proven requirement must appear in ---------------------------------
@@ -835,6 +838,32 @@ export const COMMANDS = {
     run: () => {
       for (const rel of AUTONOMOUS_ACTOR_SELFTESTS) runScript('autonomous actor', rel);
       console.log('\n✓ autonomous actor protocol + service + daemon checks complete');
+    },
+  },
+  'actor-n3-decide': {
+    desc: 'reduce signed actor responses to a fail-closed N>=3 consume decision',
+    run: (args) => {
+      const opt = {};
+      for (let index = 0; index < args.length; index += 1) {
+        if (args[index].startsWith('--')) opt[args[index].slice(2)] = args[index + 1] && !args[index + 1].startsWith('--') ? args[(index += 1)] : true;
+      }
+      const required = ['dispatch', 'responses', 'requester-keys', 'actor-keys', 'sealed'];
+      const missing = required.filter((name) => typeof opt[name] !== 'string');
+      if (missing.length > 0) {
+        console.error('usage: lba actor-n3-decide --dispatch <json> --responses <json-array> --requester-keys <json> --actor-keys <json> --sealed <json> [--out <json>]');
+        process.exit(2);
+      }
+      const load = (name) => JSON.parse(readFileSync(resolve(repoRoot, opt[name]), 'utf8'));
+      const decision = decideAutonomousN3({
+        dispatch: load('dispatch'),
+        responses: load('responses'),
+        requesterKeys: load('requester-keys'),
+        actorKeys: load('actor-keys'),
+        sealedCandidate: load('sealed'),
+      });
+      if (typeof opt.out === 'string') writeFileSync(resolve(repoRoot, opt.out), `${JSON.stringify(decision, null, 2)}\n`);
+      console.log(JSON.stringify(decision, null, 2));
+      if (!decision.consume) process.exitCode = 1;
     },
   },
   'provision-linux-actor': {

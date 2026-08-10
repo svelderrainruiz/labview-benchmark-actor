@@ -127,6 +127,7 @@ progressively.
 | LBA-REQ-097 | The system shall classify every experiment lifecycle and continuously verify before verdict that prohibited experiments do not reach production and the local CHANGELOG/system-version/test/gate/correspondence/package KPI is current, so prototypes cannot silently become active implementations. | Historical and exploratory directories outlive their learning; without lifecycle and production boundaries they can be reused accidentally, while end-loaded release checks allow incremental documentation drift. | RTM paths govern active experiments; an override manifest classifies the remainder; a pure verifier rejects gaps/references; quick/full local KPI scripts retain machine receipts and AGENTS states numeric targets. | `test/experiment-governance.mjs` plus `experiment-lifecycle-local-kpi` prove full inventory, prohibited-reference rejection, superseded replacement, KPI wiring, and agent guidance. |
 | LBA-REQ-098 | The system shall gate autonomous actor benchmark execution through an enrolled-signer protocol that binds freshness, target plane, allowlisted workload, exact candidate identity, replay state, plus an actor-signed outcome to one request digest. | The governed mesh binds dispatch through fulfillment, but host-driven SSH and hypervisor controls cannot prove that an actor independently authorized the task or prevent a captured request from being replayed against another candidate. | `autonomousActorProtocol.mjs` builds and validates Ed25519-signed request/response envelopes over the existing bounded `bus-msg@1` transport, requiring a short expiry, requester nonce, candidate commit/tree/bundle SHA-256, local workload allowlist, one-task concurrency, content-addressed artifacts, and bounded failure codes. | `node experiments/mesh-fulfillment/autonomousActorProtocol.selftest.mjs` proves an authorized request plus signed success/BUSY outcomes while rejecting expiry, replay, unallowlisted work, tampering, un-enrolled requesters, request rebinding, and unbounded failures; gated by `mesh-autonomous-actor-protocol`. |
 | LBA-REQ-099 | The system shall run each autonomous actor as a persistent cross-platform `lbabus` service that durably admits one fixed local workload per signed nonce, stores bounded artifacts in guest-local content-addressed storage, and retries cached actor-signed outcomes without re-execution. | A signed protocol alone does not own live delivery, restart state, one-task concurrency, constrained subprocess invocation, or response loss; SSH-per-task would retain the host as the execution plane. | Linux uses the Node 24 service/daemon with systemd; Windows uses a native Windows PowerShell 5 daemon, Startup persistence, fixed-path Git OpenSSL Ed25519, and a fixed PowerShell LabVIEWCLI workload. Both bind the same `bus-msg@1` metadata and signed protocol without request-derived commands. | `node scripts/lba.mjs actor-service-check` runs 31 protocol/service/daemon/PowerShell cases, including canonical JSON and digest parity with `attest.mjs`; live Windows evidence proves reboot persistence, enrolled request verification, fixed LabVIEW result `3`, and an actor-signed response accepted by `validateActorResponse`; gated by `mesh-autonomous-actor-service`. |
+| LBA-REQ-100 | The system shall reduce a complete signed cross-plane autonomous actor response set of at least three distinct actors to one fail-closed candidate-bound consume decision. | The live N=3 proof required manual request/result correlation and decision assembly, so a missing, duplicated, forged, wrong-task, wrong-answer, or candidate-drifted response could be mishandled outside the actor protocol. | `autonomousN3Controller.mjs` builds one signed actor-bound request per roster entry and revalidates every requester envelope, actor signature, task, plane, exact candidate, unique response, `SUCCESS`, and fixed known answer before emitting `autonomous-n3-decision@1` with `consume:true`. | `node experiments/mesh-fulfillment/autonomousN3Controller.selftest.mjs` proves the complete N=3 path across ten cases; `lba actor-n3-decide` emits the same decision from explicit dispatch/response/key/sealed-descriptor files; gated by `mesh-autonomous-n3-controller`. |
 
 ---
 
@@ -3069,6 +3070,25 @@ progressively.
   - Windows canonical JSON and SHA-256 output match `attest.mjs`, the actor key remains guest-local, inbound `lbabus`
     is narrowly firewall-scoped to the configured port, and Startup persistence survives reboot and interactive logon.
 
+### LBA-REQ-100: Fail-closed autonomous N>=3 controller decision
+
+- Status: Proven
+- Area: Coordination / security / operation (ADR-0083)
+- Statement: The system shall reduce a complete signed cross-plane autonomous actor response set of at least three
+  distinct actors to one fail-closed candidate-bound consume decision.
+- Rationale: Persistent actors own execution and signed delivery, but the controller must still prove that the full
+  expected roster responded exactly once for the sealed candidate before any result is consumed.
+- Acceptance Criteria:
+  - Dispatch construction requires at least three distinct actor identities spanning LINUX and WIN and emits one
+    requester-signed, actor-specific task per roster entry.
+  - Decision reduction revalidates each requester envelope and actor response against enrolled public keys, expected
+    actor identity, task, plane, request digest, and exact dispatch candidate.
+  - Every expected actor returns exactly one signed `SUCCESS` whose fixed known-answer result is observed 3, expected
+    3, verdict `PASS`; missing, duplicate, unknown-task, failed, forged, tampered, or wrong-answer outcomes block.
+  - The dispatch candidate equals the independently sealed commit/tree/bundle descriptor before `consume:true`.
+  - The dependency-free reducer emits one portable `autonomous-n3-decision@1`; `lba actor-n3-decide` accepts only
+    explicit local files and exits nonzero when the decision does not consume.
+
 ## Traceability (requirement → architecture view / test)
 
 | Requirement | Architecture view | Test items |
@@ -3172,3 +3192,4 @@ progressively.
 | LBA-REQ-097 | Configuration management / assurance / operation (experiment lifecycle and local KPI) | T-097 |
 | LBA-REQ-098 | Deployment / security / operation (signed autonomous actor protocol) | T-098 |
 | LBA-REQ-099 | Deployment / security / operation (persistent lbabus autonomous actor service) | T-099 |
+| LBA-REQ-100 | Coordination / security / operation (autonomous N>=3 controller decision) | T-100 |

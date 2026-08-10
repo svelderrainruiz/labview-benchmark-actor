@@ -106,5 +106,6 @@
 | LBA-REQ-097 | Experiment lifecycle and local continuous KPI | Proven | — | ADR-0080 | T-097 | 16 |
 | LBA-REQ-098 | Signed autonomous actor protocol | Proven | — | ADR-0081 | T-098 | 6 |
 | LBA-REQ-099 | Persistent lbabus autonomous actor service | Proven | — | ADR-0082 | T-099 | 14 |
+| LBA-REQ-100 | Fail-closed autonomous N>=3 controller decision | Proven | — | ADR-0083 | T-100 | 6 |
 
-_Generated for 99 requirements._
+_Generated for 100 requirements._
