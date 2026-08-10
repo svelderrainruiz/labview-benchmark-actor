@@ -3,6 +3,8 @@ param()
 
 $ErrorActionPreference = 'Stop'
 $packages = @(
+  @{ id = 'OpenJS.NodeJS.LTS' },
+  @{ id = 'Microsoft.VisualStudioCode' },
   @{ id = 'Git.Git' },
   @{ id = 'BurntSushi.ripgrep.MSVC' },
   @{ id = 'GitHub.cli' },
@@ -13,12 +15,12 @@ $packages = @(
 foreach ($package in $packages) {
   $installed = (& winget list --id $package.id --exact --accept-source-agreements --disable-interactivity 2>&1 | Out-String)
   $verb = if ($LASTEXITCODE -eq 0 -and $installed -match [regex]::Escape($package.id)) { 'upgrade' } else { 'install' }
-  $args = @(
+  $wingetArgs = @(
     $verb, '--id', $package.id, '--exact', '--silent',
     '--accept-package-agreements', '--accept-source-agreements', '--disable-interactivity'
   )
-  if ($package.version) { $args += @('--version', $package.version) }
-  & winget @args | Out-Host
+  if ($package.version) { $wingetArgs += @('--version', $package.version) }
+  & winget @wingetArgs | Out-Host
   # APPINSTALLER_CLI_ERROR_UPDATE_NOT_APPLICABLE: the exact package is already installed with no newer version.
   if ($LASTEXITCODE -notin 0, -1978335189) {
     throw "winget install $($package.id) failed ($LASTEXITCODE)."
@@ -35,6 +37,8 @@ function Find-WingetTool([string]$PackagePrefix, [string]$FileName) {
 }
 
 $tools = [ordered]@{
+  node = 'C:\Program Files\nodejs\node.exe'
+  code = Join-Path $env:LOCALAPPDATA 'Programs\Microsoft VS Code\bin\code.cmd'
   git = 'C:\Program Files\Git\cmd\git.exe'
   rg = Find-WingetTool 'BurntSushi.ripgrep.MSVC_' 'rg.exe'
   gh = 'C:\Program Files\GitHub CLI\gh.exe'
@@ -57,6 +61,8 @@ foreach ($entry in $pathEntries) {
 $env:Path = "$([Environment]::GetEnvironmentVariable('Path', 'Machine'));$($parts -join ';')"
 
 $versions = [ordered]@{
+  node = (& $tools.node --version | Select-Object -First 1)
+  code = (& $tools.code --version | Select-Object -First 1)
   git = (& $tools.git --version | Select-Object -First 1)
   rg = (& $tools.rg --version | Select-Object -First 1)
   gh = (& $tools.gh --version | Select-Object -First 1)
@@ -73,5 +79,6 @@ $receipt = [ordered]@{
   pathEntries = $pathEntries
 }
 $receiptPath = 'C:\lba-tools\reviewer-toolchain.json'
+New-Item -ItemType Directory -Path (Split-Path $receiptPath -Parent) -Force | Out-Null
 [IO.File]::WriteAllText($receiptPath, "$($receipt | ConvertTo-Json -Depth 8)`n", [Text.UTF8Encoding]::new($false))
 $receipt | ConvertTo-Json -Depth 8 -Compress
