@@ -83,6 +83,7 @@ await test('accepts only CLAIM payloads bound to bus sender and task metadata', 
   const request = requestEnvelope();
   const valid = busEnvelope(request);
   assert.deepEqual(parseBusRequest(valid), request);
+  assert.deepEqual(parseBusRequest({ ...valid, senderId: valid.senderId.toUpperCase() }), request);
   assert.equal(parseBusRequest({ ...valid, type: 'NOTE' }), null);
   assert.equal(parseBusRequest({ ...valid, senderId: 'spoofed-controller' }), null);
   assert.equal(parseBusRequest({ ...valid, task: 'different-task' }), null);

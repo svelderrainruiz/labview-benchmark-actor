@@ -51,7 +51,8 @@ export function parseBusRequest(busEnvelope) {
   catch { return null; }
   const request = requestEnvelope?.request;
   if (typeof request?.taskId !== 'string' || busEnvelope.task !== request.taskId) return null;
-  if (typeof request?.requesterId !== 'string' || busEnvelope.senderId !== request.requesterId) return null;
+  if (typeof request?.requesterId !== 'string' || typeof busEnvelope.senderId !== 'string'
+    || busEnvelope.senderId.toUpperCase() !== request.requesterId.toUpperCase()) return null;
   return requestEnvelope;
 }
 
