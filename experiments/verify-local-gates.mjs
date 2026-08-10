@@ -3646,6 +3646,10 @@ check('acg-cross-plane-corroboration-workflow-wired', () => {
   assert(linuxSubstrates.length >= 2, 'must build on >= 2 concrete LINUX substrates (e.g. ubuntu-22.04 + ubuntu-24.04)');
   assert(windowsSubstrates.length >= 2, 'must build on >= 2 concrete WINDOWS substrates (e.g. windows-2022 + windows-2025)');
   assert(/produce-witness\.mjs/.test(t), 'each substrate must produce its witness via produce-witness.mjs');
+  assert(
+    (t.match(/github\.event\.pull_request\.head\.sha \|\| github\.sha/g) || []).length >= 3,
+    'PR witnesses, checkout, and corroboration must bind the reviewed head SHA rather than the synthetic merge SHA',
+  );
   assert(/corroborate-planes\.mjs/.test(t), 'the corroborate job must run corroborate-planes.mjs (the quorum) over ALL substrates');
   assert(/witnesses\/\*\/\*\.bundle\.json/.test(t), 'the corroborate job must ingest ALL substrate witnesses (glob)');
   assert(/npm test/.test(t), 'each substrate must run the extension gate (npm test) for its verdict');
