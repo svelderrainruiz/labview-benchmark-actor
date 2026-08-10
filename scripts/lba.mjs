@@ -49,8 +49,9 @@ import { assembleLiveN2 } from '../experiments/mesh-fulfillment/driveLiveN2.mjs'
 import { stagedOk } from '../reviewer-workstation/release-with-review-drive.mjs';
 import { buildReleaseStage } from '../reviewer-workstation/record-release-stage.mjs';
 import { enrolledReviewerPublicKeys } from '../experiments/handoff-beacon/reviewerVerdict.mjs';
+import { validateLbabusProvisioningPin } from './verify-ubuntu-golden-box.mjs';
 
-export const ITERATION = 21; // bump when you refine this tool (see the banner above)
+export const ITERATION = 22; // bump when you refine this tool (see the banner above)
 
 const here = dirname(fileURLToPath(import.meta.url));
 export const repoRoot = resolve(here, '..');
@@ -863,6 +864,10 @@ export const COMMANDS = {
 const SELFTEST = [
   ['every pipeline script exists', () => PIPELINE.every(([, rel]) => existsSync(join(repoRoot, rel)))],
   ['every governance-surface file exists', () => GOVERNANCE_SURFACES.every((s) => existsSync(join(repoRoot, s.file)))],
+  ['Ubuntu golden lbabus source defaults match the cleanroom manifest', () => validateLbabusProvisioningPin({
+    manifest: JSON.parse(read('cleanroom/ubuntu-labview/cleanroom-manifest.json')),
+    provisioner: read('cleanroom/ubuntu-labview/provision-lbabus-fromsource.sh'),
+  }).ok],
   ['capture preflight selects an active Xorg display when all native dependencies exist', () => {
     const result = capturePreflight({ platform: 'linux', sessionType: 'x11', display: ':0', binaries: { ffmpeg: true, xdpyinfo: true }, labviewPresent: true });
     return result.ok && result.mode === 'xorg-active-display';
