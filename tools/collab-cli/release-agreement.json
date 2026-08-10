@@ -6,6 +6,23 @@
     "LINUX"
   ],
   "releases": {
+    "0.15.11": {
+      "summary": "lbabus 0.15.11 -- governed coordination component for extension 1.4.12 / AGENTS 0.3.16. Embeds the current canonical requirements and reviewer instructions, carries Ubuntu reviewer station support, and is the exact bus version used for the cross-plane quorum, Ubuntu selfcheck/capabilities proof, and correlated Windows DONE staging frame.",
+      "signoffs": {
+        "LINUX": {
+          "agreed": true,
+          "reviewedCommit": "ebcda914daee5609183f7622ef4fafdaf0d5feb8",
+          "at": "2026-08-10T05:25:36Z",
+          "note": "Built lbabus 0.15.11 from exact source ebcda91 inside the activated Ubuntu 24.04 VirtualBox reviewer. Offline source build and gate suite passed; version=0.15.11; pinned rg 14.1.0, git 2.43.0, gh 2.45.0, checksum-verified upstream glab 1.112.0, and dotnet 8.0.129 all passed selfcheck; capabilities was non-empty. The same station produced the enrolled signed visual PASS and quorum approval for extension 1.4.12. LINUX agrees to publish collab-cli-v0.15.11."
+        },
+        "WIN": {
+          "agreed": true,
+          "reviewedCommit": "ebcda914daee5609183f7622ef4fafdaf0d5feb8",
+          "at": "2026-08-10T05:25:36Z",
+          "note": "Built the exact 0.15.11 Windows lbabus from source ebcda91 with dotnet 8.0.423; version and selfcheck passed with rg 15.2.0, git 2.54.0, gh 2.92.0, glab 1.112.0, and dotnet 8.0.423. The binary emitted the real correlated WIN DONE release-stage@1 frame over TCP for extension 1.4.12 commit ebcda91 / VSIX f2723108. WIN agrees to publish collab-cli-v0.15.11."
+        }
+      }
+    },
     "0.15.0": {
       "summary": "lbabus 0.15.0 -- BREAKING net-only release. Removes the GitHub-Discussion coordination transport entirely: the discussion-backed commands init/post/poll/wait/delta + their config (category/title/agent-id/counterpart/addresses-me) are gone (ADR-0047), and the message priority + explicit-addressing model is retired (ADR-0048; LBA-REQ-013 superseded). The live `lbabus net` TCP bus is now the SOLE cross-plane coordination transport (net send / net listen). GitHubGraphQL is REST-only, retained just for selfcheck (release-tag listing) + defect (issue-comment); the GraphQL discussion client + the CollabMessage/Priority types are deleted, and the CI mock server keeps only the issue-comment REST route. Help text, the embedded AGENTS.md, and the MCP tool descriptions describe the net-only model. Delivered off-Discussions across #340-#344 (all merged to develop); LbaBus.csproj 0.14.0 -> 0.15.0 + CHANGELOG [0.15.0]. NOTE: 0.14.0 already released with the OLD discussion CLI, so this net-only build ships as a NEW version (0.15.0, a breaking bump), it does not re-release 0.14.0.",
       "signoffs": {
