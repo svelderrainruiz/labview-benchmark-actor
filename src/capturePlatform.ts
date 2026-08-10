@@ -1,7 +1,7 @@
 export interface CaptureMetadata {
   workload: 'labview-launch';
   plane: 'WIN' | 'LINUX';
-  source: 'ffmpeg-gdigrab' | 'ffmpeg-x11grab';
+  source: 'ffmpeg-gdigrab' | 'ffmpeg-x11grab' | 'gnome-shell-screencast';
 }
 
 export function labviewCandidatesForPlatform(platform: NodeJS.Platform): string[] {
@@ -20,11 +20,30 @@ export function labviewCandidatesForPlatform(platform: NodeJS.Platform): string[
   return [];
 }
 
-export function captureMetadataForPlatform(platform: NodeJS.Platform): CaptureMetadata {
+export function captureMetadataForPlatform(platform: NodeJS.Platform, sessionType = ''): CaptureMetadata {
   if (platform === 'linux') {
+    if (sessionType.trim().toLowerCase() === 'wayland') {
+      return { workload: 'labview-launch', plane: 'LINUX', source: 'gnome-shell-screencast' };
+    }
     return { workload: 'labview-launch', plane: 'LINUX', source: 'ffmpeg-x11grab' };
   }
   return { workload: 'labview-launch', plane: 'WIN', source: 'ffmpeg-gdigrab' };
+}
+
+export function gnomeScreencastScript(): string {
+  return [
+    'const { Gio, GLib, GLibUnix } = imports.gi;',
+    'const proxy = Gio.DBusProxy.new_for_bus_sync(Gio.BusType.SESSION, Gio.DBusProxyFlags.NONE, null, "org.gnome.Shell.Screencast", "/org/gnome/Shell/Screencast", "org.gnome.Shell.Screencast", null);',
+    'const options = { framerate: new GLib.Variant("i", 12), "draw-cursor": new GLib.Variant("b", true) };',
+    'const [started, output] = proxy.call_sync("Screencast", new GLib.Variant("(sa{sv})", [ARGV[0], options]), Gio.DBusCallFlags.NONE, -1, null).deep_unpack();',
+    'if (!started) throw new Error("GNOME Shell rejected the screencast request");',
+    'print(`READY:${output}`);',
+    'const loop = new GLib.MainLoop(null, false);',
+    'const stop = () => { try { proxy.call_sync("StopScreencast", null, Gio.DBusCallFlags.NONE, -1, null); } finally { loop.quit(); } return GLib.SOURCE_REMOVE; };',
+    'GLibUnix.signal_add(GLib.PRIORITY_DEFAULT, 2, stop);',
+    'GLibUnix.signal_add(GLib.PRIORITY_DEFAULT, 15, stop);',
+    'loop.run();',
+  ].join('\n');
 }
 
 export function x11DisplayForCapture(env: NodeJS.ProcessEnv = process.env): string {
@@ -72,6 +91,10 @@ export function linuxSamplerScript(outFile: string): string {
   return [
     'set -eu',
     `out=${out}`,
+    'epoch_ms() {',
+    '  local ns; ns=$(date +%s%N)',
+    '  printf \'%s\\n\' "${ns:0:${#ns}-6}"',
+    '}',
     'read_cpu() {',
     "  awk '/^cpu / { idle=$5+$6; total=0; for(i=2;i<=NF;i++) total+=$i; print total, idle; exit }' /proc/stat",
     '}',
@@ -86,7 +109,7 @@ export function linuxSamplerScript(outFile: string): string {
     '  prev_write["$name"]=$sectors_written',
     '  prev_io["$name"]=$io_ms',
     'done < <(read_disks)',
-    'prev_ms=$(date +%s%3N)',
+    'prev_ms=$(epoch_ms)',
     'set -- $(read_cpu); prev_total=$1; prev_idle=$2',
     'while true; do',
     '  sleep 0.1',
@@ -96,7 +119,7 @@ export function linuxSamplerScript(outFile: string): string {
     "  total_kb=$(awk '/^MemTotal:/ {print $2}' /proc/meminfo)",
     "  avail_kb=$(awk '/^MemAvailable:/ {print $2}' /proc/meminfo)",
     "  ram=$(awk -v t=\"$total_kb\" -v a=\"$avail_kb\" 'BEGIN { printf \"%.1f\", (t-a)/1024 }')",
-    '  ms=$(date +%s%3N)',
+    '  ms=$(epoch_ms)',
     '  elapsed=$((ms-prev_ms)); [ "$elapsed" -gt 0 ] || elapsed=1',
     "  disk_pct=0; disks=''; separator=''",
     '  while read -r name sectors_read sectors_written io_ms; do',

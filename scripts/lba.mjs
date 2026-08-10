@@ -33,6 +33,7 @@
 //   release-verify-published <X.Y.Z>  confirm the VS Code Marketplace listing shows the version live after publish (#412)
 //   release-cut-github <X.Y.Z> --run <id>  verify the publish-workflow run artifact + cut the immutable ext-v* release (#412)
 //   signing-status               discover + report the enrolled reviewer key location + where each sign-off runs
+//   capture-preflight            report native LabVIEW launch-capture readiness + selected Linux display mode
 //   selftest                     self-check this tool (run by the `agent-tooling-selftest` gate)
 
 import { mkdirSync, readFileSync, writeFileSync, existsSync, readdirSync, rmSync } from 'node:fs';
@@ -49,7 +50,7 @@ import { stagedOk } from '../reviewer-workstation/release-with-review-drive.mjs'
 import { buildReleaseStage } from '../reviewer-workstation/record-release-stage.mjs';
 import { enrolledReviewerPublicKeys } from '../experiments/handoff-beacon/reviewerVerdict.mjs';
 
-export const ITERATION = 18; // bump when you refine this tool (see the banner above)
+export const ITERATION = 20; // bump when you refine this tool (see the banner above)
 
 const here = dirname(fileURLToPath(import.meta.url));
 export const repoRoot = resolve(here, '..');
@@ -103,6 +104,24 @@ export function hostCapabilities() {
   const caps = ['node'];
   if (existsSync('/usr/local/bin/LabVIEWCLI')) caps.push('labview');
   return caps.sort();
+}
+
+export function capturePreflight({ platform, sessionType, display, binaries = {}, labviewPresent = false } = {}) {
+  const linux = platform === 'linux';
+  const xorg = linux && String(sessionType).toLowerCase() === 'x11';
+  const mode = !linux ? 'windows-gdigrab' : xorg ? 'xorg-active-display' : 'wayland-visible-gnome';
+  const checks = [
+    { label: 'ffmpeg', ok: binaries.ffmpeg === true },
+    { label: 'LabVIEW 2026', ok: labviewPresent === true },
+  ];
+  if (linux) {
+    if (xorg) {
+      checks.push({ label: 'xdpyinfo (x11-utils)', ok: binaries.xdpyinfo === true });
+      checks.push({ label: 'active DISPLAY', ok: Boolean(String(display || '').trim()) });
+    }
+    else checks.push({ label: 'gjs (GNOME visible recorder)', ok: binaries.gjs === true });
+  }
+  return { ok: checks.every((check) => check.ok), mode, checks };
 }
 
 export function goldenActivationHandoffCommands({ vm = 'actor1', hostname = vm, ip = '192.168.56.11' } = {}) {
@@ -773,6 +792,28 @@ export const COMMANDS = {
     desc: "print this host's execution capabilities (labview iff LabVIEWCLI present, node)",
     run: () => console.log(hostCapabilities().join(', ')),
   },
+  'capture-preflight': {
+    desc: 'report native LabVIEW launch-capture readiness + selected Linux display mode',
+    run: () => {
+      const available = (name) => { try { execFileSync('which', [name], { stdio: 'ignore' }); return true; } catch { return false; } };
+      const labviewPresent = [
+        '/usr/local/natinst/LabVIEW-2026-64/labview',
+        '/usr/local/natinst/LabVIEW-2026-64/labview64',
+        '/usr/local/bin/labview64',
+      ].some(existsSync);
+      const result = capturePreflight({
+        platform: process.platform,
+        sessionType: process.env.XDG_SESSION_TYPE,
+        display: process.env.DISPLAY,
+        binaries: { ffmpeg: available('ffmpeg'), xdpyinfo: available('xdpyinfo'), gjs: available('gjs') },
+        labviewPresent,
+      });
+      console.log(`native launch-capture mode: ${result.mode}`);
+      for (const check of result.checks) console.log(`  ${check.ok ? '\u2713' : '\u2717'} ${check.label}`);
+      console.log(result.ok ? '\n\u2713 host is ready for Capture LabVIEW Launch' : '\n\u2717 host is not capture-ready');
+      if (!result.ok) process.exit(1);
+    },
+  },
   selftest: {
     desc: 'self-check this tool (run by the agent-tooling-selftest gate)',
     run: () => runSelftest(),
@@ -822,6 +863,15 @@ export const COMMANDS = {
 const SELFTEST = [
   ['every pipeline script exists', () => PIPELINE.every(([, rel]) => existsSync(join(repoRoot, rel)))],
   ['every governance-surface file exists', () => GOVERNANCE_SURFACES.every((s) => existsSync(join(repoRoot, s.file)))],
+  ['capture preflight selects an active Xorg display when all native dependencies exist', () => {
+    const result = capturePreflight({ platform: 'linux', sessionType: 'x11', display: ':0', binaries: { ffmpeg: true, xdpyinfo: true }, labviewPresent: true });
+    return result.ok && result.mode === 'xorg-active-display';
+  }],
+  ['capture preflight selects visible GNOME recording on Wayland and fails closed when gjs is absent', () => {
+    const ready = capturePreflight({ platform: 'linux', sessionType: 'wayland', display: ':0', binaries: { ffmpeg: true, gjs: true }, labviewPresent: true });
+    const missing = capturePreflight({ platform: 'linux', sessionType: 'wayland', display: ':0', binaries: { ffmpeg: true, gjs: false }, labviewPresent: true });
+    return ready.ok && ready.mode === 'wayland-visible-gnome' && !missing.ok;
+  }],
   ['next requirement id is greater than the current max', () => {
     const cur = maxNum(read('docs/requirements/rtm.csv'), /^LBA-REQ-(\d+),/gm);
     return Number(nextRequirementId().match(/(\d+)$/)[1]) === cur + 1;

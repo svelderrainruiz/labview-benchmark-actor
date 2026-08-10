@@ -168,15 +168,16 @@ workspace root.
 - **Pre:** the reviewer's box has **licensed LabVIEW** (per the BYO docs).
 - **Steps:**
   1. Close all LabVIEW windows so the next process is a real launch transition.
-  2. On Ubuntu, confirm `echo $XDG_SESSION_TYPE` is `x11` (an Ubuntu Xorg session) and
-     `command -v xdpyinfo` succeeds, then run
+    2. On Ubuntu, confirm `command -v ffmpeg` succeeds; on Wayland also confirm `command -v gjs`, or on Xorg
+      confirm `command -v xdpyinfo`. Then run
      **LabVIEW Benchmark Actor: Capture LabVIEW Launch**.
-  3. Wait until the activated LabVIEW start screen is visible, then click **Stop LabVIEW Capture** in the status bar.
+    3. Wait until the activated LabVIEW start screen is visible. Interact with LabVIEW to create a deliberate
+      benchmark variation, then click **Stop LabVIEW Capture** in the status bar.
   4. Inspect the opened frame correlator and the retained `capture.json`.
 - **Expected:** LabVIEW launches successfully; the correlator contains real non-blank frames spanning the transition.
-  Windows records `plane=WIN`, `source=ffmpeg-gdigrab`; Ubuntu Xorg records `plane=LINUX`,
-  `source=ffmpeg-x11grab`. The capture covers the full X11 desktop, includes CPU/RAM/disk samples,
-  and can be scrubbed.
+  Windows records `plane=WIN`, `source=ffmpeg-gdigrab`; Ubuntu records `plane=LINUX`,
+  `source=ffmpeg-x11grab` on Xorg or `source=gnome-shell-screencast` on Wayland. Both capture the visible
+  operator desktop and the deliberate interaction. The capture includes CPU/RAM/disk samples and can be scrubbed.
 - **Result:** _____
 
 ### TC-10 — MCP server (programmatic capability)
