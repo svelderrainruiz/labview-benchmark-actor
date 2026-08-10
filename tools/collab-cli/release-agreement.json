@@ -6,6 +6,23 @@
     "LINUX"
   ],
   "releases": {
+    "0.15.12": {
+      "summary": "lbabus 0.15.12 -- immutable-tag recovery release for extension 1.4.13 / AGENTS 0.3.17. Restores the missing T-066 test-plan evidence required by the Proven LBA-REQ-066 RTM row while retaining the complete Ubuntu reviewer and net-only coordination hardening.",
+      "signoffs": {
+        "LINUX": {
+          "agreed": true,
+          "reviewedCommit": "9182780fa475473e155cda2cb804cd612debbe6a",
+          "at": "2026-08-10T06:06:07Z",
+          "note": "Built lbabus 0.15.12 from exact source 9182780 inside the activated Ubuntu 24.04 VirtualBox reviewer. Source build, gate suite, 210/210 local inventory, 182/182 correspondences, requirements-coverage harness, exact version, pinned-tool selfcheck, and capabilities all passed. LINUX agrees to publish collab-cli-v0.15.12."
+        },
+        "WIN": {
+          "agreed": true,
+          "reviewedCommit": "9182780fa475473e155cda2cb804cd612debbe6a",
+          "at": "2026-08-10T06:06:07Z",
+          "note": "Built exact lbabus 0.15.12 from source 9182780 with dotnet 8.0.423; version and selfcheck passed with pinned rg/git/gh/glab/dotnet. The binary emitted the real correlated WIN DONE release-stage@1 frame for extension 1.4.13 / VSIX 7a312186. WIN agrees to publish collab-cli-v0.15.12."
+        }
+      }
+    },
     "0.15.11": {
       "summary": "lbabus 0.15.11 -- governed coordination component for extension 1.4.12 / AGENTS 0.3.16. Embeds the current canonical requirements and reviewer instructions, carries Ubuntu reviewer station support, and is the exact bus version used for the cross-plane quorum, Ubuntu selfcheck/capabilities proof, and correlated Windows DONE staging frame.",
       "signoffs": {
@@ -879,6 +896,77 @@
               "publicKeyPem": "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEASfJb5PJovFnp0q+i6G4ZUko3jgFZtOBkyIElyezIHg4=\n-----END PUBLIC KEY-----\n",
               "signedAt": "2026-08-10T04:54:36.923Z",
               "signature": "Xz6HSeT+3r7M4s9YG3oQHmD42PzjwaEGGp9f3IpBSn9HOMeSBGPfTak/Q9xzf24WcsJvu/B7ygUYPExZ5ktXBg=="
+            }
+          }
+        },
+        "1.4.13": {
+          "summary": "extension 1.4.13 release agreement",
+          "signoffs": {
+            "WIN": {
+              "agreed": true,
+              "reviewedCommit": "9182780fa475473e155cda2cb804cd612debbe6a",
+              "at": "2026-08-10T06:05:53.233Z",
+              "note": "Windows 2022/2025 witnesses and correlated WIN TCP DONE staging agree on the exact candidate."
+            },
+            "LINUX": {
+              "agreed": true,
+              "reviewedCommit": "9182780fa475473e155cda2cb804cd612debbe6a",
+              "at": "2026-08-10T06:05:53.233Z",
+              "note": "Ubuntu Xorg reviewer signed exact PASS; Ubuntu 22.04/24.04 witnesses agree."
+            }
+          },
+          "visualReview": {
+            "verdict": {
+              "schema": "labview-benchmark-actor/reviewer-verdict@1",
+              "target": {
+                "component": "extension",
+                "version": "1.4.13",
+                "commit": "9182780fa475473e155cda2cb804cd612debbe6a",
+                "vsixSha256": "7a31218669da793b54d4eb79ee772a3be1ee5011eaf6527a07f4ddde5edf6d50"
+              },
+              "verdict": "pass",
+              "reviewer": "reviewer@vi-tech.nl",
+              "station": "UBUNTU_VM",
+              "notes": "",
+              "evidence": [
+                {
+                  "kind": "kpi",
+                  "ref": "local-kpi.json"
+                },
+                {
+                  "kind": "capture",
+                  "ref": "native-ubuntu-capture.json"
+                },
+                {
+                  "kind": "activation",
+                  "ref": "activation-receipt.json"
+                },
+                {
+                  "kind": "lbabus",
+                  "ref": "lbabus-gate-suite-receipt.json"
+                }
+              ],
+              "renderedAt": "2026-08-10T05:44:38.532Z"
+            },
+            "signOff": {
+              "schema": "labview-benchmark-actor/acg-human-signoff-v1",
+              "subject": {
+                "verdictDigest": "82482d842fd97359188d22447f7cf62b05e618b9c0fa891791f88ff2ae6f749d",
+                "consensusVerdict": "pass",
+                "target": {
+                  "component": "extension",
+                  "version": "1.4.13",
+                  "commit": "9182780fa475473e155cda2cb804cd612debbe6a",
+                  "vsixSha256": "7a31218669da793b54d4eb79ee772a3be1ee5011eaf6527a07f4ddde5edf6d50"
+                }
+              },
+              "reviewer": "reviewer@vi-tech.nl",
+              "decision": "approve",
+              "station": "UBUNTU_VM",
+              "algorithm": "ed25519",
+              "publicKeyPem": "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEAoyUXrKW53W3+FuBxhvScWL1eu5oD6/Vilqo12FLVH6E=\n-----END PUBLIC KEY-----\n",
+              "signedAt": "2026-08-10T05:44:38.534Z",
+              "signature": "qmFhvIzm9cj+y2PNifuYh2J9et/AeQtAQ8mcgcTQhFkfpefWOKaUcJWDuJeAcjcaXPIq6rdYOe4wBpuxSZ0FDQ=="
             }
           }
         }

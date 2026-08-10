@@ -10,6 +10,13 @@ so the WIN and LINUX planes install the exact same pinned version and cannot dri
 
 ## [Unreleased]
 
+## [0.15.12] — 2026-08-10
+
+### Changed
+
+- Advance after the immutable 0.15.11 tag failed the requirements harness.
+- Restore the missing T-066 test-plan evidence required by the Proven LBA-REQ-066 RTM row.
+
 ## [0.15.11] — 2026-08-10
 
 ### Changed
@@ -345,7 +352,8 @@ so the published release notes are self-complete.
 
 - Shared versioned .NET CLI (`lbabus`) for the WIN↔LINUX coordination bus (#6).
 
-[Unreleased]: https://github.com/LabVIEW-Community-CI-CD/labview-benchmark-actor/compare/collab-cli-v0.15.11...HEAD
+[Unreleased]: https://github.com/LabVIEW-Community-CI-CD/labview-benchmark-actor/compare/collab-cli-v0.15.12...HEAD
+[0.15.12]: https://github.com/LabVIEW-Community-CI-CD/labview-benchmark-actor/compare/collab-cli-v0.15.11...collab-cli-v0.15.12
 [0.15.11]: https://github.com/LabVIEW-Community-CI-CD/labview-benchmark-actor/compare/collab-cli-v0.15.10...collab-cli-v0.15.11
 [0.15.10]: https://github.com/LabVIEW-Community-CI-CD/labview-benchmark-actor/compare/collab-cli-v0.15.9...collab-cli-v0.15.10
 [0.15.9]: https://github.com/LabVIEW-Community-CI-CD/labview-benchmark-actor/compare/collab-cli-v0.15.8...collab-cli-v0.15.9

@@ -277,7 +277,7 @@ The controlled state of the repository's configuration items, derived from the r
 | Architecture decisions (ADRs) | 80 | docs/architecture/adr/README.md |
 | Governed gates | 210 | experiments/verify-local-gates.mjs |
 | Correspondence rules | 7 | experiments/reqs-coverage/verify-correspondences.mjs |
-| Governed test items | 96 | docs/testing/test-plan.md |
+| Governed test items | 97 | docs/testing/test-plan.md |
 
 Baselines are cut on the `main` branch via SemVer tags (GitFlow); each release is keyless-signed and
 corroborated across planes before publication (see `docs/cm/cm-plan.md` and the release procedure).
@@ -294,4 +294,4 @@ the same correspondence graph (ADR-0013).
 `node experiments/reqs-coverage/generate-test-report.mjs` rewrites this file; `--check` (the
 `test-report-current` gate) fails closed on drift, so the report can never silently lag the apparatus.
 
-_Generated from 210 gates, 7 correspondence rules, 97 requirements, 80 ADRs, 96 test items._
+_Generated from 210 gates, 7 correspondence rules, 97 requirements, 80 ADRs, 97 test items._

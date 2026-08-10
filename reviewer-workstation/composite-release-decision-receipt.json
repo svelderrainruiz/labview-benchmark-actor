@@ -6,9 +6,9 @@
   "capability": null,
   "candidate": {
     "component": "extension",
-    "version": "1.4.12",
-    "commit": "ebcda914daee5609183f7622ef4fafdaf0d5feb8",
-    "vsixSha256": "f272310866c02440bfb6f9acfafca2d0c00dfe48062b8259cf281d2bc6e3a638"
+    "version": "1.4.13",
+    "commit": "9182780fa475473e155cda2cb804cd612debbe6a",
+    "vsixSha256": "7a31218669da793b54d4eb79ee772a3be1ee5011eaf6527a07f4ddde5edf6d50"
   },
   "staged": {
     "drive": "await-agent-reply",
@@ -16,20 +16,20 @@
     "matched": true,
     "candidate": {
       "component": "extension",
-      "version": "1.4.12",
-      "commit": "ebcda914daee5609183f7622ef4fafdaf0d5feb8",
-      "vsixSha256": "f272310866c02440bfb6f9acfafca2d0c00dfe48062b8259cf281d2bc6e3a638"
+      "version": "1.4.13",
+      "commit": "9182780fa475473e155cda2cb804cd612debbe6a",
+      "vsixSha256": "7a31218669da793b54d4eb79ee772a3be1ee5011eaf6527a07f4ddde5edf6d50"
     },
     "frame": {
       "transport": "TCP",
-      "remote": "127.0.0.1:60100",
-      "ts": "2026-08-10T05:07:41.258Z",
+      "remote": "127.0.0.1:55077",
+      "ts": "2026-08-10T06:05:01.688Z",
       "senderId": "WIN",
-      "seq": "1786338461",
+      "seq": "1786341901",
       "type": "DONE",
-      "task": "extension-stage-1.4.12-ebcda91",
+      "task": "extension-stage-1.4.13-9182780",
       "ackOf": null,
-      "payload": "{\"schema\":\"labview-benchmark-actor/release-stage@1\",\"candidate\":{\"component\":\"extension\",\"version\":\"1.4.12\",\"commit\":\"ebcda914daee5609183f7622ef4fafdaf0d5feb8\",\"vsixSha256\":\"f272310866c02440bfb6f9acfafca2d0c00dfe48062b8259cf281d2bc6e3a638\"}}"
+      "payload": "{\"schema\":\"labview-benchmark-actor/release-stage@1\",\"candidate\":{\"component\":\"extension\",\"version\":\"1.4.13\",\"commit\":\"9182780fa475473e155cda2cb804cd612debbe6a\",\"vsixSha256\":\"7a31218669da793b54d4eb79ee772a3be1ee5011eaf6527a07f4ddde5edf6d50\"}}"
     }
   },
   "machine": {
@@ -44,8 +44,8 @@
       "crossPlane": true,
       "consensusVerdict": "pass",
       "consensus": {
-        "version": "1.4.12",
-        "sourceCommit": "ebcda914daee5609183f7622ef4fafdaf0d5feb8",
+        "version": "1.4.13",
+        "sourceCommit": "9182780fa475473e155cda2cb804cd612debbe6a",
         "verdict": "pass",
         "seriesHash": "7ad1c75d08244013d339c3f256fd14220a2df7cea56d5be5b38af2d82d68efaa",
         "pngSha256": null,
@@ -64,16 +64,16 @@
       {
         "schema": "labview-benchmark-actor/acg-human-signoff-v1",
         "subject": {
-          "verdictDigest": "abe0bb11e3a453d78d33dd56e17fa083fec189807cd4c9417604159093b5b4d4",
+          "verdictDigest": "61812a069a9089a523d2e8473d5efdeaba157f8e9196c4b53f60ce4040ea8eaa",
           "consensusVerdict": "pass"
         },
         "reviewer": "reviewer@vi-tech.nl",
         "decision": "approve",
         "station": "UBUNTU_VM",
         "algorithm": "ed25519",
-        "publicKeyPem": "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEAiBBPiAVQzibs3I1y/p2VJKmDletOaq3rvaVSg8iZKlA=\n-----END PUBLIC KEY-----\n",
-        "signedAt": "2026-08-10T04:53:00.261Z",
-        "signature": "oak/oDH2ePgvM32mVDGQTf9oi7/ix70htR1/PWK03e1rA8RwlOA+zAslbQzau1WtRdEBTbNHotVejx2GdJmfBQ=="
+        "publicKeyPem": "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEABbBO5KM4aU/UUMmczCCJMGQ8TBnOAJQ8821zhdcG1vU=\n-----END PUBLIC KEY-----\n",
+        "signedAt": "2026-08-10T05:47:37.317Z",
+        "signature": "BeUJkhO/CfQGgaTkUZY4tog9mzpsjXLzAdUkmrnX0AiS6LwrYdDxo8ztMuRtOdW6pMA1z6ARCbTT4JVwxSzxBQ=="
       }
     ]
   },
@@ -82,9 +82,9 @@
       "schema": "labview-benchmark-actor/reviewer-verdict@1",
       "target": {
         "component": "extension",
-        "version": "1.4.12",
-        "commit": "ebcda914daee5609183f7622ef4fafdaf0d5feb8",
-        "vsixSha256": "f272310866c02440bfb6f9acfafca2d0c00dfe48062b8259cf281d2bc6e3a638"
+        "version": "1.4.13",
+        "commit": "9182780fa475473e155cda2cb804cd612debbe6a",
+        "vsixSha256": "7a31218669da793b54d4eb79ee772a3be1ee5011eaf6527a07f4ddde5edf6d50"
       },
       "verdict": "pass",
       "reviewer": "reviewer@vi-tech.nl",
@@ -108,27 +108,27 @@
           "ref": "lbabus-gate-suite-receipt.json"
         }
       ],
-      "renderedAt": "2026-08-10T04:54:36.921Z"
+      "renderedAt": "2026-08-10T05:44:38.532Z"
     },
     "signOff": {
       "schema": "labview-benchmark-actor/acg-human-signoff-v1",
       "subject": {
-        "verdictDigest": "0d6a1f738c5dc0fa3997b1e1260a9292055b168189c9b5126235410255f14402",
+        "verdictDigest": "82482d842fd97359188d22447f7cf62b05e618b9c0fa891791f88ff2ae6f749d",
         "consensusVerdict": "pass",
         "target": {
           "component": "extension",
-          "version": "1.4.12",
-          "commit": "ebcda914daee5609183f7622ef4fafdaf0d5feb8",
-          "vsixSha256": "f272310866c02440bfb6f9acfafca2d0c00dfe48062b8259cf281d2bc6e3a638"
+          "version": "1.4.13",
+          "commit": "9182780fa475473e155cda2cb804cd612debbe6a",
+          "vsixSha256": "7a31218669da793b54d4eb79ee772a3be1ee5011eaf6527a07f4ddde5edf6d50"
         }
       },
       "reviewer": "reviewer@vi-tech.nl",
       "decision": "approve",
       "station": "UBUNTU_VM",
       "algorithm": "ed25519",
-      "publicKeyPem": "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEASfJb5PJovFnp0q+i6G4ZUko3jgFZtOBkyIElyezIHg4=\n-----END PUBLIC KEY-----\n",
-      "signedAt": "2026-08-10T04:54:36.923Z",
-      "signature": "Xz6HSeT+3r7M4s9YG3oQHmD42PzjwaEGGp9f3IpBSn9HOMeSBGPfTak/Q9xzf24WcsJvu/B7ygUYPExZ5ktXBg=="
+      "publicKeyPem": "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEAoyUXrKW53W3+FuBxhvScWL1eu5oD6/Vilqo12FLVH6E=\n-----END PUBLIC KEY-----\n",
+      "signedAt": "2026-08-10T05:44:38.534Z",
+      "signature": "qmFhvIzm9cj+y2PNifuYh2J9et/AeQtAQ8mcgcTQhFkfpefWOKaUcJWDuJeAcjcaXPIq6rdYOe4wBpuxSZ0FDQ=="
     }
   },
   "reviewerAllowlist": {
@@ -302,6 +302,22 @@
         "purposes": [
           "quorum"
         ]
+      },
+      {
+        "publicKeyPem": "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEAoyUXrKW53W3+FuBxhvScWL1eu5oD6/Vilqo12FLVH6E=\n-----END PUBLIC KEY-----\n",
+        "validFrom": "1.4.13",
+        "validThrough": "1.4.13",
+        "purposes": [
+          "visual"
+        ]
+      },
+      {
+        "publicKeyPem": "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEABbBO5KM4aU/UUMmczCCJMGQ8TBnOAJQ8821zhdcG1vU=\n-----END PUBLIC KEY-----\n",
+        "validFrom": "1.4.13",
+        "validThrough": "1.4.13",
+        "purposes": [
+          "quorum"
+        ]
       }
     ]
   },
@@ -326,7 +342,7 @@
   },
   "verdict": {
     "compositeReleaseProven": true,
-    "reason": "both gates publish for extension 1.4.12: machine quorum + enrolled sign-off (ADR-0018) AND human visual PASS (LBA-REQ-057), bound to the same net-staged candidate"
+    "reason": "both gates publish for extension 1.4.13: machine quorum + enrolled sign-off (ADR-0018) AND human visual PASS (LBA-REQ-057), bound to the same net-staged candidate"
   },
-  "digest": "61c57e944d642aed6794067bf647d93887c3d3760cf77d0ee6a37c167d12bcca"
+  "digest": "efff847ff03fa8ee1149096475e54f597d039ef7a34c410bbaa725ab8ac859ee"
 }
