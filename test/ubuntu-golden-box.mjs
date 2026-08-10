@@ -9,12 +9,15 @@ import {
   validateBaseBootstrapReceipt,
   validateGoldenBaseProof,
   validateGoldenBoxDefinition,
+  validateLbabusProvisioningPin,
 } from '../scripts/verify-ubuntu-golden-box.mjs';
 
 const repoRoot = fileURLToPath(new URL('..', import.meta.url));
 const vagrantfile = readFileSync(join(repoRoot, 'cleanroom', 'ubuntu-labview', 'production-golden-box.Vagrantfile'), 'utf8');
 const metadataText = readFileSync(join(repoRoot, 'cleanroom', 'ubuntu-labview', 'production-golden-box.metadata.json'), 'utf8');
 const metadata = JSON.parse(metadataText);
+const manifest = JSON.parse(readFileSync(join(repoRoot, 'cleanroom', 'ubuntu-labview', 'cleanroom-manifest.json'), 'utf8'));
+const lbabusProvisioner = readFileSync(join(repoRoot, 'cleanroom', 'ubuntu-labview', 'provision-lbabus-fromsource.sh'), 'utf8');
 const activationCycle = readFileSync(join(repoRoot, 'cleanroom', 'ubuntu-labview', 'golden-activation-cycle.ps1'), 'utf8');
 const screenshotPath = 'docs/information-for-users/images/ubuntu-24.04-labview-2026/golden-base-ready.png';
 const screenshotSha256 = sha256(readFileSync(join(repoRoot, screenshotPath)));
@@ -46,6 +49,23 @@ const baseReceipt = {
 };
 
 assert.equal(validateGoldenBoxDefinition({ metadata, vagrantfile }).ok, true, 'committed golden definition must validate');
+assert.equal(validateLbabusProvisioningPin({ manifest, provisioner: lbabusProvisioner }).ok, true, 'committed lbabus pin must validate');
+assert.equal(
+  validateLbabusProvisioningPin({
+    manifest: { ...manifest, lbabus: { ...manifest.lbabus, source_ref: 'collab-cli-v0.0.0' } },
+    provisioner: lbabusProvisioner,
+  }).ok,
+  false,
+  'stale lbabus source tag must fail closed',
+);
+assert.equal(
+  validateLbabusProvisioningPin({
+    manifest: { ...manifest, lbabus: { ...manifest.lbabus, source_repo: 'https://example.invalid/wrong.git' } },
+    provisioner: lbabusProvisioner,
+  }).ok,
+  false,
+  'wrong lbabus source repository must fail closed',
+);
 assert.equal(
   sha256(vagrantfile),
   sha256(vagrantfile.replace(/\r\n?/g, '\n')),

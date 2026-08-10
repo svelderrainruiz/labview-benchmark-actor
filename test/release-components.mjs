@@ -20,7 +20,7 @@ const base = {
       releaseRisk: { present: 12, total: 28, status: 'BLOCKED' },
     },
   },
-  packageJson: { version: extensionVersion, scripts: { package: 'vsce package --pre-release --out labview-benchmark-actor.vsix' } },
+  packageJson: { version: extensionVersion, scripts: { package: 'vsce package --out labview-benchmark-actor.vsix' } },
   packageLock: { version: extensionVersion, packages: { '': { version: extensionVersion } } },
   agentsManifest: { version: releaseComponents.agents },
   agentsText: `exactly \`${releaseComponents.lbabus}\` for this extension build\nbundle v${releaseComponents.humanTasks}`,
@@ -28,7 +28,7 @@ const base = {
   humanTasksSource: `HUMAN_TASKS_VERSION = '${releaseComponents.humanTasks}'`,
   humanTaskRunner: `HUMAN_TASKS_VERSION = '${releaseComponents.humanTasks}'`,
   changelog: `## [${extensionVersion}]`,
-  releaseWorkflow: 'vsce publish --pre-release',
+  releaseWorkflow: 'vsce publish --packagePath',
   releaseCli: "['--target', 'main']",
   releaseRiskBaseline,
   standardsScoreBaseline,
@@ -40,11 +40,11 @@ const base = {
 assert.equal(verifyReleaseComponents(base).ok, true);
 assert.equal(verifyReleaseComponents({
   ...base,
-  components: { ...base.components, marketplaceChannel: 'stable' },
+  components: { ...base.components, marketplaceChannel: 'prerelease' },
 }).ok, false);
 assert.equal(verifyReleaseComponents({
   ...base,
-  packageJson: { ...base.packageJson, scripts: { package: 'vsce package --out labview-benchmark-actor.vsix' } },
+  packageJson: { ...base.packageJson, scripts: { package: 'vsce package --pre-release --out labview-benchmark-actor.vsix' } },
 }).ok, false);
 
 const falselyPromoted = structuredClone(releaseRiskBaseline);

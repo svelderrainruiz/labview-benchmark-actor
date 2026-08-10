@@ -6,6 +6,22 @@ follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project
 
 ## [Unreleased]
 
+## [1.4.14] - 2026-08-10
+
+### Fixed
+
+- **Interactive Ubuntu Wayland capture now preserves benchmark variation.** GNOME Shell records the operator-visible
+  desktop while LabVIEW remains interactive; extracted frames use reconstructed capture timestamps, and Linux resource
+  samples use epoch milliseconds so CPU, RAM, and disk curves correlate to the correct frame instead of the final sample.
+- **Legacy Wayland captures recover available benchmark data.** Assembly normalizes previously recorded nanosecond
+  sample timestamps and preserves `LINUX` / `gnome-shell-screencast` metadata without requiring LabVIEW to remain open
+  when the operator stops the capture.
+
+### Changed
+
+- **Marketplace publication is stable.** The canonical, signed GitHub Release VSIX is packaged and published on the
+  stable Marketplace channel after byte-identity verification; 1.4.14 is no longer marked as a prerelease extension.
+
 ## [1.4.13] - 2026-08-10
 
 ### Changed

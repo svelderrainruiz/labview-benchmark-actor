@@ -37,8 +37,8 @@ DOCS_ROOT="$(dirname "$LBA_DIR")/docs"
 DEST="${LBABUS_DEST:-/usr/local/bin/lbabus}"
 EMIT="${LBABUS_EMIT:-/usr/local/bin/emit-boot-marker.sh}"  # PATH-standard, next to lbabus; where mesh-actor.sh expects it
 SDK_PKG="${DOTNET_SDK_PKG:-dotnet-sdk-8.0}"          # Ubuntu 24.04 ships this; net8.0 builds natively
-REPO_URL="${LBABUS_REPO_URL:-https://github.com/LabVIEW-Community-CI-CD/labview-benchmark-actor}"  # PUBLIC
-REF="${LBABUS_REF:-collab-cli-v0.15.0}"              # cleanroom baseline; env may pin a tag or commit explicitly
+REPO_URL="${LBABUS_REPO_URL:-https://github.com/svelderrainruiz/labview-benchmark-actor}"  # PUBLIC
+REF="${LBABUS_REF:-collab-cli-v0.15.12}"             # cleanroom baseline; env may pin a tag or commit explicitly
 SRC_DIR="${LBABUS_SRC_DIR:-}"                        # optional: bake a LOCAL tools/collab-cli instead of cloning
 RID="${LBABUS_RID:-linux-x64}"
 

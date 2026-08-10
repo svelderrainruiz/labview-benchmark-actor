@@ -969,6 +969,73 @@
               "signature": "qmFhvIzm9cj+y2PNifuYh2J9et/AeQtAQ8mcgcTQhFkfpefWOKaUcJWDuJeAcjcaXPIq6rdYOe4wBpuxSZ0FDQ=="
             }
           }
+        },
+        "1.4.14": {
+          "summary": "Extension 1.4.14 stable release: visible Wayland capture fix",
+          "signoffs": {
+            "WIN": {
+              "agreed": true,
+              "reviewedCommit": "fd687b0bcca8414d49144bc0d4c41fbf75ca2492",
+              "at": "2026-08-10T11:37:51.994Z",
+              "note": "Reviewer VM staged exact VSIX SHA-256 24ab88106b4e0bb009646e4146b7bd5d20a5afaa67a8607c79bf7384c36559bb and emitted correlated DONE stage-1.4.14-fd687b0-json."
+            },
+            "LINUX": {
+              "agreed": true,
+              "reviewedCommit": "fd687b0bcca8414d49144bc0d4c41fbf75ca2492",
+              "at": "2026-08-10T11:37:51.994Z",
+              "note": "Cross-plane corroboration run 31382715934 and attestation 348a537442d79f2302775cab491f9a7104bbdee02092d03dc82841a59aab52d8 passed."
+            }
+          },
+          "visualReview": {
+            "verdict": {
+              "schema": "labview-benchmark-actor/reviewer-verdict@1",
+              "target": {
+                "component": "extension",
+                "version": "1.4.14",
+                "commit": "fd687b0bcca8414d49144bc0d4c41fbf75ca2492",
+                "vsixSha256": "24ab88106b4e0bb009646e4146b7bd5d20a5afaa67a8607c79bf7384c36559bb"
+              },
+              "verdict": "pass",
+              "reviewer": "reviewer@vi-tech.nl",
+              "station": "WINDOWS_VM",
+              "notes": "",
+              "evidence": [
+                {
+                  "kind": "cross-plane-run",
+                  "ref": "31382715934"
+                },
+                {
+                  "kind": "attestation-sha256",
+                  "ref": "348a537442d79f2302775cab491f9a7104bbdee02092d03dc82841a59aab52d8"
+                },
+                {
+                  "kind": "windows-stage",
+                  "ref": "stage-1.4.14-fd687b0-json"
+                }
+              ],
+              "renderedAt": "2026-08-10T11:36:45.587Z"
+            },
+            "signOff": {
+              "schema": "labview-benchmark-actor/acg-human-signoff-v1",
+              "subject": {
+                "verdictDigest": "9466bd7b6824c2709183adbb3e8394ab7214360cf11b51745b056e633b1f296e",
+                "consensusVerdict": "pass",
+                "target": {
+                  "component": "extension",
+                  "version": "1.4.14",
+                  "commit": "fd687b0bcca8414d49144bc0d4c41fbf75ca2492",
+                  "vsixSha256": "24ab88106b4e0bb009646e4146b7bd5d20a5afaa67a8607c79bf7384c36559bb"
+                }
+              },
+              "reviewer": "reviewer@vi-tech.nl",
+              "decision": "approve",
+              "station": "WINDOWS_VM",
+              "algorithm": "ed25519",
+              "publicKeyPem": "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEABpaBe/zqNZyNyRKKl2Kg+OlEiowgpHuLdHC07xDzLv0=\n-----END PUBLIC KEY-----\n",
+              "signedAt": "2026-08-10T11:36:45.588Z",
+              "signature": "36kBj0rI0i9cWk+ScLOM6ENQNf1+oci0bzHN4MySU1e4jZ+XAz5irJr1xz1B1mpOGu9Q5T8SHhZ9pCJr8JcgDA=="
+            }
+          }
         }
       }
     }

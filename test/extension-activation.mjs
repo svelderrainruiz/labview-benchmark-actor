@@ -8,7 +8,7 @@
 // Usage: npm test   (== npm run compile && node test/extension-activation.mjs)
 
 import Module, { createRequire } from 'node:module';
-import { existsSync, readFileSync, readdirSync, mkdirSync, writeFileSync, rmSync, statSync, copyFileSync, chmodSync } from 'node:fs';
+import { existsSync, readFileSync, readdirSync, mkdirSync, writeFileSync, rmSync, statSync, copyFileSync, chmodSync, utimesSync } from 'node:fs';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { dirname, join } from 'node:path';
 import { tmpdir } from 'node:os';
@@ -78,6 +78,7 @@ const mockVscode = {
       return warnResponseQueue.length ? warnResponseQueue.shift() : undefined;
     },
     showTextDocument: async () => undefined,
+    createStatusBarItem: () => ({ show() {}, dispose() {} }),
     createTerminal: (options) => ({
       name: options && options.name,
       show() {},
@@ -114,6 +115,8 @@ const mockVscode = {
       return panel;
     },
   },
+  StatusBarAlignment: { Left: 1, Right: 2 },
+  ThemeColor: class { constructor(id) { this.id = id; } },
   ViewColumn: { Active: -1 },
   ProgressLocation: { Notification: 15, Window: 10, SourceControl: 1 },
   Uri: {
@@ -220,11 +223,20 @@ const childProcessMock = {
   spawnSync: (...args) => spawnSyncHandler(...args),
   execFile: execFileMock,
   spawn: (_file, _args, opts) => {
-    spawnCalls.push({ file: _file, args: _args });
-    const mkStream = () => ({ on(event, cb) { if (event === 'data') { cb(Buffer.from('[mprr] run\n')); } return this; } });
+    const streamOutput = _file === 'gjs' ? `READY:${_args.at(-1)}.mp4\n` : '[mprr] run\n';
+    const mkStream = () => ({ on(event, cb) { if (event === 'data') { cb(Buffer.from(streamOutput)); } return this; } });
     const handlers = {};
-    const proc = { stdout: mkStream(), stderr: mkStream(), on(event, cb) { handlers[event] = cb; return this; } };
-    setImmediate(() => {
+    const emitClose = () => { if (handlers.close) handlers.close(spawnMode.code); };
+    const proc = {
+      stdout: mkStream(), stderr: mkStream(), stdin: { write() { setImmediate(emitClose); } }, killed: false,
+      on(event, cb) { handlers[event] = cb; return this; },
+      once(event, cb) { handlers[event] = cb; return this; },
+      off(event, cb) { if (handlers[event] === cb) delete handlers[event]; return this; },
+      kill(signal) { this.killed = true; this.signal = signal; setImmediate(emitClose); return true; },
+      unref() { return this; },
+    };
+    spawnCalls.push({ file: _file, args: _args, opts, proc });
+    if (_file === 'node') setImmediate(() => {
       if (spawnMode.error) { if (handlers.error) { handlers.error(new Error('spawn node ENOENT')); } return; }
       const outTrend = opts && opts.env && opts.env.LBA_OUT;
       if (spawnMode.code === 0 && outTrend) {
@@ -232,7 +244,7 @@ const childProcessMock = {
           ? '{bad'
           : JSON.stringify({ schema: 'labview-benchmark-actor/workload-trend@1', plane: 'LINUX', n: 3, verdict: 'PASS', latest: 1919, stats: { mean: 1866.3 } }));
       }
-      if (handlers.close) { handlers.close(spawnMode.code); }
+      emitClose();
     });
     return proc;
   },
@@ -562,22 +574,25 @@ try {
     mkdirSync(capDir, { recursive: true });
     writeFileSync(join(capDir, 'frame-00000.png'), 'x'.repeat(120));
     writeFileSync(join(capDir, 'frame-00001.png'), 'x'.repeat(140));
+    utimesSync(join(capDir, 'frame-00000.png'), 1_700_000_000, 1_700_000_000);
+    utimesSync(join(capDir, 'frame-00001.png'), 1_700_000_001, 1_700_000_001);
     // resources.jsonl: two valid samples (incl per-physical-disk throughput) + a blank line + a partial
     // (unparseable) line the assembler must skip.
     writeFileSync(
       join(capDir, 'resources.jsonl'),
-      '{"ms":1,"cpuPct":10,"ramMb":2000,"diskPct":1,"disks":[{"name":"0 C:","writeMBs":0,"readMBs":0}]}\n\n{bad partial line\n{"ms":2,"cpuPct":12,"ramMb":2010,"diskPct":2,"disks":[{"name":"0 C:","writeMBs":11.4,"readMBs":0.2}]}\n'
+      '{"ms":1700000000000000000,"cpuPct":10,"ramMb":2000,"diskPct":1,"disks":[{"name":"0 C:","writeMBs":0,"readMBs":0}]}\n\n{bad partial line\n{"ms":1700000001000000000,"cpuPct":12,"ramMb":2010,"diskPct":2,"disks":[{"name":"0 C:","writeMBs":11.4,"readMBs":0.2}]}\n'
     );
     writeFileSync(
       join(capDir, 'capture-meta.json'),
-      '{"workload":"labview-launch","plane":"LINUX","source":"ffmpeg-x11grab"}\n',
+      '{"workload":"labview-launch","plane":"LINUX","source":"gnome-shell-screencast"}\n',
     );
     const rec = ext.assembleCaptureFromDir(capDir, capBuilder);
     assert(Array.isArray(rec.frames) && rec.frames.length === 2, `assembleCaptureFromDir builds a 2-frame record, got ${rec.frames && rec.frames.length}`);
     assert(existsSync(join(capDir, 'capture.json')), 'assembleCaptureFromDir writes capture.json alongside the frames');
     assert(Array.isArray(rec.diskNames) && rec.diskNames.includes('0 C:'), 'assembleCaptureFromDir exposes the per-physical-disk names');
+    assert(rec.frames[0].cpuPct === 10 && rec.frames[1].cpuPct === 12, 'assembleCaptureFromDir normalizes legacy Linux nanoseconds and correlates distinct resource samples');
     assert(rec.frames[1].disks && rec.frames[1].disks[0].writeMBs === 11.4, 'assembleCaptureFromDir carries per-disk write throughput onto frames');
-    assert(rec.plane === 'LINUX' && rec.source === 'ffmpeg-x11grab', 'assembleCaptureFromDir preserves the native Ubuntu capture source');
+    assert(rec.plane === 'LINUX' && rec.source === 'gnome-shell-screencast', 'assembleCaptureFromDir preserves the visible GNOME capture source');
 
     // empty dir -> fails closed (no frames were captured).
     const capEmpty = join(tmpdir(), 'lba-test-capture-empty-xyz');
@@ -936,22 +951,33 @@ try {
         const errorsBefore = errorMessages.length;
         await registered.find((r) => r.id === 'labviewBenchmarkActor.captureLaunch').handler();
         const dirsAfter = existsSync(captureRoot) ? readdirSync(captureRoot).length : 0;
+        const waylandSpawns = spawnCalls.slice(spawnsBefore);
+        const gnomeRecorderSpawn = waylandSpawns.find((call) => call.file === 'gjs');
+        const xvfbSpawn = waylandSpawns.find((call) => call.file === 'Xvfb');
+        const ffmpegSpawn = waylandSpawns.find((call) => call.file === process.execPath && Array.isArray(call.args) && call.args.includes('x11grab'));
+        const labviewSpawn = waylandSpawns.find((call) => call.file === process.execPath && Array.isArray(call.args) && call.args.length === 0);
         assert(
-          errorMessages.slice(errorsBefore).some((m) => /requires an Xorg session/.test(m)),
-          'native Linux capture reports the Xorg requirement',
+          !errorMessages.slice(errorsBefore).some((m) => /requires an Xorg session/.test(m)),
+          'native Linux capture no longer rejects a Wayland host',
         );
-        assert(dirsAfter === dirsBefore, 'Xorg validation fails before creating a capture or beacon directory');
-        assert(spawnCalls.length === spawnsBefore, 'Xorg validation fails before spawning ffmpeg or the sampler');
+        assert(dirsAfter === dirsBefore + 1, 'Wayland capture creates one capture directory');
+        assert(gnomeRecorderSpawn && gnomeRecorderSpawn.args.includes('-c'), 'Wayland capture starts the persistent GNOME Shell recorder');
+        assert(!xvfbSpawn, 'Wayland capture never starts a hidden Xvfb display');
+        assert(!ffmpegSpawn, 'Wayland capture does not x11grab the incomplete rootless Xwayland display');
+        assert(labviewSpawn?.opts?.env === undefined, 'LabVIEW inherits the operator-visible Wayland session');
+        await registered.find((r) => r.id === 'labviewBenchmarkActor.stopCapture').handler();
+        assert(gnomeRecorderSpawn.proc.killed === true && gnomeRecorderSpawn.proc.signal === 'SIGINT', 'stopping capture asks GNOME Shell to finalize the visible recording');
 
         delete process.env.DISPLAY;
         process.env.XDG_SESSION_TYPE = 'x11';
+        const x11FailureSpawnsBefore = spawnCalls.length;
         const missingDisplayErrors = errorMessages.length;
         await registered.find((r) => r.id === 'labviewBenchmarkActor.captureLaunch').handler();
         assert(
           errorMessages.slice(missingDisplayErrors).some((m) => /requires DISPLAY/.test(m)),
           'native Linux capture validates DISPLAY before creating a capture beacon',
         );
-        assert((existsSync(captureRoot) ? readdirSync(captureRoot).length : 0) === dirsBefore, 'missing DISPLAY leaves no stale capture directory');
+        assert((existsSync(captureRoot) ? readdirSync(captureRoot).length : 0) === dirsAfter, 'missing DISPLAY leaves no stale capture directory');
 
         process.env.DISPLAY = ':0';
         execFileHandler = () => { throw 'xdpyinfo unavailable'; };
@@ -961,12 +987,12 @@ try {
           errorMessages.slice(xdpyErrors).some((m) => /Unable to resolve the full X11 desktop dimensions/.test(m)),
           'native Linux capture reports xdpyinfo failure before creating a capture beacon',
         );
-        assert((existsSync(captureRoot) ? readdirSync(captureRoot).length : 0) === dirsBefore, 'xdpyinfo failure leaves no stale capture directory');
-        assert(spawnCalls.length === spawnsBefore, 'all X11 preflight failures occur before child process launch');
+        assert((existsSync(captureRoot) ? readdirSync(captureRoot).length : 0) === dirsAfter, 'xdpyinfo failure leaves no stale capture directory');
+        assert(spawnCalls.length === x11FailureSpawnsBefore, 'all X11 preflight failures occur before child process launch');
 
         execFileHandler = () => { throw new Error('xdpyinfo failed'); };
         await registered.find((r) => r.id === 'labviewBenchmarkActor.captureLaunch').handler();
-        assert((existsSync(captureRoot) ? readdirSync(captureRoot).length : 0) === dirsBefore, 'Error-shaped xdpyinfo failure also leaves no stale capture directory');
+        assert((existsSync(captureRoot) ? readdirSync(captureRoot).length : 0) === dirsAfter, 'Error-shaped xdpyinfo failure also leaves no stale capture directory');
       } finally {
         delete configStore.labviewPath;
         delete configStore.ffmpegPath;

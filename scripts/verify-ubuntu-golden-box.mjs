@@ -9,6 +9,8 @@ const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const defaultVagrantfile = join(repoRoot, 'cleanroom', 'ubuntu-labview', 'production-golden-box.Vagrantfile');
 const defaultMetadata = join(repoRoot, 'cleanroom', 'ubuntu-labview', 'production-golden-box.metadata.json');
 const defaultProof = join(repoRoot, 'cleanroom', 'ubuntu-labview', 'production-golden-base-proof.json');
+const defaultManifest = join(repoRoot, 'cleanroom', 'ubuntu-labview', 'cleanroom-manifest.json');
+const defaultLbabusProvisioner = join(repoRoot, 'cleanroom', 'ubuntu-labview', 'provision-lbabus-fromsource.sh');
 
 export function sha256(value) {
   const canonical = typeof value === 'string' ? value.replace(/\r\n?/g, '\n') : value;
@@ -85,6 +87,30 @@ export function validateGoldenBoxDefinition({ metadata, vagrantfile }) {
     if (!vagrantfile.includes(marker)) failures.push(`golden Vagrantfile marker is missing: ${marker}`);
   }
   if (/password|token|private.?key/i.test(JSON.stringify(metadata))) failures.push('golden metadata must not contain secret-bearing fields');
+  return { ok: failures.length === 0, failures };
+}
+
+export function validateLbabusProvisioningPin({ manifest, provisioner }) {
+  const failures = [];
+  if (manifest?.schema !== 'labview-benchmark-actor/cleanroom-provisioning-manifest-v1') {
+    failures.push('cleanroom manifest schema is invalid');
+  }
+  const sourceRepo = manifest?.lbabus?.source_repo;
+  const sourceRef = manifest?.lbabus?.source_ref;
+  const sdkPackage = manifest?.lbabus?.dotnet_sdk_pkg;
+  const runtimeIdentifier = manifest?.lbabus?.runtime_identifier;
+  for (const [name, value] of Object.entries({ sourceRepo, sourceRef, sdkPackage, runtimeIdentifier })) {
+    if (!value) failures.push(`cleanroom manifest lbabus ${name} is missing`);
+  }
+  const requiredDefaults = [
+    ['source repository', `REPO_URL="\${LBABUS_REPO_URL:-${sourceRepo}}"`],
+    ['source reference', `REF="\${LBABUS_REF:-${sourceRef}}"`],
+    ['SDK package', `SDK_PKG="\${DOTNET_SDK_PKG:-${sdkPackage}}"`],
+    ['runtime identifier', `RID="\${LBABUS_RID:-${runtimeIdentifier}}"`],
+  ];
+  for (const [name, marker] of requiredDefaults) {
+    if (!provisioner.includes(marker)) failures.push(`lbabus provisioner ${name} default does not match the manifest`);
+  }
   return { ok: failures.length === 0, failures };
 }
 
@@ -171,9 +197,15 @@ function main() {
   }
   const metadataText = readFileSync(defaultMetadata, 'utf8');
   const vagrantfileText = readFileSync(defaultVagrantfile, 'utf8');
+  const manifest = JSON.parse(readFileSync(defaultManifest, 'utf8'));
+  const lbabusProvisioner = readFileSync(defaultLbabusProvisioner, 'utf8');
   report('ubuntu production golden definition', validateGoldenBoxDefinition({
     metadata: JSON.parse(metadataText),
     vagrantfile: vagrantfileText,
+  }));
+  report('ubuntu golden lbabus provisioning pin', validateLbabusProvisioningPin({
+    manifest,
+    provisioner: lbabusProvisioner,
   }));
   if (existsSync(defaultProof)) {
     report('ubuntu production golden base proof', validateGoldenBaseProof(JSON.parse(readFileSync(defaultProof, 'utf8')), {

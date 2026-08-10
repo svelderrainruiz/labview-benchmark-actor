@@ -23,13 +23,14 @@ if [ -r /etc/os-release ]; then
   [ "${VERSION_ID:-}" = "24.04" ] || log "[warn] expected Ubuntu 24.04, found ${PRETTY_NAME:-unknown} — continuing."
 fi
 
-# 1) Base tooling + the runtime libs LabVIEW's installer + IDE expect on a minimal Ubuntu, plus Xvfb —
+# 1) Base tooling + the runtime libs LabVIEW's installer + IDE expect on a minimal Ubuntu, plus capture tools —
 #    a headless X display is REQUIRED for `LabVIEWCLI` (RunVI / MassCompile / RunVIAnalyzer) to run over
-#    SSH with no desktop session (`xvfb-run -a LabVIEWCLI ...`); without it the CLI cannot open a display.
-log 'apt update + base packages (incl. Xvfb for headless LabVIEWCLI)...'
+#    SSH with no desktop session (`xvfb-run -a LabVIEWCLI ...`). Native launch capture uses ffmpeg directly on
+#    Xorg, or a persistent GJS client for GNOME Shell's visible-desktop recorder on Wayland.
+log 'apt update + base packages (incl. ffmpeg/gjs/Xvfb/x11-utils for LabVIEW capture)...'
 apt-get update -y
 apt-get install -y --no-install-recommends \
-  ca-certificates curl gnupg apt-transport-https xvfb \
+  ca-certificates curl gnupg apt-transport-https ffmpeg gjs x11-utils xvfb \
   libglu1-mesa libxinerama1 libxrandr2 libxcursor1 libxi6 libgl1
 
 # 1b) Passwordless sudo for the primary 'actor' user (cross-plane identity parity with the Windows

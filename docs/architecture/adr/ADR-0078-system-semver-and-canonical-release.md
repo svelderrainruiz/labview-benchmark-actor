@@ -2,6 +2,7 @@
 
 - Status: Accepted
 - Date: 2026-08-08
+- Amended: 2026-08-10 (1.4.14 promotes the byte-identical secondary Marketplace publication to stable)
 - Deciders: signed 1.4.1 feedback + maintainer + 1.4.3 release agent
 - Relates to: LBA-REQ-095 (realized here), LBA-REQ-020 (release agreement), LBA-REQ-057 (human gate),
   LBA-REQ-085 / LBA-REQ-086 / LBA-REQ-093 (reviewed artifact reproducibility)
@@ -36,9 +37,9 @@ controls below; they are not a blanket conformance claim.
   prefix every task/command/output event with a stable index, UTC timestamp, monotonic nanoseconds, and the named
   `process.hrtime.bigint` clock source. A JSON receipt is retained under extension global storage.
 - The immutable GitHub Release targeting `main` is canonical. Marketplace publication is a separate, explicitly
-  requested second dispatch, uses `vsce publish --pre-release`, and first downloads the GitHub Release VSIX and proves
-  its SHA-256 equals the staged VSIX. That dispatch runs from the release tag and publishes the downloaded release
-  asset itself. There is no stable Marketplace path in the governed workflow.
+  requested second dispatch, uses stable `vsce publish`, and first downloads the GitHub Release VSIX and proves its
+  SHA-256 equals the staged VSIX. That dispatch runs from the release tag and publishes the downloaded release asset
+  itself. The prior prerelease-only restriction is superseded by the 1.4.14 stable promotion.
 
 ## Consequences
 
