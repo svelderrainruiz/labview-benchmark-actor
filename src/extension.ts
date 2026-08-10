@@ -1,6 +1,6 @@
 import * as vscode from 'vscode';
 import { execFile, spawn, spawnSync, ChildProcess } from 'node:child_process';
-import { readFileSync, mkdirSync, readdirSync, statSync, writeFileSync, existsSync, watch } from 'node:fs';
+import { readFileSync, mkdirSync, readdirSync, statSync, writeFileSync, existsSync, watch, utimesSync } from 'node:fs';
 import { createHash } from 'node:crypto';
 import { promisify } from 'node:util';
 import { pathToFileURL } from 'node:url';
@@ -13,6 +13,7 @@ import { reviewerStationForEnvironment } from './reviewerStation';
 import {
   captureMetadataForPlatform,
   ffmpegCaptureArgsForPlatform,
+  gnomeScreencastScript,
   labviewCandidatesForPlatform,
   linuxSamplerScript,
   parseX11DisplaySize,
@@ -699,6 +700,12 @@ function busConfig(): { netHosts: string; netLog: string } {
   };
 }
 
+function normalizeResourceSample(sample: Record<string, unknown>): Record<string, unknown> {
+  const ms = Number(sample.ms);
+  if (Number.isFinite(ms) && ms >= 1e15) return { ...sample, ms: Math.round(ms / 1e6) };
+  return sample;
+}
+
 /** Parse a capture's resources.jsonl into the raw sample array (skipping blank/partial lines). */
 export function readResourceSamples(dir: string): Array<Record<string, unknown>> {
   const out: Array<Record<string, unknown>> = [];
@@ -707,7 +714,7 @@ export function readResourceSamples(dir: string): Array<Record<string, unknown>>
   for (const line of readFileSync(resFile, 'utf8').split('\n')) {
     const t = line.trim();
     if (!t) continue;
-    try { out.push(JSON.parse(t) as Record<string, unknown>); } catch { /* skip partial */ }
+    try { out.push(normalizeResourceSample(JSON.parse(t) as Record<string, unknown>)); } catch { /* skip partial */ }
   }
   return out;
 }
@@ -978,12 +985,47 @@ export function buildCorrelatorFrame(f: Record<string, unknown>, imageSrc: strin
 
 interface ActiveCapture {
   dir: string;
-  ffmpeg: ChildProcess;
+  recorder: ChildProcess;
+  recorderKind: 'frame-sequence' | 'gnome-video';
+  ffmpegCommand: string;
+  framePattern: string;
+  videoFile?: string;
   sampler: ChildProcess;
   status: vscode.StatusBarItem;
   startedAt: string;
 }
 let activeCapture: ActiveCapture | undefined;
+
+async function startGnomeScreencast(videoTemplate: string, output: vscode.OutputChannel): Promise<{ recorder: ChildProcess; videoFile: string }> {
+  const recorder = spawn('gjs', ['-c', gnomeScreencastScript(), videoTemplate], {
+    windowsHide: true,
+    stdio: ['ignore', 'pipe', 'pipe'],
+  });
+  recorder.stderr?.on('data', (data: Buffer) => output.append(data.toString()));
+  return new Promise((resolve, reject) => {
+    let stdout = '';
+    let settled = false;
+    const timer = setTimeout(() => finish(new Error('GNOME Shell screencast did not become ready within 10 seconds')), 10000);
+    const finish = (error?: Error, videoFile?: string): void => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      if (error) {
+        recorder.kill();
+        reject(error);
+      } else {
+        resolve({ recorder, videoFile: String(videoFile) });
+      }
+    };
+    recorder.on('error', (error) => finish(error));
+    recorder.on('close', (code) => finish(new Error(`GNOME Shell screencast exited before capture began (exit ${code})`)));
+    recorder.stdout?.on('data', (data: Buffer) => {
+      stdout += data.toString();
+      const match = /(?:^|\n)READY:([^\r\n]+)/.exec(stdout);
+      if (match) finish(undefined, match[1]);
+    });
+  });
+}
 
 function captureCfg<T>(key: string, dflt: T): T {
   return vscode.workspace.getConfiguration('labviewBenchmarkActor').get<T>(key, dflt);
@@ -1288,8 +1330,10 @@ async function captureLaunchCommand(context: vscode.ExtensionContext, output: vs
     await promptInstallFfmpeg(output);
     return;
   }
+  const sessionType = String(process.env.XDG_SESSION_TYPE || '').trim().toLowerCase();
+  const waylandCapture = process.platform === 'linux' && sessionType === 'wayland';
   let x11VideoSize: string | undefined;
-  if (process.platform === 'linux') {
+  if (process.platform === 'linux' && !waylandCapture) {
     let x11Display: string;
     try {
       x11Display = x11DisplayForCapture(process.env);
@@ -1315,18 +1359,20 @@ async function captureLaunchCommand(context: vscode.ExtensionContext, output: vs
   }
   const dir = path.join(capturesRoot(context), `run-${Date.now()}`);
   const framePattern = path.join(dir, 'frame-%05d.png');
-  let ffmpegArgs: string[];
-  try {
-    ffmpegArgs = ffmpegCaptureArgsForPlatform(process.platform, framePattern, process.env, x11VideoSize);
-  } catch (error) {
-    reportUiError(output, 'Capture LabVIEW Launch (ffmpeg arguments)', error);
-    return;
-  }
   try {
     mkdirSync(dir, { recursive: true });
   } catch (err) {
     reportUiError(output, 'Capture LabVIEW Launch', err);
     return;
+  }
+  let ffmpegArgs: string[] = [];
+  if (!waylandCapture) {
+    try {
+      ffmpegArgs = ffmpegCaptureArgsForPlatform(process.platform, framePattern, process.env, x11VideoSize);
+    } catch (error) {
+      reportUiError(output, 'Capture LabVIEW Launch (ffmpeg arguments)', error);
+      return;
+    }
   }
   // Handoff beacon: mark the capture in flight so the agent's poll knows one is running (LBA-REQ-055).
   const startedAt = new Date().toISOString();
@@ -1334,22 +1380,28 @@ async function captureLaunchCommand(context: vscode.ExtensionContext, output: vs
   const resourcesFile = path.join(dir, 'resources.jsonl');
   writeFileSync(
     path.join(dir, 'capture-meta.json'),
-    `${JSON.stringify(captureMetadataForPlatform(process.platform), null, 2)}\n`,
+    `${JSON.stringify(captureMetadataForPlatform(process.platform, sessionType), null, 2)}\n`,
   );
 
-  // 1) ffmpeg screen capture at 12 fps (stdin kept open so we can 'q' it for a clean finalize on stop).
-  let ffmpegProc: ChildProcess;
+  // 1) Capture the operator-visible desktop: direct ffmpeg on Windows/Xorg, GNOME Shell recorder on Wayland.
+  let recorder: ChildProcess;
+  let recorderKind: ActiveCapture['recorderKind'] = 'frame-sequence';
+  let videoFile: string | undefined;
   try {
-    ffmpegProc = spawn(
-      ffmpeg,
-      ffmpegArgs,
-      { windowsHide: true, stdio: ['pipe', 'ignore', 'pipe'] }
-    );
+    if (waylandCapture) {
+      const started = await startGnomeScreencast(path.join(dir, 'visible-desktop'), output);
+      recorder = started.recorder;
+      recorderKind = 'gnome-video';
+      videoFile = started.videoFile;
+      output.appendLine(`Wayland session detected; recording the operator-visible desktop through GNOME Shell -> ${videoFile}`);
+    } else {
+      recorder = spawn(ffmpeg, ffmpegArgs, { windowsHide: true, stdio: ['pipe', 'ignore', 'pipe'] });
+    }
   } catch (err) {
-    reportUiError(output, 'Capture LabVIEW Launch (ffmpeg)', err);
+    reportUiError(output, 'Capture LabVIEW Launch (screen recorder)', err);
     return;
   }
-  ffmpegProc.on('error', (e) => {
+  recorder.on('error', (e) => {
     output.appendLine(`ffmpeg error: ${e.message}. Set "labviewBenchmarkActor.ffmpegPath" to ffmpeg.exe.`);
     void vscode.window.showErrorMessage(
       `ffmpeg failed to start (${e.message}). Install ffmpeg or set labviewBenchmarkActor.ffmpegPath.`
@@ -1379,11 +1431,11 @@ async function captureLaunchCommand(context: vscode.ExtensionContext, output: vs
   status.backgroundColor = new vscode.ThemeColor('statusBarItem.warningBackground');
   status.show();
 
-  activeCapture = { dir, ffmpeg: ffmpegProc, sampler, status, startedAt };
-  output.appendLine(`capture started: ${dir} (${captureMetadataForPlatform(process.platform).source} 12fps + CPU/RAM/disk; LabVIEW launching)`);
+  activeCapture = { dir, recorder, recorderKind, ffmpegCommand: ffmpeg, framePattern, videoFile, sampler, status, startedAt };
+  output.appendLine(`capture started: ${dir} (${captureMetadataForPlatform(process.platform, sessionType).source} 12fps + CPU/RAM/disk; LabVIEW launching)`);
   void vscode.window
     .showInformationMessage(
-      'Capturing the LabVIEW launch at 12 fps. Click "Stop LabVIEW Capture" in the status bar when the IDE is up.',
+      'Capturing the visible LabVIEW launch at 12 fps. Interact with LabVIEW to create benchmark variations, then click "Stop LabVIEW Capture" in the status bar.',
       'Stop now'
     )
     .then((a) => {
@@ -1399,9 +1451,15 @@ async function stopCaptureCommand(context: vscode.ExtensionContext, output: vsco
   }
   activeCapture = undefined;
   cap.status.dispose();
-  // Stop ffmpeg cleanly (q on stdin -> finalize the last frame), then hard-stop the sampler.
   try {
-    cap.ffmpeg.stdin?.write('q\n');
+    cap.sampler.kill();
+  } catch {
+    /* ignore */
+  }
+  // Finalize the active recorder before assembling its frames.
+  try {
+    if (cap.recorderKind === 'gnome-video') cap.recorder.kill('SIGINT');
+    else cap.recorder.stdin?.write('q\n');
   } catch {
     /* fall through to kill */
   }
@@ -1413,20 +1471,35 @@ async function stopCaptureCommand(context: vscode.ExtensionContext, output: vsco
         resolve();
       }
     };
-    cap.ffmpeg.on('close', finish);
+    cap.recorder.on('close', finish);
     setTimeout(() => {
       try {
-        cap.ffmpeg.kill();
+        cap.recorder.kill();
       } catch {
         /* ignore */
       }
       finish();
     }, 4000);
   });
-  try {
-    cap.sampler.kill();
-  } catch {
-    /* ignore */
+  if (cap.recorderKind === 'gnome-video') {
+    try {
+      if (!cap.videoFile || !existsSync(cap.videoFile)) throw new Error('GNOME Shell did not produce a visible-desktop recording');
+      await execFileAsync(cap.ffmpegCommand, ['-nostdin', '-hide_banner', '-loglevel', 'error', '-i', cap.videoFile, '-vf', 'fps=12', cap.framePattern], {
+        timeout: 120000,
+        windowsHide: true,
+      });
+      const startSeconds = Date.parse(cap.startedAt) / 1000;
+      readdirSync(cap.dir).filter((name) => /^frame-\d+\.png$/.test(name)).sort().forEach((name, index) => {
+        const timestamp = startSeconds + index / 12;
+        utimesSync(path.join(cap.dir, name), timestamp, timestamp);
+      });
+    } catch (error) {
+      const stoppedAt = new Date().toISOString();
+      const message = error instanceof Error ? error.message : String(error);
+      await writeCaptureStatusBeacon(context.extensionUri, cap.dir, (b) => b.buildFailedStatus({ runDir: cap.dir, startedAt: cap.startedAt, stoppedAt, error: message }), output);
+      reportUiError(output, 'Finalize visible Wayland capture', error);
+      return;
+    }
   }
 
   const stoppedAt = new Date().toISOString();
@@ -1469,26 +1542,14 @@ export function assembleCaptureFromDir(dir: string, builder: CaptureBuilder): La
     return { index: i, imageFile: image, imageBytes: st.size, ms: st.mtimeMs };
   });
   const firstFrameMs = frames[0].ms;
-  const resourceSamples: Array<Record<string, unknown>> = [];
-  const resFile = path.join(dir, 'resources.jsonl');
-  if (existsSync(resFile)) {
-    for (const line of readFileSync(resFile, 'utf8').split('\n')) {
-      const t = line.trim();
-      if (!t) continue;
-      try {
-        resourceSamples.push(JSON.parse(t) as Record<string, unknown>);
-      } catch {
-        /* skip a partial trailing line */
-      }
-    }
-  }
+  const resourceSamples = readResourceSamples(dir);
   let meta = captureMetadataForPlatform('win32');
   const metaFile = path.join(dir, 'capture-meta.json');
   if (existsSync(metaFile)) {
     const parsed = JSON.parse(readFileSync(metaFile, 'utf8')) as Partial<typeof meta>;
     if (parsed.workload === 'labview-launch'
       && ['WIN', 'LINUX'].includes(String(parsed.plane))
-      && ['ffmpeg-gdigrab', 'ffmpeg-x11grab'].includes(String(parsed.source))) {
+      && ['ffmpeg-gdigrab', 'ffmpeg-x11grab', 'gnome-shell-screencast'].includes(String(parsed.source))) {
       meta = parsed as typeof meta;
     }
   }

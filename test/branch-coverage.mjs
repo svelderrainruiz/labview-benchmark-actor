@@ -463,6 +463,11 @@ assert.deepEqual(captureMetadataForPlatform('linux'), {
   plane: 'LINUX',
   source: 'ffmpeg-x11grab',
 });
+assert.deepEqual(captureMetadataForPlatform('linux', 'wayland'), {
+  workload: 'labview-launch',
+  plane: 'LINUX',
+  source: 'gnome-shell-screencast',
+});
 assert.deepEqual(captureMetadataForPlatform('win32'), {
   workload: 'labview-launch',
   plane: 'WIN',

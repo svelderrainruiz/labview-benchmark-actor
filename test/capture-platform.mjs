@@ -1,14 +1,23 @@
 #!/usr/bin/env node
 
 import assert from 'node:assert/strict';
-import {
+import { readFileSync } from 'node:fs';
+import ts from 'typescript';
+
+const source = readFileSync(new URL('../src/capturePlatform.ts', import.meta.url), 'utf8');
+const compiled = ts.transpileModule(source, {
+  compilerOptions: { module: ts.ModuleKind.ES2022, target: ts.ScriptTarget.ES2022 },
+  fileName: 'capturePlatform.ts',
+}).outputText;
+const {
   captureMetadataForPlatform,
   ffmpegCaptureArgsForPlatform,
+  gnomeScreencastScript,
   labviewCandidatesForPlatform,
   linuxSamplerScript,
   parseX11DisplaySize,
   x11DisplayForCapture,
-} from '../src/capturePlatform.ts';
+} = await import(`data:text/javascript;base64,${Buffer.from(compiled).toString('base64')}`);
 
 assert.equal(
   labviewCandidatesForPlatform('linux')[0],
@@ -44,7 +53,19 @@ assert.deepEqual(
   captureMetadataForPlatform('linux'),
   { workload: 'labview-launch', plane: 'LINUX', source: 'ffmpeg-x11grab' },
 );
+assert.deepEqual(
+  captureMetadataForPlatform('linux', 'wayland'),
+  { workload: 'labview-launch', plane: 'LINUX', source: 'gnome-shell-screencast' },
+);
+assert.match(gnomeScreencastScript(), /org\.gnome\.Shell\.Screencast/);
+assert.match(gnomeScreencastScript(), /framerate.*12/);
+assert.match(gnomeScreencastScript(), /StopScreencast/);
+assert.match(gnomeScreencastScript(), /GLibUnix\.signal_add/);
 const sampler = linuxSamplerScript('/tmp/resources.jsonl');
+assert.match(sampler, /epoch_ms\(\)/);
+assert.match(sampler, /date \+%s%N/);
+assert.match(sampler, /\$\{ns:0:\$\{#ns\}-6\}/);
+assert.doesNotMatch(sampler, /date \+%s%3N/);
 assert.match(sampler, /\/proc\/stat/);
 assert.match(sampler, /MemAvailable/);
 assert.match(sampler, /"cpuPct"/);
