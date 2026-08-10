@@ -70,9 +70,8 @@ ExecStart=/usr/local/bin/node /opt/lba-autonomous-actor/experiments/mesh-fulfill
 Restart=on-failure
 RestartSec=2
 NoNewPrivileges=true
-PrivateTmp=true
 ProtectSystem=strict
-ReadWritePaths=/var/lib/lba-autonomous-actor /home/actor
+ReadWritePaths=/var/lib/lba-autonomous-actor /home/actor /tmp /usr/local/natinst/share/nilvcli
 
 [Install]
 WantedBy=multi-user.target'

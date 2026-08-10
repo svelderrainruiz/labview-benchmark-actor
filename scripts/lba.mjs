@@ -54,7 +54,7 @@ import { buildReleaseStage } from '../reviewer-workstation/record-release-stage.
 import { enrolledReviewerPublicKeys } from '../experiments/handoff-beacon/reviewerVerdict.mjs';
 import { validateLbabusProvisioningPin } from './verify-ubuntu-golden-box.mjs';
 
-export const ITERATION = 28; // bump when you refine this tool (see the banner above)
+export const ITERATION = 29; // bump when you refine this tool (see the banner above)
 
 const here = dirname(fileURLToPath(import.meta.url));
 export const repoRoot = resolve(here, '..');
@@ -897,6 +897,12 @@ const SELFTEST = [
   ['autonomous Linux actor avoids a multi-user/graphical target ordering cycle', () => {
     const provisioner = read('scripts/provision-autonomous-linux-actor.sh');
     return provisioner.includes('After=network-online.target\nWants=network-online.target') && !provisioner.includes('After=network-online.target graphical.target');
+  }],
+  ['autonomous Linux actor exposes LabVIEWCLI shared writable state through its strict sandbox', () => {
+    const provisioner = read('scripts/provision-autonomous-linux-actor.sh');
+    return provisioner.includes('ProtectSystem=strict')
+      && provisioner.includes('ReadWritePaths=/var/lib/lba-autonomous-actor /home/actor /tmp /usr/local/natinst/share/nilvcli')
+      && !provisioner.includes('PrivateTmp=true');
   }],
   ['autonomous Windows actor requires native PowerShell 5 and never provisions Node', () => {
     const provisioner = read('scripts/provision-autonomous-windows-actor.ps1');
