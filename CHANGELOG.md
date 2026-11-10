@@ -9,6 +9,7 @@ follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project
 ### Fixed
 
 - Windows local gates now pass native PowerShell script paths to `pwsh` instead of URL pathnames with a leading slash.
+- The autonomous Linux actor ordering selftest now normalizes CRLF checkouts on Windows.
 - Marketplace repository, homepage, support, and README documentation links now point to the independent
   `svelderrainruiz/labview-benchmark-actor` repository.
 
