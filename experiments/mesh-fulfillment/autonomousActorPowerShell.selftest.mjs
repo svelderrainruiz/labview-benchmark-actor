@@ -3,11 +3,12 @@
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
 import { bundleDigest, canonicalize } from '../acg-provenance/attest.mjs';
 
 const fixture = { z: [3, { b: true, a: null }], a: 'line\nvalue', nested: { two: 2, one: 1 } };
-const daemonPath = new URL('./autonomousActorDaemon.ps1', import.meta.url).pathname;
-const workloadPath = new URL('./runLabviewKnownAnswer.ps1', import.meta.url).pathname;
+const daemonPath = fileURLToPath(new URL('./autonomousActorDaemon.ps1', import.meta.url));
+const workloadPath = fileURLToPath(new URL('./runLabviewKnownAnswer.ps1', import.meta.url));
 const actual = JSON.parse(execFileSync('pwsh', ['-NoProfile', '-NonInteractive', '-File', daemonPath, '-SelfTest'], { encoding: 'utf8' }));
 
 assert.equal(actual.canonical, canonicalize(fixture), 'PowerShell canonical JSON must match attest.mjs');

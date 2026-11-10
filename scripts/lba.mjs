@@ -56,7 +56,7 @@ import { enrolledReviewerPublicKeys } from '../experiments/handoff-beacon/review
 import { validateLbabusProvisioningPin } from './verify-ubuntu-golden-box.mjs';
 import { decideAutonomousN3 } from '../experiments/mesh-fulfillment/autonomousN3Controller.mjs';
 
-export const ITERATION = 30; // bump when you refine this tool (see the banner above)
+export const ITERATION = 31; // bump when you refine this tool (see the banner above)
 
 const here = dirname(fileURLToPath(import.meta.url));
 export const repoRoot = resolve(here, '..');
@@ -923,9 +923,14 @@ export const COMMANDS = {
 const SELFTEST = [
   ['every pipeline script exists', () => PIPELINE.every(([, rel]) => existsSync(join(repoRoot, rel)))],
   ['every autonomous-actor focused-check script exists', () => AUTONOMOUS_ACTOR_SELFTESTS.every((rel) => existsSync(join(repoRoot, rel)))],
-  ['autonomous Linux actor avoids a multi-user/graphical target ordering cycle', () => {
+  ['autonomous Linux actor ordering check is line-ending independent', () => {
     const provisioner = read('scripts/provision-autonomous-linux-actor.sh');
-    return provisioner.includes('After=network-online.target\nWants=network-online.target') && !provisioner.includes('After=network-online.target graphical.target');
+    const normalize = (text) => text.replace(/\r\n/g, '\n');
+    const expected = 'After=network-online.target\nWants=network-online.target';
+    const crlfFixture = expected.replaceAll('\n', '\r\n');
+    return normalize(provisioner).includes(expected)
+      && normalize(crlfFixture).includes(expected)
+      && !normalize(provisioner).includes('After=network-online.target graphical.target');
   }],
   ['autonomous Linux actor exposes LabVIEWCLI shared writable state through its strict sandbox', () => {
     const provisioner = read('scripts/provision-autonomous-linux-actor.sh');

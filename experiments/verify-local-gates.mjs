@@ -351,7 +351,17 @@ check('mesh-actor-registration-requires-activation', () => {
 //     confirms a fully-governed requirement and fails closed on a missing one. Extend the tool freely;
 //     the gate catches regressions.
 check('agent-tooling-selftest', () => {
-  execFileSync(process.execPath, [join(pkgRoot, 'scripts', 'lba.mjs'), 'selftest'], { stdio: 'pipe' });
+  try {
+    execFileSync(process.execPath, [join(pkgRoot, 'scripts', 'lba.mjs'), 'selftest'], { stdio: 'pipe' });
+  } catch (error) {
+    const output = [error.stdout, error.stderr]
+      .filter(Boolean)
+      .map((value) => Buffer.isBuffer(value) ? value.toString('utf8') : String(value))
+      .filter(Boolean)
+      .join('\n')
+      .trim();
+    throw new Error(`scripts/lba.mjs selftest failed${output ? `:\n${output}` : ''}`);
+  }
   return { tool: 'scripts/lba.mjs', note: 'iteratively-refined agent governance + verification helper' };
 });
 

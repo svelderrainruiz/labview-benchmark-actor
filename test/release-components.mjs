@@ -4,6 +4,16 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { verifyReleaseComponents, verifyStagedReleaseMetadata } from '../scripts/release-components.mjs';
 
+const extensionManifest = JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8'));
+const repositoryUrl = 'https://github.com/svelderrainruiz/labview-benchmark-actor';
+assert.equal(extensionManifest.name, 'labview-benchmark-actor');
+assert.equal(extensionManifest.publisher, 'svelderrainruiz');
+assert.equal(extensionManifest.repository.url, repositoryUrl);
+assert.equal(extensionManifest.homepage, `${repositoryUrl}#readme`);
+assert.equal(extensionManifest.bugs.url, `${repositoryUrl}/issues`);
+const readme = readFileSync(new URL('../README.md', import.meta.url), 'utf8');
+assert.ok(readme.includes(`](${repositoryUrl}/issues)`), 'Marketplace README must link to the independent issue tracker');
+
 const releaseRiskBaseline = JSON.parse(readFileSync(new URL('../release-risk-baseline.json', import.meta.url), 'utf8'));
 const standardsScoreBaseline = JSON.parse(readFileSync(new URL('../standards-score-baseline.json', import.meta.url), 'utf8'));
 const releaseComponents = JSON.parse(readFileSync(new URL('../release-components.json', import.meta.url), 'utf8'));
