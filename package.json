@@ -8,11 +8,11 @@
   "author": "Sergio Velderrain",
   "repository": {
     "type": "git",
-    "url": "https://github.com/LabVIEW-Community-CI-CD/labview-benchmark-actor"
+    "url": "https://github.com/svelderrainruiz/labview-benchmark-actor"
   },
-  "homepage": "https://github.com/LabVIEW-Community-CI-CD/labview-benchmark-actor#readme",
+  "homepage": "https://github.com/svelderrainruiz/labview-benchmark-actor#readme",
   "bugs": {
-    "url": "https://github.com/LabVIEW-Community-CI-CD/labview-benchmark-actor/issues"
+    "url": "https://github.com/svelderrainruiz/labview-benchmark-actor/issues"
   },
   "qna": false,
   "icon": "media/icon.png",

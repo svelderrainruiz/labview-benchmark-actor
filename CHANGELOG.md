@@ -6,6 +6,11 @@ follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project
 
 ## [Unreleased]
 
+### Fixed
+
+- Marketplace repository, homepage, support, and README documentation links now point to the independent
+  `svelderrainruiz/labview-benchmark-actor` repository.
+
 ## [1.4.14] - 2026-08-10
 
 ### Fixed
