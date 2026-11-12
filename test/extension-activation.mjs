@@ -681,6 +681,9 @@ try {
     assert(ext.clampFrameIndex(2, 5) === 2 && ext.clampFrameIndex(99, 5) === 0 && ext.clampFrameIndex(-1, 5) === 0 && ext.clampFrameIndex(0, 0) === 0, 'clampFrameIndex bounds the auto-jump target into [0,count)');
     const cm = ext.buildCorrelatorModel([{ index: 0 }, { index: 1 }, { index: 2 }], 2, [{ frameIndex: 1 }], ['0 C:']);
     assert(cm.selectedIndex === 2 && cm.frames.length === 3 && cm.markers.length === 1 && cm.diskNames[0] === '0 C:' && cm.fps === 12, 'buildCorrelatorModel builds the model + clamps to the auto-jump index');
+    const desktopModel = ext.buildCorrelatorModel([], 0, [], [], { workload: 'desktop-capture', fps: 1 / 60 });
+    assert(desktopModel.title === 'Desktop capture' && desktopModel.fps === 1 / 60, 'desktop correlator retains its actual workload and capture cadence');
+    assert(ext.buildCorrelatorModel([], 0, [], [], { fps: Infinity }).fps === 12, 'nonfinite correlator cadence cannot reach the viewer');
     assert(ext.buildCorrelatorModel(null, 99, null, undefined).selectedIndex === 0 && ext.buildCorrelatorModel(null, 0, null, undefined).frames.length === 0, 'buildCorrelatorModel tolerates non-array frames/markers');
     const fr = ext.buildCorrelatorFrame({ index: 3, tMs: 250, cpuPct: 10, ramMb: 200, diskPct: 5, disks: [{ name: '0 C:' }], counters: { a: 1 } }, 'vscode-webview://img.png');
     assert(fr.index === 3 && fr.tMs === 250 && fr.cpuPct === 10 && fr.ramMb === 200 && fr.diskPct === 5 && fr.imageSrc === 'vscode-webview://img.png' && fr.disks[0].name === '0 C:' && fr.counters.a === 1, 'buildCorrelatorFrame maps a capture frame + webview image src');
@@ -891,6 +894,62 @@ try {
   assert(typedResult instanceof mockVscode.LanguageModelToolResult, 'LM tools use host result classes when available');
   delete mockVscode.LanguageModelTextPart;
   delete mockVscode.LanguageModelToolResult;
+
+  {
+    const restorePlatform = setPlatform('win32');
+    try {
+      const desktopCommand = registered.find((command) => command.id === 'labviewBenchmarkActor.captureDesktop');
+      assert(desktopCommand, 'standalone desktop capture is registered');
+      configStore.labviewPath = join(tmpdir(), 'lba-desktop-no-labview', 'LabVIEW.exe');
+      configStore.ffmpegPath = process.execPath;
+      configStore.desktopCaptureIntervalSeconds = 0;
+      const errorsBefore = errorMessages.length;
+      const spawnsBefore = spawnCalls.length;
+      await desktopCommand.handler();
+      assert(errorMessages.slice(errorsBefore).some((message) => /integer from 1 through 120/.test(message)), 'desktop cadence is validated before recording');
+      assert(spawnCalls.length === spawnsBefore, 'invalid desktop cadence never starts a recorder');
+      configStore.desktopCaptureIntervalSeconds = 60;
+      const captureRoot = join(gsRoot, 'captures');
+      const previous = new Set(existsSync(captureRoot) ? readdirSync(captureRoot) : []);
+      await desktopCommand.handler();
+      const desktopSpawns = spawnCalls.slice(spawnsBefore);
+      const recorder = desktopSpawns.find((call) => call.args?.includes('gdigrab'));
+      assert(recorder && recorder.args[recorder.args.indexOf('-framerate') + 1] === '1/60', 'desktop recording uses the configured bounded cadence');
+      assert(!desktopSpawns.some((call) => call.args?.length === 0), 'desktop capture does not launch LabVIEW');
+      const directory = join(captureRoot, readdirSync(captureRoot).find((name) => !previous.has(name)));
+      const metadata = JSON.parse(readFileSync(join(directory, 'capture-meta.json'), 'utf8'));
+      const beacon = JSON.parse(readFileSync(join(directory, 'active-capture-session.json'), 'utf8'));
+      assert(metadata.workload === 'desktop-capture' && metadata.frameIntervalSeconds === 60, 'desktop metadata retains workload and cadence');
+      assert(beacon.workload === 'desktop-capture' && beacon.state === 'capturing', 'desktop capture publishes an active pathless session');
+      const image = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAFgAI/ScL9WQAAAABJRU5ErkJggg==', 'base64');
+      const { crc32 } = require('node:zlib');
+      for (let offset = 8; offset + 12 <= image.length;) {
+        const length = image.readUInt32BE(offset);
+        image.writeUInt32BE(crc32(image.subarray(offset + 4, offset + 8 + length)), offset + 8 + length);
+        offset += 12 + length;
+      }
+      writeFileSync(join(directory, 'frame-00001.png'), image);
+      writeFileSync(join(directory, 'resources.jsonl'), `${JSON.stringify({ ms: Date.now(), cpuPct: 1, ramMb: 1, diskPct: 0, disks: [] })}\n`);
+      await registered.find((command) => command.id === 'labviewBenchmarkActor.stopCapture').handler();
+      const finalized = JSON.parse(readFileSync(join(directory, 'capture.json'), 'utf8'));
+      const stopped = JSON.parse(readFileSync(join(directory, 'active-capture-session.json'), 'utf8'));
+      assert(finalized.workload === 'desktop-capture' && finalized.fps === 1 / 60, 'desktop finalization preserves truthful workload and cadence');
+      assert(stopped.state === 'stopped' && stopped.workload === 'desktop-capture', 'desktop capture uses the shared stop lifecycle');
+    } finally {
+      delete configStore.labviewPath;
+      delete configStore.ffmpegPath;
+      delete configStore.desktopCaptureIntervalSeconds;
+      restorePlatform();
+    }
+  }
+  {
+    const restorePlatform = setPlatform('linux');
+    try {
+      const before = errorMessages.length;
+      await registered.find((command) => command.id === 'labviewBenchmarkActor.captureDesktop').handler();
+      assert(errorMessages.slice(before).some((message) => /desktop capture currently requires Windows/.test(message)), 'standalone desktop capture does not silently select a different platform');
+    } finally { restorePlatform(); }
+  }
 
   // captureLaunch Windows body: with no resolvable LabVIEW it short-circuits at resolveLabview with the
   // "LabVIEW.exe not found" guard BEFORE spawning ffmpeg. Force win32 so the Windows body runs on any CI host;

@@ -108,5 +108,6 @@
 | LBA-REQ-099 | Persistent lbabus autonomous actor service | Proven | — | ADR-0082 | T-099 | 14 |
 | LBA-REQ-100 | Fail-closed autonomous N>=3 controller decision | Proven | — | ADR-0083 | T-100 | 6 |
 | LBA-REQ-101 | Read-only active-capture MCP resources | Planned | §3.7 Agentic-infrastructure | ADR-0084 | T-101 | 8 |
+| LBA-REQ-102 | Standalone Windows desktop capture | Planned | §3.7 Agentic-infrastructure | ADR-0085 | T-102 | 7 |
 
-_Generated for 101 requirements._
+_Generated for 102 requirements._

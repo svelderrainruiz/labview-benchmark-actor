@@ -6,8 +6,11 @@ follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project
 
 ## [Unreleased]
 
+## [1.5.0] - Unreleased
+
 ### Added
 
+- Specify standalone Windows desktop capture with a bounded operator-selected cadence under LBA-REQ-102 / ADR-0085; live qualification remains gated.
 - Pathless active-capture MCP resources are specified under ADR-0084 / LBA-REQ-101; implementation and fixture tests are in progress.
 
 ### Fixed

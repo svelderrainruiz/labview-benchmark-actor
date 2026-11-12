@@ -93,5 +93,7 @@
 | [ADR-0083](ADR-0083-fail-closed-autonomous-n3-controller.md) | Build actor-bound signed requests and reduce a complete cross-plane N>=3 response set to one candidate-bound consume decision, failing closed on response cardinality, signature, task, plane, known-answer, or sealed-candidate mismatch. | LINUX | Accepted | LBA-REQ-100 |
 | [ADR-0084](ADR-0084-active-capture-mcp-resources.md) | Expose ordered active-capture session metadata and bounded frame resources through the existing read-only MCP server without host-path disclosure or capture mutation. | LINUX | Proposed | LBA-REQ-101 |
 
+| [ADR-0085](ADR-0085-standalone-desktop-capture.md) | Record a standalone Windows desktop workload at an explicit bounded cadence without LabVIEW discovery or launch, preserving existing capture defaults and read-only MCP ownership. | LINUX | Proposed | LBA-REQ-102 |
+
 Numbering is split by owner to avoid collisions: WIN takes 0001–0002 (+0005, 0006, 0007, 0008, 0009),
 LINUX takes 0003–0004 (+0010, 0011, 0012, 0013, 0014, 0015, 0016, 0017, 0018, 0019, 0020, 0021, 0022, 0023, 0024). Add new ADRs by extending your own range.

@@ -1,7 +1,17 @@
+export type CaptureWorkload = 'labview-launch' | 'desktop-capture';
+
 export interface CaptureMetadata {
-  workload: 'labview-launch';
+  workload: CaptureWorkload;
   plane: 'WIN' | 'LINUX';
   source: 'ffmpeg-gdigrab' | 'ffmpeg-x11grab' | 'gnome-shell-screencast';
+  frameIntervalSeconds?: number;
+}
+
+export function desktopCaptureInterval(value: unknown): number {
+  if (typeof value !== 'number' || !Number.isInteger(value) || value < 1 || value > 120) {
+    throw new Error('Desktop frame interval must be an integer from 1 through 120 seconds');
+  }
+  return value;
 }
 
 export function labviewCandidatesForPlatform(platform: NodeJS.Platform): string[] {
@@ -61,9 +71,11 @@ export function ffmpegCaptureArgsForPlatform(
   framePattern: string,
   env: NodeJS.ProcessEnv = process.env,
   x11VideoSize?: string,
+  frameIntervalSeconds?: number,
 ): string[] {
+  const frameRate = frameIntervalSeconds === undefined ? '12' : `1/${desktopCaptureInterval(frameIntervalSeconds)}`;
   if (platform === 'win32') {
-    return ['-y', '-f', 'gdigrab', '-framerate', '12', '-i', 'desktop', framePattern];
+    return ['-y', '-f', 'gdigrab', '-framerate', frameRate, '-i', 'desktop', framePattern];
   }
   if (platform === 'linux') {
     const display = x11DisplayForCapture(env);
@@ -71,7 +83,7 @@ export function ffmpegCaptureArgsForPlatform(
     if (!/^[1-9]\d*x[1-9]\d*$/.test(videoSize)) {
       throw new Error('Ubuntu LabVIEW capture requires the active X11 desktop dimensions');
     }
-    return ['-y', '-f', 'x11grab', '-framerate', '12', '-video_size', videoSize, '-draw_mouse', '0', '-i', display, framePattern];
+    return ['-y', '-f', 'x11grab', '-framerate', frameRate, '-video_size', videoSize, '-draw_mouse', '0', '-i', display, framePattern];
   }
   throw new Error(`LabVIEW launch capture is unsupported on ${platform}`);
 }

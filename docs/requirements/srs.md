@@ -130,6 +130,8 @@ progressively.
 | LBA-REQ-100 | The system shall reduce a complete signed cross-plane autonomous actor response set of at least three distinct actors to one fail-closed candidate-bound consume decision. | The live N=3 proof required manual request/result correlation and decision assembly, so a missing, duplicated, forged, wrong-task, wrong-answer, or candidate-drifted response could be mishandled outside the actor protocol. | `autonomousN3Controller.mjs` builds one signed actor-bound request per roster entry and revalidates every requester envelope, actor signature, task, plane, exact candidate, unique response, `SUCCESS`, and fixed known answer before emitting `autonomous-n3-decision@1` with `consume:true`. | `node experiments/mesh-fulfillment/autonomousN3Controller.selftest.mjs` proves the complete N=3 path across ten cases; `lba actor-n3-decide` emits the same decision from explicit dispatch/response/key/sealed-descriptor files; gated by `mesh-autonomous-n3-controller`. |
 | LBA-REQ-101 | The system shall expose the lifecycle and ordered evidence of a local active LabVIEW capture through a pathless, read-only MCP resource contract. | ProjectBuddy #250 needs timely frame/event reads while LBA capture remains active, but the separate stdio MCP server cannot access the extension process's in-memory `activeCapture` and host-specific storage paths are not a stable consumer interface. | `active-capture-session@1` assigns an opaque UUID and lifecycle (`capturing`, `finalizing`, `stopped`, `failed`) to each run. `resources/list` exposes only bounded metadata/session URIs; `resources/read` returns a session/batch or an explicitly requested frame resource. Batches preserve frame/sample sequence and capture timestamps, mark gaps/partial writes, enforce a per-frame size bound, and never expose absolute paths or frame bytes by default. Reads never mutate capture. | `test/active-capture-mcp.mjs` exercises fake Global Storage roots and spawned stdio MCP for pathless discovery, lifecycle, ordered batch cursors, explicit frame resources, and fail-closed malformed/partial/path-traversal cases; gated in `npm test`. |
 
+| LBA-REQ-102 | The system shall record an explicitly requested Windows desktop workload at a bounded operator-selected cadence without locating or launching LabVIEW. | A standalone synthetic UI live proof must not depend on NI activation or inherit an unreviewable 12-fps inference queue. | A separate Capture Desktop command records `desktop-capture` with an integer interval of 1 through 120 seconds (default 60), emits the existing pathless lifecycle/resources, and uses the existing stop/finalization path; Capture LabVIEW Launch retains its 12-fps behavior. | Host-free activation, argument, cadence, and lifecycle fixtures in `npm test`; Windows desktop execution remains a separate live-proof gate. |
+
 ---
 
 ### LBA-REQ-001: Standalone extraction of hooking and agentic infrastructure
@@ -3106,6 +3108,19 @@ progressively.
   - No frame or run data is sent over the lbabus coordination bus.
 - Verification: Run `node test/active-capture-mcp.mjs` after `npm run compile`; `npm test` also checks the generated `docs/mcp-tools.md`. Tests use only temporary fixtures and a spawned local stdio server; no real capture, VM, or model is required.
 - Change Guidance: Preserve the four core tools in LBA-REQ-019. Add resources as a separate read-only capability under ADR-0084; depend on Actor issue #45 for the consumer contract. Keep raw frame bytes explicit and bounded, never return storage paths, and leave the existing finalized `capture.json` contract unchanged.
+
+### LBA-REQ-102: Standalone Windows desktop capture
+
+- Status: Planned
+- Area: Capture / agentic infrastructure (ADR-0085)
+- Statement: The system shall record an explicitly requested Windows desktop workload at a bounded operator-selected cadence without locating or launching LabVIEW.
+- Acceptance Criteria:
+  - A separate Capture Desktop command requires Windows and the existing ffmpeg readiness checks, not a LabVIEW executable, licence, or launch.
+  - The operator selects an integer frame interval from 1 through 120 seconds; the default is 60 seconds. Invalid values fail before starting a recorder.
+  - Session and finalized capture metadata identify `desktop-capture`; cadence is retained with the capture and actual frame timestamps remain authoritative.
+  - The existing Stop Capture command finalizes either workload with explicit finalizing/stopped/failed lifecycle and bounded read-only MCP evidence.
+  - The existing Capture LabVIEW Launch command retains its launch guards and 12-fps behavior. No capture mutation is added to MCP.
+- Verification: `npm test` covers host-free command registration, cadence validation, metadata, and frame arguments; a disposable Windows desktop proof is required before claiming live qualification.
 
 ## Traceability (requirement → architecture view / test)
 
