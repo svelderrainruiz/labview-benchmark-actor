@@ -14,6 +14,23 @@ const require = createRequire(import.meta.url);
 const core = require(join(root, 'out', 'mcp', 'benchmarkActorMcpServer.js'));
 const { buildActiveCaptureSession, validateActiveCaptureSession, writeActiveCaptureSession } = require(join(root, 'out', 'captureSession.js'));
 const { createActiveCaptureResourceProvider } = require(join(root, 'out', 'mcp', 'activeCaptureEvidence.js'));
+const { desktopCaptureInterval, ffmpegCaptureArgsForPlatform } = require(join(root, 'out', 'capturePlatform.js'));
+assertDesktopCadence();
+
+function assertDesktopCadence() {
+  for (const interval of [1, 60, 120]) {
+    if (desktopCaptureInterval(interval) !== interval) throw new Error('desktop cadence changed');
+    const args = ffmpegCaptureArgsForPlatform('win32', 'frame-%05d.png', {}, undefined, interval);
+    if (args[args.indexOf('-framerate') + 1] !== `1/${interval}`) throw new Error('desktop ffmpeg cadence mismatch');
+  }
+  for (const interval of [0, 121, 1.5, true, '60', NaN, Infinity, undefined]) {
+    let refused = false;
+    try { desktopCaptureInterval(interval); } catch { refused = true; }
+    if (!refused) throw new Error('unbounded desktop cadence was accepted');
+  }
+  const legacyArgs = ffmpegCaptureArgsForPlatform('win32', 'frame-%05d.png');
+  if (legacyArgs[legacyArgs.indexOf('-framerate') + 1] !== '12') throw new Error('legacy capture cadence changed');
+}
 const png = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAFgAI/ScL9WQAAAABJRU5ErkJggg==', 'base64');
 for (let offset = 8; offset + 12 <= png.length;) {
   const length = png.readUInt32BE(offset);
@@ -130,6 +147,7 @@ for (const state of ['finalizing', 'stopped', 'failed']) {
   writeFileSync(join(directory, 'resources.jsonl'), '');
   writeActiveCaptureSession(directory, buildActiveCaptureSession({
     runId: lifecycleId,
+    workload: state === 'finalizing' ? 'desktop-capture' : 'labview-launch',
     state,
     plane: 'WIN',
     source: 'ffmpeg-gdigrab',
@@ -195,6 +213,7 @@ for (const [state, lifecycleId] of lifecycleRunIds) {
   const lifecycleUri = `lba-capture://session/${lifecycleId}`;
   const lifecycleRead = await request('resources/read', { uri: lifecycleUri }, 40 + lifecycleId.length);
   assert(JSON.parse(lifecycleRead.result.contents[0].text).state === state, `session read preserves the ${state} lifecycle state`);
+  if (state === 'finalizing') assert(JSON.parse(lifecycleRead.result.contents[0].text).workload === 'desktop-capture', 'desktop capture lifecycle preserves its truthful workload identity');
 }
 assert(validateActiveCaptureSession({ ...session, state: 'stopped', stoppedAt: null }) === null, 'terminal session states require a stop timestamp');
 

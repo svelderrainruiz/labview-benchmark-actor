@@ -151,6 +151,7 @@ Code:
 | `LabVIEW Benchmark Actor: Open Mesh-Stress Calibration` | Review calibrated throughput/stress limits. |
 | `LabVIEW Benchmark Actor: Open Concurrent Mesh Board` | Inspect concurrent actor status and results. |
 | `LabVIEW Benchmark Actor: Capture LabVIEW Launch` | Record a real Windows LabVIEW launch with FFmpeg plus CPU/RAM/disk samples. |
+| `LabVIEW Benchmark Actor: Capture Desktop` | Record a standalone Windows desktop without launching LabVIEW, at the bounded configured frame interval. |
 | `LabVIEW Benchmark Actor: Capture LabVIEW Launch (mprr, cross-platform VM)` | Capture a VM LabVIEW launch through the mprr visual ring. |
 | `LabVIEW Benchmark Actor: Stop LabVIEW Capture` | Stop the active launch capture and finalize available evidence. |
 | `LabVIEW Benchmark Actor: Mark Handoff Step Done` | Complete the active human-assisted handoff step. |

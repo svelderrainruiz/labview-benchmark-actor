@@ -182,7 +182,7 @@ multi-VM / Codespace topology.
   `resultHash`), making a static-analysis run a cross-plane-comparable benchmark
   (LBA-REQ-015).
 
-### 3.7 Agentic-infrastructure view — addresses LBA-REQ-012, LBA-REQ-013, LBA-REQ-018, LBA-REQ-019, LBA-REQ-101
+### 3.7 Agentic-infrastructure view — addresses LBA-REQ-012, LBA-REQ-013, LBA-REQ-018, LBA-REQ-019, LBA-REQ-101, LBA-REQ-102
 - The `lbabus` binary embeds version-pinned agent base instructions and exposes
   them via `lbabus agents` (print / --out / --check), so every session on a given
   version shares byte-identical, hardenable base instructions (LBA-REQ-012).
@@ -361,6 +361,8 @@ chain is attested and logged before installing it (verify-before-install, LBA-RE
 | AD-97 | Reduce one signed cross-plane autonomous actor dispatch and its complete N>=3 response set to a portable fail-closed consume decision: revalidate enrolled requester/actor signatures, unique actor-specific task responses, plane/request/exact-candidate binding, SUCCESS, and the fixed known answer before consumption | The persistent service owns execution and delivery, but the live N=3 controller decision was assembled manually; a governed reducer prevents missing, duplicate, forged, wrong-task, wrong-answer, or candidate-drifted responses from being consumed (ADR-0083) | LBA-REQ-100 |
 | AD-98 | Expose active capture lifecycle and ordered evidence through bounded, pathless MCP resources; return frame bytes only through explicit, validated resource reads, and keep reads side-effect-free | ProjectBuddy needs live frame/event access while the Actor's MCP server is a separate process; Global Storage paths are host-specific and capture bytes must not enter default metadata or the coordination bus (ADR-0084) | LBA-REQ-101 |
 
+| AD-99 | Record an explicitly requested Windows desktop workload at an operator-selected bounded cadence without LabVIEW discovery or launch; retain existing capture control and read-only evidence ownership | The synthetic task must not require NI activation or silently overrun its local inference queue (ADR-0085) | LBA-REQ-102 |
+
 ## 5. Risks and open questions
 
 - `[Resolved ADR-0003]` Bus wire format — length-prefixed JSON over TCP.
@@ -389,6 +391,7 @@ Detailed decisions are recorded as ADRs in [adr/](adr/README.md):
 | [ADR-0003](adr/ADR-0003-coordination-bus-wire-format.md) | Coordination-bus wire format (length-prefixed JSON over TCP) | LINUX |
 | [ADR-0004](adr/ADR-0004-cross-vm-time-sync.md) | UDP presence/liveness + advisory coordination time (no cross-VM comparison) | LINUX |
 | [ADR-0084](adr/ADR-0084-active-capture-mcp-resources.md) | Pathless, bounded, read-only MCP resources for active-capture evidence | LINUX |
+| [ADR-0085](adr/ADR-0085-standalone-desktop-capture.md) | Standalone Windows desktop capture with explicit bounded cadence | LINUX |
 | [ADR-0007](adr/ADR-0007-image-derived-timing-binary-strip.md) | Image-derived timing binds to the pixel-decoded binary strip (cross-platform) | WIN |
 | [ADR-0008](adr/ADR-0008-interactive-ollama-drive-mirrored-build-coordination.md) | Interactive host-Ollama drive + mirrored build-coordination over `lbabus` | WIN |
 | [ADR-0009](adr/ADR-0009-absorb-mprr-model-self-owned.md) | Absorb the mprr ring/timing model as self-owned (retire the external `svelderrainruiz/mprr`) | WIN |
