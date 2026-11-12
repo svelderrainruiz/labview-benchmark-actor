@@ -43,6 +43,25 @@ export interface McpToolResult {
   isError?: boolean;
 }
 
+export interface McpResourceDescriptor {
+  uri: string;
+  name: string;
+  mimeType: string;
+  description: string;
+}
+
+export interface McpResourceContents {
+  uri: string;
+  mimeType: string;
+  text?: string;
+  blob?: string;
+}
+
+export interface BenchmarkActorMcpResources {
+  listResources(): McpResourceDescriptor[] | Promise<McpResourceDescriptor[]>;
+  readResource(uri: string): McpResourceContents[] | Promise<McpResourceContents[]>;
+}
+
 export interface BenchmarkActorMcpTool {
   name: string;
   description: string;
@@ -126,6 +145,8 @@ export interface BenchmarkActorMcpToolDeps {
   readonly extraTools?: readonly BenchmarkActorMcpTool[];
   /** Execute a folded extra tool by name. Throw {@link McpArgumentError} for a bad argument shape (-32602). */
   dispatchExtraTool?(name: string, args: unknown): Promise<unknown> | unknown;
+  /** Read-only active-capture MCP resources; independent of the four core tool registry. */
+  readonly captureResources?: BenchmarkActorMcpResources;
 }
 
 function success(id: number | string | null, result: unknown): JsonRpcResponse {
@@ -212,7 +233,7 @@ export async function handleBenchmarkActorMcpMessage(
     case 'initialize':
       return success(id, {
         protocolVersion: BENCHMARK_ACTOR_MCP_PROTOCOL_VERSION,
-        capabilities: { tools: {} },
+        capabilities: { tools: {}, resources: {} },
         serverInfo: { name: BENCHMARK_ACTOR_MCP_SERVER_NAME, version: deps.serverVersion }
       });
 
@@ -225,6 +246,41 @@ export async function handleBenchmarkActorMcpMessage(
 
     case 'tools/list':
       return success(id, { tools: [...BENCHMARK_ACTOR_MCP_TOOLS, ...(deps.extraTools ?? [])] });
+
+    case 'resources/list':
+      return success(id, { resources: await deps.captureResources?.listResources() ?? [] });
+
+    case 'resources/templates/list':
+      return success(id, {
+        resourceTemplates: [
+          {
+            uriTemplate: 'lba-capture://session/{runId}/batch?afterFrame={afterFrame}&afterSample={afterSample}&limit={limit}',
+            name: 'Active capture evidence batch',
+            description: 'Read an ordered, bounded batch of frame and resource-sample metadata.',
+            mimeType: 'application/json'
+          },
+          {
+            uriTemplate: 'lba-capture://session/{runId}/frame/{sequence}?sha256={sha256}',
+            name: 'Explicit captured frame',
+            description: 'Read one complete PNG frame after matching the SHA-256 from its evidence batch.',
+            mimeType: 'image/png'
+          }
+        ]
+      });
+
+    case 'resources/read': {
+      const params = (message.params ?? {}) as { uri?: unknown };
+      if (typeof params.uri !== 'string' || params.uri.length > 2048) {
+        return failure(id, JSON_RPC_INVALID_PARAMS, 'resources/read requires a bounded string "uri"');
+      }
+      try {
+        const contents = await deps.captureResources?.readResource(params.uri);
+        if (!contents) return failure(id, -32002, 'resource unavailable');
+        return success(id, { contents });
+      } catch {
+        return failure(id, -32002, 'resource unavailable');
+      }
+    }
 
     case 'tools/call': {
       const params = (message.params ?? {}) as { name?: unknown; arguments?: unknown };
