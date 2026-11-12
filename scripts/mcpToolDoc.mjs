@@ -66,6 +66,16 @@ function render() {
       `process launched by the extension; the tools that shell \`lbabus\` degrade gracefully when the CLI is absent.`
   );
   lines.push('');
+  lines.push('## Active capture resources');
+  lines.push('');
+  lines.push(
+    'The same server lists bounded, pathless `lba-capture://session/{runId}` metadata resources and supports ' +
+      '`resources/read` for session state, ordered frame/sample batches, and explicitly requested PNG frames. ' +
+      'Batch and frame URI templates are listed by `resources/templates/list`; frame reads require the SHA-256 ' +
+      'returned by a batch. The extension passes its Global Storage root only through the stdio process environment. ' +
+      'Reads never control capture. See ADR-0084 / LBA-REQ-101.'
+  );
+  lines.push('');
   for (const tool of BENCHMARK_ACTOR_MCP_TOOLS) {
     lines.push(`## \`${tool.name}\``);
     lines.push('');

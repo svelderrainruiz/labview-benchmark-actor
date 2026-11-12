@@ -20,6 +20,7 @@ import {
   McpToolResult,
   handleBenchmarkActorMcpMessage
 } from '../mcp/benchmarkActorMcpServer';
+import { createActiveCaptureResourceProvider } from './activeCaptureEvidence';
 
 const execFileAsync = promisify(execFile);
 const CLI = String(process.env.LBA_LBABUS_PATH ?? '').trim() || 'lbabus';
@@ -110,7 +111,8 @@ const serverDeps: BenchmarkActorMcpToolDeps = {
   getHostCapabilities: () => runLbabus(['capabilities'], 15000),
   getBenchmarkSeries,
   pollCoordinationBus: ({ tail }) => runLbabus(pollBusArgs(tail), 30000),
-  postCoordinationNote: ({ message }) => runLbabus(postNoteArgs(message), 20000)
+  postCoordinationNote: ({ message }) => runLbabus(postNoteArgs(message), 20000),
+  captureResources: createActiveCaptureResourceProvider(process.env.LBA_CAPTURE_ROOT ?? '')
 };
 
 // Fold the ACG corroboration-grid tools into THIS server from the bundled dep-free engines

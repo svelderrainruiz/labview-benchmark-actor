@@ -259,6 +259,7 @@ ext.activate({
   subscriptions,
   extensionPath: '/ext',
   extensionUri: { path: '/ext', fsPath: '/ext' },
+  globalStorageUri: { fsPath: '/storage/actor' },
   extension: { packageJSON: { version: '0.1.1' } },
 });
 ext.activate({
@@ -278,6 +279,7 @@ assert(
 const defs = captured[0].provider.provideMcpServerDefinitions();
 assert(Array.isArray(defs) && defs.length === 1, 'the provider yields exactly one server definition');
 assert(defs[0].command === process.execPath, 'the server launches with the editor Node (process.execPath)');
+assert(defs[0].env.LBA_CAPTURE_ROOT === join('/storage/actor', 'captures'), 'the provider passes the private Global Storage capture root to stdio');
 assert(
   /out[\\/]+mcp[\\/]+runBenchmarkActorMcpServer\.js$/.test(defs[0].args[0]),
   'the server arg is the bundled stdio entrypoint (out/mcp/runBenchmarkActorMcpServer.js)'
@@ -303,6 +305,8 @@ assert(
   Object.keys(envNone).length === 1 && typeof envNone.LBA_LBABUS_PATH === 'string',
   'busEnvFromConfig still passes the resolved lbabus path when the net bus is unconfigured',
 );
+const envCapture = providerMod.busEnvFromConfig({ netHosts: '', netLog: '' }, '/private/global-storage/captures');
+assert(envCapture.LBA_CAPTURE_ROOT === '/private/global-storage/captures', 'busEnvFromConfig passes the capture root only as a private child-process environment value');
 const fDefault = providerMod.buildBenchmarkActorMcpServerDefinitionFields({ extensionPath: '/x', execPath: '/node', version: '1.2.3' });
 assert(fDefault.args[0] === providerMod.resolveBenchmarkActorMcpServerScriptPath('/x') && fDefault.version === '1.2.3', 'buildFields resolves the default script path + carries the version');
 const capturedDirect = [];

@@ -107,5 +107,6 @@
 | LBA-REQ-098 | Signed autonomous actor protocol | Proven | — | ADR-0081 | T-098 | 6 |
 | LBA-REQ-099 | Persistent lbabus autonomous actor service | Proven | — | ADR-0082 | T-099 | 14 |
 | LBA-REQ-100 | Fail-closed autonomous N>=3 controller decision | Proven | — | ADR-0083 | T-100 | 6 |
+| LBA-REQ-101 | Read-only active-capture MCP resources | Planned | §3.7 Agentic-infrastructure | ADR-0084 | T-101 | 8 |
 
-_Generated for 100 requirements._
+_Generated for 101 requirements._

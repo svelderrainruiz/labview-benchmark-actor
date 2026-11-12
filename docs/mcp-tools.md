@@ -5,6 +5,10 @@
 
 The extension contributes a Model Context Protocol server (provider `labviewBenchmarkActor`, server `labview-benchmark-actor`, protocol `2025-06-18`) exposing the following tools to Copilot agent mode. The server is a dependency-free stdio JSON-RPC process launched by the extension; the tools that shell `lbabus` degrade gracefully when the CLI is absent.
 
+## Active capture resources
+
+The same server lists bounded, pathless `lba-capture://session/{runId}` metadata resources and supports `resources/read` for session state, ordered frame/sample batches, and explicitly requested PNG frames. Batch and frame URI templates are listed by `resources/templates/list`; frame reads require the SHA-256 returned by a batch. The extension passes its Global Storage root only through the stdio process environment. Reads never control capture. See ADR-0084 / LBA-REQ-101.
+
 ## `get_host_capabilities`
 
 Report what the current host can actually run for LabVIEW benchmarking (LabVIEW runtime + bitness, Docker engine, etc.) via the lbabus capabilities probe. Run this before proposing benchmark work.

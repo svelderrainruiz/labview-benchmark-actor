@@ -6,8 +6,13 @@ follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project
 
 ## [Unreleased]
 
+### Added
+
+- Pathless active-capture MCP resources are specified under ADR-0084 / LBA-REQ-101; implementation and fixture tests are in progress.
+
 ### Fixed
 
+- Active-capture candidate reads now reject PNG chunk-CRC corruption and files replaced or grown during stat/open/read; descriptor reads are explicitly size-capped.
 - Windows local gates now pass native PowerShell script paths to `pwsh` instead of URL pathnames with a leading slash.
 - The autonomous Linux actor ordering selftest now normalizes CRLF checkouts on Windows.
 - Marketplace repository, homepage, support, and README documentation links now point to the independent

@@ -7,6 +7,7 @@ import { pathToFileURL } from 'node:url';
 import * as path from 'node:path';
 
 import { registerBenchmarkActorMcpServerProvider } from './mcp/benchmarkActorMcpServerProvider';
+import { ActiveCapturePlane, ActiveCaptureState, buildActiveCaptureSession, newCaptureRunId, writeActiveCaptureSession } from './captureSession';
 import { registerHumanTasks } from './humanTasks';
 import { resolveLbabusExecutable } from './lbabusPath';
 import { reviewerStationForEnvironment } from './reviewerStation';
@@ -984,6 +985,9 @@ export function buildCorrelatorFrame(f: Record<string, unknown>, imageSrc: strin
 }
 
 interface ActiveCapture {
+  runId: string;
+  source: string;
+  plane: ActiveCapturePlane;
   dir: string;
   recorder: ChildProcess;
   recorderKind: 'frame-sequence' | 'gnome-video';
@@ -995,6 +999,21 @@ interface ActiveCapture {
   startedAt: string;
 }
 let activeCapture: ActiveCapture | undefined;
+
+function writeCaptureSessionState(cap: ActiveCapture, state: ActiveCaptureState, stoppedAt: string | undefined, output: vscode.OutputChannel): void {
+  try {
+    writeActiveCaptureSession(cap.dir, buildActiveCaptureSession({
+      runId: cap.runId,
+      state,
+      plane: cap.plane,
+      source: cap.source,
+      startedAt: cap.startedAt,
+      stoppedAt
+    }));
+  } catch (error) {
+    output.appendLine(`active capture session beacon unavailable (${state}): ${error instanceof Error ? error.message : String(error)}`);
+  }
+}
 
 async function startGnomeScreencast(videoTemplate: string, output: vscode.OutputChannel): Promise<{ recorder: ChildProcess; videoFile: string }> {
   const recorder = spawn('gjs', ['-c', gnomeScreencastScript(), videoTemplate], {
@@ -1357,7 +1376,8 @@ async function captureLaunchCommand(context: vscode.ExtensionContext, output: vs
       return;
     }
   }
-  const dir = path.join(capturesRoot(context), `run-${Date.now()}`);
+  const runId = newCaptureRunId();
+  const dir = path.join(capturesRoot(context), `run-${runId}`);
   const framePattern = path.join(dir, 'frame-%05d.png');
   try {
     mkdirSync(dir, { recursive: true });
@@ -1378,9 +1398,10 @@ async function captureLaunchCommand(context: vscode.ExtensionContext, output: vs
   const startedAt = new Date().toISOString();
   void writeCaptureStatusBeacon(context.extensionUri, dir, (b) => b.buildCapturingStatus({ runDir: dir, startedAt }), output);
   const resourcesFile = path.join(dir, 'resources.jsonl');
+  const captureMetadata = captureMetadataForPlatform(process.platform, sessionType);
   writeFileSync(
     path.join(dir, 'capture-meta.json'),
-    `${JSON.stringify(captureMetadataForPlatform(process.platform, sessionType), null, 2)}\n`,
+    `${JSON.stringify(captureMetadata, null, 2)}\n`,
   );
 
   // 1) Capture the operator-visible desktop: direct ffmpeg on Windows/Xorg, GNOME Shell recorder on Wayland.
@@ -1431,8 +1452,23 @@ async function captureLaunchCommand(context: vscode.ExtensionContext, output: vs
   status.backgroundColor = new vscode.ThemeColor('statusBarItem.warningBackground');
   status.show();
 
-  activeCapture = { dir, recorder, recorderKind, ffmpegCommand: ffmpeg, framePattern, videoFile, sampler, status, startedAt };
-  output.appendLine(`capture started: ${dir} (${captureMetadataForPlatform(process.platform, sessionType).source} 12fps + CPU/RAM/disk; LabVIEW launching)`);
+  const captureOwner: ActiveCapture = {
+    runId,
+    source: String(captureMetadata.source),
+    plane: process.platform === 'win32' ? 'WIN' : 'LINUX',
+    dir,
+    recorder,
+    recorderKind,
+    ffmpegCommand: ffmpeg,
+    framePattern,
+    videoFile,
+    sampler,
+    status,
+    startedAt
+  };
+  activeCapture = captureOwner;
+  writeCaptureSessionState(captureOwner, 'capturing', undefined, output);
+  output.appendLine(`capture started: ${dir} (${captureOwner.source} 12fps + CPU/RAM/disk; LabVIEW launching)`);
   void vscode.window
     .showInformationMessage(
       'Capturing the visible LabVIEW launch at 12 fps. Interact with LabVIEW to create benchmark variations, then click "Stop LabVIEW Capture" in the status bar.',
@@ -1449,6 +1485,7 @@ async function stopCaptureCommand(context: vscode.ExtensionContext, output: vsco
     void vscode.window.showInformationMessage('No LabVIEW capture is running.');
     return;
   }
+  writeCaptureSessionState(cap, 'finalizing', undefined, output);
   activeCapture = undefined;
   cap.status.dispose();
   try {
@@ -1496,6 +1533,7 @@ async function stopCaptureCommand(context: vscode.ExtensionContext, output: vsco
     } catch (error) {
       const stoppedAt = new Date().toISOString();
       const message = error instanceof Error ? error.message : String(error);
+      writeCaptureSessionState(cap, 'failed', stoppedAt, output);
       await writeCaptureStatusBeacon(context.extensionUri, cap.dir, (b) => b.buildFailedStatus({ runDir: cap.dir, startedAt: cap.startedAt, stoppedAt, error: message }), output);
       reportUiError(output, 'Finalize visible Wayland capture', error);
       return;
@@ -1509,11 +1547,13 @@ async function stopCaptureCommand(context: vscode.ExtensionContext, output: vsco
     // peak-write frame, so the correlator opens THERE -- the human + agent land on the evidence, not frame 0.
     const samples = readResourceSamples(cap.dir);
     const status = await writeCaptureStatusBeacon(context.extensionUri, cap.dir, (b) => b.buildCaptureStatus(record, samples, { runDir: cap.dir, startedAt: cap.startedAt, stoppedAt }), output);
+    writeCaptureSessionState(cap, 'stopped', stoppedAt, output);
     const peakIndex = peakFrameIndexOf(status);
     await openCorrelatorForCapture(context, output, cap.dir, record, peakIndex);
     output.appendLine(`capture stopped: ${record.frameCount} frames -> correlator @ frame ${peakIndex + 1} (peak write; beacon written)`);
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
+    writeCaptureSessionState(cap, 'failed', stoppedAt, output);
     await writeCaptureStatusBeacon(context.extensionUri, cap.dir, (b) => b.buildFailedStatus({ runDir: cap.dir, startedAt: cap.startedAt, stoppedAt, error: message }), output);
     reportUiError(output, 'Assemble LabVIEW capture', err);
   }

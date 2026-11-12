@@ -59,10 +59,11 @@ export function buildBenchmarkActorMcpServerDefinitionFields(options: {
 
 /** Map the extension's `lbabus net` config to the env the stdio MCP server reads (LBA-REQ-066, ADR-0046,
  *  net-only). Empty net values are omitted; the resolved lbabus executable is always provided. */
-export function busEnvFromConfig(cfg: { netHosts: string; netLog: string }): Record<string, string> {
+export function busEnvFromConfig(cfg: { netHosts: string; netLog: string }, captureRoot = ''): Record<string, string> {
   const env: Record<string, string> = { LBA_LBABUS_PATH: resolveLbabusExecutable() };
   if (cfg.netHosts) { env.VIHS_COLLAB_NET_HOSTS = cfg.netHosts; }
   if (cfg.netLog) { env.VIHS_COLLAB_NET_LOG = cfg.netLog; }
+  if (captureRoot) { env.LBA_CAPTURE_ROOT = captureRoot; }
   return env;
 }
 
@@ -96,7 +97,7 @@ export function registerBenchmarkActorMcpServerProvider(
       const env = busEnvFromConfig({
         netHosts: (c.get<string>('busNetHosts', '') || '').trim(),
         netLog: (c.get<string>('busNetLog', '') || '').trim()
-      });
+      }, context.globalStorageUri?.fsPath ? path.join(context.globalStorageUri.fsPath, 'captures') : '');
       return [
         new vscode.McpStdioServerDefinition(fields.label, fields.command, fields.args, env, fields.version)
       ];
