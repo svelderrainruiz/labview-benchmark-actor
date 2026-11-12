@@ -9,7 +9,7 @@
 //                     (get_benchmark_series is deterministic and needs no CLI) over newline-delimited JSON-RPC.
 // Run after `npm run compile`. Usage: node test/mcp-server.mjs
 import Module, { createRequire } from 'node:module';
-import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
@@ -255,11 +255,12 @@ Module._load = function patched(request, parent, isMain) {
 
 const ext = require(extPath);
 const subscriptions = [];
+const activationStorage = mkdtempSync(join(tmpdir(), 'lba-mcp-activation-'));
 ext.activate({
   subscriptions,
   extensionPath: '/ext',
   extensionUri: { path: '/ext', fsPath: '/ext' },
-  globalStorageUri: { fsPath: '/storage/actor' },
+  globalStorageUri: { fsPath: activationStorage },
   extension: { packageJSON: { version: '0.1.1' } },
 });
 ext.activate({
@@ -279,7 +280,7 @@ assert(
 const defs = captured[0].provider.provideMcpServerDefinitions();
 assert(Array.isArray(defs) && defs.length === 1, 'the provider yields exactly one server definition');
 assert(defs[0].command === process.execPath, 'the server launches with the editor Node (process.execPath)');
-assert(defs[0].env.LBA_CAPTURE_ROOT === join('/storage/actor', 'captures'), 'the provider passes the private Global Storage capture root to stdio');
+assert(defs[0].env.LBA_CAPTURE_ROOT === join(activationStorage, 'captures'), 'the provider passes the private Global Storage capture root to stdio');
 assert(
   /out[\\/]+mcp[\\/]+runBenchmarkActorMcpServer\.js$/.test(defs[0].args[0]),
   'the server arg is the bundled stdio entrypoint (out/mcp/runBenchmarkActorMcpServer.js)'
@@ -318,6 +319,8 @@ mockVscode.lm.registerMcpServerDefinitionProvider = undefined; // simulate a hos
 const noop = providerMod.registerBenchmarkActorMcpServerProvider({ subscriptions: [] });
 assert(noop === undefined, 'registerProvider is a no-op (undefined) when the host lacks the MCP definition-provider API');
 
+for (const subscription of subscriptions) subscription?.dispose?.();
+rmSync(activationStorage, { recursive: true, force: true });
 console.log('mcp-activation: PASS -- provider registered, manifest id == runtime id, bundled stdio launch');
 
 // ---- 3. STDIO: real newline-delimited JSON-RPC round-trip against the spawned server ----

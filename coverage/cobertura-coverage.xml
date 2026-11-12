@@ -1,6 +1,6 @@
 <?xml version="1.0" ?>
 <!DOCTYPE coverage SYSTEM "http://cobertura.sourceforge.net/xml/coverage-04.dtd">
-<coverage lines-valid="5687" lines-covered="5540" line-rate="0.9741" branches-valid="1986" branches-covered="1897" branch-rate="0.9551000000000001" timestamp="0" complexity="0" version="0.1">
+<coverage lines-valid="5687" lines-covered="5538" line-rate="0.9737" branches-valid="1987" branches-covered="1897" branch-rate="0.9547" timestamp="0" complexity="0" version="0.1">
   <sources>
     <source>.</source>
   </sources>
@@ -2785,7 +2785,7 @@
         </class>
       </classes>
     </package>
-    <package name="src" line-rate="0.9456" branch-rate="0.9077">
+    <package name="src" line-rate="0.9448000000000001" branch-rate="0.9064">
       <classes>
         <class name="capturePlatform.ts" filename="src/capturePlatform.ts" line-rate="1" branch-rate="1">
           <methods>
@@ -3094,7 +3094,7 @@
             <line number="86" hits="7" branch="false"/>
           </lines>
         </class>
-        <class name="extension.ts" filename="src/extension.ts" line-rate="0.9373999999999999" branch-rate="0.8946">
+        <class name="extension.ts" filename="src/extension.ts" line-rate="0.9365000000000001" branch-rate="0.8929">
           <methods>
             <method name="probeCommand" hits="9" signature="()V">
               <lines>
@@ -3356,9 +3356,9 @@
                 <line number="819" hits="7"/>
               </lines>
             </method>
-            <method name="dispose" hits="0" signature="()V">
+            <method name="dispose" hits="1" signature="()V">
               <lines>
-                <line number="832" hits="0"/>
+                <line number="832" hits="1"/>
               </lines>
             </method>
             <method name="renderReviewerVerdictCommand" hits="7" signature="()V">
@@ -4480,14 +4480,14 @@
             <line number="825" hits="5" branch="false"/>
             <line number="826" hits="5" branch="false"/>
             <line number="827" hits="5" branch="false"/>
-            <line number="828" hits="6" branch="true" condition-coverage="100% (1/1)"/>
+            <line number="828" hits="7" branch="true" condition-coverage="0% (0/1)"/>
             <line number="829" hits="5" branch="true" condition-coverage="100% (1/1)"/>
             <line number="830" hits="5" branch="false"/>
             <line number="831" hits="5" branch="false"/>
-            <line number="832" hits="5" branch="false"/>
-            <line number="833" hits="6" branch="true" condition-coverage="100% (1/1)"/>
-            <line number="834" hits="1" branch="true" condition-coverage="0% (0/1)"/>
-            <line number="835" hits="1" branch="false"/>
+            <line number="832" hits="5" branch="true" condition-coverage="100% (1/1)"/>
+            <line number="833" hits="7" branch="true" condition-coverage="0% (0/1)"/>
+            <line number="834" hits="0" branch="false"/>
+            <line number="835" hits="0" branch="false"/>
             <line number="836" hits="7" branch="false"/>
             <line number="837" hits="1" branch="false"/>
             <line number="838" hits="1" branch="false"/>
@@ -5829,7 +5829,7 @@
             <line number="2174" hits="1" branch="false"/>
           </lines>
         </class>
-        <class name="humanTasks.ts" filename="src/humanTasks.ts" line-rate="1" branch-rate="0.9285">
+        <class name="humanTasks.ts" filename="src/humanTasks.ts" line-rate="1" branch-rate="0.9333">
           <methods>
             <method name="taskFor" hits="9" signature="()V">
               <lines>
@@ -5841,9 +5841,9 @@
                 <line number="46" hits="7"/>
               </lines>
             </method>
-            <method name="dispose" hits="0" signature="()V">
+            <method name="dispose" hits="1" signature="()V">
               <lines>
-                <line number="47" hits="0"/>
+                <line number="47" hits="1"/>
               </lines>
             </method>
             <method name="provideTasks" hits="2" signature="()V">
@@ -5904,7 +5904,7 @@
             <line number="44" hits="9" branch="false"/>
             <line number="45" hits="1" branch="false"/>
             <line number="46" hits="7" branch="true" condition-coverage="100% (1/1)"/>
-            <line number="47" hits="7" branch="true" condition-coverage="100% (2/2)"/>
+            <line number="47" hits="7" branch="true" condition-coverage="100% (3/3)"/>
             <line number="48" hits="5" branch="true" condition-coverage="100% (1/1)"/>
             <line number="49" hits="5" branch="true" condition-coverage="100% (2/2)"/>
             <line number="50" hits="5" branch="true" condition-coverage="100% (1/1)"/>
