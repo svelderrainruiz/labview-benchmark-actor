@@ -2406,13 +2406,14 @@ check('mprr-absorbed-self-owned-not-external', () => {
 // the boot-benchmark schema must all agree with it, and existing LBA identifiers must stay accepted aliases.
 check('mprr-contract-matches-pinned-fixture', () => {
   const { pin, contract, sha256 } = loadMprrContract();
-  assert(/^v\d+\.\d+\.\d+$/.test(pin.tag) && pin.source === 'svelderrainruiz/mprr', `pin must name a tagged mprr release, got ${pin.source}@${pin.tag}`);
+  assert(/^v\d+\.\d+\.\d+$/.test(pin.tag) && pin.source === 'gitlab.com/svelderrainruiz/mprr', `pin must name a tagged mprr release, got ${pin.source}@${pin.tag}`);
   const ring = { TICKS_PER_MS, DEFAULT_BLOCK_DURATION_MS, DEFAULT_BLOCK_DURATION_TICKS, NORMAL_LOAD_BOUNDARY_VARIATION_PCT,
     AUTHORITATIVE_BOUNDARY_VARIATION_PCT, ADMISSION_CAPACITY_HEADROOM, CLI_DEFAULT_CAPACITY_BYTES, MIN_CAPACITY_BYTES, requiredThreeBlockCapacityBytes };
   const packet = { CAPTURE_RING_SCHEMA, PACKET_BYTES, PACKET_VERSION, OFFSETS, FLAG_SETTLED, MILESTONE_IDS };
   const launch = buildLaunchCapture({
     frames: [{ ms: 0, imageFile: 'f0.png', imageBytes: 10, dhashHex: 'ffffffffffffffff' }, { ms: 100, imageFile: 'f1.png', imageBytes: 10 }],
-    resourceSamples: [{ ms: 0, cpuPct: 10, ramMb: 512, diskPct: 1 }],
+    // counters and disks make the optional frame and record fields appear, so renaming them is caught too.
+    resourceSamples: [{ ms: 0, cpuPct: 10, ramMb: 512, diskPct: 1, counters: { 'processor-time': 10 }, disks: [{ name: 'C:', writeMBs: 1, readMBs: 2 }] }],
     meta: { workload: 'gate', plane: 'WIN', screenW: 1, screenH: 1 },
   });
   const bootSchema = JSON.parse(readFileSync(join(here, 'mprr-boot-benchmark', 'boot-benchmark-v1.schema.json'), 'utf8'));
@@ -2432,6 +2433,10 @@ check('mprr-contract-matches-pinned-fixture', () => {
   assert(compareCaptureRingPacket(contract, { ...packet, OFFSETS: { ...OFFSETS, flags: 22 } }).length > 0, 'a drifted packet offset must be reported');
   const { cpuPct: _dropped, ...frameWithoutCpu } = launch.frames[0];
   assert(compareLaunchCaptureRecord(contract, { ...launch, frames: [frameWithoutCpu] }).length > 0, 'a missing required frame field must be reported');
+  assert(compareLaunchCaptureRecord(contract, { ...launch, plane: undefined }).length > 0, 'a required key left undefined (dropped from the written JSON) must be reported');
+  assert(compareLaunchCaptureRecord(contract, { ...launch, diskNames: undefined, physicalDisks: launch.diskNames }).length > 0, 'a renamed optional field must be reported');
+  assert(compareLaunchCaptureRecord(contract, { ...launch, dualPacket: { ...launch.dualPacket, frames: [] } }).length > 0, 'a record whose short packets cannot be checked must be reported');
+  assert(compareLaunchCaptureRecord(contract, { ...launch, frames: launch.frames.map((frame) => ({ ...frame, timingTicks64: String(BigInt(frame.tMs) * 1000n) })) }).length > 0, 'a wrong tick rate on frames must be reported');
   assert(compareBootBenchmarkSchema(contract, { ...bootSchema, required: bootSchema.required.slice(1) }).length > 0, 'a dropped required boot field must be reported');
   const tampered = join(tmpdir(), `lba-mprr-contract-${process.pid}.json`);
   writeFileSync(tampered, readFileSync(join(here, 'mprr-ring', 'contract', 'mprr-shared-contract.v1.json'), 'utf8').replace('"value": 45000', '"value": 46000'));

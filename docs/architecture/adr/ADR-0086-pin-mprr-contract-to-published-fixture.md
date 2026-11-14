@@ -25,8 +25,9 @@ with canonical identifiers. The identifiers this repository already emits are ac
 
 - The implementation under `experiments/mprr-ring/` and `experiments/mprr-capture-ring/` stays self-owned
   and dependency-free, as ADR-0009 decided.
-- The contract is vendored byte-for-byte into `experiments/mprr-ring/contract/` from a tagged mprr release,
-  with `pin.json` recording the source, the tag and the SHA-256. `.gitattributes` keeps the file byte-exact
+- The contract is vendored byte-for-byte into `experiments/mprr-ring/contract/` from a tagged release of the
+  private mprr repository on GitLab (`gitlab.com/svelderrainruiz/mprr`), with `pin.json` recording that
+  source, the tag and the SHA-256. `.gitattributes` keeps the file byte-exact
   on every plane.
 - `experiments/mprr-ring/mprrContract.mjs` refuses a vendored file that does not match its pin, and
   compares the implementation with the contract:
@@ -46,7 +47,8 @@ with canonical identifiers. The identifiers this repository already emits are ac
 ## Consequences
 
 - Every shared constant and wire shape now cites one versioned upstream source, not prose.
-- The mprr repository is private. The published contract carries only values, units, requirement
+- The mprr repository is private, so the pinned tag can't be fetched from public CI; the SHA-256 in
+  `pin.json` is the integrity anchor. The published contract carries only values, units, requirement
   identifiers and wire shapes; its verification bindings stay private in mprr.
 - Readers that check a `schema` value with strict equality still accept only the existing identifiers.
   They need to move to `isContractSchema` before any producer emits a canonical identifier.

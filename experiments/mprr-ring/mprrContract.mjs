@@ -59,7 +59,7 @@ export function compareRingConstants(contract, impl) {
   const blockBytes = 100_000;
   const blocks = Array.from({ length: c.blocksPerHorizon.value + 2 }, () => blockBytes);
   expect('blocksPerHorizon', impl.requiredThreeBlockCapacityBytes(blocks),
-    Math.ceil(c.admissionCapacitySafetyFactor.value * c.blocksPerHorizon.value * blockBytes));
+    Math.ceil(c.admissionCapacitySafetyFactor.value * (c.blocksPerHorizon.value * blockBytes)));
   return mismatches;
 }
 
@@ -82,8 +82,10 @@ export function compareCaptureRingPacket(contract, impl) {
 }
 
 /** Mismatches between one launch-capture record and mprr/launch-capture@1 field presence and nullability. */
-export function compareLaunchCaptureRecord(contract, record) {
+export function compareLaunchCaptureRecord(contract, inMemoryRecord) {
   const entry = contractEntry(contract, 'mprr/launch-capture@1');
+  // Check the record as it is written: JSON drops keys whose value is undefined.
+  const record = JSON.parse(JSON.stringify(inMemoryRecord));
   const mismatches = [];
   const check = (object, required, nullable, optional, label) => {
     for (const field of required) {
@@ -95,9 +97,20 @@ export function compareLaunchCaptureRecord(contract, record) {
     }
   };
   if (!isContractSchema(contract, entry.id, record.schema)) mismatches.push(`schema ${record.schema} is not an accepted identifier`);
-  if (record.dualPacket && record.dualPacket.frames && record.frames.length > 0) {
-    const shortBytes = record.dualPacket.frames[0]?.shortBytes;
-    if (shortBytes !== undefined && shortBytes !== entry.shortPacketBytes) mismatches.push(`shortPacketBytes: implementation ${shortBytes}, contract ${entry.shortPacketBytes}`);
+  const dualFrames = Array.isArray(record.dualPacket?.frames) ? record.dualPacket.frames : [];
+  if (dualFrames.length === 0) mismatches.push('dualPacket.frames is empty, so shortPacketBytes cannot be checked');
+  for (const [index, dualFrame] of dualFrames.entries()) {
+    if (dualFrame.shortBytes !== entry.shortPacketBytes) {
+      mismatches.push(`dualPacket.frames[${index}].shortBytes: implementation ${dualFrame.shortBytes}, contract ${entry.shortPacketBytes}`);
+    }
+  }
+  const ticksPerMs = BigInt(contract.constants.timingTicksPerMillisecond.value);
+  for (const [index, frame] of (Array.isArray(record.frames) ? record.frames : []).entries()) {
+    let ticks = null;
+    try { ticks = BigInt(frame.timingTicks64); } catch { ticks = null; }
+    if (ticks === null || !Number.isInteger(frame.tMs) || ticks !== BigInt(frame.tMs) * ticksPerMs) {
+      mismatches.push(`frames[${index}].timingTicks64 ${frame.timingTicks64} is not tMs ${frame.tMs} x ${ticksPerMs} ticks/ms`);
+    }
   }
   check(record, entry.requiredRecordFields, entry.nullableRecordFields ?? [], entry.optionalRecordFields ?? [], 'record');
   for (const [index, frame] of record.frames.entries()) {
