@@ -10,6 +10,12 @@ absorption decision, and
 / [ADR-0007](../../docs/architecture/adr/ADR-0007-image-derived-timing-binary-strip.md)
 for how the model is used (VM-local storage; image-derived timing).
 
+**Contract pin (ADR-0086).** The implementation stays owned here. Its *contract* is pinned to the shared
+contract that mprr publishes: `contract/mprr-shared-contract.v1.json` is vendored byte-for-byte from a
+tagged mprr release, and `contract/pin.json` records the tag and SHA-256. The constants, packet layout and
+record shapes are checked against it by `mprrContract.mjs` and the `mprr-contract-matches-pinned-fixture`
+gate. To move to a newer contract, vendor the newer tag's file, update `pin.json`, and pass the gate.
+
 Everything here is a **faithful ESM mirror** with **no runtime dependency** — Node
 built-ins only — so both planes (LINUX and native-Windows) share one testable model and a
 benchmark run is comparable across planes through the benchmark store. The historical mprr

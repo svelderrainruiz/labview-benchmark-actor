@@ -1,0 +1,143 @@
+{
+  "schemaVersion": "mprr-shared-contract-v1",
+  "contractRevision": 1,
+  "description": "Constants and wire contracts that mprr owns and that downstream implementations (labview-benchmark-actor, vi-history-suite) vendor at a pinned mprr tag and gate against. Verification bindings live in the private contracts/mprr-shared-contract.bindings.json. See ADR-0046.",
+  "governingRequirements": ["MPRR-REQ-106", "MPRR-REQ-110", "MPRR-REQ-182"],
+  "governingAdrs": ["ADR-0031", "ADR-0046"],
+  "constants": {
+    "timingTicksPerMillisecond": {
+      "value": 10000,
+      "unit": "100ns ticks per millisecond",
+      "requirement": "MPRR-REQ-106"
+    },
+    "defaultBlockDurationMilliseconds": {
+      "value": 45000,
+      "unit": "milliseconds",
+      "requirement": "MPRR-REQ-106"
+    },
+    "blocksPerHorizon": {
+      "value": 3,
+      "unit": "logical time blocks",
+      "requirement": "MPRR-REQ-106"
+    },
+    "normalLoadBoundaryVariationPercent": {
+      "value": 1.0,
+      "unit": "percent",
+      "requirement": "MPRR-REQ-106"
+    },
+    "nonAuthoritativeBoundaryVariationPercent": {
+      "value": 5.0,
+      "unit": "percent",
+      "requirement": "MPRR-REQ-106"
+    },
+    "admissionCapacitySafetyFactor": {
+      "value": 1.10,
+      "unit": "multiplier over the peak three-block horizon",
+      "requirement": "MPRR-REQ-110"
+    },
+    "defaultRingCapacityBytes": {
+      "value": 58000,
+      "unit": "bytes",
+      "requirement": "MPRR-REQ-110"
+    },
+    "minimumRingCapacityBytes": {
+      "value": 4096,
+      "unit": "bytes",
+      "requirement": "MPRR-REQ-110"
+    }
+  },
+  "contracts": [
+    {
+      "id": "mprr/capture-ring-packet@1",
+      "aliases": ["labview-benchmark-actor/capture-ring-packet@v1"],
+      "kind": "binary-record",
+      "description": "Self-describing short-ring frame record. Readers fail closed on any packetVersion other than the one declared here.",
+      "byteOrder": "little-endian",
+      "recordBytes": 24,
+      "versionField": {
+        "name": "packetVersion",
+        "value": 1,
+        "onOtherValue": "fail-closed"
+      },
+      "fields": [
+        {
+          "name": "timingTicks64",
+          "offset": 0,
+          "type": "u64",
+          "meaning": "monotonic 100ns ticks (timingTicksPerMillisecond)"
+        },
+        {
+          "name": "frameIndex",
+          "offset": 8,
+          "type": "u32",
+          "meaning": "producer frame counter"
+        },
+        {
+          "name": "dhash64",
+          "offset": 12,
+          "type": "u64",
+          "meaning": "dhash-64 perceptual fingerprint; 0 marks a pure timing marker with no frame"
+        },
+        {
+          "name": "milestoneId",
+          "offset": 20,
+          "type": "u8",
+          "meaning": "milestoneIds enum"
+        },
+        {
+          "name": "flags",
+          "offset": 21,
+          "type": "u8",
+          "meaning": "bit 0 settled; bits 1-7 reserved and written as 0"
+        },
+        {
+          "name": "packetVersion",
+          "offset": 22,
+          "type": "u8",
+          "meaning": "record version"
+        },
+        {
+          "name": "reserved",
+          "offset": 23,
+          "type": "u8",
+          "meaning": "written as 0"
+        }
+      ],
+      "flags": {
+        "settled": 1
+      },
+      "milestoneIds": {
+        "0": null,
+        "1": "BOOT-START",
+        "2": "LBABUS-BUILD-START",
+        "3": "LBABUS-BUILT",
+        "4": "MESH-OK"
+      },
+      "reservedMilestoneIdRange": [5, 255]
+    },
+    {
+      "id": "mprr/launch-capture@1",
+      "aliases": ["labview-benchmark-actor/launch-capture@1"],
+      "kind": "json-record",
+      "description": "Dual-packet screen-capture record: the short packet carries timing and resource metrics, the long packet the image payload, correlated by frame index with short-packet continuity first.",
+      "schemaField": "schema",
+      "shortPacketBytes": 24,
+      "fieldPresence": "required fields are always present as keys; nullable fields are required keys whose value may be null; optional fields may be absent",
+      "requiredRecordFields": ["schema", "workload", "plane", "source", "fps", "startMs", "frameCount", "durationMs", "screen", "frames", "resources", "dualPacket", "meta"],
+      "nullableRecordFields": ["plane", "screen"],
+      "optionalRecordFields": ["counterKeys", "diskNames"],
+      "requiredFrameFields": ["index", "tMs", "timingTicks64", "cpuPct", "ramMb", "diskPct", "image", "imageBytes", "dhashHex"],
+      "nullableFrameFields": ["cpuPct", "ramMb", "diskPct", "image", "dhashHex"],
+      "optionalFrameFields": ["counters", "disks"]
+    },
+    {
+      "id": "mprr/boot-benchmark@1",
+      "aliases": ["labview-benchmark-actor/boot-benchmark-v1"],
+      "kind": "json-schema",
+      "description": "Dual-clock boot benchmark record: a host-monotonic visual timeline plus guest-monotonic authoritative spans, sealed.",
+      "schemaField": "schema",
+      "jsonSchemaDialect": "http://json-schema.org/draft-07/schema#",
+      "requiredRecordFields": ["schema", "iteration", "sessionId", "sealedAt", "plane", "hypervisor", "capture", "procedure", "fingerprintAlgo", "fingerprintSpecVersion", "anchor", "frames", "spans", "visual", "seal"]
+    }
+  ]
+}

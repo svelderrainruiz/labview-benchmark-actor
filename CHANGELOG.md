@@ -10,6 +10,7 @@ follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project
 
 ### Added
 
+- Pin the absorbed mprr contract to the shared contract mprr publishes (`v0.1.1`, ADR-0086): the vendored file is SHA-256 pinned, and the `mprr-contract-matches-pinned-fixture` gate checks the ring constants, capture-ring packet layout, launch-capture field presence and boot-benchmark schema against it, replacing `mprr-absorbed-constants-match-mprr-spec`.
 - Specify standalone Windows desktop capture with a bounded operator-selected cadence under LBA-REQ-102 / ADR-0085; live qualification remains gated.
 - Pathless active-capture MCP resources are specified under ADR-0084 / LBA-REQ-101; implementation and fixture tests are in progress.
 

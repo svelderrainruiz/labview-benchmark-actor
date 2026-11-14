@@ -22,7 +22,8 @@ import { fileURLToPath } from 'node:url';
 import { dirname, join, resolve } from 'node:path';
 import { tmpdir } from 'node:os';
 import { corroborationConfidence, REAL_READBACK_CASES, validateColonOcrFidelity } from './corroboration-confidence-reference.mjs';
-import { ingestShortPackets, MPRR_RING_SCHEMA, TICKS_PER_MS, DEFAULT_BLOCK_DURATION_MS, DEFAULT_BLOCK_DURATION_TICKS, ADMISSION_CAPACITY_HEADROOM, AUTHORITATIVE_BOUNDARY_VARIATION_PCT, NORMAL_LOAD_BOUNDARY_VARIATION_PCT, createShortRing, CLI_DEFAULT_CAPACITY_BYTES } from './mprr-ring/mprrRing.mjs';
+import { ingestShortPackets, MPRR_RING_SCHEMA, TICKS_PER_MS, DEFAULT_BLOCK_DURATION_MS, DEFAULT_BLOCK_DURATION_TICKS, ADMISSION_CAPACITY_HEADROOM, AUTHORITATIVE_BOUNDARY_VARIATION_PCT, NORMAL_LOAD_BOUNDARY_VARIATION_PCT, createShortRing, CLI_DEFAULT_CAPACITY_BYTES, MIN_CAPACITY_BYTES, requiredThreeBlockCapacityBytes } from './mprr-ring/mprrRing.mjs';
+import { loadMprrContract, compareRingConstants, compareCaptureRingPacket, compareLaunchCaptureRecord, compareBootBenchmarkSchema, isContractSchema } from './mprr-ring/mprrContract.mjs';
 import { projectViewerSeries, seriesHash } from './mprr-ring/mprrViewerSeries.mjs';
 import { correlateDualStream } from './mprr-ring/mprrDualPacket.mjs';
 import { summarizeViAnalyzerReport } from './vi-analyzer/viAnalyzerResult.mjs';
@@ -39,7 +40,7 @@ import { parseJournalMonotonic } from './mprr-boot-benchmark/journal-monotonic.m
 import { createVmwareBackend, vmwareSerialConfigVmx, vmwareVncConfigVmx, upsertVmxConfig } from './mprr-boot-benchmark/capture-backend-vmware.mjs';
 import { bootBenchmarkDiff } from './mprr-boot-benchmark/boot-benchmark-diff.mjs';
 import { bootbenchDiff } from './mesh-runs/bootbench-diff.mjs';
-import { PACKET_BYTES, PACKET_VERSION, OFFSETS, MILESTONE_IDS, encodeCaptureFrame, decodeCaptureFrame, writeCaptureFrame, readCaptureFrames } from './mprr-capture-ring/capture-ring.mjs';
+import { CAPTURE_RING_SCHEMA, FLAG_SETTLED, PACKET_BYTES, PACKET_VERSION, OFFSETS, MILESTONE_IDS, encodeCaptureFrame, decodeCaptureFrame, writeCaptureFrame, readCaptureFrames } from './mprr-capture-ring/capture-ring.mjs';
 import { ringFrameFromDescriptor, makeRingSink } from './mprr-capture-ring/vmware-ring-capture.mjs';
 import { recordFromRing } from './mprr-capture-ring/capture-ring-recorder.mjs';
 import { fiducialDhash } from './mprr-capture-ring/fiducial-vnc-server.mjs';
@@ -2399,19 +2400,49 @@ check('mprr-absorbed-self-owned-not-external', () => {
   assert(/External canonical reference:/.test('- External canonical reference: mprr'), 'guard must catch a reintroduced ADR reference label');
   return { adr: 'ADR-0009', deBrandedEnv: ['LBA_MPRR_ROOT', 'LBA_CONFORMANCE_OUT'], backCompat: 'VIHS_MPRR_ROOT' };
 });
-// The absorbed ring is a FAITHFUL mirror only while its GOVERNED constants equal the real mprr spec.
-// Verified against the local svelderrainruiz/mprr source: MPRR-REQ-106 (45 s block, <=1% normal / >5%
-// non-authoritative) + Program.cs GovernedDefaultBlockDurationMilliseconds=45_000; MPRR-REQ-110 admission +
-// Program.cs Math.Ceiling(window * 1.10); the writer's mprr-self-test-synthetic-monotonic-100ns tick
-// (RelativeMilliseconds * 10_000). Pinning them here fails closed if the absorbed mirror drifts (ADR-0009).
-check('mprr-absorbed-constants-match-mprr-spec', () => {
-  assert(TICKS_PER_MS === 10_000n, `100ns tick: TICKS_PER_MS must be 10_000n, got ${TICKS_PER_MS}`);
-  assert(DEFAULT_BLOCK_DURATION_MS === 45_000, `MPRR-REQ-106 block duration must be 45_000 ms, got ${DEFAULT_BLOCK_DURATION_MS}`);
-  assert(DEFAULT_BLOCK_DURATION_TICKS === 450_000_000n, `block duration must be 450_000_000 ticks, got ${DEFAULT_BLOCK_DURATION_TICKS}`);
-  assert(NORMAL_LOAD_BOUNDARY_VARIATION_PCT === 1.0, `MPRR-REQ-106 normal-load boundary target must be 1.0 pct, got ${NORMAL_LOAD_BOUNDARY_VARIATION_PCT}`);
-  assert(AUTHORITATIVE_BOUNDARY_VARIATION_PCT === 5.0, `MPRR-REQ-106 non-authoritative boundary must be 5.0 pct, got ${AUTHORITATIVE_BOUNDARY_VARIATION_PCT}`);
-  assert(ADMISSION_CAPACITY_HEADROOM === 1.1, `MPRR-REQ-110 admission headroom must be 1.1 (10 pct), got ${ADMISSION_CAPACITY_HEADROOM}`);
-  return { blockMs: DEFAULT_BLOCK_DURATION_MS, headroomPct: (ADMISSION_CAPACITY_HEADROOM - 1) * 100, ticksPerMs: Number(TICKS_PER_MS) };
+// The absorbed implementation stays self-owned (ADR-0009), but its CONTRACT is pinned to the shared contract
+// that mprr publishes (ADR-0086): experiments/mprr-ring/contract/ holds the file vendored from the tagged mprr
+// release plus its SHA-256 pin. Ring constants, the capture-ring packet layout, launch-capture field presence and
+// the boot-benchmark schema must all agree with it, and existing LBA identifiers must stay accepted aliases.
+check('mprr-contract-matches-pinned-fixture', () => {
+  const { pin, contract, sha256 } = loadMprrContract();
+  assert(/^v\d+\.\d+\.\d+$/.test(pin.tag) && pin.source === 'svelderrainruiz/mprr', `pin must name a tagged mprr release, got ${pin.source}@${pin.tag}`);
+  const ring = { TICKS_PER_MS, DEFAULT_BLOCK_DURATION_MS, DEFAULT_BLOCK_DURATION_TICKS, NORMAL_LOAD_BOUNDARY_VARIATION_PCT,
+    AUTHORITATIVE_BOUNDARY_VARIATION_PCT, ADMISSION_CAPACITY_HEADROOM, CLI_DEFAULT_CAPACITY_BYTES, MIN_CAPACITY_BYTES, requiredThreeBlockCapacityBytes };
+  const packet = { CAPTURE_RING_SCHEMA, PACKET_BYTES, PACKET_VERSION, OFFSETS, FLAG_SETTLED, MILESTONE_IDS };
+  const launch = buildLaunchCapture({
+    frames: [{ ms: 0, imageFile: 'f0.png', imageBytes: 10, dhashHex: 'ffffffffffffffff' }, { ms: 100, imageFile: 'f1.png', imageBytes: 10 }],
+    resourceSamples: [{ ms: 0, cpuPct: 10, ramMb: 512, diskPct: 1 }],
+    meta: { workload: 'gate', plane: 'WIN', screenW: 1, screenH: 1 },
+  });
+  const bootSchema = JSON.parse(readFileSync(join(here, 'mprr-boot-benchmark', 'boot-benchmark-v1.schema.json'), 'utf8'));
+  const mismatches = [
+    ...compareRingConstants(contract, ring),
+    ...compareCaptureRingPacket(contract, packet),
+    ...compareLaunchCaptureRecord(contract, launch),
+    ...compareBootBenchmarkSchema(contract, bootSchema),
+  ];
+  assert(mismatches.length === 0, `implementation disagrees with mprr ${pin.tag}: ${mismatches.join('; ')}`);
+  assert(isContractSchema(contract, 'mprr/boot-benchmark@1', 'labview-benchmark-actor/boot-benchmark-v1')
+    && isContractSchema(contract, 'mprr/boot-benchmark@1', 'mprr/boot-benchmark@1')
+    && !isContractSchema(contract, 'mprr/boot-benchmark@1', 'labview-benchmark-actor/boot-benchmark-v2'),
+  'records must be accepted by canonical identifier or alias, and nothing else');
+  // Teeth: each comparator reports a drifted implementation, and a tampered vendored file fails the pin.
+  assert(compareRingConstants(contract, { ...ring, ADMISSION_CAPACITY_HEADROOM: 1.15 }).length > 0, 'a drifted headroom must be reported');
+  assert(compareCaptureRingPacket(contract, { ...packet, OFFSETS: { ...OFFSETS, flags: 22 } }).length > 0, 'a drifted packet offset must be reported');
+  const { cpuPct: _dropped, ...frameWithoutCpu } = launch.frames[0];
+  assert(compareLaunchCaptureRecord(contract, { ...launch, frames: [frameWithoutCpu] }).length > 0, 'a missing required frame field must be reported');
+  assert(compareBootBenchmarkSchema(contract, { ...bootSchema, required: bootSchema.required.slice(1) }).length > 0, 'a dropped required boot field must be reported');
+  const tampered = join(tmpdir(), `lba-mprr-contract-${process.pid}.json`);
+  writeFileSync(tampered, readFileSync(join(here, 'mprr-ring', 'contract', 'mprr-shared-contract.v1.json'), 'utf8').replace('"value": 45000', '"value": 46000'));
+  try {
+    let rejected = false;
+    try { loadMprrContract(tampered); } catch { rejected = true; }
+    assert(rejected, 'a vendored contract that does not match the pinned SHA-256 must be rejected');
+  } finally {
+    rmSync(tampered, { force: true });
+  }
+  return { tag: pin.tag, sha256: sha256.slice(0, 12), contracts: contract.contracts.length, constants: Object.keys(contract.constants).length };
 });
 
 // boot-benchmark recorder seam (experiments/mprr-boot-benchmark): the boot-as-benchmark sibling of the

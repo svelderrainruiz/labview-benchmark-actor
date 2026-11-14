@@ -362,6 +362,7 @@ chain is attested and logged before installing it (verify-before-install, LBA-RE
 | AD-98 | Expose active capture lifecycle and ordered evidence through bounded, pathless MCP resources; return frame bytes only through explicit, validated resource reads, and keep reads side-effect-free | ProjectBuddy needs live frame/event access while the Actor's MCP server is a separate process; Global Storage paths are host-specific and capture bytes must not enter default metadata or the coordination bus (ADR-0084) | LBA-REQ-101 |
 
 | AD-99 | Record an explicitly requested Windows desktop workload at an operator-selected bounded cadence without LabVIEW discovery or launch; retain existing capture control and read-only evidence ownership | The synthetic task must not require NI activation or silently overrun its local inference queue (ADR-0085) | LBA-REQ-102 |
+| AD-100 | Pin the absorbed mprr contract (constants, packet layout, record shapes) to the shared contract that mprr publishes at a tagged release; the implementation stays self-owned | One versioned upstream source instead of hand-copied values; existing identifiers stay valid as aliases | LBA-REQ-009 |
 
 ## 5. Risks and open questions
 
@@ -392,6 +393,7 @@ Detailed decisions are recorded as ADRs in [adr/](adr/README.md):
 | [ADR-0004](adr/ADR-0004-cross-vm-time-sync.md) | UDP presence/liveness + advisory coordination time (no cross-VM comparison) | LINUX |
 | [ADR-0084](adr/ADR-0084-active-capture-mcp-resources.md) | Pathless, bounded, read-only MCP resources for active-capture evidence | LINUX |
 | [ADR-0085](adr/ADR-0085-standalone-desktop-capture.md) | Standalone Windows desktop capture with explicit bounded cadence | LINUX |
+| [ADR-0086](adr/ADR-0086-pin-mprr-contract-to-published-fixture.md) | Pin the absorbed mprr contract to mprr's published shared contract | LINUX |
 | [ADR-0007](adr/ADR-0007-image-derived-timing-binary-strip.md) | Image-derived timing binds to the pixel-decoded binary strip (cross-platform) | WIN |
 | [ADR-0008](adr/ADR-0008-interactive-ollama-drive-mirrored-build-coordination.md) | Interactive host-Ollama drive + mirrored build-coordination over `lbabus` | WIN |
 | [ADR-0009](adr/ADR-0009-absorb-mprr-model-self-owned.md) | Absorb the mprr ring/timing model as self-owned (retire the external `svelderrainruiz/mprr`) | WIN |
