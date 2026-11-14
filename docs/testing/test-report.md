@@ -164,8 +164,8 @@ mesh-stress-signature-calibrator
 mesh-stress-signature-extractor
 mesh-typed-peer-routing
 mesh-verified-tier-attested
-mprr-absorbed-constants-match-mprr-spec
 mprr-absorbed-self-owned-not-external
+mprr-contract-matches-pinned-fixture
 mprr-dual-packet-degradation-green
 mprr-live-capture-shared-inputs-present
 mprr-packet-harness-profiles-green
@@ -278,7 +278,7 @@ The controlled state of the repository's configuration items, derived from the r
 | — Status: Planned | 2 | rtm.csv |
 | — Status: Proven | 99 | rtm.csv |
 | — Status: Superseded | 1 | rtm.csv |
-| Architecture decisions (ADRs) | 85 | docs/architecture/adr/README.md |
+| Architecture decisions (ADRs) | 86 | docs/architecture/adr/README.md |
 | Governed gates | 213 | experiments/verify-local-gates.mjs |
 | Correspondence rules | 7 | experiments/reqs-coverage/verify-correspondences.mjs |
 | Governed test items | 102 | docs/testing/test-plan.md |
@@ -298,4 +298,4 @@ the same correspondence graph (ADR-0013).
 `node experiments/reqs-coverage/generate-test-report.mjs` rewrites this file; `--check` (the
 `test-report-current` gate) fails closed on drift, so the report can never silently lag the apparatus.
 
-_Generated from 213 gates, 7 correspondence rules, 102 requirements, 85 ADRs, 102 test items._
+_Generated from 213 gates, 7 correspondence rules, 102 requirements, 86 ADRs, 102 test items._

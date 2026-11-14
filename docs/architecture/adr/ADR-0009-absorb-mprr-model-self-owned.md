@@ -1,6 +1,6 @@
 # ADR-0009: Absorb the mprr ring-buffer and self-test timing model as self-owned (retire the external `svelderrainruiz/mprr` dependency)
 
-- Status: Accepted
+- Status: Accepted; superseded in part by [ADR-0086](ADR-0086-pin-mprr-contract-to-published-fixture.md) (the contract is pinned to mprr's published shared contract; the implementation stays self-owned)
 - Owner: WIN
 - Traces to: LBA-REQ-003, LBA-REQ-005, LBA-REQ-009
 - Supersedes: the "External canonical dependency / reference" framing in
