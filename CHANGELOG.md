@@ -12,7 +12,9 @@ follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project
   configured by `.wiki-generator.json`) instead of `scripts/build-wiki.mjs`, which is retired (ADR-0090 supersedes
   ADR-0089; LBA-REQ-103, T-103; VITechnologies/projectbuddy#418). The wiki gains the governed requirement and test pages
   of the ecosystem wiki standard and 103 test pages (T-102 and T-103 were unreadable as a test-plan table split by a
-  blank line). It no longer writes `.obsidian/core-plugins.json` and `.obsidian/graph.json`.
+  blank line). It no longer writes `.obsidian/core-plugins.json` and `.obsidian/graph.json`. The Docs Link Check now walks `docs/`
+  as a directory: its `docs/**/*.md` pattern was expanded by the shell and skipped files deeper than two levels,
+  such as the ADRs.
 
 ### Fixed
 
