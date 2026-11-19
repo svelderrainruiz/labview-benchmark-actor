@@ -301,7 +301,7 @@ check('information-for-users-26514', () => {
 //      generator (.repo-standards-review/wiki_generate.py) under .wiki-generator.json. The generator validates the wiki
 //      (resolved wikilinks, indexed pages, page budget, configured requirement sections); this gate adds what CI must
 //      prove: a clean run with one page per requirement and test item, a byte-identical second run, the Obsidian vault
-//      settings and how-to, two negative controls that fail closed, and a publish workflow that publishes only from
+//      settings and how-to, no aliased wikilink outside code, three negative controls that fail closed, and a publish workflow that publishes only from
 //      develop and drift-checks a fresh clone of the published wiki.
 check('wiki-vault', () => {
   const generator = join(pkgRoot, '.repo-standards-review', 'wiki_generate.py');
@@ -325,6 +325,19 @@ check('wiki-vault', () => {
   assert(requirements > 0 && report.requirement_pages === requirements, `${report.requirement_pages} requirement pages for ${requirements} RTM requirements`);
   assert(tests > 0 && report.test_pages === tests, `${report.test_pages} test pages for ${tests} test-plan items`);
   assert(report.rtm_requirements_without_page === 0, 'an RTM requirement has no page');
+  // An aliased wikilink [[a|b]] reads differently in Obsidian and in the GitHub wiki, so none may remain outside code.
+  const aliasedLinks = (vault) => {
+    const found = [];
+    for (const file of readdirSync(vault, { recursive: true })) {
+      const name = String(file).replace(/\\/g, '/');
+      if (!name.endsWith('.md') || name.startsWith('.git/')) continue;
+      const text = readFileSync(join(vault, name), 'utf8')
+        .replace(/^(`{3,}|~{3,})[^\n]*\n[\s\S]*?^\1[ \t]*$/gm, '')
+        .replace(/`[^`\n]*`/g, '');
+      for (const link of text.match(/\[\[[^\]\n]*\|[^\]\n]*\]\]/g) || []) found.push(`aliased wikilink ${link} in ${name}`);
+    }
+    return found;
+  };
   const scratch = mkdtempSync(join(tmpdir(), 'lba-wiki-'));
   try {
     const first = join(scratch, 'first');
@@ -340,6 +353,15 @@ check('wiki-vault', () => {
     }
     assert(existsSync(join(first, '.obsidian', 'app.json')), 'the vault has no .obsidian/app.json');
     assert(/Open folder as vault/.test(readFileSync(join(first, 'Home.md'), 'utf8')), 'Home lacks the open-in-Obsidian how-to');
+    const aliased = aliasedLinks(first);
+    assert(aliased.length === 0, `${aliased.length} ${aliased[0]}`);
+    const aliasRoot = join(scratch, 'aliased-link');
+    mkdirSync(aliasRoot);
+    cpSync(join(pkgRoot, 'docs'), join(aliasRoot, 'docs'), { recursive: true });
+    cpSync(join(pkgRoot, '.wiki-generator.json'), join(aliasRoot, '.wiki-generator.json'));
+    appendFileSync(join(aliasRoot, 'docs', 'information-item-map.md'), '\n[[Home|alias]]\n');
+    assert(run(['--out', join(scratch, 'aliased-vault')], aliasRoot).code === 0, 'negative control aliased-link: the generator should accept the source');
+    assert(aliasedLinks(join(scratch, 'aliased-vault')).some((line) => /aliased wikilink \[\[Home\|alias\]\]/.test(line)), 'negative control aliased-link was not detected');
     const control = (name, mutate, pattern) => {
       const root = join(scratch, name);
       mkdirSync(root);
@@ -362,7 +384,7 @@ check('wiki-vault', () => {
   assert(workflow.includes("github.ref == 'refs/heads/develop'"), 'wiki-publish must refuse to publish any other ref');
   assert(workflow.includes('python3 .repo-standards-review/wiki_generate.py --out .wiki'), 'wiki-publish must write the generated wiki');
   assert(/python3 \.repo-standards-review\/wiki_generate\.py --check "\$RUNNER_TEMP\/wiki-verify"/.test(workflow), 'wiki-publish must verify a fresh clone of the published wiki');
-  return { generator: '.repo-standards-review/wiki_generate.py', summary: `${report.requirement_pages} requirement pages, ${report.test_pages} test pages, ${report.adr_pages} ADR pages, ${report.pages} pages; deterministic; 2 negative controls` };
+  return { generator: '.repo-standards-review/wiki_generate.py', summary: `${report.requirement_pages} requirement pages, ${report.test_pages} test pages, ${report.adr_pages} ADR pages, ${report.pages} pages; deterministic; alias-free wikilinks; 3 negative controls` };
 });
 
 // 6f. Test & assurance report is generated + current (ISO/IEC/IEEE 29119-3 test report + ISO 10007 status

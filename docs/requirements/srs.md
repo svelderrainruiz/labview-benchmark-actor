@@ -131,7 +131,7 @@ progressively.
 | LBA-REQ-101 | The system shall expose the lifecycle and ordered evidence of a local active LabVIEW capture through a pathless, read-only MCP resource contract. | ProjectBuddy #250 needs timely frame/event reads while LBA capture remains active, but the separate stdio MCP server cannot access the extension process's in-memory `activeCapture` and host-specific storage paths are not a stable consumer interface. | `active-capture-session@1` assigns an opaque UUID and lifecycle (`capturing`, `finalizing`, `stopped`, `failed`) to each run. `resources/list` exposes only bounded metadata/session URIs; `resources/read` returns a session/batch or an explicitly requested frame resource. Batches preserve frame/sample sequence and capture timestamps, mark gaps/partial writes, enforce a per-frame size bound, and never expose absolute paths or frame bytes by default. Reads never mutate capture. | `test/active-capture-mcp.mjs` exercises fake Global Storage roots and spawned stdio MCP for pathless discovery, lifecycle, ordered batch cursors, explicit frame resources, and fail-closed malformed/partial/path-traversal cases; gated in `npm test`. |
 
 | LBA-REQ-102 | The system shall record an explicitly requested Windows desktop workload at a bounded operator-selected cadence without locating or launching LabVIEW. | A standalone synthetic UI live proof must not depend on NI activation or inherit an unreviewable 12-fps inference queue. | A separate Capture Desktop command records `desktop-capture` with an integer interval of 1 through 120 seconds (default 60), emits the existing pathless lifecycle/resources, and uses the existing stop/finalization path; Capture LabVIEW Launch retains its 12-fps behavior. | Host-free activation, argument, cadence, and lifecycle fixtures in `npm test`; Windows desktop execution remains a separate live-proof gate. |
-| LBA-REQ-103 | The system shall publish the repository wiki as an Obsidian vault generated from `docs/` by the shared repo-standards-review generator, in which every requirement page links its test. | The operator could not open the wiki in Obsidian (1.5.2 Marketplace rejection, #64), and hand-maintained pages drift from the governed sources, so the wiki is derived from `docs/`; the ecosystem wiki standard and its registry export need the one shared generator. | `.repo-standards-review/wiki_generate.py` under `.wiki-generator.json` passes with no problem and writes one page per RTM requirement and per test-plan item, every requirement page lists its `TestID`, two runs are byte-identical, `.obsidian/app.json` and the open-in-Obsidian how-to are present, and two negative controls fail closed; after publishing, `--check` finds no drift in a fresh wiki clone. | The `wiki-vault` gate in `verify-local-gates` (T-103); the `wiki-publish` workflow verifies the published wiki with `--check`. |
+| LBA-REQ-103 | The system shall publish the repository wiki as an Obsidian vault generated from `docs/` by the shared repo-standards-review generator, in which every requirement page links its test. | The operator could not open the wiki in Obsidian (1.5.2 Marketplace rejection, #64), and hand-maintained pages drift from the governed sources, so the wiki is derived from `docs/`; the ecosystem wiki standard and its registry export need the one shared generator. | `.repo-standards-review/wiki_generate.py` under `.wiki-generator.json` passes with no problem and writes one page per RTM requirement and per test-plan item, every requirement page lists its `TestID`, two runs are byte-identical, `.obsidian/app.json` and the open-in-Obsidian how-to are present, no aliased wikilink remains outside code in the generated wiki, and three negative controls fail closed; after publishing, `--check` finds no drift in a fresh wiki clone. | The `wiki-vault` gate in `verify-local-gates` (T-103); the `wiki-publish` workflow verifies the published wiki with `--check`. |
 
 ---
 
@@ -3143,18 +3143,23 @@ progressively.
   - Every requirement page lists its RTM `TestID` as a wikilink to its test page. `Home`
     explains how to open the wiki as an Obsidian vault.
   - Links are alias-free `[[Page]]` wikilinks that Obsidian and the GitHub wiki read the
-    same way; links to other repository files and explicit `owner/repo#N` issue
+    same way; the `wiki-vault` gate fails on an aliased `[[a|b]]` wikilink in the generated
+    wiki outside code. Links to other repository files and explicit `owner/repo#N` issue
     references become GitHub URLs. A bare `#N` stays text.
   - The generator fails closed on a wikilink that names no page, a page that is not
     indexed, a page over the size budget, and a requirement label outside the configured
     sections; a second run is byte-identical to the first.
   - The `wiki-publish` workflow publishes every `develop` change to `docs/` and verifies
     the published wiki with `--check` against a fresh clone.
+  - A relative link to a missing file, a missing image and a missing anchor in `docs/` are
+    caught at the source by the Docs Link Check workflow (lychee with `--include-fragments`)
+    on every pull request. Every wiki page must be indexed (the generator fails on one that
+    is not); reachability by links is not checked.
   - Known reductions from the previous generator (ADR-0090): the vault plugin list
     (`core-plugins.json`) and graph colour groups (`graph.json`) are not written; the
-    generator does not refuse an `--out` directory that is the repository or a parent;
-    aliased wikilinks, missing relative links and missing images in `docs/` are not
-    reported; a requirement page does not list its architecture view or decisions.
+    generator does not refuse an `--out` directory that is the repository or a parent
+    (fixed in repo-standards-review work item 7, planned for v0.13.0); a requirement page
+    does not list its architecture view or decisions.
 - Verification: The `wiki-vault` gate (`node experiments/verify-local-gates.mjs`, T-103)
   and the `wiki-publish` drift check.
 
