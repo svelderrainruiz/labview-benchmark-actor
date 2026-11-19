@@ -330,6 +330,14 @@ check('wiki-vault', () => {
     const first = join(scratch, 'first');
     assert(run(['--out', first]).code === 0, 'wiki_generate.py --out failed');
     assert(run(['--check', first]).code === 0, 'a second generator run differs from the first (the wiki is not deterministic)');
+    const rtmRows = [...readFileSync(join(pkgRoot, 'docs', 'requirements', 'rtm.csv'), 'utf8').matchAll(/^(LBA-REQ-\d{3}),"(?:[^"]|"")*",([^,]*),/gm)];
+    assert(rtmRows.length === requirements, 'could not read the TestID of every RTM requirement');
+    for (const [, id, testIds] of rtmRows) {
+      const page = readFileSync(join(first, 'requirements', `${id}.md`), 'utf8');
+      for (const testId of testIds.match(/T-\d{3}/g) || []) {
+        assert(page.includes(`[[${testId}]]`), `${id}'s page does not link its test ${testId}`);
+      }
+    }
     assert(existsSync(join(first, '.obsidian', 'app.json')), 'the vault has no .obsidian/app.json');
     assert(/Open folder as vault/.test(readFileSync(join(first, 'Home.md'), 'utf8')), 'Home lacks the open-in-Obsidian how-to');
     const control = (name, mutate, pattern) => {
