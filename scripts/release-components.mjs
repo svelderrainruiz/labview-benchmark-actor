@@ -31,7 +31,6 @@ export function verifyReleaseComponents(input) {
     packageLock,
     agentsManifest,
     agentsText,
-    lbabusProject,
     humanTasksSource,
     humanTaskRunner,
     changelog,
@@ -97,10 +96,18 @@ export function verifyReleaseComponents(input) {
     reasons.push('agents manifest version does not match release-components.json');
   }
 
-  const lbabus = extract(/<Version>([^<]+)<\/Version>/, lbabusProject, 'lbabus version', reasons);
   const tasksSource = extract(/HUMAN_TASKS_VERSION\s*=\s*'([^']+)'/, humanTasksSource, 'human task source version', reasons);
   const tasksRunner = extract(/HUMAN_TASKS_VERSION\s*=\s*'([^']+)'/, humanTaskRunner, 'human task runner version', reasons);
-  if (lbabus && lbabus !== components.lbabus) reasons.push('lbabus version does not match release-components.json');
+  const pin = components.lbabusRelease;
+  const hex = (value, length) => typeof value === 'string' && new RegExp(`^[0-9a-f]{${length}}$`).test(value);
+  const pinnedAssets = Object.entries(pin?.assets ?? {});
+  if (pin?.repository !== 'https://github.com/svelderrainruiz/lbabus') reasons.push('lbabusRelease must name the svelderrainruiz/lbabus repository');
+  if (pin?.tag !== `v${components.lbabus}`) reasons.push('lbabusRelease tag does not match the lbabus version');
+  if (!hex(pin?.tagObject, 40) || !hex(pin?.commit, 40)) reasons.push('lbabusRelease must pin the tag object and commit as 40-hex SHA-1');
+  const nupkg = `LabViewBenchmarkActor.CollabBus.${components.lbabus}.nupkg`;
+  if (!hex(pin?.assets?.[nupkg], 64) || pinnedAssets.some(([, digest]) => !hex(digest, 64))) {
+    reasons.push('lbabusRelease must pin the package and every release asset by SHA-256');
+  }
   if (tasksSource && tasksSource !== components.humanTasks) reasons.push('human task source version does not match release-components.json');
   if (tasksRunner && tasksRunner !== components.humanTasks) reasons.push('human task runner version does not match release-components.json');
   if (experimentGovernanceManifest?.version !== components.experimentGovernance) {
@@ -146,7 +153,6 @@ function currentInput() {
     packageLock: readJson('package-lock.json'),
     agentsManifest: readJson('extension-agents/agents.manifest.json'),
     agentsText: text('extension-agents/AGENTS.md'),
-    lbabusProject: text('tools/collab-cli/LbaBus.csproj'),
     humanTasksSource: text('src/humanTasks.ts'),
     humanTaskRunner: text('extension-tasks/human-task-runner.mjs'),
     changelog: text('CHANGELOG.md'),
@@ -208,7 +214,6 @@ export function verifyStagedReleaseMetadata({ staged, unstaged, previous, curren
       'scripts/release-components.mjs',
       'src/humanTasks.ts',
       'standards-score-baseline.json',
-      'tools/collab-cli/LbaBus.csproj',
     ]) {
       if (unstaged.includes(file)) reasons.push(`${file} has unstaged edits; governed release inputs must match the staged index`);
     }

@@ -101,9 +101,10 @@ export function validateLbabusProvisioningPin({ manifest, provisioner, component
   }
   const sourceRepo = manifest?.lbabus?.source_repo;
   const sourceRef = manifest?.lbabus?.source_ref;
+  const sourceCommit = manifest?.lbabus?.source_commit;
   const sdkPackage = manifest?.lbabus?.dotnet_sdk_pkg;
   const runtimeIdentifier = manifest?.lbabus?.runtime_identifier;
-  for (const [name, value] of Object.entries({ sourceRepo, sourceRef, sdkPackage, runtimeIdentifier })) {
+  for (const [name, value] of Object.entries({ sourceRepo, sourceRef, sourceCommit, sdkPackage, runtimeIdentifier })) {
     if (!value) failures.push(`cleanroom manifest lbabus ${name} is missing`);
   }
   if (sourceRepo && sourceRepo !== LBABUS_SOURCE_REPO) {
@@ -115,9 +116,13 @@ export function validateLbabusProvisioningPin({ manifest, provisioner, component
   } else if (sourceRef && sourceRef !== `v${lbabusVersion}`) {
     failures.push(`cleanroom manifest lbabus source_ref ${sourceRef} must be v${lbabusVersion} (release-components.json lbabus)`);
   }
+  if (sourceCommit && sourceCommit !== components?.lbabusRelease?.commit) {
+    failures.push(`cleanroom manifest lbabus source_commit ${sourceCommit} must equal release-components.json lbabusRelease.commit`);
+  }
   const requiredDefaults = [
     ['source repository', `REPO_URL="\${LBABUS_REPO_URL:-${sourceRepo}}"`],
     ['source reference', `REF="\${LBABUS_REF:-${sourceRef}}"`],
+    ['source commit', `EXPECT_COMMIT="\${LBABUS_EXPECT_COMMIT:-${sourceCommit}}"`],
     ['SDK package', `SDK_PKG="\${DOTNET_SDK_PKG:-${sdkPackage}}"`],
     ['runtime identifier', `RID="\${LBABUS_RID:-${runtimeIdentifier}}"`],
   ];

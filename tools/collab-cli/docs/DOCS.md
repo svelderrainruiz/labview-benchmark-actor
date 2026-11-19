@@ -21,8 +21,8 @@ version-over-version. Do not hand-edit a materialized copy — iterate the sourc
 - `cleanroom/README.md` — the Vagrant golden-VM manual-verify lane.
 - `tools/collab-cli/ci/README.md` — the Docker-CI harness that gates every release.
 - `lbabus agents` / `lbabus docs` — the version-pinned agent base instructions + this guide.
-- `lbabus docs show srs` / `lbabus docs show rtm` — the version-pinned requirements (SRS) + traceability
-  matrix (RTM), embedded BY REFERENCE from `docs/requirements/` so they stay aligned with the build;
+- `lbabus docs show srs` / `lbabus docs show rtm` — lbabus's version-pinned requirements (SRS, allocated from
+  the extension's) + traceability matrix (RTM), embedded BY REFERENCE from `docs/requirements/` so they stay aligned with the build;
   `lbabus docs list` enumerates the whole bundle.
 
 ## Evolving the docs (the loop)

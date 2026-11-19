@@ -15,7 +15,7 @@
     <PackageId>LabViewBenchmarkActor.CollabBus</PackageId>
 
     <!-- SemVer: the single source of truth for `lbabus version` and the released package. -->
-    <Version>0.16.0</Version>
+    <Version>0.17.0</Version>
     <Authors>Sergio Velderrain</Authors>
     <Description>Shared cross-plane coordination bus CLI for labview-benchmark-actor (WIN &lt;-&gt; LINUX). One versioned binary, one deterministic protocol, pulled from an immutable SemVer release.</Description>
     <PackageProjectUrl>https://github.com/svelderrainruiz/lbabus</PackageProjectUrl>
@@ -70,7 +70,7 @@
   </Target>
 
   <!--
-    Version-pinned REQUIREMENTS bundle: the repo's CANONICAL software requirements spec (SRS) + traceability
+    Version-pinned REQUIREMENTS bundle: lbabus's software requirements (SRS, allocated from LBA's) + traceability
     matrix (RTM), embedded BY REFERENCE (single source of truth: docs/requirements/*) so THIS lbabus build
     carries the exact requirements it was cut from. Surfaced by `lbabus docs show srs|rtm` and round-tripped
     by the ci-docs harness stage, so "same version => same requirements" holds and the docs an agent reads

@@ -34,7 +34,6 @@ const base = {
   packageLock: { version: extensionVersion, packages: { '': { version: extensionVersion } } },
   agentsManifest: { version: releaseComponents.agents },
   agentsText: `exactly \`${releaseComponents.lbabus}\` for this extension build. Else install with \`dotnet tool install --global LabViewBenchmarkActor.CollabBus --version ${releaseComponents.lbabus} --add-source <folder>\`.\nbundle v${releaseComponents.humanTasks}`,
-  lbabusProject: `<Version>${releaseComponents.lbabus}</Version>`,
   humanTasksSource: `HUMAN_TASKS_VERSION = '${releaseComponents.humanTasks}'`,
   humanTaskRunner: `HUMAN_TASKS_VERSION = '${releaseComponents.humanTasks}'`,
   changelog: `## [${extensionVersion}]`,
@@ -48,6 +47,17 @@ const base = {
 };
 
 assert.equal(verifyReleaseComponents(base).ok, true);
+// The lbabus release is pinned by tag, tag object, commit and SHA-256 digests; any gap fails closed.
+for (const lbabusRelease of [
+  { ...releaseComponents.lbabusRelease, tag: 'v0.0.1' },
+  { ...releaseComponents.lbabusRelease, commit: 'abc' },
+  { ...releaseComponents.lbabusRelease, repository: 'https://github.com/example/lbabus' },
+  { ...releaseComponents.lbabusRelease, assets: {} },
+  { ...releaseComponents.lbabusRelease, assets: { ...releaseComponents.lbabusRelease.assets, 'lbabus-x': 'nothex' } },
+  undefined,
+]) {
+  assert.equal(verifyReleaseComponents({ ...base, components: { ...base.components, lbabusRelease } }).ok, false);
+}
 // The AGENTS install fallback must install the same lbabus version the preflight pins.
 assert.equal(verifyReleaseComponents({
   ...base,

@@ -1,8 +1,8 @@
 {
   "schema": "labview-benchmark-actor/lbabus-vendor@1",
   "repository": "https://github.com/svelderrainruiz/lbabus",
-  "tag": "v0.16.0",
-  "commit": "ae37317ad20467b4518dd634ef1ce5d291e472f5",
+  "tag": "v0.17.0",
+  "commit": "1e08fa4c23fc5998f68b973cf0cd7e22a26db697",
   "path": "tools/collab-cli",
   "files": {
     "tools/collab-cli/.gitignore": {
@@ -19,7 +19,7 @@
     },
     "tools/collab-cli/CHANGELOG.md": {
       "mode": "100644",
-      "blob": "f1760bda7504ae7998669f09ca42b1c814315b96"
+      "blob": "5d143fe070168e4810f6d8b704e7d333578599e7"
     },
     "tools/collab-cli/Capabilities.cs": {
       "mode": "100644",
@@ -43,11 +43,11 @@
     },
     "tools/collab-cli/LbaBus.csproj": {
       "mode": "100644",
-      "blob": "0082ae55c790cf3e6323f469c963077b57592176"
+      "blob": "75ad8e0489c2059d6dd0354e5610b1969a7ec9ea"
     },
     "tools/collab-cli/Net.cs": {
       "mode": "100644",
-      "blob": "30a57b30ca05fc7018683227df25dbbfaf593a33"
+      "blob": "30e200acf7f6b7c132108dc0c66e089b0c12d184"
     },
     "tools/collab-cli/Program.cs": {
       "mode": "100644",
@@ -161,6 +161,18 @@
       "mode": "100644",
       "blob": "6b849243e15757485994580cf50a7624c2006cc1"
     },
+    "tools/collab-cli/ci/cases/net-listen-bind-empty-fails-closed.json": {
+      "mode": "100644",
+      "blob": "0b56de8a11b7c7ce388ea39b01e0327c378a21de"
+    },
+    "tools/collab-cli/ci/cases/net-listen-bind-hostname-fails-closed.json": {
+      "mode": "100644",
+      "blob": "7c635ca142bc08bca40207bfb3b90e548a0f071d"
+    },
+    "tools/collab-cli/ci/cases/net-listen-bind-invalid-ip-fails-closed.json": {
+      "mode": "100644",
+      "blob": "1f059d2eb3c0716bef208159f3c126b68fc91fce"
+    },
     "tools/collab-cli/ci/fixtures/sample.txt": {
       "mode": "100644",
       "blob": "9e41219dcd314e823268d2dda867c15a40bfebc9"
@@ -199,7 +211,7 @@
     },
     "tools/collab-cli/docs/DOCS.md": {
       "mode": "100644",
-      "blob": "df0fda9bf1e55d65dc25cff203ba484c8a484ef4"
+      "blob": "7a7e76563d8be5c9d8916cabe4511d24172cb254"
     }
   }
 }

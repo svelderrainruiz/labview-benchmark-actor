@@ -1,0 +1,13 @@
+{
+  "name": "net-listen-bind-invalid-ip-fails-closed",
+  "owner": "WIN",
+  "description": "net listen --bind with an unparseable IP must fail closed (non-zero exit), never fall back to listening on 0.0.0.0.",
+  "requiresMock": false,
+  "env": { "LBABUS_SKIP_VERSION_CHECK": "1" },
+  "args": ["net", "listen", "--udp", "0", "--timeout", "2", "--bind", "999.1.1.1"],
+  "cwd": "tools/collab-cli",
+  "expect": {
+    "exitCode": 1,
+    "stderrContains": ["--bind: invalid IP '999.1.1.1'"]
+  }
+}

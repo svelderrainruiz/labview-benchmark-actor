@@ -250,7 +250,13 @@ internal static class NetCommands
             tcpPort = 7420;
         }
 
-        IPAddress bind = IPAddress.TryParse(bindStr, out IPAddress? ip) ? ip : IPAddress.Any;
+        // Fail closed: an unparseable --bind must never silently widen the listener to 0.0.0.0.
+        // The 0.0.0.0 default applies only when --bind is absent.
+        if (!IPAddress.TryParse(bindStr, out IPAddress? bind))
+        {
+            return Fail($"--bind: invalid IP '{bindStr}'");
+        }
+
         DateTimeOffset deadline = timeoutSec > 0 ? DateTimeOffset.UtcNow.AddSeconds(timeoutSec) : DateTimeOffset.MaxValue;
         int received = 0;
         string self = SenderId();

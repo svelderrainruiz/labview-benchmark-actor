@@ -11,6 +11,23 @@ pinned version and cannot drift.
 
 ## [Unreleased]
 
+## [0.17.0] - 2026-11-19
+
+### Changed
+
+- `lbabus docs show srs|rtm` now prints lbabus's own requirements instead of the extension's full specification.
+  These are the 8 LabVIEW Benchmark Actor requirements allocated to lbabus: the non-superseded ones whose code
+  references include a file of lbabus's code. Each keeps its ID and LBA's text, verbatim from
+  svelderrainruiz/labview-benchmark-actor at `3534e4b`, and the RTM's code references are limited to lbabus's own.
+  LBA's specification stays the source of truth for the whole system. The governed pages are in the
+  [lbabus wiki](https://github.com/svelderrainruiz/lbabus/wiki) (VITechnologies/projectbuddy#336).
+
+### Fixed
+
+- **`lbabus net listen --bind` fails closed** — an invalid IP, an empty string or a hostname now exits 1 with
+  `--bind: invalid IP '…'` (like `net beacon`) instead of silently listening on 0.0.0.0. The default applies only when
+  `--bind` is absent. Harness cases `net-listen-bind-*-fails-closed`.
+
 ## [0.16.0] - 2026-11-15
 
 ### Changed

@@ -26,7 +26,7 @@ tag on `main` remains the sole publish authority (GitFlow never weakens it).
 - Feature branches are created from `develop` and merge back into `develop` through a reviewed pull request; the feature branch is deleted after merge.
 - Release branches are cut from `develop`, then merged into `main` and merged into `develop`; delete the release branch after both merges complete.
 - Hotfix branches are created from `main`, then merged into `main` and merged into `develop` (or the active `release/*` branch when one is open), and deleted after the required merges complete.
-- Releases are SemVer-tagged (`vX.Y.Z`) on `main`; the tag is CI-owned and triggers publish (`collab-cli-vX.Y.Z` for the CLI; the extension release for the `.vsix`).
+- Releases are SemVer-tagged (`vX.Y.Z`) on `main`; the tag is CI-owned and triggers publish (the extension release for the `.vsix`; lbabus is tagged `vX.Y.Z` in its own repository).
 - On the tagged release path CI re-runs the full verification suite and retains its coverage evidence, so coverage is retained on every release tag.
 
 ### Merge method by branch type

@@ -62,6 +62,15 @@ assert.equal(
 );
 assert.equal(
   validateLbabusProvisioningPin({
+    manifest: { ...manifest, lbabus: { ...manifest.lbabus, source_commit: '0'.repeat(40) } },
+    provisioner: lbabusProvisioner,
+    components,
+  }).ok,
+  false,
+  'a clean-room commit that differs from the pinned lbabus release commit must fail closed',
+);
+assert.equal(
+  validateLbabusProvisioningPin({
     manifest: { ...manifest, lbabus: { ...manifest.lbabus, source_repo: 'https://example.invalid/wrong.git' } },
     provisioner: lbabusProvisioner,
     components,

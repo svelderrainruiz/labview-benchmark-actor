@@ -16,10 +16,10 @@ namespace on the protected `main` branch:
 
 - the **VS Code extension** `.vsix` — tag `ext-vX.Y.Z`, workflow
   `.github/workflows/extension-release.yml`;
-- the **collab-cli / lbabus** bus binaries + package — tag `collab-cli-vX.Y.Z`,
-  workflow `.github/workflows/collab-cli-release.yml`.
+- **lbabus** is released from [svelderrainruiz/lbabus](https://github.com/svelderrainruiz/lbabus) (tag `vX.Y.Z`), not
+  from this repository; the extension pins one release in `release-components.json` (`lbabusRelease`, ADR-0088).
 
-Both publishes are **fail-closed** behind the bidirectional WIN ↔ LINUX agreement
+The extension publish is **fail-closed** behind the bidirectional WIN ↔ LINUX agreement
 gate (LBA-REQ-020) and carry keyless provenance recorded in the signed
 transparency log (LBA-REQ-031). No release is installable until its corroboration
 attestation is proven included in that log.
@@ -67,7 +67,7 @@ attestation is proven included in that log.
 5. **Record the bidirectional sign-off (LBA-REQ-020).** The `.vsix` / bus release
    publishes only after **both** the WIN and LINUX planes record an agreed
    sign-off for that exact version — the agreement gate in
-   `.github/workflows/extension-release.yml` (and `collab-cli-release.yml`) is the
+   `.github/workflows/extension-release.yml` is the
    enforcement point.
 6. **Keyless-sign the artifacts (LBA-REQ-025, ADR-0016).** CI keyless-signs each
    staged artifact with cosign — a short-lived Fulcio certificate bound to the
@@ -81,7 +81,7 @@ attestation is proven included in that log.
    inclusion proof against the signed tree head.
 8. **Cut the immutable GitHub Release.** A maintainer creates the immutable
    release with the signed assets attached at creation:
-   `gh release create ext-vX.Y.Z staging/* --target main` (or `collab-cli-vX.Y.Z`). Attaching
+   `gh release create ext-vX.Y.Z staging/* --target main`. Attaching
    the signed `.vsix` (+ `.sigstore` / `.pem` / `.sig`) at creation keeps the
    release immutable-safe. The retained `push: tags: ext-v*` trigger is dormant
    under branch protection; `workflow_dispatch` is the live build/stage path.

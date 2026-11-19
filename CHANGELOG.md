@@ -14,6 +14,19 @@ follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project
   Upgrading from a version without this fix needs a one-time workaround: run any `LabVIEW Benchmark Actor:` command,
   then reload the window.
 
+## [1.6.6] - Unreleased
+
+### Changed
+
+- Consume lbabus 0.17.0, pinned by tag, tag object, commit and SHA-256 asset digests in `release-components.json`
+  (`lbabusRelease`) instead of reading `<Version>` from `tools/collab-cli/LbaBus.csproj` (#57, ADR-0088).
+  - 0.17.0 makes `net listen --bind` fail closed on an empty, hostname or invalid IP value (svelderrainruiz/lbabus#12);
+    0.16.0 does not. The vendored mirror, the agent contract (0.3.28), the Ubuntu clean-room pin (now also checked by
+    commit) and the vendor pin move together.
+  - The release-governance files moved to `tools/release-governance/` (#57 slice 1). The in-repository lbabus
+    release and Windows verify workflows (`collab-cli-release.yml`, `lbabus-verify-windows.yml`) are retired: lbabus's
+    own repository now runs those gates, and `lbabus-vendored-mirror` proves this tree equals its verified tag.
+
 ## [1.6.5] - Unreleased
 
 ### Changed

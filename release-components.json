@@ -1,8 +1,19 @@
 {
   "schema": "labview-benchmark-actor/release-components@1",
-  "extension": "1.6.5",
-  "agents": "0.3.27",
-  "lbabus": "0.16.0",
+  "extension": "1.6.6",
+  "agents": "0.3.28",
+  "lbabus": "0.17.0",
+  "lbabusRelease": {
+    "repository": "https://github.com/svelderrainruiz/lbabus",
+    "tag": "v0.17.0",
+    "tagObject": "758cb218e709ed0eb6dc5b3a579d1cbbd8cc2141",
+    "commit": "1e08fa4c23fc5998f68b973cf0cd7e22a26db697",
+    "assets": {
+      "LabViewBenchmarkActor.CollabBus.0.17.0.nupkg": "18bb8d33110d64f058f66d53c36d7607fa5972ccfc95a0b18ad35c14c3ffa6fe",
+      "lbabus-0.17.0-linux-x64": "642a30aa789e69d15c26309b9db95cc8417c6feab8c7277f36596479d4c73bac",
+      "lbabus-0.17.0-win-x64.exe": "a407ac2f9d6f6acec90487d20f6e4fa06caa27484eb4a93472e4e40ac75d9726"
+    }
+  },
   "humanTasks": "1.0.7",
   "experimentGovernance": "1.0.1",
   "canonicalDistribution": "github-release",

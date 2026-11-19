@@ -45,3 +45,16 @@ in #57.
   binaries. The vendored harness no longer checks this repository's files; the gates above do.
 - `collab-cli-release.yml` (the former in-repository lbabus release lane) is obsolete and is retired by #57.
 - The release-governance files should move out of `tools/collab-cli` as part of #57.
+
+## Amendment 2026-11-19 (#57 slices 1-2)
+
+- The release-governance files now live in `tools/release-governance/`, outside the lbabus tree.
+- `release-components.json` pins the consumed release in `lbabusRelease`: repository, tag, tag object, commit and the
+  SHA-256 of the package and both binaries (read from the immutable v0.17.0 release; `gh release verify` and
+  `gh attestation verify` pass). `release-components.mjs` validates it and no longer reads `LbaBus.csproj`.
+- The vendored mirror moved to v0.17.0, the first release with the fail-closed `net listen --bind` fix. The mirror
+  gate also requires the vendor pin to equal `lbabusRelease`. The clean-room manifest pins the commit as well, and
+  `provision-lbabus-fromsource.sh` refuses a tag that resolves to a different commit.
+- `collab-cli-release.yml` and `lbabus-verify-windows.yml` are retired. lbabus's own CI runs the Docker harness
+  stages and the native Windows build, and the mirror gate proves this tree equals the verified tag. Consumers keep
+  building from the pinned source, per the build-from-source directive, until slice 3 deletes the in-tree copy.

@@ -1319,7 +1319,7 @@ check('release-lanes-keyless-attested', () => {
   assert(/using:\s*composite/.test(action), 'the keyless-attest action must be a composite action');
   assert(/sigstore\/cosign-installer/.test(action), 'the keyless-attest action must install cosign');
   assert(/cosign sign-blob/.test(action), 'the keyless-attest action must keyless-sign the artifacts with cosign');
-  for (const wf of ['extension-release.yml', 'collab-cli-release.yml']) {
+  for (const wf of ['extension-release.yml']) {
     const text = readFileSync(join(pkgRoot, '.github', 'workflows', wf), 'utf8').replace(/\r\n/g, '\n');
     assert(/id-token:\s*write/.test(text), `${wf} must grant the OIDC id-token for keyless signing`);
     assert(/uses:\s*\.\/\.github\/actions\/keyless-attest/.test(text), `${wf} must invoke the keyless-attest action before creating the release`);
@@ -1330,7 +1330,7 @@ check('release-lanes-keyless-attested', () => {
   const extWf = readFileSync(join(pkgRoot, '.github', 'workflows', 'extension-release.yml'), 'utf8').replace(/\r\n/g, '\n');
   assert(/workflow_dispatch:/.test(extWf), 'extension-release.yml must expose workflow_dispatch (the org-ruleset-safe live release path)');
   assert(/uses:\s*actions\/upload-artifact/.test(extWf), 'extension-release.yml must upload the keyless-signed .vsix as a run artifact so the maintainer can cut the immutable release');
-  return { lanes: ['extension-release', 'collab-cli-release'], attested: true };
+  return { lanes: ['extension-release'], attested: true };
 });
 
 // LBA-REQ-025 / ADR-0016: the reviewer-workstation must cosign-VERIFY the .vsix's keyless signature (a Fulcio
@@ -1730,6 +1730,7 @@ check('lbabus-vendored-mirror', () => {
   const versions = readJson('release-components.json');
   assert(pin.schema === 'labview-benchmark-actor/lbabus-vendor@1' && pin.repository === 'https://github.com/svelderrainruiz/lbabus', 'the lbabus vendor pin must name the lbabus repository');
   assert(pin.tag === `v${versions.lbabus}` && /^[0-9a-f]{40}$/.test(pin.commit), 'the vendored lbabus tag must match the lbabus version in release-components.json');
+  assert(pin.tag === versions.lbabusRelease.tag && pin.commit === versions.lbabusRelease.commit, 'the vendored lbabus tag and commit must equal the lbabusRelease pin in release-components.json');
   const governance = new Set(['release-agreement.json', 'reviewer-allowlist.json', 'record-release-agreement.mjs', 'record-release-agreement.selftest.mjs',
     'verify-composite-release.mjs', 'verify-release-agreement.mjs', 'verify-visual-review.mjs'].map((f) => `tools/release-governance/${f}`));
   const index = new Map(execFileSync('git', ['ls-files', '-s', '--', 'tools/collab-cli'], { cwd: pkgRoot, encoding: 'utf8' })
