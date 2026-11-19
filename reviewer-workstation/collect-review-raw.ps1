@@ -3,11 +3,12 @@ param(
   [Parameter(Mandatory)][string]$VmName,
   [Parameter(Mandatory)][string]$OutDir,
   [string]$GuestUser = 'vagrant',
-  [string]$GuestPassword = 'Vagrant1234!'
+  [string]$GuestPassword = $env:LBA_VM_PASS
 )
 
 $ErrorActionPreference = 'Stop'
 $passwordFile = $null # set before anything can throw: the trap below covers this whole scope
+if ([string]::IsNullOrEmpty($GuestPassword)) { throw 'Set LBA_VM_PASS (or pass -GuestPassword) to the reviewer VM password; there is no built-in default.' }
 $repoRoot = Split-Path $PSScriptRoot -Parent
 $releaseComponents = Get-Content (Join-Path $repoRoot 'release-components.json') -Raw | ConvertFrom-Json
 $expectedLbabusVersion = [string]$releaseComponents.lbabus

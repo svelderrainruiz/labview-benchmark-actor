@@ -1629,6 +1629,10 @@ check('human-task-shortcuts', () => {
       && rawCollector.includes('Guest candidate receipt does not bind'),
     'raw reviewer evidence does not retain and verify the candidate receipt',
   );
+  assert(
+    rawCollector.includes('$GuestPassword = $env:LBA_VM_PASS') && rawCollector.includes('there is no built-in default'),
+    'raw reviewer collector must take the guest password from LBA_VM_PASS and fail closed when empty',
+  );
   const dependencies = readFileSync(join(pkgRoot, 'tools', 'collab-cli', 'Dependencies.cs'), 'utf8');
   for (const productSource of [
     join('tools', 'collab-cli', 'AgentGuards.cs'),
