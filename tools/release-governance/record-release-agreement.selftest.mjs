@@ -7,7 +7,7 @@
 //      (which gains a trailing comma), and unrelated entries are byte-identical (no whole-file reformat);
 //   3. it REFUSES to clobber an existing version;
 //   4. it seeds an EMPTY releases map correctly.
-// Run: `node tools/collab-cli/record-release-agreement.selftest.mjs`.
+// Run: `node tools/release-governance/record-release-agreement.selftest.mjs`.
 
 import assert from 'node:assert/strict';
 import { readFileSync, writeFileSync, mkdtempSync, rmSync } from 'node:fs';

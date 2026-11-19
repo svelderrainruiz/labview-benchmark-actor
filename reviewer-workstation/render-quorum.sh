@@ -29,7 +29,7 @@ vm_key="${LBA_VM_KEY:-C:\\lba-review\\reviewer-vitech.pem}"
 vm_stage='C:\lba-review'
 version=""; attestation=""; out=""; signoff=""
 here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-allowlist="${here}/../tools/collab-cli/reviewer-allowlist.json"
+allowlist="${here}/../tools/release-governance/reviewer-allowlist.json"
 
 while [[ $# -gt 0 ]]; do
   case "$1" in

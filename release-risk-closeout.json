@@ -79,7 +79,7 @@
       "status": "present",
       "evidence": "Enrolled Ed25519 PASS binds extension 1.4.9, exact commit, and exact VSIX; verdict SHA-256 3dadc9661f1e95e6b3ade4230d8ebda1f95a296cfe45213948467e1ba9a2f9eb.",
       "artifacts": [
-        "tools/collab-cli/release-agreement.json"
+        "tools/release-governance/release-agreement.json"
       ]
     },
     {
@@ -87,7 +87,7 @@
       "status": "present",
       "evidence": "Signed PASS notes explicitly accept ADR-0078 through ADR-0080.",
       "artifacts": [
-        "tools/collab-cli/release-agreement.json",
+        "tools/release-governance/release-agreement.json",
         "docs/architecture/adr/README.md"
       ]
     },
@@ -104,7 +104,7 @@
       "status": "present",
       "evidence": "Independent VM agent used generated AGENTS 0.3.13 and returned PASS; the human then signed the candidate-scoped verdict.",
       "artifacts": [
-        "tools/collab-cli/release-agreement.json",
+        "tools/release-governance/release-agreement.json",
         "extension-agents/agents.manifest.json"
       ]
     },
@@ -130,7 +130,7 @@
       "status": "present",
       "evidence": "Visual gate verified publish:true for one distinct enrolled approving reviewer.",
       "artifacts": [
-        "tools/collab-cli/release-agreement.json"
+        "tools/release-governance/release-agreement.json"
       ]
     },
     {
@@ -178,5 +178,5 @@
     "develop": "9d455fd0d91aefa2e10d151a6d94e57135f7d736",
     "shared": true
   },
-  "digest": "44211071bf94c637c82e1b9571c4bee174a4d076bba2c5742153a8b7d1cac36a"
+  "digest": "b53b08b3bf68301bcbf9af1ab9f1350954d94be19dc517a0882b060f835c5d44"
 }

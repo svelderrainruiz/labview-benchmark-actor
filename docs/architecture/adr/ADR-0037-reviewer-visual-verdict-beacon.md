@@ -3,7 +3,7 @@
 - Status: Accepted
 - Date: 2026-08-03
 - Deciders: operator directive (2026-08, PR4 direction: verdict binds to the release candidate + evidence; Ed25519 in the VM now + keyless cosign counter-sign in CI; a new reviewer-verdict@1 mapping to acg-human-signoff-v1; full wiring into gateReleasePublish + release-agreement) + agent
-- Relates to: LBA-REQ-057, ADR-0035 (Handoff Beacon Protocol — parent), ADR-0036 (agent→human request), ADR-0018 (human sign-off gate, LBA-REQ-027), ADR-0016 (enrolled Ed25519 attestation, LBA-REQ-025), tools/collab-cli/release-agreement.json
+- Relates to: LBA-REQ-057, ADR-0035 (Handoff Beacon Protocol — parent), ADR-0036 (agent→human request), ADR-0018 (human sign-off gate, LBA-REQ-027), ADR-0016 (enrolled Ed25519 attestation, LBA-REQ-025), tools/release-governance/release-agreement.json
 
 ## Context
 
@@ -37,7 +37,7 @@ the extension's `media/`, `handoff-verdict` gate):
 
 Wiring: the extension's **Render Reviewer Verdict** command signs the verdict in the VM and writes
 it to `handoff/verdicts/`; `reviewer-workstation/render-verdict.sh` sets the review target and
-collects the signed verdict; `tools/collab-cli/verify-visual-review.mjs` gates a release's
+collects the signed verdict; `tools/release-governance/verify-visual-review.mjs` gates a release's
 `visualReview` block against the committed `reviewer-allowlist.json` (layered on top of
 `verify-release-agreement.mjs`); and CI **keyless-cosign counter-signs** the verdict bundle for a
 transparency-logged record.

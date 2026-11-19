@@ -26,7 +26,7 @@ import { buildReceipt as buildComposite, validateReceipt as validateComposite } 
 import { buildReceipt as buildAttestation } from '../experiments/acg-quorum/cross-plane-attestation.mjs';
 import { ghRepoArgs } from '../scripts/canonical-repo.mjs';
 
-export const DEFAULT_REVIEWER_ALLOWLIST_PATH = join(dirname(fileURLToPath(import.meta.url)), '..', 'tools', 'collab-cli', 'reviewer-allowlist.json');
+export const DEFAULT_REVIEWER_ALLOWLIST_PATH = join(dirname(fileURLToPath(import.meta.url)), '..', 'tools', 'release-governance', 'reviewer-allowlist.json');
 
 // The four candidate-identity fields every piece must agree on.
 const CANDIDATE_FIELDS = ['component', 'version', 'commit', 'vsixSha256'];

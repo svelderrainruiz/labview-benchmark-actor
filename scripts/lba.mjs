@@ -223,7 +223,7 @@ export function releasePlan(version) {
     { id: 7, key: 'stage-benchmark', kind: 'operator', exec: 'operator', dependsOn: [3], title: 'stage the candidate on the WIN VM (net DONE frame) and set the evidence-bound review target', command: 'lba release-stage-win ' + v + ' --vm <reviewer-vm> --commit <candidate> --vsix <candidate.vsix> --attestation ~/lba-vm-share/attestation-' + v + '.json (#73)  ->  ~/lba-vm-share/staged-frame-WIN-' + v + '.json' },
     { id: 8, key: 'visual-verdict', kind: 'operator', exec: 'operator', signing: true, dependsOn: [7], title: 'signed reviewer visual verdict of the built candidate (Ed25519)', command: 'run "Render Reviewer Verdict" in the VM  ->  render-verdict.sh collect' },
     { id: 9, key: 'assemble-composite', kind: 'auto', exec: 'auto', dependsOn: [3, 5, 6, 7, 8], title: 'assemble the composite-release-decision receipt (binds all pieces to one candidate)', command: 'node reviewer-workstation/assemble-composite.mjs --component extension --version ' + v + ' … --out reviewer-workstation/composite-release-decision-receipt.json (#410)' },
-    { id: 10, key: 'record-agreement', kind: 'auto', exec: 'auto', dependsOn: [9], title: 'record WIN+LINUX agreed + visualReview in release-agreement.json', command: 'node tools/collab-cli/record-release-agreement.mjs … (#419)' },
+    { id: 10, key: 'record-agreement', kind: 'auto', exec: 'auto', dependsOn: [9], title: 'record WIN+LINUX agreed + visualReview in release-agreement.json', command: 'node tools/release-governance/record-release-agreement.mjs … (#419)' },
     { id: 11, key: 'merge-main', kind: 'auto', exec: 'irreversible', dependsOn: [10], title: `merge release/${v} -> main (--no-ff)`, command: `gh pr merge <n> --repo ${repo} --merge  (release/${v} -> main, --no-ff)` },
     { id: 12, key: 'cut-gh-release', kind: 'operator', exec: 'irreversible', dependsOn: [11], title: 'tag + workflow_dispatch extension-release.yml + cut the immutable GitHub Release', command: `gh workflow run extension-release.yml --repo ${repo}  ->  lba release-cut-github ${v} --run <id> --create (#412)` },
     { id: 13, key: 'publish-backmerge', kind: 'operator', exec: 'irreversible', dependsOn: [12], title: 'publish to the stable Marketplace channel + back-merge to develop (--no-ff), then confirm the Marketplace', command: `vsce publish --packagePath <canonical-release.vsix>  ->  git merge --no-ff release/${v} into develop (#417)  ->  lba release-verify-published ${v} (#412)` },
@@ -382,7 +382,7 @@ export function liveReleaseProbes(version, { env = process.env } = {}) {
   const tryGit = (args) => { try { execFileSync('git', args, { stdio: 'pipe' }); return true; } catch { return false; } };
   const pkg = (() => { try { return JSON.parse(read('package.json')); } catch { return {}; } })();
   const composite = (() => { try { return JSON.parse(read('reviewer-workstation/composite-release-decision-receipt.json')); } catch { return null; } })();
-  const agreement = (() => { try { return read('tools/collab-cli/release-agreement.json'); } catch { return null; } })();
+  const agreement = (() => { try { return read('tools/release-governance/release-agreement.json'); } catch { return null; } })();
   const shareHas = (name) => !!share && existsSync(join(share, name));
   const compositeSealed = !!composite && composite.candidate?.version === v && composite.verdict?.compositeReleaseProven === true;
   const stagedFrame = (() => { if (!share) return null; try { return JSON.parse(readFileSync(join(share, `staged-frame-WIN-${v}.json`), 'utf8')); } catch { return null; } })();
@@ -541,7 +541,7 @@ export const STATIONS = { VM: 'WINDOWS_VM', HOST: 'HOST', UNKNOWN: 'UNKNOWN' };
 // The enrolled reviewer allowlist (reviewer id -> Ed25519 SPKI public-key PEM). Only PUBLIC material.
 export function readReviewerAllowlist() {
   try {
-    const raw = JSON.parse(read('tools/collab-cli/reviewer-allowlist.json') || '{}');
+    const raw = JSON.parse(read('tools/release-governance/reviewer-allowlist.json') || '{}');
     const out = {};
     const validKey = (key) => typeof key === 'string'
       ? key.trim() !== ''
@@ -760,9 +760,9 @@ export const COMMANDS = {
         compositeVersion: (() => { try { return JSON.parse(read('reviewer-workstation/composite-release-decision-receipt.json')).candidate.version; } catch { return undefined; } })(),
       });
       const gates = [
-        ['release-agreement WIN+LINUX agreed', 'tools/collab-cli/verify-release-agreement.mjs'],
-        ['signed reviewer visual verdict', 'tools/collab-cli/verify-visual-review.mjs'],
-        ['composite release decision', 'tools/collab-cli/verify-composite-release.mjs'],
+        ['release-agreement WIN+LINUX agreed', 'tools/release-governance/verify-release-agreement.mjs'],
+        ['signed reviewer visual verdict', 'tools/release-governance/verify-visual-review.mjs'],
+        ['composite release decision', 'tools/release-governance/verify-composite-release.mjs'],
       ].map(([label, rel]) => {
         let ok = false;
         try { execFileSync(process.execPath, [join(repoRoot, rel), '--component', 'extension', version], { stdio: 'pipe' }); ok = true; } catch { ok = false; }
@@ -844,7 +844,7 @@ export const COMMANDS = {
         }
         console.log(`\u2713 listing Issues link: ${linkCheck.links.Support}`);
         const artifact = assertShippedArtifact({
-          agreement: JSON.parse(read('tools/collab-cli/release-agreement.json')),
+          agreement: JSON.parse(read('tools/release-governance/release-agreement.json')),
           version,
           marketplaceSha256: await downloadVsixSha256(marketplaceVsixUrl({ publisher, name, version })),
           githubReleaseSha256: await downloadVsixSha256(githubReleaseVsixUrl({ repositoryUrl, name: pkg.name, version })),
@@ -934,7 +934,7 @@ export const COMMANDS = {
       console.log(`  keyExists     : ${s.keyExists === null ? '(unknown)' : s.keyExists}`);
       console.log(`  station       : ${s.station}  (${disc.source})`);
       console.log(`  purpose       : ${s.purpose}`);
-      console.log(`  enrolled      : ${s.enrolled ? 'yes' : 'no'}${s.keyMatch !== 'unknown' ? ` (public-key ${s.keyMatch})` : ''}  [tools/collab-cli/reviewer-allowlist.json]`);
+      console.log(`  enrolled      : ${s.enrolled ? 'yes' : 'no'}${s.keyMatch !== 'unknown' ? ` (public-key ${s.keyMatch})` : ''}  [tools/release-governance/reviewer-allowlist.json]`);
       console.log(`\n  quorum sign-off (machine consensus) — run on ${s.station === STATIONS.VM ? 'the reviewer VM' : s.station === STATIONS.HOST ? 'this host' : 'the station where the key lives'}:\n    ${s.commands.quorum}`);
       console.log(`\n  visual verdict (human PASS) — always rendered + signed in the reviewer VM:\n    ${s.commands.visual}`);
       if (s.ok) { console.log(`\n\u2713 signing ready: ${s.reviewerId} enrolled, key present at ${s.reviewerKeyPath} on ${s.station}`); return; }

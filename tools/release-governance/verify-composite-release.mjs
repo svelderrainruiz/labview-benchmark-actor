@@ -12,7 +12,7 @@
 // (the WIN<->LINUX plane agreement) + verify-visual-review.mjs (the human visual verdict). Reuses the gated
 // validateReceipt from the composite-release-decision verifier -- no gating logic is reimplemented here.
 //
-// Usage: node tools/collab-cli/verify-composite-release.mjs --component <name> <version>
+// Usage: node tools/release-governance/verify-composite-release.mjs --component <name> <version>
 // Exit: 0 = the composite decision passes (cleared to publish); 1 = fail-closed; 2 = usage.
 
 import { readFileSync } from 'node:fs';

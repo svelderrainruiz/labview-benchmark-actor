@@ -8,10 +8,10 @@
 // verifiable (Ed25519, enrolled reviewer key). Reuses the gated gateVisualReview.
 //
 // Usage:
-//   node tools/collab-cli/verify-visual-review.mjs --component extension <version> [--min 1]
+//   node tools/release-governance/verify-visual-review.mjs --component extension <version> [--min 1]
 //     -> reads components.<component>.releases.<version>.visualReview from release-agreement.json + the
 //        committed reviewer-allowlist.json
-//   node tools/collab-cli/verify-visual-review.mjs --verdict <record.json> --allowlist <allowlist.json> [--min 1]
+//   node tools/release-governance/verify-visual-review.mjs --verdict <record.json> --allowlist <allowlist.json> [--min 1]
 //     -> verify a standalone { verdict, signOffs|signOff } record (used by the gate + CI)
 // Exit: 0 = the visual review passes (cleared to publish); 1 = fail-closed; 2 = usage.
 

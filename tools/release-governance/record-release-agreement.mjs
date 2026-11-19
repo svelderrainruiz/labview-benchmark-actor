@@ -10,7 +10,7 @@
 // runs verify-release-agreement + verify-visual-review for that version and fails closed on any problem.
 //
 // Usage:
-//   node tools/collab-cli/record-release-agreement.mjs \
+//   node tools/release-governance/record-release-agreement.mjs \
 //     --component extension --version X.Y.Z --commit <sha> \
 //     --linux-note "..." --win-note "..." \
 //     --visual-verdict ~/lba-vm-share/visual-verdict-X.Y.Z.json \

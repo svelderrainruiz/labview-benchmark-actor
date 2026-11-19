@@ -59,7 +59,7 @@ import { buildFrameCorrelatorHtml } from './mprr-capture-ring/frame-correlator.m
 import { buildCaptureStatus, validateCaptureStatus } from './handoff-beacon/captureStatus.mjs';
 import { buildAgentRequest, buildOpDone, validateAgentRequest, validateOpDone, selectPendingRequest } from './handoff-beacon/handoffRequest.mjs';
 import { buildReviewerVerdict, signReviewerVerdict, verifyReviewerVerdict, gateVisualReview, buildVerdictBusPost, generateEnrolledKeypair as generateReviewerKeypair } from './handoff-beacon/reviewerVerdict.mjs';
-import { verifyVisualReview } from '../tools/collab-cli/verify-visual-review.mjs';
+import { verifyVisualReview } from '../tools/release-governance/verify-visual-review.mjs';
 import { crossPlaneTrendReceipt } from './mprr-capture-ring/cross-plane-trend.mjs';
 import { buildResourceUsageCorrelation } from './resource-usage-correlation/resourceUsageCorrelation.mjs';
 import { verifyDepManifest } from './labview-authoring/verify-dep-manifest.mjs';
@@ -1731,7 +1731,7 @@ check('lbabus-vendored-mirror', () => {
   assert(pin.schema === 'labview-benchmark-actor/lbabus-vendor@1' && pin.repository === 'https://github.com/svelderrainruiz/lbabus', 'the lbabus vendor pin must name the lbabus repository');
   assert(pin.tag === `v${versions.lbabus}` && /^[0-9a-f]{40}$/.test(pin.commit), 'the vendored lbabus tag must match the lbabus version in release-components.json');
   const governance = new Set(['release-agreement.json', 'reviewer-allowlist.json', 'record-release-agreement.mjs', 'record-release-agreement.selftest.mjs',
-    'verify-composite-release.mjs', 'verify-release-agreement.mjs', 'verify-visual-review.mjs'].map((f) => `tools/collab-cli/${f}`));
+    'verify-composite-release.mjs', 'verify-release-agreement.mjs', 'verify-visual-review.mjs'].map((f) => `tools/release-governance/${f}`));
   const index = new Map(execFileSync('git', ['ls-files', '-s', '--', 'tools/collab-cli'], { cwd: pkgRoot, encoding: 'utf8' })
     .split('\n').filter(Boolean).map((line) => { const [meta, path] = line.split('\t'); const [mode, blob] = meta.split(' '); return [path, { mode, blob }]; }));
   const pinned = Object.entries(pin.files);
@@ -3214,7 +3214,7 @@ check('handoff-verdict', () => {
   const { privateKeyPem, publicKeyPem } = generateReviewerKeypair();
   const reviewer = 'reviewer@example';
   const allow = { [reviewer]: publicKeyPem };
-  const committedReviewerAllowlist = readJson('tools/collab-cli/reviewer-allowlist.json');
+  const committedReviewerAllowlist = readJson('tools/release-governance/reviewer-allowlist.json');
   const productionKeys = Object.entries(committedReviewerAllowlist)
     .filter(([identity]) => identity !== '_comment')
     .flatMap(([, keys]) => Array.isArray(keys) ? keys : [keys]);
@@ -3233,7 +3233,7 @@ check('handoff-verdict', () => {
   const decision = gateVisualReview({ verdict, signOffs: [signed], reviewerAllowlist: allow, minReviewers: 1 });
   assert(decision.publish === true, 'a pass verdict + an enrolled approval publishes the visual review');
   assert(gateVisualReview({ verdict: { ...verdict, notes: 'tampered' }, signOffs: [signed], reviewerAllowlist: allow }).publish === false, 'a tampered verdict fails closed');
-  // the release-agreement visual-review verifier (tools/collab-cli/verify-visual-review.mjs) reuses the gate over
+  // the release-agreement visual-review verifier (tools/release-governance/verify-visual-review.mjs) reuses the gate over
   // a { verdict, signOff } record -- so the extension-signed verdict + a plane agreement gate the release together.
   assert(verifyVisualReview({ record: { verdict, signOff: signed }, reviewerAllowlist: allow, minReviewers: 1 }).publish === true, 'verify-visual-review publishes a signed pass record');
   assert(verifyVisualReview({ record: { verdict, signOffs: [] }, reviewerAllowlist: allow }).publish === false, 'verify-visual-review fails closed without a sign-off');
@@ -3385,7 +3385,7 @@ check('assemble-composite', () => {
 // that the enforcement CLI clears the committed candidate + fails closed for a version with no decision, AND that
 // extension-release.yml runs the CLI in the publish-gating agreement job (release needs: [build, agreement]).
 check('composite-release-enforced', () => {
-  const cli = join(here, '..', 'tools', 'collab-cli', 'verify-composite-release.mjs');
+  const cli = join(here, '..', 'tools', 'release-governance', 'verify-composite-release.mjs');
   // The committed receipt's candidate.version is the SINGLE SOURCE OF TRUTH (#416): assert the receipt is
   // PROVEN for ITS OWN version, so a release version bump touches only the receipt, never this gate file.
   const receiptVersion = JSON.parse(readFileSync(join(here, '..', 'reviewer-workstation', 'composite-release-decision-receipt.json'), 'utf8')).candidate.version;
@@ -4023,8 +4023,8 @@ check('acg-crossplane-composite-reseal', () => {
 // clobber, and fails closed unless BOTH release gates pass. Guarded by its selftest so a release entry is never
 // hand-edited JSON again.
 check('record-release-agreement-selftested', () => {
-  execFileSync(process.execPath, [join(here, '..', 'tools', 'collab-cli', 'record-release-agreement.selftest.mjs')], { stdio: 'pipe' });
-  return { helper: 'tools/collab-cli/record-release-agreement.mjs', proof: 'records + minimal-diff + no-clobber + empty-seed (both gates pass)' };
+  execFileSync(process.execPath, [join(here, '..', 'tools', 'release-governance', 'record-release-agreement.selftest.mjs')], { stdio: 'pipe' });
+  return { helper: 'tools/release-governance/record-release-agreement.mjs', proof: 'records + minimal-diff + no-clobber + empty-seed (both gates pass)' };
 });
 
 const passed = checks.filter((c) => c.pass).length;

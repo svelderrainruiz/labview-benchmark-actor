@@ -6,8 +6,8 @@
 // runnable locally by either plane to check status.
 //
 // Usage:
-//   node tools/collab-cli/verify-release-agreement.mjs <version>                    (collab-cli, default)
-//   node tools/collab-cli/verify-release-agreement.mjs --component <name> <version>  (e.g. --component extension 0.1.0)
+//   node tools/release-governance/verify-release-agreement.mjs <version>                    (collab-cli, default)
+//   node tools/release-governance/verify-release-agreement.mjs --component <name> <version>  (e.g. --component extension 0.1.0)
 // <version> accepts the bare SemVer or the tagged form (collab-cli-vX.Y.Z / ext-vX.Y.Z).
 // Exit:   0 = both planes agreed (cleared to publish); 1 = fail-closed (missing/withheld); 2 = usage.
 

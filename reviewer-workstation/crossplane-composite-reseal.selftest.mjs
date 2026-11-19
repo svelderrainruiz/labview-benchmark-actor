@@ -11,7 +11,7 @@ import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import { validateReceipt } from './composite-release-decision.mjs';
-import { verifyCompositeRelease } from '../tools/collab-cli/verify-composite-release.mjs';
+import { verifyCompositeRelease } from '../tools/release-governance/verify-composite-release.mjs';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const crossplane = JSON.parse(readFileSync(join(here, 'composite-release-decision-receipt.json'), 'utf8'));

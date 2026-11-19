@@ -186,7 +186,7 @@ The quorum key is distinct and is used only for the later machine-quorum sign-of
 ## Validate a release on the WIN plane (auth-free, native Windows)
 
 The bidirectional release-agreement gate
-([tools/collab-cli/verify-release-agreement.mjs](../tools/collab-cli/verify-release-agreement.mjs)) needs an
+([tools/release-governance/verify-release-agreement.mjs](../tools/release-governance/verify-release-agreement.mjs)) needs an
 independent **WIN-plane** build/test pass before an `ext-v*` can publish. Run it in the reviewer VM straight
 from the host with [win-plane-validate.sh](win-plane-validate.sh):
 

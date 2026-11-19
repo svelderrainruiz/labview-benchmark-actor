@@ -129,8 +129,8 @@ key material). Then:
    VM-resident enrolled key (the key never leaves the VM; it wraps the guestcontrol `cmd /c`
    node-invocation gotcha), collects the signed `quorum-signoff-X.Y.Z.json` to `~/lba-vm-share/`,
    and verifies it (`verify-quorum-signoff.mjs`: enrolled key + passing cross-plane quorum, fail-closed).
-3. Verify both locally before sealing: `tools/collab-cli/verify-visual-review.mjs` and
-   the composite verifier `tools/collab-cli/verify-composite-release.mjs`.
+3. Verify both locally before sealing: `tools/release-governance/verify-visual-review.mjs` and
+   the composite verifier `tools/release-governance/verify-composite-release.mjs`.
 
 ## 5. Seal — receipt + agreement
 
@@ -154,7 +154,7 @@ key material). Then:
 2. **Record the agreement.** Instead of hand-editing JSON, run the recorder (issue #419):
 
    ```
-   node tools/collab-cli/record-release-agreement.mjs \
+   node tools/release-governance/record-release-agreement.mjs \
      --component extension --version X.Y.Z --commit <sha> \
      --linux-note "..." --win-note "..." \
      --visual-verdict ~/lba-vm-share/visual-verdict-X.Y.Z.json
@@ -162,9 +162,9 @@ key material). Then:
 
    It inserts the `components.extension.releases.<version>` entry (both planes
    `agreed:true` + the embedded signed `visualReview`) as a minimal structured edit into
-   `tools/collab-cli/release-agreement.json`, refuses to clobber an existing version, and
-   fails closed unless `tools/collab-cli/verify-release-agreement.mjs` +
-   `tools/collab-cli/verify-visual-review.mjs` both pass for that version.
+   `tools/release-governance/release-agreement.json`, refuses to clobber an existing version, and
+   fails closed unless `tools/release-governance/verify-release-agreement.mjs` +
+   `tools/release-governance/verify-visual-review.mjs` both pass for that version.
    These two generated sealing receipts are release evidence, not product-component source;
    the precommit version classifier therefore permits their post-signing update without
    forcing a new extension or `lbabus` identity.
@@ -177,7 +177,7 @@ key material). Then:
 
 1. Merge `origin/main` into the release branch to absorb any divergence (issue #417),
    resolving the sealing files (`reviewer-workstation/composite-release-decision-receipt.json`,
-   `tools/collab-cli/release-agreement.json`) with `--ours`; verify no main-unique commit
+   `tools/release-governance/release-agreement.json`) with `--ours`; verify no main-unique commit
    is lost.
 2. Open the PR to `main` and merge with `--no-ff` (never squash a release), so
    `main` ↔ `develop` never diverge (`docs/cm/cm-plan.md`).
@@ -191,7 +191,7 @@ key material). Then:
 
 1. Dispatch `.github/workflows/extension-release.yml` (`workflow_dispatch`,
    `-f version=X.Y.Z -f publish_marketplace=false`, `--ref main`). The `agreement` job runs
-   `tools/collab-cli/verify-composite-release.mjs --component extension X.Y.Z` and blocks
+   `tools/release-governance/verify-composite-release.mjs --component extension X.Y.Z` and blocks
    the publish unless the committed composite decision proves both gates for the tagged
    candidate. This first dispatch stages signed assets and does not publish to Marketplace.
 2. Confirm reviewed == shipped: `scripts/verify-published-vsix.mjs` asserts the CI-built
@@ -233,6 +233,6 @@ key material). Then:
 | Signed visual verdict | `~/lba-vm-share/visual-verdict-X.Y.Z.json` (host) |
 | Marketplace verification | `~/lba-vm-share/marketplace-verification-X.Y.Z.json` (host) |
 | Composite receipt (committed) | `reviewer-workstation/composite-release-decision-receipt.json` |
-| Release agreement (committed) | `tools/collab-cli/release-agreement.json` |
+| Release agreement (committed) | `tools/release-governance/release-agreement.json` |
 | Marketplace publish credential | none stored: Trusted Publishing policy on the `svelderrainruiz` publisher for `extension-release.yml` + environment `marketplace` |
 | `ext-v*` tag push | an authorized bypass token (protected tag) |
