@@ -293,7 +293,14 @@ try {
     'labviewBenchmarkActor.showAgents',
     'labviewBenchmarkActor.checkAgents',
   ];
-  const contributedCommands = JSON.parse(readFileSync(join(repoRoot, 'package.json'), 'utf8')).contributes.commands;
+  const manifest = JSON.parse(readFileSync(join(repoRoot, 'package.json'), 'utf8'));
+  // Issue #88: VS Code caches the MCP definition per workspace and the agent host launches it without activating
+  // the extension, so after an upgrade a stale path is used until the provider re-registers on startup.
+  assert(
+    Array.isArray(manifest.activationEvents) && manifest.activationEvents.includes('onStartupFinished'),
+    'package.json activationEvents must include onStartupFinished so the MCP provider refreshes its cached path after an upgrade (issue #88)',
+  );
+  const contributedCommands = manifest.contributes.commands;
   const generatedAgents = readFileSync(join(repoRoot, 'media', 'AGENTS.md'), 'utf8');
   for (const contribution of contributedCommands) {
     assert(

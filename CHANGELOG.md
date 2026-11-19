@@ -6,6 +6,14 @@ follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project
 
 ## [Unreleased]
 
+### Fixed
+
+- Activate on `onStartupFinished` so the MCP server provider re-registers every session and VS Code refreshes its
+  cached server definition after an upgrade (#88). Before, the agent host could launch the previous version's
+  removed path and report `LabVIEW Benchmark Actor: MCP tools ... are unavailable` (`MODULE_NOT_FOUND`).
+  Upgrading from a version without this fix needs a one-time workaround: run any `LabVIEW Benchmark Actor:` command,
+  then reload the window.
+
 ## [1.6.5] - Unreleased
 
 ### Changed

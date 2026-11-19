@@ -19,6 +19,8 @@ Everything is **governed by construction**: every capability is proven on real d
 
 Install **LabVIEW Benchmark Actor** from the VS Code Marketplace (publisher `svelderrainruiz`), or from a packaged `.vsix`. Requires VS Code **1.101+**. The extension is fully free and non-commercial; running LabVIEW benchmarks happens locally in your own activated golden VM.
 
+**After upgrading:** the extension activates on startup, so the MCP tools refresh to the new version on the next window reload. If Copilot reports that the `LabVIEW Benchmark Actor: MCP tools` are unavailable right after upgrading from a version older than this behavior, run any `LabVIEW Benchmark Actor:` command once, then reload the window.
+
 ## Quickstart
 
 1. **Provision a personal golden VM** — one command mints a clean Ubuntu 24.04 VM, installs LabVIEW 2026 Community Edition + VIPM from NI's apt repo, and hands off to you for the one irreducibly-human step: signing in to your NI account and **activating** LabVIEW CE. The tool then confirms activation with a headless probe VI and mints your local golden VM.
