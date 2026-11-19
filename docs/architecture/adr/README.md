@@ -97,7 +97,8 @@
 | [ADR-0086](ADR-0086-pin-mprr-contract-to-published-fixture.md) | Pin the absorbed mprr contract to mprr's published shared contract (implementation stays self-owned) | LINUX | Accepted | LBA-REQ-003, LBA-REQ-005, LBA-REQ-009 |
 | [ADR-0087](ADR-0087-recertify-standards-baseline-rsr-consumer-kit.md) | Re-certify the standards baseline at repo-standards-review v0.4.1 through the RSR consumer kit (amends ADR-0079) | LINUX | Accepted | LBA-REQ-008, LBA-REQ-096 |
 | [ADR-0088](ADR-0088-vendor-lbabus-from-its-own-repository.md) | lbabus lives in its own repository; the extension vendors a pinned release | LINUX | Accepted | LBA-REQ-007, LBA-REQ-013 |
-| [ADR-0089](ADR-0089-generate-the-wiki-as-an-obsidian-vault.md) | Generate the repository wiki as an Obsidian vault from docs/ | LINUX | Accepted | LBA-REQ-103 |
+| [ADR-0089](ADR-0089-generate-the-wiki-as-an-obsidian-vault.md) | Generate the repository wiki as an Obsidian vault from docs/ | LINUX | Superseded | LBA-REQ-103 |
+| [ADR-0090](ADR-0090-generate-the-wiki-with-the-shared-generator.md) | Generate the repository wiki with the shared repo-standards-review generator | LINUX | Accepted | LBA-REQ-103 |
 
 Numbering is split by owner to avoid collisions: WIN takes 0001–0002 (+0005, 0006, 0007, 0008, 0009),
 LINUX takes 0003–0004 (+0010, 0011, 0012, 0013, 0014, 0015, 0016, 0017, 0018, 0019, 0020, 0021, 0022, 0023, 0024). Add new ADRs by extending your own range.

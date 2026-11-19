@@ -17,7 +17,7 @@
 //   node experiments/verify-local-gates.mjs [--json] [--out <path>]
 // Exit code 0 when every check passes, 1 otherwise.
 
-import { readFileSync, readdirSync, existsSync, writeFileSync, rmSync } from 'node:fs';
+import { readFileSync, readdirSync, existsSync, writeFileSync, rmSync, mkdtempSync, mkdirSync, cpSync, appendFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join, resolve } from 'node:path';
 import { tmpdir } from 'node:os';
@@ -297,20 +297,64 @@ check('information-for-users-26514', () => {
   return { standard: 'ISO/IEC/IEEE 26514:2022', selftest: 'verify-information-for-users 2/2 (committed conformant + fail-closed)' };
 });
 
-// 6e2. Repository wiki (LBA-REQ-103, ADR-0089): the wiki is an Obsidian vault GENERATED from docs/. The generator
-//      validates it fail-closed (resolved alias-free wikilinks, no relative links, images in the vault, every note
-//      reachable from Home, requirement notes linked to their tests and decisions, byte-identical rebuilds) and proves
-//      each detector with a negative control. The publish workflow must publish only from develop and must verify the
-//      published wiki against the generator.
+// 6e2. Repository wiki (LBA-REQ-103, ADR-0090): the wiki is GENERATED from docs/ by the shared repo-standards-review
+//      generator (.repo-standards-review/wiki_generate.py) under .wiki-generator.json. The generator validates the wiki
+//      (resolved wikilinks, indexed pages, page budget, configured requirement sections); this gate adds what CI must
+//      prove: a clean run with one page per requirement and test item, a byte-identical second run, the Obsidian vault
+//      settings and how-to, two negative controls that fail closed, and a publish workflow that publishes only from
+//      develop and drift-checks a fresh clone of the published wiki.
 check('wiki-vault', () => {
-  const out = execFileSync(process.execPath, [join(pkgRoot, 'scripts', 'build-wiki.mjs')], { stdio: 'pipe' }).toString();
-  assert(/^wiki-vault: PASS/m.test(out), `build-wiki.mjs did not pass: ${out.trim()}`);
+  const generator = join(pkgRoot, '.repo-standards-review', 'wiki_generate.py');
+  const python = ['python3', 'python', 'py'].find((candidate) => {
+    try { execFileSync(candidate, ['--version'], { stdio: 'pipe' }); return true; } catch { return false; }
+  });
+  assert(python, 'wiki-vault needs Python 3 (python3, python or py) to run the shared wiki generator');
+  const run = (args, root = pkgRoot) => {
+    try {
+      return { code: 0, out: execFileSync(python, [generator, '--member-root', root, ...args], { stdio: 'pipe', maxBuffer: 1 << 26 }).toString() };
+    } catch (error) {
+      return { code: error.status, out: `${error.stdout || ''}${error.stderr || ''}` };
+    }
+  };
+  const base = run([]);
+  assert(base.code === 0, `wiki_generate.py did not pass: ${base.out.trim().slice(0, 600)}`);
+  const report = JSON.parse(base.out);
+  const requirements = (readFileSync(join(pkgRoot, 'docs', 'requirements', 'rtm.csv'), 'utf8').match(/^LBA-REQ-\d{3},/gm) || []).length;
+  const tests = (readFileSync(join(pkgRoot, 'docs', 'testing', 'test-plan.md'), 'utf8').match(/^\| T-\d{3} \|/gm) || []).length;
+  assert(report.problem_count === 0, 'the generated wiki has problems');
+  assert(requirements > 0 && report.requirement_pages === requirements, `${report.requirement_pages} requirement pages for ${requirements} RTM requirements`);
+  assert(tests > 0 && report.test_pages === tests, `${report.test_pages} test pages for ${tests} test-plan items`);
+  assert(report.rtm_requirements_without_page === 0, 'an RTM requirement has no page');
+  const scratch = mkdtempSync(join(tmpdir(), 'lba-wiki-'));
+  try {
+    const first = join(scratch, 'first');
+    assert(run(['--out', first]).code === 0, 'wiki_generate.py --out failed');
+    assert(run(['--check', first]).code === 0, 'a second generator run differs from the first (the wiki is not deterministic)');
+    assert(existsSync(join(first, '.obsidian', 'app.json')), 'the vault has no .obsidian/app.json');
+    assert(/Open folder as vault/.test(readFileSync(join(first, 'Home.md'), 'utf8')), 'Home lacks the open-in-Obsidian how-to');
+    const control = (name, mutate, pattern) => {
+      const root = join(scratch, name);
+      mkdirSync(root);
+      cpSync(join(pkgRoot, 'docs'), join(root, 'docs'), { recursive: true });
+      cpSync(join(pkgRoot, '.wiki-generator.json'), join(root, '.wiki-generator.json'));
+      mutate(root);
+      const result = run([], root);
+      assert(result.code === 1 && pattern.test(result.out), `negative control ${name} did not fail closed (exit ${result.code})`);
+    };
+    control('unresolved-link', (root) => appendFileSync(join(root, 'docs', 'information-item-map.md'), '\n[[No-Such-Page]]\n'), /names no page/);
+    control('unconfigured-label', (root) => {
+      const srs = join(root, 'docs', 'requirements', 'srs.md');
+      writeFileSync(srs, readFileSync(srs, 'utf8').replace('- Status:', '- Unconfigured Label: x\n- Status:'));
+    }, /Unconfigured Label/);
+  } finally {
+    rmSync(scratch, { recursive: true, force: true });
+  }
   const workflow = readFileSync(join(pkgRoot, '.github', 'workflows', 'wiki-publish.yml'), 'utf8').replace(/\r\n/g, '\n');
   assert(/push:\n\s+branches:\n\s+- develop\n/.test(workflow), 'wiki-publish must publish on pushes to develop');
   assert(workflow.includes("github.ref == 'refs/heads/develop'"), 'wiki-publish must refuse to publish any other ref');
-  assert(workflow.includes('node scripts/build-wiki.mjs --out .wiki'), 'wiki-publish must write the generated vault');
-  assert(/node scripts\/build-wiki\.mjs --check "\$RUNNER_TEMP\/wiki-verify"/.test(workflow), 'wiki-publish must verify a fresh clone of the published wiki');
-  return { generator: 'scripts/build-wiki.mjs', summary: out.trim().replace(/^wiki-vault: PASS, /, '') };
+  assert(workflow.includes('python3 .repo-standards-review/wiki_generate.py --out .wiki'), 'wiki-publish must write the generated wiki');
+  assert(/python3 \.repo-standards-review\/wiki_generate\.py --check "\$RUNNER_TEMP\/wiki-verify"/.test(workflow), 'wiki-publish must verify a fresh clone of the published wiki');
+  return { generator: '.repo-standards-review/wiki_generate.py', summary: `${report.requirement_pages} requirement pages, ${report.test_pages} test pages, ${report.adr_pages} ADR pages, ${report.pages} pages; deterministic; 2 negative controls` };
 });
 
 // 6f. Test & assurance report is generated + current (ISO/IEC/IEEE 29119-3 test report + ISO 10007 status

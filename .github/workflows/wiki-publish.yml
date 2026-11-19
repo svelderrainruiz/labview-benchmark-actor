@@ -1,9 +1,10 @@
-# Publishes the generated Obsidian vault to the repository wiki (LBA-REQ-103, ADR-0089).
+# Publishes the generated Obsidian vault to the repository wiki (LBA-REQ-103, ADR-0090).
 #
-# docs/ is the single source of truth: scripts/build-wiki.mjs regenerates the whole wiki from it, this workflow
-# commits the result to <repo>.wiki.git, then re-clones the published wiki and compares it with the generator
-# (--check), so the wiki cannot drift from develop. Pull requests validate the vault through the wiki-vault gate in
-# the local gate suite; only develop publishes.
+# docs/ is the single source of truth: the shared repo-standards-review generator
+# (.repo-standards-review/wiki_generate.py, configured by .wiki-generator.json) regenerates the whole wiki from it,
+# this workflow commits the result to <repo>.wiki.git, then re-clones the published wiki and compares it with the
+# generator (--check), so the wiki cannot drift from develop. Pull requests validate the wiki through the wiki-vault
+# gate in the local gate suite; only develop publishes.
 name: wiki-publish
 
 on:
@@ -12,7 +13,8 @@ on:
       - develop
     paths:
       - 'docs/**'
-      - 'scripts/build-wiki.mjs'
+      - '.wiki-generator.json'
+      - '.repo-standards-review/wiki_generate.py'
       - '.github/workflows/wiki-publish.yml'
   workflow_dispatch:
 
@@ -36,12 +38,8 @@ jobs:
         with:
           persist-credentials: false
 
-      - uses: actions/setup-node@v5
-        with:
-          node-version-file: .nvmrc
-
-      - name: Validate the generated vault
-        run: node scripts/build-wiki.mjs
+      - name: Validate the generated wiki
+        run: python3 .repo-standards-review/wiki_generate.py
 
       - name: Check out the wiki
         uses: actions/checkout@v5
@@ -53,7 +51,7 @@ jobs:
         env:
           SOURCE_SHA: ${{ github.sha }}
         run: |
-          node scripts/build-wiki.mjs --out .wiki
+          python3 .repo-standards-review/wiki_generate.py --out .wiki
           cd .wiki
           git add -A
           if git diff --cached --quiet; then
@@ -69,4 +67,4 @@ jobs:
           WIKI_URL: https://github.com/${{ github.repository }}.wiki.git
         run: |
           git clone --quiet "$WIKI_URL" "$RUNNER_TEMP/wiki-verify"
-          node scripts/build-wiki.mjs --check "$RUNNER_TEMP/wiki-verify"
+          python3 .repo-standards-review/wiki_generate.py --check "$RUNNER_TEMP/wiki-verify"

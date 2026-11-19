@@ -363,7 +363,7 @@ chain is attested and logged before installing it (verify-before-install, LBA-RE
 
 | AD-99 | Record an explicitly requested Windows desktop workload at an operator-selected bounded cadence without LabVIEW discovery or launch; retain existing capture control and read-only evidence ownership | The synthetic task must not require NI activation or silently overrun its local inference queue (ADR-0085) | LBA-REQ-102 |
 | AD-100 | Pin the absorbed mprr contract (constants, packet layout, record shapes) to the shared contract that mprr publishes at a tagged release; the implementation stays self-owned | One versioned upstream source instead of hand-copied values; existing identifiers stay valid as aliases | LBA-REQ-009 |
-| AD-101 | Generate the repository wiki as an Obsidian vault from `docs/` and publish it from `develop`, verified against the generator after every publish | One source of truth; the wiki cannot drift and opens as a connected Obsidian graph ([ADR-0089](adr/ADR-0089-generate-the-wiki-as-an-obsidian-vault.md)) | LBA-REQ-103 |
+| AD-101 | Generate the repository wiki as an Obsidian vault from `docs/` with the shared repo-standards-review generator and publish it from `develop`, verified against the generator after every publish | One source of truth; the wiki cannot drift, opens as an Obsidian vault and follows the ecosystem wiki standard ([ADR-0090](adr/ADR-0090-generate-the-wiki-with-the-shared-generator.md), which supersedes [ADR-0089](adr/ADR-0089-generate-the-wiki-as-an-obsidian-vault.md)) | LBA-REQ-103 |
 
 ## 5. Risks and open questions
 
@@ -398,6 +398,7 @@ Detailed decisions are recorded as ADRs in [adr/](adr/README.md):
 | [ADR-0087](adr/ADR-0087-recertify-standards-baseline-rsr-consumer-kit.md) | Re-certify the standards baseline at repo-standards-review v0.4.1 through the RSR consumer kit | LINUX |
 | [ADR-0088](adr/ADR-0088-vendor-lbabus-from-its-own-repository.md) | lbabus lives in its own repository; the extension vendors a pinned release | LINUX |
 | [ADR-0089](adr/ADR-0089-generate-the-wiki-as-an-obsidian-vault.md) | Generate the repository wiki as an Obsidian vault from docs/ | LINUX |
+| [ADR-0090](adr/ADR-0090-generate-the-wiki-with-the-shared-generator.md) | Generate the repository wiki with the shared repo-standards-review generator | LINUX |
 | [ADR-0007](adr/ADR-0007-image-derived-timing-binary-strip.md) | Image-derived timing binds to the pixel-decoded binary strip (cross-platform) | WIN |
 | [ADR-0008](adr/ADR-0008-interactive-ollama-drive-mirrored-build-coordination.md) | Interactive host-Ollama drive + mirrored build-coordination over `lbabus` | WIN |
 | [ADR-0009](adr/ADR-0009-absorb-mprr-model-self-owned.md) | Absorb the mprr ring/timing model as self-owned (retire the external `svelderrainruiz/mprr`) | WIN |

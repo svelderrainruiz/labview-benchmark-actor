@@ -109,6 +109,6 @@
 | LBA-REQ-100 | Fail-closed autonomous N>=3 controller decision | Proven | — | ADR-0083 | T-100 | 6 |
 | LBA-REQ-101 | Read-only active-capture MCP resources | Planned | §3.7 Agentic-infrastructure | ADR-0084 | T-101 | 8 |
 | LBA-REQ-102 | Standalone Windows desktop capture | Planned | §3.7 Agentic-infrastructure | ADR-0085 | T-102 | 7 |
-| LBA-REQ-103 | Obsidian-ready wiki generated from docs | Proven | §3.8 Configuration-management & assurance | ADR-0089 | T-103 | 4 |
+| LBA-REQ-103 | Obsidian-ready wiki generated from docs | Proven | §3.8 Configuration-management & assurance | ADR-0089, ADR-0090 | T-103 | 5 |
 
 _Generated for 103 requirements._
