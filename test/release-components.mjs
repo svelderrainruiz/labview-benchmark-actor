@@ -53,6 +53,9 @@ for (const lbabusRelease of [
   { ...releaseComponents.lbabusRelease, commit: 'abc' },
   { ...releaseComponents.lbabusRelease, repository: 'https://github.com/example/lbabus' },
   { ...releaseComponents.lbabusRelease, assets: {} },
+  { ...releaseComponents.lbabusRelease, assets: Object.fromEntries(Object.entries(releaseComponents.lbabusRelease.assets).filter(([name]) => name !== 'SHA256SUMS')) },
+  { ...releaseComponents.lbabusRelease, assets: Object.fromEntries(Object.entries(releaseComponents.lbabusRelease.assets).filter(([name]) => !name.endsWith('win-x64.exe'))) },
+  { ...releaseComponents.lbabusRelease, assets: { ...releaseComponents.lbabusRelease.assets, extra: 'a'.repeat(64) } },
   { ...releaseComponents.lbabusRelease, assets: { ...releaseComponents.lbabusRelease.assets, 'lbabus-x': 'nothex' } },
   undefined,
 ]) {

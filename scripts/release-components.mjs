@@ -104,9 +104,14 @@ export function verifyReleaseComponents(input) {
   if (pin?.repository !== 'https://github.com/svelderrainruiz/lbabus') reasons.push('lbabusRelease must name the svelderrainruiz/lbabus repository');
   if (pin?.tag !== `v${components.lbabus}`) reasons.push('lbabusRelease tag does not match the lbabus version');
   if (!hex(pin?.tagObject, 40) || !hex(pin?.commit, 40)) reasons.push('lbabusRelease must pin the tag object and commit as 40-hex SHA-1');
-  const nupkg = `LabViewBenchmarkActor.CollabBus.${components.lbabus}.nupkg`;
-  if (!hex(pin?.assets?.[nupkg], 64) || pinnedAssets.some(([, digest]) => !hex(digest, 64))) {
-    reasons.push('lbabusRelease must pin the package and every release asset by SHA-256');
+  const expectedAssets = [
+    `LabViewBenchmarkActor.CollabBus.${components.lbabus}.nupkg`,
+    `lbabus-${components.lbabus}-linux-x64`,
+    `lbabus-${components.lbabus}-win-x64.exe`,
+    'SHA256SUMS',
+  ];
+  if (pinnedAssets.length !== expectedAssets.length || expectedAssets.some((name) => !hex(pin?.assets?.[name], 64))) {
+    reasons.push('lbabusRelease must pin exactly the package, both binaries and SHA256SUMS by SHA-256');
   }
   if (tasksSource && tasksSource !== components.humanTasks) reasons.push('human task source version does not match release-components.json');
   if (tasksRunner && tasksRunner !== components.humanTasks) reasons.push('human task runner version does not match release-components.json');

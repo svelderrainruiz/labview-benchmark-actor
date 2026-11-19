@@ -11,7 +11,8 @@
     "assets": {
       "LabViewBenchmarkActor.CollabBus.0.17.0.nupkg": "18bb8d33110d64f058f66d53c36d7607fa5972ccfc95a0b18ad35c14c3ffa6fe",
       "lbabus-0.17.0-linux-x64": "642a30aa789e69d15c26309b9db95cc8417c6feab8c7277f36596479d4c73bac",
-      "lbabus-0.17.0-win-x64.exe": "a407ac2f9d6f6acec90487d20f6e4fa06caa27484eb4a93472e4e40ac75d9726"
+      "lbabus-0.17.0-win-x64.exe": "a407ac2f9d6f6acec90487d20f6e4fa06caa27484eb4a93472e4e40ac75d9726",
+      "SHA256SUMS": "a947dd998a2e24e1d31ff830e6e9e0521f158ea9923a69bab609eec92e7a87af"
     }
   },
   "humanTasks": "1.0.7",
