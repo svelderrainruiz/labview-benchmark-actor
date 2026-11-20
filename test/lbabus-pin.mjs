@@ -67,7 +67,7 @@ const commit = git(repo, 'rev-parse', 'HEAD');
 const tagObject = git(repo, 'rev-parse', `refs/tags/v${version}`);
 const sourcePin = (overrides) => pinFor({ commit, tagObject, ...overrides });
 const dir = checkoutSource({ components: sourcePin(), repository: repo, cacheDir: join(work, 'ok') });
-assert.equal(readFileSync(join(dir, 'file.txt'), 'utf8'), 'one\n');
+assert.equal(readFileSync(join(dir, 'file.txt'), 'utf8').replace(/\r\n/g, '\n'), 'one\n');
 assert.throws(() => checkoutSource({ components: sourcePin({ commit: 'd'.repeat(40) }), repository: repo, cacheDir: join(work, 'bad-commit') }), /not the pinned d{40}/);
 assert.equal(existsSync(join(work, 'bad-commit', `src-${'d'.repeat(40)}`)), false, 'a failed checkout must not be cached');
 assert.throws(() => checkoutSource({ components: sourcePin({ tagObject: 'e'.repeat(40) }), repository: repo, cacheDir: join(work, 'bad-tag') }), /not the pinned e{40}/);
