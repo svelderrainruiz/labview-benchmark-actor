@@ -1,6 +1,6 @@
 # labview-benchmark-actor — Software Requirements Specification
 
-> Standards baseline: `repo-standards-review` v0.12.0. Requirements follow
+> Standards baseline: `repo-standards-review` v0.15.0. Requirements follow
 > ISO/IEC/IEEE 29148 §5 (requirement quality: verifiable, unambiguous,
 > traceable). Requirement IDs are `LBA-REQ-NNN`; acceptance criteria are cited
 > by position as `LBA-REQ-NNN.M`.
@@ -289,7 +289,7 @@ progressively.
   `labview-benchmark-actor` repository without losing traceability.
 - Acceptance Criteria:
   - The package overview and CM plan both name `repo-standards-review`
-    **v0.12.0** (commit `49dfa312`).
+    **v0.15.0** (commit `3d4a10f1`).
   - The `docs/` lane layout matches the standards runner's expected structure
     (requirements, architecture, testing, cm, information-for-users, plus the
     information-item map).
@@ -2993,7 +2993,7 @@ progressively.
 - Statement: The generated agent contract shall preserve the exact standards-workbench score and conservatively
   overlay every `-` Missing Proof cell with evidence-counted candidate risk and artifact-dependent forward actions,
   so a static PASS cannot be mistaken for release readiness.
-- Rationale: The pinned repo-standards-review workbench (v0.12.0; re-certified under ADR-0087) correctly reports static repository maturity as 25/25
+- Rationale: The pinned repo-standards-review workbench (v0.15.0; re-certified under ADR-0087) correctly reports static repository maturity as 25/25
   with six PASS gates, but it does not model the exact candidate's human, hosted, cross-plane, canonical-release, and
   Marketplace-closeout proofs.
 - Acceptance Criteria:

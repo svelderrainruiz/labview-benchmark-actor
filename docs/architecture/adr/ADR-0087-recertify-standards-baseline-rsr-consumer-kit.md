@@ -52,10 +52,17 @@
   PASS/High gates, DoD 5/5 and no contradictions. No control run of an earlier workbench was made for this
   amendment; the score is unchanged against the retained baseline, and only the source identity moves;
   VITechnologies/projectbuddy#387)
+- Amended: 2026-11-20 (the kit and governance pin move to v0.15.0, commit `3d4a10f1`, workbench
+  `sha256:f3193f85…c278`, from the kit manifest `manifests/v0.15.0.json` through `cruft update` with the release-owned
+  values. The v0.15.0 deep run (`--profile release-gate --depth deep`, standards corpus mounted read-only) on the
+  current tree scores 25/25, six PASS/High gates, DoD 5/5 and no contradictions. A control run of the v0.12.0
+  workbench on the same tree gives a byte-identical `score.json` (SHA-256 `babbeba2…898e`); the retained baselines are
+  re-captured on that hash because this repository's own content changed since 2026-11-19, not the standard;
+  #99)
 - Owner: LINUX
 - Traces to: LBA-REQ-008, LBA-REQ-096
 - Amends: [ADR-0079](ADR-0079-standards-release-risk-overlay.md). The overlay is unchanged; the static
-  baseline it preserves is the v0.6.0 re-capture, re-identified as v0.12.0 by the last amendment above.
+  baseline it preserves is the v0.6.0 re-capture, re-identified as v0.15.0 by the last amendment above.
 
 ## Context
 

@@ -1,6 +1,6 @@
 # labview-benchmark-actor — Architecture Description
 
-> Standards baseline: `repo-standards-review` v0.12.0. Architecture description
+> Standards baseline: `repo-standards-review` v0.15.0. Architecture description
 > follows ISO/IEC/IEEE 42010 (stakeholders, concerns, viewpoints, views,
 > architecture decisions). It covers the original plan and the capabilities
 > since delivered, each traced to its requirements in the RTM.

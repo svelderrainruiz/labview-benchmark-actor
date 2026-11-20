@@ -1492,12 +1492,12 @@ check('ollama-comparison-core-receipt-green', () => {
 // 17. The documentation package carries the repo-standards-review stamp and the requirement IDs are
 //     contiguous with no renumbering after the standalone-repo move (LBA-REQ-008, T-008). Static/CM.
 check('docs-stamp-and-no-id-renumbering', () => {
-  // (a) Stamp: README + cm-plan name repo-standards-review v0.12.0 (commit 49dfa312).
+  // (a) Stamp: README + cm-plan name repo-standards-review v0.15.0 (commit 3d4a10f1).
   for (const rel of ['README.md', join('docs', 'cm', 'cm-plan.md')]) {
     const text = readFileSync(join(pkgRoot, rel), 'utf8');
     assert(/repo-standards-review/.test(text), `${rel} must name repo-standards-review`);
-    assert(/v0\.12\.0/.test(text), `${rel} must name the v0.12.0 baseline`);
-    assert(/49dfa312/.test(text), `${rel} must cite the 49dfa312 commit`);
+    assert(/v0\.15\.0/.test(text), `${rel} must name the v0.15.0 baseline`);
+    assert(/3d4a10f1/.test(text), `${rel} must cite the 3d4a10f1 commit`);
   }
   // (b) The docs/ lane layout the standards runner expects.
   for (const lane of ['architecture', 'cm', 'requirements', 'testing']) {
@@ -1741,7 +1741,7 @@ check('release-component-versioning', () => {
   assert(versions.canonicalDistribution === 'github-release' && versions.marketplaceChannel === 'stable', 'distribution policy drifted');
   assert(/^[0-9a-f]{40}$/.test(versions.governance.standardsReviewCommit), 'standards-review commit is not pinned');
   assert(/^sha256:[0-9a-f]{64}$/.test(versions.governance.workbenchDigest), 'governance workbench digest is not pinned');
-  assert(versions.governance.standardsReviewVersion === '0.12.0', 'standards-review version is not pinned');
+  assert(versions.governance.standardsReviewVersion === '0.15.0', 'standards-review version is not pinned');
   // The RSR consumer kit (ADR-0087) pins the same release that certifies this repository.
   const kitPin = readJson('.repo-standards-review.json');
   assert(
@@ -1755,7 +1755,7 @@ check('release-component-versioning', () => {
   assert(riskBaseline.source.standardsReviewCommit === versions.governance.standardsReviewCommit, 'release-risk source commit drifted');
   assert(riskBaseline.source.workbenchDigest === versions.governance.workbenchDigest, 'release-risk image digest drifted');
   assert(riskCore.includes("const GATES = ['coverage', 'cm', 'req', 'arch', 'doc', 'dod']"), 'release-risk evaluator lacks all scorecard gates');
-  assert(agents.includes('repo-standards-review 0.12.0') && agents.includes('12/28 (42.9%)') && agents.includes('Prioritize DoD blockers'), 'generated AGENTS lacks forward risk awareness');
+  assert(agents.includes('repo-standards-review 0.15.0') && agents.includes('12/28 (42.9%)') && agents.includes('Prioritize DoD blockers'), 'generated AGENTS lacks forward risk awareness');
   assert(hook.includes('release-components.mjs --precommit'), 'precommit release-component gate missing');
   assert(
     workflow.includes('inputs.publish_marketplace')
@@ -1846,7 +1846,7 @@ check('standards-release-risk-baseline', () => {
   const scoreBaseline = readJson('standards-score-baseline.json');
   const gateNames = ['coverage', 'cm', 'req', 'arch', 'doc', 'dod'];
   assert(baseline.schema === 'labview-benchmark-actor/release-risk-baseline@1', 'release-risk schema mismatch');
-  assert(baseline.source.workbenchVersion === '0.12.0' && baseline.source.scoreSchema === '1.3.0', 'workbench score identity drifted');
+  assert(baseline.source.workbenchVersion === '0.15.0' && baseline.source.scoreSchema === '1.3.0', 'workbench score identity drifted');
   assert(scoreBaseline.source.workbenchVersion === baseline.source.workbenchVersion, 'retained score workbench version drifted');
   assert(scoreBaseline.source.standardsReviewCommit === baseline.source.standardsReviewCommit, 'retained score source commit drifted');
   assert(scoreBaseline.source.workbenchDigest === baseline.source.workbenchDigest, 'retained score image digest drifted');
@@ -1869,7 +1869,7 @@ check('standards-release-risk-baseline', () => {
   assert(runner.includes('verifyGovernedRisk(risk, governance.releaseRisk)'), 'runtime risk does not match the governed system tuple');
   assert(runner.includes("if (risk.status !== 'READY')"), 'Release Candidate Check does not fail closed on blocked risk');
   const agents = readFileSync(join(pkgRoot, 'extension-agents', 'AGENTS.md'), 'utf8');
-  for (const signal of ['repo-standards-review 0.12.0', '12/28 (42.9%)', 'Missing Proof cells are `-`', 'Do not publish', 'expected artifact']) {
+  for (const signal of ['repo-standards-review 0.15.0', '12/28 (42.9%)', 'Missing Proof cells are `-`', 'Do not publish', 'expected artifact']) {
     assert(agents.includes(signal), `generated AGENTS lacks release-risk signal '${signal}'`);
   }
   for (const gate of gateNames) {

@@ -1,7 +1,7 @@
 {
   "template": "https://github.com/svelderrainruiz/repo-standards-review-consumer-kit",
-  "commit": "8636c1423d5bd102e2a78d45c6d18fb0ac877d33",
-  "checkout": "v0.12.0",
+  "commit": "028a485f6b56c3b29caaf73379edeb61e2940a26",
+  "checkout": "v0.15.0",
   "context": {
     "cookiecutter": {
       "repo_name": "labview-benchmark-actor",
@@ -12,17 +12,18 @@
       "script_dirs": "",
       "lf_paths": "*.py,cleanroom/ubuntu-labview/*.ps1,experiments/multi-vm-topology/**/*.ps1",
       "exempt_paths": "experiments/mesh-stress-signature/fixtures/win-vm-*.json,experiments/windows-docker-container/evidence/**",
-      "rsr_tag": "v0.12.0",
-      "rsr_commit": "49dfa312040b338a61b95ad9022f1ddddd318ab1",
-      "workbench_image": "registry.gitlab.com/svelderrainruiz/repo-standards-review/assurance-workbench@sha256:1b6e639e2d20d25231ba9be8da52afd8368152713498275cb4e6aa895f45a241",
+      "rsr_tag": "v0.15.0",
+      "rsr_commit": "3d4a10f1e974ad5a3cb09840c452159465154f6d",
+      "workbench_image": "registry.gitlab.com/svelderrainruiz/repo-standards-review/assurance-workbench@sha256:f3193f850d290feeb5cb99d8ded9e9eb1c3edd7f336f726b6308ef60e690c278",
       "__kit_dir": "labview-benchmark-actor",
       "_copy_without_render": [
         ".repo-standards-review/check_consumer.py",
-        ".repo-standards-review/observations.py"
+        ".repo-standards-review/observations.py",
+        ".repo-standards-review/wiki_generate.py"
       ],
       "_gitattributes": ".gitattributes",
       "_template": "https://github.com/svelderrainruiz/repo-standards-review-consumer-kit",
-      "_commit": "8636c1423d5bd102e2a78d45c6d18fb0ac877d33"
+      "_commit": "028a485f6b56c3b29caaf73379edeb61e2940a26"
     }
   },
   "directory": null

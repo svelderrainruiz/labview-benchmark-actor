@@ -49,9 +49,9 @@ Governance requires the standards PDFs at `C:\design\standards` (or `STANDARDS_R
 
 ## Standards scorecard and forward risk baseline
 
-This build uses **repo-standards-review 0.12.0** at commit
-`49dfa312040b338a61b95ad9022f1ddddd318ab1`, workbench digest
-`sha256:1b6e639e2d20d25231ba9be8da52afd8368152713498275cb4e6aa895f45a241`, score schema 1.3.0,
+This build uses **repo-standards-review 0.15.0** at commit
+`3d4a10f1e974ad5a3cb09840c452159465154f6d`, workbench digest
+`sha256:f3193f850d290feeb5cb99d8ded9e9eb1c3edd7f336f726b6308ef60e690c278`, score schema 1.3.0,
 profile `release-gate`, depth `deep`.
 
 The raw static baseline is REQ/ARCH/TEST/CM/DOC **5/5** (25/25) and coverage/CM/REQ/ARCH/DOC/DoD

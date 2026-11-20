@@ -1,7 +1,7 @@
 {
   "schema": "labview-benchmark-actor/release-components@1",
   "extension": "1.6.7",
-  "agents": "0.3.29",
+  "agents": "0.3.30",
   "lbabus": "0.17.1",
   "lbabusRelease": {
     "repository": "https://github.com/svelderrainruiz/lbabus",
@@ -20,10 +20,10 @@
   "canonicalDistribution": "github-release",
   "marketplaceChannel": "stable",
   "governance": {
-    "standardsReviewVersion": "0.12.0",
-    "standardsReviewCommit": "49dfa312040b338a61b95ad9022f1ddddd318ab1",
+    "standardsReviewVersion": "0.15.0",
+    "standardsReviewCommit": "3d4a10f1e974ad5a3cb09840c452159465154f6d",
     "workbenchImage": "registry.gitlab.com/svelderrainruiz/repo-standards-review/assurance-workbench",
-    "workbenchDigest": "sha256:1b6e639e2d20d25231ba9be8da52afd8368152713498275cb4e6aa895f45a241",
+    "workbenchDigest": "sha256:f3193f850d290feeb5cb99d8ded9e9eb1c3edd7f336f726b6308ef60e690c278",
     "standardsRootDefault": "C:\\design\\standards",
     "releaseRisk": {
       "present": 12,
