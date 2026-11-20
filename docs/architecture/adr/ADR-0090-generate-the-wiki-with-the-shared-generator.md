@@ -36,7 +36,9 @@ governed source, by construction.
   `Information-For-Users-Plan`), and puts the "open this wiki in Obsidian" how-to on `Home`.
 - The `wiki-vault` gate runs the generator, requires one page per RTM requirement and per test-plan item with no
   generator problem, requires a second run to equal the first byte for byte, requires the vault setting and the how-to,
-  requires that the generated wiki has no aliased `[[a|b]]` wikilink outside code, and proves three detectors with
+  requires that `--out` refuses the member root, its parent and an unrelated non-empty directory (the generator
+  from repo-standards-review v0.14.0 does; ADR-0089's refusal criterion is restored), requires that the generated
+  wiki has no aliased `[[a|b]]` wikilink outside code, and proves three detectors with
   negative controls (an unresolved wikilink, an unconfigured requirement label and an aliased wikilink). The
   `wiki-publish` workflow regenerates the wiki on every `develop` change, pushes it to the `.wiki.git` repository with
   the workflow token, then re-clones it and runs `--check` to prove the published wiki has not drifted.
@@ -48,10 +50,6 @@ governed source, by construction.
 - Known reductions against ADR-0089, accepted rather than patched in the shared generator:
   - `.obsidian/core-plugins.json` (the plugin list) and `.obsidian/graph.json` (the graph colour groups) are no longer
     written; Obsidian falls back to its defaults for both.
-  - The generator does not refuse an `--out` directory that is the repository or one of its parents; it prunes
-    whatever it is pointed at. This is fixed in repo-standards-review work item 7 (planned for v0.13.0); this
-    repository then re-vendors the kit file and restores the old refusal criterion. Until then the workflow only
-    writes into the `.wiki` clone, and no gate asserts the refusal.
   - The generator does not check that every page is reachable from `Home` by links; it requires every page to be
     indexed. The gate proves three detectors, not the eight of ADR-0089.
   - A relative link to a missing file, a missing image and a missing anchor in `docs/` are not generator findings,

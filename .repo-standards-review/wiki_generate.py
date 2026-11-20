@@ -8,7 +8,9 @@ docs/ and configuration always give the same files, byte for byte.
 Commands:
 - no option: build the wiki in memory, validate it, and print a JSON summary.
 - `--out <dir>`: write the wiki into `<dir>`, keeping `<dir>/.git` and pruning
-  stale files.
+  stale files. It refuses (exit 2, nothing written) the member root and its
+  parents, and any non-empty directory that is neither a previous output (it
+  holds `.wiki-profile.json`) nor a git clone (it holds `.git`).
 - `--check <dir>`: exit 1 when `<dir>` differs from the generated wiki.
 
 The configuration is a JSON file, by default `.wiki-generator.json` at the member
@@ -22,8 +24,10 @@ profile and the pages cannot disagree.
 Output:
 - a requirement page for each requirement of the specification, in the software
   scope's directory, with the configured sections in order;
-- a stub test page for each test-plan row, when a test scope is configured
-  (`observations.py generate` and `stimulus` replace the stubs);
+- a stub test page for each test-plan row, when a test scope is configured; with
+  `testPlan.canonical`, a test whose linked requirements name a test file that the
+  evidence ran and passed gets a skeleton page that `observations.py stimulus` and
+  `generate` fill, and `Home` counts canonical and stub pages;
 - every other Markdown page of docs/, a generated traceability matrix, an ADR
   index, `Home` and `_Sidebar`;
 - a page over the 16,384-byte budget becomes a hub whose children are its parts.
@@ -40,6 +44,7 @@ import json
 import os
 import posixpath
 import re
+import subprocess
 import sys
 from pathlib import Path
 
@@ -56,7 +61,15 @@ TEST_SECTIONS = ["Stimulus", "Required observation"]
 PREFIX = re.compile(r"[A-Z][A-Z0-9]*(?:-[A-Z][A-Z0-9]*)*")
 DIRECTORY = re.compile(r"[A-Za-z0-9][A-Za-z0-9_-]*")
 NAME = re.compile(r"[A-Za-z0-9_-]+")
-SOURCE = re.compile(r"(block|table|rtm):(.+)")
+SOURCE = re.compile(r"(block|table|rtm|plan):(.+)")
+EVIDENCE_SCHEMA = "rsr/test-evidence@1"
+CANONICAL_KEYS = {"evidence", "artifactSection", "testFiles", "notRunReason"}
+STIMULUS_PENDING = "Pending: `observations.py stimulus` writes the steps."
+OBSERVATION_PENDING = "Pending: `observations.py generate` writes the test-case items."
+COMMIT = re.compile(r"[0-9a-f]{40}")
+PLATFORM = re.compile(r"[a-z0-9][a-z0-9._-]{0,63}")
+EVIDENCE_KEYS = {"schema", "commit", "platform", "format", "cases"}
+TOKEN = re.compile(r"[^\s`'\"()\[\]{},;]+")
 SCHEME = re.compile(r"^[a-z][a-z0-9+.-]*:", re.I)
 LINK = re.compile(r"(!?)\[((?:[^\[\]]|\[[^\[\]]*\])*)\]\(([^()\s]*(?:\([^()\s]*\)[^()\s]*)*)(\s+\"[^\"]*\")?\)")
 WIKILINK = re.compile(r"\[\[([^\]]+)\]\]")
@@ -128,7 +141,7 @@ def load_config(path: Path) -> dict:
              f"section name {section['name']!r} is not allowed")
         need(section["name"] not in names, f"section {section['name']} appears twice")
         names.append(section["name"])
-        need(SOURCE.fullmatch(section["from"]) is not None, f"section {section['name']}: from must be block:<label>, table:<header> or rtm:<column>")
+        need(SOURCE.fullmatch(section["from"]) is not None, f"section {section['name']}: from must be block:<label>, table:<header>, rtm:<column> or plan:tests")
     srs = config.get("srs")
     need(isinstance(srs, dict) and isinstance(srs.get("path"), str) and srs.get("style") in ("blocks", "table"),
          "srs needs a path and a style of blocks or table")
@@ -136,7 +149,7 @@ def load_config(path: Path) -> dict:
         match = SOURCE.fullmatch(section.get("from", "")) if isinstance(section, dict) else None
         if match and isinstance(srs, dict):
             kind = match.group(1)
-            need(kind == "rtm" or kind == ("block" if srs.get("style") == "blocks" else "table"),
+            need(kind in ("rtm", "plan") or kind == ("block" if srs.get("style") == "blocks" else "table"),
                  f"section {section['name']}: {kind}: does not fit the {srs.get('style')} style")
     rtm = config.get("rtm")
     need(rtm is None or (isinstance(rtm, dict) and isinstance(rtm.get("path"), str) and isinstance(rtm.get("idColumn"), str)),
@@ -144,6 +157,29 @@ def load_config(path: Path) -> dict:
     plan = config.get("testPlan")
     need(plan is None or isinstance(plan, dict) and isinstance(plan.get("path"), str), "testPlan needs a path")
     need("test" not in scopes or plan is not None, "a test scope needs a testPlan")
+    for section in sections if isinstance(sections, list) else []:
+        if isinstance(section, dict) and str(section.get("from", "")).startswith("plan:"):
+            need(section["from"] == "plan:tests", f"section {section['name']}: the only plan source is plan:tests")
+    canonical = plan.get("canonical") if isinstance(plan, dict) else None
+    if canonical is not None:
+        valid = (isinstance(canonical, dict) and set(canonical) <= CANONICAL_KEYS and isinstance(canonical.get("evidence"), list)
+                 and bool(canonical["evidence"]) and all(isinstance(e, str) and e for e in canonical["evidence"]))
+        need(valid, f"testPlan.canonical needs an evidence array of paths and may hold only {', '.join(sorted(CANONICAL_KEYS))}")
+        if valid:
+            artifact = canonical.get("artifactSection", "TestArtifact")
+            need(isinstance(artifact, str) and artifact in names and "TestID" in names,
+                 "testPlan.canonical needs software sections named TestID and its artifactSection (default TestArtifact)")
+            need("test" in scopes, "testPlan.canonical needs a test scope")
+            patterns = canonical.get("testFiles", [])
+            need(isinstance(patterns, list) and all(isinstance(x, str) for x in patterns),
+                 "testPlan.canonical.testFiles must be an array of regular expressions")
+            for pattern in patterns if isinstance(patterns, list) else []:
+                try:
+                    re.compile(pattern)
+                except (re.error, TypeError):
+                    need(False, f"testPlan.canonical.testFiles: {pattern!r} is not a regular expression")
+            reason = canonical.get("notRunReason", "")
+            need(isinstance(reason, str) and "\n" not in reason, "testPlan.canonical.notRunReason must be one line of text")
     for key in ("names", "words"):
         need(isinstance(config.get(key, {}), dict), f"{key} must be an object")
     for key in ("exclude", "assetDirs"):
@@ -167,6 +203,12 @@ def profile_of(config: dict) -> dict:
 
 
 # ---- small helpers --------------------------------------------------------------------------------------------
+def safe_relative(path: object) -> bool:
+    if not isinstance(path, str) or not path or "\\" in path or "`" in path or path.startswith("/"):
+        return False
+    return not any(c in path for c in "\n\r\t\0") and all(segment not in ("", ".", "..") for segment in path.split("/"))
+
+
 def split_row(line: str) -> list[str]:
     cells, cell, index = [], "", 0
     while index < len(line):
@@ -282,6 +324,7 @@ class Model:
         self.load_requirements()
         self.load_rtm()
         self.load_tests()
+        self.load_canonical()
         self.check_labels()
         self.rtm_only = sorted(set(self.rtm) - {r["id"] for r in self.requirements})
 
@@ -389,6 +432,58 @@ class Model:
             self.tests.append({"id": match.group(1), "title": match.group(2).strip(), "row": {h: v for h, v in row.items() if h != key and v},
                                "requirements": requirements})
 
+    @staticmethod
+    def evidence_valid(document: object) -> bool:
+        """Whether observations.py evidence_problem would accept the document."""
+        if not isinstance(document, dict) or set(document) != EVIDENCE_KEYS or document["schema"] != EVIDENCE_SCHEMA:
+            return False
+        valid = (isinstance(document["commit"], str) and COMMIT.fullmatch(document["commit"]) is not None
+                 and isinstance(document["platform"], str) and PLATFORM.fullmatch(document["platform"]) is not None
+                 and isinstance(document["format"], str) and isinstance(document["cases"], list))
+        return valid and all(isinstance(c, dict) and set(c) == {"file", "name", "status"} and safe_relative(c["file"])
+                             and isinstance(c["name"], str) and c["name"].strip() != "" and "\n" not in c["name"] and "\r" not in c["name"]
+                             and c["status"] in ("passed", "failed", "skipped")
+                             for c in document["cases"])
+
+    def load_canonical(self) -> None:
+        """The evidence's test files that ran and passed, or None when the configuration has no canonical block."""
+        self.canonical = None
+        block = (self.config.get("testPlan") or {}).get("canonical")
+        if block is None:
+            return
+        statuses: dict[str, set] = {}
+        commits: set[str] = set()
+        platforms: list[str] = []
+        for rel in block["evidence"]:
+            try:
+                document = json.loads(self.path(rel).read_text(encoding="utf-8"))
+            except (OSError, ValueError) as error:
+                raise Refused(f"cannot read the evidence {rel}: {error}")
+            if not self.evidence_valid(document):
+                raise Refused(f"{rel} is not {EVIDENCE_SCHEMA} evidence from observations.py evidence")
+            platforms.append(document["platform"])
+            commits.add(document["commit"])
+            for case in document["cases"]:
+                statuses.setdefault(case["file"], set()).add(case["status"])
+        if len(commits) != 1:
+            raise Refused("the evidence files record different commits: " + ", ".join(sorted(commits)))
+        if len(set(platforms)) != len(platforms):
+            raise Refused("give one evidence file per platform")
+        commit = next(iter(commits))
+        try:
+            head = subprocess.run(["git", "-C", str(self.root), "rev-parse", "HEAD"], capture_output=True, text=True)
+        except OSError as error:
+            raise Refused(f"cannot read the member commit: {error}")
+        if head.returncode != 0 or head.stdout.strip() != commit:
+            raise Refused(f"the evidence is from commit {commit[:12]}, which is not the member commit; "
+                          "run the tests and the generator at the same commit")
+        # A file passes only when every one of its test cases passed: generate lists each case, and a skipped one is not a pass.
+        self.canonical = {"ran": set(statuses), "passing": {f for f, s in statuses.items() if s == {"passed"}},
+                          "failing": {f for f, s in statuses.items() if s != {"passed"}},
+                          "artifact": block.get("artifactSection", "TestArtifact"),
+                          "testFiles": [re.compile(p) for p in block.get("testFiles", [])],
+                          "reason": block.get("notRunReason") or "the evidence did not run it"}
+
     def check_labels(self) -> None:
         sections = self.config["scopes"]["software"]["sections"]
         used = {s["from"].partition(":")[2] for s in sections if s["from"].startswith(("block:", "table:"))}
@@ -470,6 +565,8 @@ class Vault:
         self.test_dir = scopes["test"]["directory"] if "test" in scopes else None
         self.adr_names = sorted(n for n in self.names.values() if re.fullmatch(r"ADR-\d{4}", n))
         self.assets: dict[str, str] = {}
+        self.warnings: list[str] = []
+        self.canonical_ids: list[str] = []
 
     # -- registry of notes
     def register(self, name: str, path: str) -> None:
@@ -662,7 +759,10 @@ class Vault:
             bodies = []
             for section in sections:
                 kind, _, label = section["from"].partition(":")
-                raw = rtm.get(label, "") if kind == "rtm" else req["fields"].get(label, "")
+                if kind == "plan":
+                    raw = ", ".join(t["id"] for t in self.model.tests if req["id"] in t["requirements"])
+                else:
+                    raw = rtm.get(label, "") if kind == "rtm" else req["fields"].get(label, "")
                 only = self.model.test_id if section["name"] == "TestID" else None
                 if section["name"] == "TestID" and only is None:
                     only = re.compile(r"(?!)")
@@ -699,16 +799,74 @@ class Vault:
             bodies[largest] = f"The full text is in {', '.join(links)}: this page would exceed the wiki page budget of {BUDGET} bytes."
         self.put(f"{self.req_dir}/{rid}.md", render())
 
+    def linked_artifacts(self) -> dict[str, list[str]]:
+        """Test ID -> the artifact sections of the written requirement pages whose TestID section links it.
+
+        This reads the pages as `observations.py stimulus` will, so a requirement whose section moved to a note page links nothing."""
+        names = [s["name"] for s in self.config["scopes"]["software"]["sections"]]
+        artifact = self.model.canonical["artifact"]
+        prefixes = prefixes_of(self.config["scopes"]["test"])
+        linked: dict[str, list[str]] = {}
+        for path in sorted(self.files):
+            if not path.startswith(self.req_dir + "/") or not path.endswith(".md"):
+                continue
+            text = self.files[path].decode("utf-8")
+            title = text.split("\n", 1)[0]
+            headings = list(HEADING.finditer(text, len(title)))
+            if not headings or headings[0].start() != len(title) or [h.group(1) for h in headings] != names:
+                continue
+            ends = [h.start() for h in headings[1:]] + [len(text) - 1]
+            bodies = {h.group(1): text[h.end():end] for h, end in zip(headings, ends)}
+            for link in dict.fromkeys(m.strip() for m in re.findall(r"\[\[([^\]|#\n]+)", bodies["TestID"])):
+                if re.fullmatch(r"[A-Z][A-Z0-9-]*-\d+", link) and link.rsplit("-", 1)[0] in prefixes:
+                    linked.setdefault(link, []).append(bodies[artifact])
+        return linked
+
+    def canonical_test(self, test: dict, linked: dict[str, list[str]]) -> list[str] | None:
+        """The files not run, when the test's linked files ran and passed so that its page can be canonical; else None."""
+        canonical = self.model.canonical
+        tokens: list[str] = []
+        for text in linked.get(test["id"], []):
+            for token in TOKEN.findall(text):
+                candidate = (token[2:] if token.startswith("./") else token).rstrip(".:")
+                if candidate and candidate not in tokens:
+                    tokens.append(candidate)
+        failing = [t for t in tokens if t in canonical["failing"]]
+        if failing:
+            self.warnings.append(f"{test['id']} stays a stub: the evidence shows test cases that did not pass in {', '.join(failing)}")
+            return None
+        if not any(t in canonical["passing"] for t in tokens):
+            return None
+        return [t for t in tokens if t not in canonical["ran"] and any(p.search(t) for p in canonical["testFiles"])
+                and (self.model.root / t).is_file()]
+
     def test_pages(self) -> None:
+        linked = self.linked_artifacts() if self.model.canonical else {}
         for test in self.model.tests:
+            title = f": {' '.join(test['title'].split())}" if test["title"] else ""
+            unrun = self.canonical_test(test, linked) if self.model.canonical else None
+            if unrun is not None:
+                observation = OBSERVATION_PENDING
+                if unrun:
+                    observation += f"\n\nNot verified here: {', '.join(f'`{f}`' for f in unrun)}: {self.model.canonical['reason']}."
+                self.canonical_ids.append(test["id"])
+                self.put(f"{self.test_dir}/{test['id']}.md",
+                         f"# {test['id']}{title}\n\n## Stimulus\n\n{STIMULUS_PENDING}\n\n## Required observation\n\n{observation}\n")
+                continue
             lines = [f"No test definition exists yet: this stub records the {self.model.plan_rel} row of {test['id']}."]
             if test["requirements"]:
                 lines.append("")
                 lines.append("- **Linked requirements, not verified here:** " + ", ".join(f"[[{r}]]" if r in self.req_ids else r for r in test["requirements"]))
             for header, value in test["row"].items():
                 lines.append(f"- **{header}:** {self.convert(cell_one_line(value), self.model.plan_rel, test['id'])}")
-            title = f": {' '.join(test['title'].split())}" if test["title"] else ""
             self.put(f"{self.test_dir}/{test['id']}.md", f"# {test['id']}{title}\n\n<!-- page-kind: stub -->\n" + "\n".join(lines).rstrip() + "\n")
+
+    def plan_summary(self) -> str:
+        total = len(self.model.tests)
+        if not self.model.canonical:
+            return f": {total} test items, one stub page each under `{self.test_dir}/`."
+        return (f": {total} test items, one page each under `{self.test_dir}/`: {len(self.canonical_ids)} canonical, "
+                f"{total - len(self.canonical_ids)} stub.")
 
     def spec_pages(self) -> None:
         model, config = self.model, self.config
@@ -795,7 +953,7 @@ class Vault:
             lines.append(f"- [[{SPEC_NAMES['overview']}]]: the architecture description" + (f"; {len(self.adr_names)} decisions in [[{SPEC_NAMES['adr_index']}]]." if self.adr_names else "."))
             top.append(SPEC_NAMES["overview"])
         if model.plan_rel:
-            lines.append(f"- [[{self.names[model.plan_rel]}]]" + (f": {len(model.tests)} test items, one stub page each under `{self.test_dir}/`." if model.tests else "."))
+            lines.append(f"- [[{self.names[model.plan_rel]}]]" + (self.plan_summary() if model.tests else "."))
             top.append(self.names[model.plan_rel])
         lines.append("")
         order = list(dict.fromkeys([s for _, s in sections] + ["More documentation"]))
@@ -996,6 +1154,22 @@ def generate(root: Path, config_path: Path) -> tuple[Vault, list[str]]:
     return vault, validate(vault)
 
 
+def out_refusal(out: Path, root: Path) -> str | None:
+    """Why `--out` must not be written, or None. --out prunes every file the wiki does not hold, so it only ever
+    writes into a directory that is a wiki: absent, empty, a previous output, or the top of a separate git work tree."""
+    target = out.resolve()
+    # Identity, not path text: a differently cased spelling of the root is still the root.
+    if any(target == p or (target.exists() and os.path.samefile(target, p)) for p in (root, *root.parents)):
+        return f"--out {out} is the member root or one of its parents; point it at a wiki clone"
+    if target.exists() and not target.is_dir():
+        return f"--out {out} is not a directory"
+    if not target.exists() or not any(target.iterdir()):
+        return None
+    if (target / PROFILE_FILE).is_file() or (target / ".git").exists():
+        return None
+    return f"--out {out} is not empty and is neither a previous output (no {PROFILE_FILE}) nor a git clone (no .git); nothing was written"
+
+
 def write_out(vault: Vault, out: Path) -> dict:
     out.mkdir(parents=True, exist_ok=True)
     counts = {"written": 0, "unchanged": 0, "removed": 0}
@@ -1042,10 +1216,15 @@ def differences(vault: Vault, directory: Path) -> list[str]:
 def summary(vault: Vault, errors: list[str]) -> dict:
     scopes = vault.config["scopes"]
     count = lambda directory: sum(1 for p in vault.files if p.startswith(directory + "/"))  # noqa: E731
-    return {"pages": sum(1 for p in vault.files if p.endswith(".md")), "files": len(vault.files),
-            "requirement_pages": count(scopes["software"]["directory"]),
-            "test_pages": count(scopes["test"]["directory"]) if "test" in scopes else 0,
-            "adr_pages": len(vault.adr_names), "rtm_requirements_without_page": len(vault.model.rtm_only), "problems": errors[:100], "problem_count": len(errors)}
+    report = {"pages": sum(1 for p in vault.files if p.endswith(".md")), "files": len(vault.files),
+              "requirement_pages": count(scopes["software"]["directory"]),
+              "test_pages": count(scopes["test"]["directory"]) if "test" in scopes else 0,
+              "adr_pages": len(vault.adr_names), "rtm_requirements_without_page": len(vault.model.rtm_only), "problems": errors[:100], "problem_count": len(errors)}
+    if vault.model.canonical:
+        report["canonical_test_pages"] = len(vault.canonical_ids)
+        report["stub_test_pages"] = report["test_pages"] - len(vault.canonical_ids)
+        report["warnings"] = vault.warnings
+    return report
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -1067,6 +1246,10 @@ def main(argv: list[str] | None = None) -> int:
         print(json.dumps(report, indent=2))
         return 1
     if arguments.out:
+        refusal = out_refusal(Path(arguments.out), root)
+        if refusal:
+            print(f"wiki_generate: {refusal}", file=sys.stderr)
+            return 2
         report["write"] = write_out(vault, Path(arguments.out))
     elif arguments.check:
         found = differences(vault, Path(arguments.check))

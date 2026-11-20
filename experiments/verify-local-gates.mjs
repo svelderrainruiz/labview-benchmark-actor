@@ -301,7 +301,7 @@ check('information-for-users-26514', () => {
 //      generator (.repo-standards-review/wiki_generate.py) under .wiki-generator.json. The generator validates the wiki
 //      (resolved wikilinks, indexed pages, page budget, configured requirement sections); this gate adds what CI must
 //      prove: a clean run with one page per requirement and test item, a byte-identical second run, the Obsidian vault
-//      settings and how-to, no aliased wikilink outside code, three negative controls that fail closed, and a publish workflow that publishes only from
+//      settings and how-to, no aliased wikilink outside code, an --out guard that refuses the member root, its parent and an unrelated non-empty directory, three negative controls that fail closed, and a publish workflow that publishes only from
 //      develop and drift-checks a fresh clone of the published wiki.
 check('wiki-vault', () => {
   const generator = join(pkgRoot, '.repo-standards-review', 'wiki_generate.py');
@@ -354,6 +354,19 @@ check('wiki-vault', () => {
     assert(existsSync(join(first, '.obsidian', 'app.json')), 'the vault has no .obsidian/app.json');
     assert(/Open folder as vault/.test(readFileSync(join(first, 'Home.md'), 'utf8')), 'Home lacks the open-in-Obsidian how-to');
     const aliased = aliasedLinks(first);
+    // --out prunes every file the wiki does not hold, so it must refuse the member root, its parent and an unrelated
+    // non-empty directory. The controls run on a copy of the member, so a regression cannot prune the real repository.
+    const guardRoot = join(scratch, 'guard', 'member');
+    mkdirSync(guardRoot, { recursive: true });
+    cpSync(join(pkgRoot, 'docs'), join(guardRoot, 'docs'), { recursive: true });
+    cpSync(join(pkgRoot, '.wiki-generator.json'), join(guardRoot, '.wiki-generator.json'));
+    const unrelated = join(scratch, 'unrelated');
+    mkdirSync(unrelated);
+    writeFileSync(join(unrelated, 'keep.txt'), 'keep');
+    for (const [label, target] of [['the member root', guardRoot], ['the parent of the member root', dirname(guardRoot)], ['an unrelated non-empty directory', unrelated]]) {
+      assert(run(['--out', target], guardRoot).code === 2, `--out must refuse ${label} (exit 2)`);
+    }
+    assert(existsSync(join(guardRoot, 'docs')) && existsSync(join(unrelated, 'keep.txt')), '--out wrote or pruned files in a directory it refused');
     assert(aliased.length === 0, `${aliased.length} ${aliased[0]}`);
     const aliasRoot = join(scratch, 'aliased-link');
     mkdirSync(aliasRoot);
@@ -384,7 +397,7 @@ check('wiki-vault', () => {
   assert(workflow.includes("github.ref == 'refs/heads/develop'"), 'wiki-publish must refuse to publish any other ref');
   assert(workflow.includes('python3 .repo-standards-review/wiki_generate.py --out .wiki'), 'wiki-publish must write the generated wiki');
   assert(/python3 \.repo-standards-review\/wiki_generate\.py --check "\$RUNNER_TEMP\/wiki-verify"/.test(workflow), 'wiki-publish must verify a fresh clone of the published wiki');
-  return { generator: '.repo-standards-review/wiki_generate.py', summary: `${report.requirement_pages} requirement pages, ${report.test_pages} test pages, ${report.adr_pages} ADR pages, ${report.pages} pages; deterministic; alias-free wikilinks; 3 negative controls` };
+  return { generator: '.repo-standards-review/wiki_generate.py', summary: `${report.requirement_pages} requirement pages, ${report.test_pages} test pages, ${report.adr_pages} ADR pages, ${report.pages} pages; deterministic; alias-free wikilinks; --out guard; 3 negative controls` };
 });
 
 // 6f. Test & assurance report is generated + current (ISO/IEC/IEEE 29119-3 test report + ISO 10007 status
