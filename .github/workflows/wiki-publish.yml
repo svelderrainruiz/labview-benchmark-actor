@@ -39,7 +39,9 @@ concurrency:
 jobs:
   publish:
     name: Wiki / generate, publish, verify
-    if: github.repository == 'svelderrainruiz/labview-benchmark-actor' && github.ref == 'refs/heads/develop'
+    # Fail closed: the upstream always publishes its own wiki; a fork publishes its own wiki only when its owner sets the
+    # repository variable WIKI_PUBLISH_ENABLED to 'true'. The push goes to ${{ github.repository }}.wiki with GITHUB_TOKEN.
+    if: (github.repository == 'svelderrainruiz/labview-benchmark-actor' || vars.WIKI_PUBLISH_ENABLED == 'true') && github.ref == 'refs/heads/develop'
     runs-on: ubuntu-latest
     permissions:
       contents: write # push the generated pages to the wiki repository
