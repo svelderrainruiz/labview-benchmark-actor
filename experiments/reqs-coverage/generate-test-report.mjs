@@ -83,6 +83,19 @@ export function renderReport({ repoRoot }) {
   // Architecture decisions on disk (ISO 10007 configuration items).
   const adrCount = readdirSync(ADR_DIR).filter((f) => /^ADR-\d{4}.*\.md$/.test(f)).length;
 
+  // Lanes a change still owes: listed so the report never implies a pass for a proof that was not run.
+  const notExecutedFile = join(repoRoot, 'docs', 'testing', 'not-executed.json');
+  const notExecuted = existsSync(notExecutedFile) ? JSON.parse(readFileSync(notExecutedFile, 'utf8')) : null;
+  const notExecutedSection = notExecuted && notExecuted.lanes.length ? [
+    '### 2.5 Lanes not executed',
+    '',
+    `For ${notExecuted.change}, these lanes have NOT been executed; no result is claimed for them. Executed: ${notExecuted.executed.join(', ')}.`,
+    '',
+    '| Lane | What | Status | Needs |',
+    '| --- | --- | --- | --- |',
+    ...notExecuted.lanes.map((l) => `| ${l.id} | ${l.lane} | ${l.status} | ${l.needs} |`),
+    '',
+  ] : [];
   const lines = [
   '# Test & assurance report — labview-benchmark-actor',
   '',
@@ -136,6 +149,7 @@ export function renderReport({ repoRoot }) {
   'The Mocha extension activation + view-render suites run in the `extension tests` CI jobs on',
   '`ubuntu-latest` and `windows-latest`.',
   '',
+  ...notExecutedSection,
   '## 3. Configuration status accounting (ISO 10007 / ISO/IEC/IEEE 12207)',
   '',
   'The controlled state of the repository\'s configuration items, derived from the registers:',

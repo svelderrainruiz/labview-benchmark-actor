@@ -275,6 +275,17 @@ ratchet up only (`npm run coverage:bump`); they are never lowered by hand.
 The Mocha extension activation + view-render suites run in the `extension tests` CI jobs on
 `ubuntu-latest` and `windows-latest`.
 
+### 2.5 Lanes not executed
+
+For #57 slice 3 (consume lbabus only as the pinned release), these lanes have NOT been executed; no result is claimed for them. Executed: P0 (hosted gates), P1 (hosted codespace witness).
+
+| Lane | What | Status | Needs |
+| --- | --- | --- | --- |
+| P2 | VirtualBox host and guest (golden box, from-source provisioning at the pin) | NOT executed | operator-run local session |
+| P3 | Windows native on the operator's peer machine (pinned win-x64 binary) | NOT executed | operator approval of the peer step kind and of the exact script sha256 |
+| P4 | Docker-Windows clean room (Dockerfile.windows clones the pinned tag) | NOT executed | Windows container host and the licensed LabVIEW feed |
+| P5 | Windows VM guest (cleanroom/Vagrantfile bootstrap at the pin) | NOT executed | operator workstation and a rebuilt box |
+
 ## 3. Configuration status accounting (ISO 10007 / ISO/IEC/IEEE 12207)
 
 The controlled state of the repository's configuration items, derived from the registers:

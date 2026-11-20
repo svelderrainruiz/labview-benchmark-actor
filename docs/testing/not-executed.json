@@ -1,0 +1,11 @@
+{
+  "schema": "labview-benchmark-actor/not-executed-lanes@1",
+  "change": "#57 slice 3 (consume lbabus only as the pinned release)",
+  "lanes": [
+    { "id": "P2", "lane": "VirtualBox host and guest (golden box, from-source provisioning at the pin)", "status": "NOT executed", "needs": "operator-run local session" },
+    { "id": "P3", "lane": "Windows native on the operator's peer machine (pinned win-x64 binary)", "status": "NOT executed", "needs": "operator approval of the peer step kind and of the exact script sha256" },
+    { "id": "P4", "lane": "Docker-Windows clean room (Dockerfile.windows clones the pinned tag)", "status": "NOT executed", "needs": "Windows container host and the licensed LabVIEW feed" },
+    { "id": "P5", "lane": "Windows VM guest (cleanroom/Vagrantfile bootstrap at the pin)", "status": "NOT executed", "needs": "operator workstation and a rebuilt box" }
+  ],
+  "executed": ["P0 (hosted gates)", "P1 (hosted codespace witness)"]
+}

@@ -44,6 +44,9 @@ follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project
     contract (0.3.29) names the pinned version, every default that repeats the pin matches it, and no in-tree copy may
     return. The source-reading gates (`collab-cli-embeds-canonical-requirements`, `cli-no-discussion-transport` and the
     `Net.cs`, `Program.cs` assertions) moved to lbabus.
+  - Proof status: the hosted proofs (gates and the codespace witness) ran. The VirtualBox lane (P2) and the Windows lanes
+    (P3 peer, P4 Docker-Windows, P5 Windows VM guest) are NOT executed; no result is claimed for them
+    (`docs/testing/not-executed.json`).
   - The release classifier treats a changed pin as an lbabus change. RTM CodeRefs that named the deleted tree point at the
     pin until the slice 4 requirement rewrite. Experiment governance 1.0.2 (the `hardware-capability` replacement).
 
