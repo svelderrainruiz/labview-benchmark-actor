@@ -28,7 +28,7 @@ cross-plane corroborated candidate, not a different extension.
   crossPlane quorum (LBA-REQ-088) + the enrolled machine sign-off (LBA-REQ-089); the HUMAN gate = a signed
   `WINDOWS_VM` visual PASS of the byte-reproducible candidate (vsix `2ec7bd31` @ `2a0352c`); and the genuine WIN
   net-staged frame — all five bindings hold, the quorum is `crossPlane`, and both gates are signed by the enrolled
-  `reviewer@vi-tech.nl`.
+  sign-off identity (maintainer role).
 - **Prove + guard it offline.** `crossplane-composite-reseal.selftest.mjs` proves the committed crossPlane composite
   validates as a proven composite decision AND its quorum is crossPlane, while the shipped single-plane composite is
   the defect it corrects (gate `acg-crossplane-composite-reseal`).
