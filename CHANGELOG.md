@@ -8,6 +8,8 @@ follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project
 
 ### Added
 
+- Fork and wiki guide: say how to enable Actions on a fork through the API, that the job succeeds without the
+  `repoUrl` edit but links to the upstream, and that the generated Home page replaces the first page.
 - Fork and wiki guide (`docs/information-for-users/fork-and-wiki-guide.md`): bootstrap checklist for publishing a fork's own
   wiki, and `wiki-publish` now runs on a fork only when the repository variable `WIKI_PUBLISH_ENABLED` is `true`.
 - Wiki evidence adapter (VITechnologies/projectbuddy#318 M3): `scripts/wikiEvidence.mjs` runs the local gates and the
