@@ -1,0 +1,99 @@
+name: Wiki Submission Ingest
+
+# fork-and-wiki S2 (#112). A partner fork files an issue titled "[wiki-submission] ..." whose body is an
+# rsr/wiki-submission@1 JSON document. The gate job authorizes the submitter against an Actions secret and is the
+# only job that can read it; every authorization failure gives one undifferentiated outcome. The verify job treats
+# the submission as data: it checks out upstream only, at the commit this workflow runs from, and reads the issue
+# from the event file; it never checks out or runs fork code and never interpolates event text into a shell. The
+# report job takes only fixed-vocabulary outputs. Never pull_request_target. With the secret unset or empty every
+# submission is not authorized.
+
+on:
+  issues:
+    types: [opened, edited]
+
+concurrency:
+  group: wiki-submission-${{ github.event.issue.number }}
+  cancel-in-progress: true
+
+permissions: {}
+
+jobs:
+  gate:
+    name: Authorize submitter
+    if: startsWith(github.event.issue.title, '[wiki-submission]')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    outputs:
+      authorized: ${{ steps.gate.outputs.authorized }}
+    steps:
+      - name: Checkout upstream at the workflow commit
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+
+      - name: Authorize
+        id: gate
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          SUBMISSION_ALLOWLIST: ${{ secrets.SUBMISSION_ALLOWLIST }}
+        run: python3 -B scripts/wiki_submission.py gate --event "$GITHUB_EVENT_PATH"
+
+  verify:
+    name: Verify submission
+    needs: gate
+    if: needs.gate.outputs.authorized == 'yes'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    outputs:
+      verdict: ${{ steps.verify.outputs.verdict }}
+      reason: ${{ steps.verify.outputs.reason }}
+      upstream: ${{ steps.verify.outputs.upstream }}
+    steps:
+      - name: Checkout upstream at the workflow commit
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+
+      - name: Verify the submission
+        id: verify
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: python3 -B scripts/wiki_submission.py verify --event "$GITHUB_EVENT_PATH"
+
+  report:
+    name: Report verdict
+    needs: [gate, verify]
+    if: always() && needs.gate.result == 'success' && (needs.gate.outputs.authorized == 'no' || needs.verify.result == 'success')
+    runs-on: ubuntu-latest
+    permissions:
+      issues: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+      ISSUE: ${{ github.event.issue.number }}
+      VERDICT: ${{ needs.gate.outputs.authorized == 'yes' && needs.verify.outputs.verdict || 'not-attested' }}
+      REASON: ${{ needs.gate.outputs.authorized == 'yes' && needs.verify.outputs.reason || 'not-authorized' }}
+      UPSTREAM: ${{ github.sha }}
+    steps:
+      - name: Label and comment with fixed text
+        run: |
+          case "$VERDICT" in
+            attested) add=wiki-attested; drop=wiki-not-attested ;;
+            not-attested) add=wiki-not-attested; drop=wiki-attested ;;
+            *) echo "unexpected verdict"; exit 1 ;;
+          esac
+          case "$REASON" in
+            *[!a-z-]*|"") echo "unexpected reason"; exit 1 ;;
+          esac
+          case "$UPSTREAM" in
+            *[!0-9a-f]*|"") echo "unexpected sha"; exit 1 ;;
+          esac
+          [ "${#UPSTREAM}" -eq 40 ] || { echo "unexpected sha"; exit 1; }
+          gh label create "$add" --force --color 5319e7 --description "fork-and-wiki S2 verdict"
+          gh issue edit "$ISSUE" --add-label "$add" --remove-label "$drop" || gh issue edit "$ISSUE" --add-label "$add"
+          gh issue comment "$ISSUE" --body "Wiki submission verdict: ${VERDICT} (reason code: ${REASON}). Verified by upstream commit ${UPSTREAM}. Fork content is data and is never run; attested means only that the submitted evidence matched upstream's own test definitions at that commit."

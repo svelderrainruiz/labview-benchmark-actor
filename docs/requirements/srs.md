@@ -132,6 +132,7 @@ progressively.
 
 | LBA-REQ-102 | The system shall record an explicitly requested Windows desktop workload at a bounded operator-selected cadence without locating or launching LabVIEW. | A standalone synthetic UI live proof must not depend on NI activation or inherit an unreviewable 12-fps inference queue. | A separate Capture Desktop command records `desktop-capture` with an integer interval of 1 through 120 seconds (default 60), emits the existing pathless lifecycle/resources, and uses the existing stop/finalization path; Capture LabVIEW Launch retains its 12-fps behavior. | Host-free activation, argument, cadence, and lifecycle fixtures in `npm test`; Windows desktop execution remains a separate live-proof gate. |
 | LBA-REQ-103 | The system shall publish the repository wiki as an Obsidian vault generated from `docs/` by the shared repo-standards-review generator, in which every requirement page links its test. | The operator could not open the wiki in Obsidian (1.5.2 Marketplace rejection, #64), and hand-maintained pages drift from the governed sources, so the wiki is derived from `docs/`; the ecosystem wiki standard and its registry export need the one shared generator. | `.repo-standards-review/wiki_generate.py` under `.wiki-generator.json` passes with no problem and writes one page per RTM requirement and per test-plan item, every requirement page lists its `TestID`, two runs are byte-identical, `.obsidian/app.json` and the open-in-Obsidian how-to are present, no aliased wikilink remains outside code in the generated wiki, `--out` refuses the member root, its parent and an unrelated non-empty directory, and three negative controls fail closed; after publishing, `--check` finds no drift in a fresh wiki clone. | The `wiki-vault` gate in `verify-local-gates` (T-103); the `wiki-publish` workflow verifies the published wiki with `--check`. |
+| LBA-REQ-104 | The system shall verify a fork's wiki-submission issue against upstream's own test definitions, treating fork content strictly as data, and label it attested or not-attested, with a partner allow-list, held outside the repository, that rejects everything while unset or empty. | Only evidence that upstream re-verified without running fork code may be called attested (#112). | `scripts/wiki_submission.py` rejects an unlisted submitter first, then oversize, malformed, tampered, traversing or unknown-test submissions, and accepts a matching one, in offline fixtures; an unset or garbage allow-list rejects all, and a canary login never appears in any output or in the tree. | `node test/wiki-submission.mjs` (T-104). |
 
 ---
 
@@ -3163,6 +3164,25 @@ progressively.
     requirement page does not list its architecture view or decisions.
 - Verification: The `wiki-vault` gate (`node experiments/verify-local-gates.mjs`, T-103)
   and the `wiki-publish` drift check.
+
+### LBA-REQ-104: Fork wiki submissions are verified as data
+
+- Status: Proven
+- Area: Information for users / security (ADR-0091)
+- Statement: The system shall verify a fork's wiki-submission issue against upstream's
+  own test definitions, treating fork content strictly as data, and label it
+  attested or not-attested, with a partner allow-list, held outside the repository, that rejects everything while unset or empty.
+- Rationale: Forks publish their own wikis; only evidence that upstream re-verified
+  without running fork code may be called attested (#112).
+- Acceptance Criteria:
+  - `scripts/wiki_submission.py` first authorizes the fork owner (listed in the allow-list
+    held in an Actions secret) and the author (the owner or a public org member), with one
+    undifferentiated failure outcome, then parses the body strictly, fetches evidence bytes at the
+    pinned fork commit, enforces size caps, recomputes sha256 and checks test ids against
+    upstream's test files.
+  - The ingest workflow's verify job is read-only; its report job only labels and posts a
+    fixed comment.
+- Verification: `node test/wiki-submission.mjs` (T-104).
 
 ## Traceability (requirement → architecture view / test)
 
