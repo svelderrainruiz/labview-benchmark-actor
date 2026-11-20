@@ -8,6 +8,8 @@ follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project
 
 ### Added
 
+- Fork and wiki guide (`docs/information-for-users/fork-and-wiki-guide.md`): bootstrap checklist for publishing a fork's own
+  wiki, and `wiki-publish` now runs on a fork only when the repository variable `WIKI_PUBLISH_ENABLED` is `true`.
 - Wiki evidence adapter (VITechnologies/projectbuddy#318 M3): `scripts/wikiEvidence.mjs` runs the local gates and the
   `npm test` steps and writes a Jest-compatible report, `scripts/check_wiki_canonical.py` builds the wiki twice with the
   canonical block of `.wiki-canonical.json` and checks it, and the `Wiki Canonical Test Pages` job runs both. Test pages

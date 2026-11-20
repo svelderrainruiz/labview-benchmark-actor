@@ -21,6 +21,7 @@
 | [User Guide](./user-guide.md) | learn the review workflow in depth | community member |
 | [Ubuntu 24.04 + LabVIEW 2026 Installation](./ubuntu-24.04-labview-2026-installation.md) | reproduce the measured Linux VM installation and benchmark lane | user, agent, operator |
 | [Join the Mesh](./join-the-mesh.md) | contribute cross-plane results to the mesh | community member |
+| [Fork and Wiki Guide](./fork-and-wiki-guide.md) | fork the repository and publish your own wiki | community member, maintainer |
 | [Command Reference](./command-reference.md) | find any of the 21 commands | member, agent, maintainer |
 | [Glossary](./glossary.md) | define a domain term | all |
 | [FAQ](./faq.md) | answer a recurring question | all |

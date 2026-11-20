@@ -12,7 +12,7 @@ import { join } from 'node:path';
 
 export const REQUIRED_ITEMS = Object.freeze([
   'navigation-and-search', 'getting-started', 'user-guide', 'ubuntu-24.04-labview-2026-installation', 'command-reference', 'glossary',
-  'faq', 'audience-and-task-model', 'delivery-profile', 'plan', 'conformance-boundary', 'join-the-mesh',
+  'faq', 'audience-and-task-model', 'delivery-profile', 'plan', 'conformance-boundary', 'join-the-mesh', 'fork-and-wiki-guide',
 ]);
 const MIN_NONEMPTY_LINES = 12;
 

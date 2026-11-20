@@ -32,11 +32,15 @@ upstream wiki.
 
 ## What breaks on a fork
 
-- **Marketplace and publisher secrets.** The release workflows publish the
-  extension and need secrets that exist only on the upstream. They fail or skip on
-  a fork. Do not add publisher credentials to a fork to make them pass.
-- **Self-hosted runners.** Workflows that target self-hosted or LabVIEW-equipped
-  runners stay queued on a fork until you register your own runners.
+- **Marketplace publishing.** The `publish` job in `extension-release.yml` uses OIDC
+  Trusted Publishing: no publishing secret is stored, and the publisher's policy
+  trusts only the upstream repository. The job is also guarded by a
+  `github.repository ==` check, so it is skipped on a fork. Likewise the
+  devcontainer image push in `devcontainer-prebuild.yml` is guarded to the
+  upstream. A fork that wants to publish needs its own publisher and policy.
+- **Runners.** The workflows use GitHub-hosted runners (Ubuntu and Windows), so a
+  fork needs no self-hosted runner for them. Lanes that need LabVIEW on a real
+  machine are not covered by hosted runners and show as not run.
 - **Test pages.** The wiki test pages show the evidence the job produced on your
   fork at your commit. Anything that did not run there is shown as not run, not as
   passed.
