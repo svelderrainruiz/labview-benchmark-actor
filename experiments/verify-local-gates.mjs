@@ -363,10 +363,18 @@ check('wiki-vault', () => {
     const unrelated = join(scratch, 'unrelated');
     mkdirSync(unrelated);
     writeFileSync(join(unrelated, 'keep.txt'), 'keep');
-    for (const [label, target] of [['the member root', guardRoot], ['the parent of the member root', dirname(guardRoot)], ['an unrelated non-empty directory', unrelated]]) {
-      assert(run(['--out', target], guardRoot).code === 2, `--out must refuse ${label} (exit 2)`);
+    const listing = (dir) => readdirSync(dir, { recursive: true }).map((entry) => String(entry).replace(/\\/g, '/')).sort().join('\n');
+    assert(run(['--out', first], guardRoot).code === 0, '--out must accept a previous output');
+    for (const [label, target, reason] of [
+      ['the member root', guardRoot, /member root or one of its parents/],
+      ['the parent of the member root', dirname(guardRoot), /member root or one of its parents/],
+      ['an unrelated non-empty directory', unrelated, /not empty and is neither/],
+    ]) {
+      const before = listing(target);
+      const refused = run(['--out', target], guardRoot);
+      assert(refused.code === 2 && reason.test(refused.out), `--out must refuse ${label} (exit 2, ${reason}): exit ${refused.code} ${refused.out.trim().slice(0, 200)}`);
+      assert(listing(target) === before, `--out wrote to or pruned ${label} while refusing it`);
     }
-    assert(existsSync(join(guardRoot, 'docs')) && existsSync(join(unrelated, 'keep.txt')), '--out wrote or pruned files in a directory it refused');
     assert(aliased.length === 0, `${aliased.length} ${aliased[0]}`);
     const aliasRoot = join(scratch, 'aliased-link');
     mkdirSync(aliasRoot);
