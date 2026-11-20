@@ -29,3 +29,16 @@ results and platform with upstream's own test files and the canonical evidence r
 
 Attested means only that the evidence matched upstream's definitions at that commit. The operator decides partners.
 API rate limits can turn a submission into `fetch-failed`, which is re-run by editing the issue.
+
+## S3: accepted evidence and lineage
+
+An operator runs `scripts/wiki_accept.py --issue N` for an issue labelled `wiki-attested`. The label is not trusted:
+the script fetches the issue again, runs the same gate and verifier again, refetches the evidence bytes at the pinned
+commit and checks the sha256. It writes `wiki-evidence/<sha256>.json` and `wiki-evidence/<sha256>.lineage.json` (the
+name is 64 hex digits, never a fork-controlled path) and opens a pull request as the App; the title, body, branch and
+commit message are templates filled with validated hex, the issue number and the platform. Nothing is written to a wiki.
+The record holds the submission number, the evidence hash, platform, test ids, the verifying upstream commit and the
+date; the fork owner and repository are never written, and evidence that names them is refused. `scripts/wiki_lineage.py`
+runs inside the canonical checker after the shared generator (which stays pinned and unedited) and appends a lineage
+block to every test page: `attested at <upstream sha>` when an accepted record covers one of the test files the page's
+requirements name, otherwise `not attested`. Showing the fork (`SHOW_FORK`) stays off.

@@ -53,8 +53,9 @@ upstream wiki.
 ## Sending evidence upstream (issues built, pull requests planned)
 
 The submission **issue** path is built ([ADR-0091](../architecture/adr/ADR-0091-verify-fork-wiki-submissions-as-data.md)).
-The pull request path for page changes, the lineage field on pages and the
-local producer are not built yet. The intended design is:
+The accept step and the lineage field on pages are built too (see "How an
+accepted submission reaches the wiki"). The pull request path for page changes
+and the local producer are not built yet. The intended design is:
 
 - A fork submits evidence to the upstream through an **issue** (a form with a
   structured record), and through a **pull request** for page changes, with
@@ -101,3 +102,23 @@ the declared sha256 and size limits, and the test ids, results, commit and
 platform agree with this repository's own test files and canonical evidence
 rules. Nothing from your fork is checked out or run, and none of your text is
 echoed back. Attested is not a claim that your code is correct.
+
+### How an accepted submission reaches the wiki
+
+An attested issue changes nothing by itself. The upstream operator runs
+`python3 -B scripts/wiki_accept.py --issue <number> --open-pr` (with
+`GITHUB_REPOSITORY`, `GITHUB_SHA`, `SUBMISSION_ALLOWLIST` and the App token in
+the environment). It re-verifies the submission (the label alone is never
+enough), checks the evidence bytes against their sha256, writes
+`wiki-evidence/<sha256>.json` and `wiki-evidence/<sha256>.lineage.json`, and opens
+a pull request; nothing goes to the wiki directly. Running it again for the same
+evidence changes nothing.
+
+After the pull request merges, the wiki publish step (`scripts/wiki_lineage.py`,
+run by `scripts/check_wiki_canonical.py`) adds a **Lineage** block to each test
+page: `attested at <upstream sha>` with the submission number and the evidence
+sha256 for tests an accepted record covers, and `not attested` for every other
+test. Your fork's owner and repository are never written to the tree or the
+pages, and evidence that names them is refused. The `show_fork` option
+(`SHOW_FORK` in `scripts/wiki_lineage.py`) is off and stays off by default.
+Offline tests: `python3 -B -m unittest discover -s test -p "wiki_*_test.py"`.
