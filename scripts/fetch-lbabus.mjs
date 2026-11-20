@@ -11,8 +11,8 @@
 // Test hooks: --pin FILE (alternative pin), --repository URL (alternative origin, e.g. a local repository or server).
 import { createHash } from 'node:crypto';
 import { execFileSync } from 'node:child_process';
-import { chmodSync, existsSync, mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { chmodSync, existsSync, lstatSync, mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs';
+import { homedir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { expectedAssetNames, pinProblems } from './lbabus-pin.mjs';
@@ -88,8 +88,18 @@ export function checkoutSource({ components, repository, cacheDir }) {
   return dir;
 }
 
+// A per-user cache (mode 0700, owned by the caller): a shared /tmp path would let another local user plant a checkout
+// that passes the HEAD and tag checks but holds tampered files.
 function defaultCache() {
-  return process.env.LBABUS_CACHE || join(tmpdir(), 'lba-lbabus-cache');
+  if (process.env.LBABUS_CACHE) return process.env.LBABUS_CACHE;
+  const dir = join(process.env.XDG_CACHE_HOME || join(homedir(), '.cache'), 'lba-lbabus-cache');
+  mkdirSync(dir, { recursive: true, mode: 0o700 });
+  const st = lstatSync(dir);
+  if (!st.isDirectory() || st.isSymbolicLink()) throw new Error(`cache ${dir} is not a plain directory`);
+  if (typeof process.getuid === 'function' && (st.uid !== process.getuid() || (st.mode & 0o077) !== 0)) {
+    throw new Error(`cache ${dir} must be owned by the current user with mode 0700`);
+  }
+  return dir;
 }
 
 async function main(argv) {
