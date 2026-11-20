@@ -92,7 +92,7 @@
 | LBA-REQ-083 | The mesh carries a second benchmark family (VI Analyzer) | Proven | §3.2 Deployment | ADR-0064 | T-083 | 6 |
 | LBA-REQ-084 | The stress-discounted cross-plane comparison (discount a result captured on a stressed actor) | Proven | §3.2 Deployment | ADR-0065 | T-084 | 6 |
 | LBA-REQ-085 | The byte-reproducible extension package (the reviewed .vsix equals the shipped .vsix) | Proven | §3.1 Packaging / boundary | ADR-0066 | T-085 | 7 |
-| LBA-REQ-086 | The cross-plane byte-reproducible extension package (a Windows build equals a Linux build) | Proven | §3.1 Packaging / boundary | ADR-0067 | T-086 | 6 |
+| LBA-REQ-086 | The cross-plane byte-reproducible extension package (a Windows build equals a Linux build) | Proven | §3.1 Packaging / boundary | ADR-0067 | T-086 | 7 |
 | LBA-REQ-087 | Genuine cross-plane corroboration (a windows-latest + ubuntu-latest witness prove two planes agree) | Proven | §3.9 Corroboration-grid | ADR-0069 | T-087 | 5 |
 | LBA-REQ-088 | Durable genuine cross-plane corroboration attestation (capture the live two-plane proof as a committed receipt) | Proven | §3.9 Corroboration-grid | ADR-0070 | T-088 | 5 |
 | LBA-REQ-089 | Signed cross-plane corroboration (the enrolled human sign-off over the genuine crossPlane quorum) | Proven | §3.9 Corroboration-grid | ADR-0071 | T-089 | 9 |
