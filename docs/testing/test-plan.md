@@ -187,6 +187,10 @@ a verifier script that no gate launches, a receipt, a document, or a Planned or 
 evidence is execution evidence at a commit on one platform (linux-x64); it does not say the extension is verified,
 and the lanes in `docs/testing/not-executed.json` are not run.
 
+`wiki-publish` runs the same adapter and checks before it checks out the wiki, publishes with
+`scripts/check_wiki_canonical.py --out .wiki`, and compares a fresh clone of the published wiki with the canonical build
+from the same evidence (`--check-dir`); a failing gate, test or check stops the job before anything is published.
+
 ## Entry / exit criteria (29119-2)
 
 - **Entry:** the run-result schema and bus message schema are frozen for the

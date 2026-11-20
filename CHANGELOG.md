@@ -13,6 +13,8 @@ follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project
   canonical block of `.wiki-canonical.json` and checks it, and the `Wiki Canonical Test Pages` job runs both. Test pages
   whose requirements name a file that ran and passed become canonical (execution evidence at the commit, linux-x64);
   the others stay stubs. The vendored generator is unchanged.
+- `wiki-publish` publishes the canonical wiki (issue #104): it runs the adapter and `scripts/check_wiki_canonical.py` first, writes
+  the wiki with `--out`, and its drift check compares a fresh clone with the canonical build from the same evidence.
 
 ### Changed
 

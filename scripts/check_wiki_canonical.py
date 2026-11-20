@@ -4,7 +4,8 @@
 Needs only Python 3.9+ and Git. Run it at the repository root, in a clean checkout, after
 `node scripts/wikiEvidence.mjs` wrote `wiki-jest-report.json` and `.repo-standards-review/observations.py
 evidence --format jest-json` turned it into `wiki-evidence.json` (the `Wiki Canonical Test Pages` CI job does
-both). The canonical block is in `.wiki-canonical.json`, merged into `.wiki-generator.json` at run time. It builds the wiki twice (generate, then `observations.py stimulus` and `generate`), requires the two builds to be
+both). With `--out DIR` it then writes the wiki into a wiki checkout, and with `--check-dir DIR` it
+compares a checkout with the build (the publish workflow uses both). The canonical block is in `.wiki-canonical.json`, merged into `.wiki-generator.json` at run time. It builds the wiki twice (generate, then `observations.py stimulus` and `generate`), requires the two builds to be
 byte-identical, at least one canonical page and no `Pending:` placeholder, and runs `observations.py check
 --member-commit` on the committed result. It prints the stub pages by reason. Exit 0 when all hold.
 The evidence is execution evidence at one commit; it does not say the member is verified.
@@ -54,9 +55,10 @@ def canonical_config(destination: Path) -> Path:
     return destination
 
 
-def build(wiki: Path, evidence: str, config: Path) -> dict:
-    wiki.mkdir()
-    run("git", "-C", str(wiki), "init", "-q", "-b", "main")
+def build(wiki: Path, evidence: str, config: Path, existing: bool = False) -> dict:
+    if not existing:
+        wiki.mkdir()
+        run("git", "-C", str(wiki), "init", "-q", "-b", "main")
     generated = run(sys.executable, str(KIT / "wiki_generate.py"), "--member-root", ".", "--config", str(config), "--out", str(wiki))
     summary = json.loads(generated.stdout)
     run(sys.executable, str(KIT / "observations.py"), "stimulus", "--wiki", str(wiki), "--evidence", evidence,
@@ -103,6 +105,8 @@ def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("--evidence", default="wiki-evidence.json", help="evidence file named by testPlan.canonical (default: wiki-evidence.json)")
     parser.add_argument("--emit-config", metavar="FILE", help="write the merged generator configuration to FILE and exit")
+    parser.add_argument("--out", metavar="DIR", help="after every check passes, write the canonical wiki into DIR, an existing wiki checkout (its .git is kept)")
+    parser.add_argument("--check-dir", metavar="DIR", help="after every check passes, require DIR (a wiki checkout) to equal the canonical wiki built from the same evidence")
     options = parser.parse_args()
     if options.emit_config:
         print(f"PASS: wrote {canonical_config(Path(options.emit_config))}")
@@ -130,6 +134,15 @@ def main() -> int:
         checked = run(sys.executable, str(KIT / "observations.py"), "check", "--wiki", str(first), "--member-commit", commit,
                       "--evidence", options.evidence)
         print(checked.stdout.strip())
+        if options.out:
+            build(Path(options.out), options.evidence, config, existing=True)
+            print(f"PASS: wrote the canonical wiki into {options.out}")
+        if options.check_dir:
+            published = tree(Path(options.check_dir))
+            differing = sorted(p for p in built.keys() | published.keys() if built.get(p) != published.get(p))
+            if differing:
+                sys.exit(f"FAIL: {options.check_dir} differs from the canonical wiki in {len(differing)} files: {', '.join(differing[:20])}")
+            print(f"PASS: {options.check_dir} equals the canonical wiki built from the same evidence ({len(built)} files)")
     print(f"PASS: {summary['canonical_test_pages']} canonical, {summary['stub_test_pages']} stub test pages; two builds are byte-identical")
     return 0
 

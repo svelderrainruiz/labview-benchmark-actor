@@ -404,8 +404,11 @@ check('wiki-vault', () => {
   const workflow = readFileSync(join(pkgRoot, '.github', 'workflows', 'wiki-publish.yml'), 'utf8').replace(/\r\n/g, '\n');
   assert(/push:\n\s+branches:\n\s+- develop\n/.test(workflow), 'wiki-publish must publish on pushes to develop');
   assert(workflow.includes("github.ref == 'refs/heads/develop'"), 'wiki-publish must refuse to publish any other ref');
-  assert(workflow.includes('python3 .repo-standards-review/wiki_generate.py --out .wiki'), 'wiki-publish must write the generated wiki');
-  assert(/python3 \.repo-standards-review\/wiki_generate\.py --check "\$RUNNER_TEMP\/wiki-verify"/.test(workflow), 'wiki-publish must verify a fresh clone of the published wiki');
+  assert(workflow.includes('python3 scripts/check_wiki_canonical.py --out .wiki'), 'wiki-publish must write the canonical wiki');
+  assert(workflow.includes('python3 scripts/check_wiki_canonical.py --check-dir "$RUNNER_TEMP/wiki-verify"'), 'wiki-publish must verify a fresh clone of the published wiki against the canonical build');
+  // Fail closed: the adapter and the canonical checks run before the wiki is checked out, so a failing gate publishes nothing.
+  const order = ['node scripts/wikiEvidence.mjs', 'observations.py evidence --format jest-json', 'python3 scripts/check_wiki_canonical.py\n', 'repository: ${{ github.repository }}.wiki'].map((needle) => workflow.indexOf(needle));
+  assert(order.every((i) => i >= 0) && order.every((i, n) => n === 0 || order[n - 1] < i), 'wiki-publish must run the evidence adapter and the canonical check before it checks out the wiki');
   return { generator: '.repo-standards-review/wiki_generate.py', summary: `${report.requirement_pages} requirement pages, ${report.test_pages} test pages, ${report.adr_pages} ADR pages, ${report.pages} pages; deterministic; alias-free wikilinks; --out guard; 3 negative controls` };
 });
 
