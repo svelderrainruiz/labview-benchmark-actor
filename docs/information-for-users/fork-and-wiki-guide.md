@@ -12,15 +12,20 @@ upstream wiki.
 
 1. **Fork** the repository on GitHub. Keep the default branch name `develop`:
    the workflow publishes from that branch only.
-2. **Enable Actions** on the fork (Actions tab). A fork starts with workflows
-   disabled.
+2. **Enable Actions** on the fork (Actions tab, or
+   `gh api -X PUT repos/<fork>/actions/permissions -F enabled=true -f allowed_actions=all`).
+   A fork's workflows are not registered, and a push may not start them, until
+   Actions is enabled and a push has touched `.github/workflows/`; start
+   `wiki-publish` with *Run workflow* if a push does not.
 3. **Enable the wiki** (Settings, Features, Wiki) and **create the first page in
    the web UI** (any title, any text). A fork's `<fork>.wiki.git` repository does
    not exist until a page is created, so the first clone or push fails without
    this step. The workflow overwrites that page.
 4. **Point the generator at your fork.** In `.wiki-generator.json` set `repoUrl`
    (and any URL in `description`) to your fork, so wiki links resolve to your
-   repository instead of the upstream one.
+   repository instead of the upstream one. The job succeeds without this edit,
+   but the generated pages then link to the upstream. The generated Home page
+   replaces the page you created, so put any fork notice in `description`.
 5. **Opt in.** Create the repository variable `WIKI_PUBLISH_ENABLED` with the value
    `true` (Settings, Secrets and variables, Actions, Variables). Without it the
    `wiki-publish` job is skipped on a fork (fail closed). On the upstream it runs
