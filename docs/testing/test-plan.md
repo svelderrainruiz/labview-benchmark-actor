@@ -179,7 +179,7 @@ gate passed; each `npm test` step is one case that passes when the process exits
 --format jest-json` converts the report, and `python3 scripts/check_wiki_canonical.py` builds the wiki twice from
 `docs/` with the canonical block of `.wiki-canonical.json` (merged into `.wiki-generator.json` at run time, so the
 `wiki-vault` gate and `wiki-publish` keep generating without evidence), and requires identical output, no
-`Pending:` placeholder and `observations.py check` passing.
+placeholder page and `observations.py check` passing.
 
 A test page is canonical only when a file in the `CodeRef` of a requirement that links it ran and passed at the
 same commit and no such file failed. A page whose requirements name no file that ran stays a stub: for example
