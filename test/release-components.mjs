@@ -157,12 +157,11 @@ assert.equal(verifyStagedReleaseMetadata({
   previous: base.components,
   current: base.components,
 }).ok, true);
-assert.equal(verifyStagedReleaseMetadata({
-  staged: ['tools/collab-cli/Program.cs'],
-  unstaged: [],
-  previous: base.components,
-  current: base.components,
-}).ok, false);
+// A new lbabus pin is an lbabus component change: its version must move with it.
+const repinned = { ...base.components, lbabusRelease: { ...base.components.lbabusRelease, tag: 'v0.0.9', commit: 'f'.repeat(40) } };
+const repinWithoutBump = verifyStagedReleaseMetadata({ staged: [], unstaged: [], previous: base.components, current: repinned });
+assert.equal(repinWithoutBump.ok, false);
+assert.ok(repinWithoutBump.reasons.includes('lbabus component changed without an lbabus version bump'));
 assert.equal(verifyStagedReleaseMetadata({
   staged: ['extension-tasks/release-risk.mjs'],
   unstaged: [],

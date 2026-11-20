@@ -1,7 +1,7 @@
 # VirtualBox lbabus mesh (host-only via `intnet`)
 
 The VirtualBox counterpart to the VMware mesh in [`../Vagrantfile`](../Vagrantfile). The mesh **runtime** is
-shared verbatim ([`tools/collab-cli/ci/mesh-actor.sh`](../../../../tools/collab-cli/ci/mesh-actor.sh):
+shared verbatim ([`mesh-actor.sh` in the pinned lbabus release](https://github.com/svelderrainruiz/lbabus/blob/v0.17.1/tools/collab-cli/ci/mesh-actor.sh):
 TCP 7420 + UDP 7421 peer coverage → `MESH OK (TCP+UDP)`, then the ttyS0-guarded MESH-OK emit); only the
 **topology + networking** differ. This directory fills the documented gap (no VBox mesh path existed).
 

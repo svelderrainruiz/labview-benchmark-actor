@@ -1,6 +1,6 @@
 {
   "schema": "labview-benchmark-actor/experiment-governance-overrides@1",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "overrides": {
     "agent-last-gate": {
       "status": "active",
@@ -21,8 +21,8 @@
       "productionUse": "prohibited",
       "owner": "runtime",
       "requirements": ["LBA-REQ-029", "LBA-REQ-097"],
-      "supersededBy": "tools/collab-cli/Capabilities.cs",
-      "exitCriteria": "Retain historical receipts only; remove after no governed evidence references remain."
+      "supersededBy": "release-components.json",
+      "exitCriteria": "Superseded by lbabus capabilities (the pinned svelderrainruiz/lbabus release, release-components.json). Retain historical receipts only; remove after no governed evidence references remain."
     },
     "mesh-runs": {
       "status": "prototype",

@@ -36,8 +36,8 @@
     "note": "each VM builds lbabus itself on first boot from pinned public source + a vendored offline NuGet cache; no pre-built binary is downloaded or baked (see provision-lbabus-fromsource.sh).",
     "dotnet_sdk_pkg": "dotnet-sdk-8.0",
     "source_repo": "https://github.com/svelderrainruiz/lbabus",
-    "source_ref": "v0.17.0",
-    "source_commit": "1e08fa4c23fc5998f68b973cf0cd7e22a26db697",
+    "source_ref": "v0.17.1",
+    "source_commit": "8d00f968dacb27c601d311b563ffd0a6b5d38e03",
     "runtime_identifier": "linux-x64"
   }
 }

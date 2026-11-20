@@ -4,7 +4,7 @@ import { fileURLToPath } from 'node:url';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const PRODUCTION_ROOTS = ['package.json', 'src', '.github/workflows', 'scripts', 'reviewer-workstation', 'extension-tasks'];
-export const EXPERIMENT_GOVERNANCE_VERSION = '1.0.1';
+export const EXPERIMENT_GOVERNANCE_VERSION = '1.0.2';
 
 function filesUnder(relative) {
   const absolute = path.join(root, relative);

@@ -6,8 +6,8 @@ through [docs/testing/reviewer-manual-test-plan.md](../docs/testing/reviewer-man
 
 It **repurposes the maintainer-held golden box** (Windows 11 + LabVIEW 2026 + VS Code + Node +
 git + LabVIEW fixtures + boot-time WinRM self-heal) and adds only the `labview-benchmark-actor`
-bits — the extension `.vsix` (from the gated `ext-v*` Release), the `lbabus` CLI (from the
-`collab-cli-v*` Release), and a scratch workspace.
+bits — the extension `.vsix` (from the gated `ext-v*` Release), the `lbabus` CLI (from the pinned
+svelderrainruiz/lbabus Release), and a scratch workspace.
 
 ## Providers
 
@@ -243,7 +243,7 @@ them without any menu hunting.
 | `REVIEWER_CPUS` | `4` | Guest vCPUs. |
 | `REVIEWER_REPO` | `svelderrainruiz/labview-benchmark-actor` | Release source for the `.vsix` + `lbabus`. |
 | `REVIEWER_EXT_TAG` | `latest` | `ext-v*` tag to install (`latest` = newest gated release). |
-| `REVIEWER_LBABUS_TAG` | `latest` | `collab-cli-v*` tag to install (`latest` = newest release). |
+| `REVIEWER_LBABUS_TAG` | pinned | Not an operator setting: the Vagrantfile reads the lbabus tag and the win-x64 SHA-256 from `release-components.json` (`lbabusRelease`). |
 | `VAGRANT_HOME` | Vagrant default | Box store. The verified local VirtualBox registration is in `D:\vagrant-home`. |
 
 ## What provisioning does
@@ -255,8 +255,8 @@ them without any menu hunting.
 2. Downloads and installs the extension `.vsix` from the resolved `ext-v*` Release **into the
    interactive console user's VS Code profile** (resolved from its SID), so the human reviewer — who
    logs in interactively, not as the WinRM `vagrant` provisioning user — actually sees it (#121).
-3. Downloads the self-contained `lbabus` (`*win-x64.exe`) from the resolved `collab-cli-v*`
-   Release into `C:\lba-bin` and adds it to the machine `PATH`.
+3. Downloads the self-contained `lbabus` (`*win-x64.exe`) from the pinned
+   svelderrainruiz/lbabus Release (SHA-256 checked) into `C:\lba-bin` and adds it to the machine `PATH`.
 4. Creates the `C:\lba-review` scratch workspace.
 
 Re-running is safe (downloads use `--clobber`; installs use `--force`).

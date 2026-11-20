@@ -21,7 +21,7 @@ the `LBA Local Gates verify` CI job.
 
 ## 2. Executed verification evidence (ISO/IEC/IEEE 29119-3)
 
-### 2.1 Local gate suite — 222 fail-closed checks
+### 2.1 Local gate suite — 220 fail-closed checks
 
 Run by `node experiments/verify-local-gates.mjs`. All must pass. The full gate inventory (the executed
 test items at the gate granularity) is:
@@ -95,11 +95,9 @@ cleanroom-bootstrap-is-winget-free
 cleanroom-gate-suite-shared-in-sync
 cleanroom-lbabus-pin-matches-release
 cleanroom-provisioner-scripts-pure-ascii
-cli-no-discussion-transport
 closed-loop-readback
 codespace-witness-bootstrap-valid
 codespace-witness-prebuild-workflow-wired
-collab-cli-embeds-canonical-requirements
 colon-corroboration-plane2-scoring
 composite-release-decision
 composite-release-enforced
@@ -137,7 +135,7 @@ human-task-shortcuts
 image-derived-timing-colon-ocr-fidelity
 in-guest-sampler-v2
 information-for-users-26514
-lbabus-vendored-mirror
+lbabus-pin-matches-agents-contract
 live-v2-capture-real
 lunit-test-benchmark
 mass-compile-benchmark
@@ -288,7 +286,7 @@ The controlled state of the repository's configuration items, derived from the r
 | — Status: Proven | 100 | rtm.csv |
 | — Status: Superseded | 1 | rtm.csv |
 | Architecture decisions (ADRs) | 90 | docs/architecture/adr/README.md |
-| Governed gates | 222 | experiments/verify-local-gates.mjs |
+| Governed gates | 220 | experiments/verify-local-gates.mjs |
 | Correspondence rules | 7 | experiments/reqs-coverage/verify-correspondences.mjs |
 | Governed test items | 103 | docs/testing/test-plan.md |
 
@@ -307,4 +305,4 @@ the same correspondence graph (ADR-0013).
 `node experiments/reqs-coverage/generate-test-report.mjs` rewrites this file; `--check` (the
 `test-report-current` gate) fails closed on drift, so the report can never silently lag the apparatus.
 
-_Generated from 222 gates, 7 correspondence rules, 103 requirements, 90 ADRs, 103 test items._
+_Generated from 220 gates, 7 correspondence rules, 103 requirements, 90 ADRs, 103 test items._

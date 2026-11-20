@@ -228,10 +228,12 @@ try {
   $dotnet = Get-Command dotnet -ErrorAction SilentlyContinue
   if (-not $dotnet) { throw 'dotnet is required to stage the repository lbabus tool for the container probe.' }
   $repoRoot = (Resolve-Path (Join-Path $PSScriptRoot '..\..')).Path
-  $lbabusProject = Join-Path $repoRoot 'tools\collab-cli\LbaBus.csproj'
+  $pinnedLbabus = (& node (Join-Path $repoRoot 'scripts\fetch-lbabus.mjs') source | Select-Object -Last 1)
+  if ($LASTEXITCODE -ne 0 -or -not $pinnedLbabus) { throw 'cannot check out the pinned lbabus source' }
+  $lbabusProject = Join-Path $pinnedLbabus 'tools\collab-cli\LbaBus.csproj'
   $lbabusOutput = Join-Path $secretDirectory 'lbabus'
   $lbabusArtifacts = Join-Path $secretDirectory 'lbabus-artifacts'
-  Write-RunLog 'Publishing the repository lbabus tool into the ephemeral read-only container mount.'
+  Write-RunLog 'Publishing the pinned lbabus release into the ephemeral read-only container mount.'
   Invoke-NativeLogged $dotnet.Source @(
     'publish', $lbabusProject,
     '--configuration', 'Release',
@@ -248,7 +250,7 @@ try {
   $lbabusStage = [ordered]@{
     schema = 'labview-benchmark-actor/windows-container-lbabus-stage@1'
     wallTime = [DateTime]::UtcNow.ToString('o')
-    sourceProject = 'tools/collab-cli/LbaBus.csproj'
+    sourceProject = 'svelderrainruiz/lbabus@pinned-release:tools/collab-cli/LbaBus.csproj'
     version = $lbabusVersion
     payload = 'C:\run-secrets\lbabus\lbabus.dll'
     payloadSha256 = (Get-FileHash -LiteralPath $lbabusDll -Algorithm SHA256).Hash.ToLowerInvariant()

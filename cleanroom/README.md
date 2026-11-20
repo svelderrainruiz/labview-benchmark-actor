@@ -1,7 +1,7 @@
 # VMware clean room (Vagrant)
 
 A reproducible "clean room" VM where an operator drops in their **licensed LabVIEW** and the
-**collab-cli coordination toolchain is bootstrapped automatically** (built from source, not downloaded).
+**collab-cli coordination toolchain is bootstrapped automatically** (the pinned svelderrainruiz/lbabus release, built from source, not downloaded as a binary).
 Provider is **VMware** (`vmware_desktop`), not VirtualBox, per project direction. Tracks #4; the
 resource-serializer direction that consumes it is RFC #15.
 
@@ -43,14 +43,14 @@ vagrant box add vihs/labview-cleanroom vihs-labview-cleanroom.box
 (See the vagrant-vmware-desktop docs for the exact packaging flow; VMware boxes are packaged from a
 prepared `.vmx`.) Override the box name with `CLEANROOM_BOX`.
 
-**For a self-contained box** (no host repo / SMB / credential prompt at `vagrant up`), bake the collab-cli
-source into the box so the provisioner builds from it -- `bootstrap.ps1` prefers a box-baked
-`C:\cleanroom-src\tools\collab-cli` over the SMB paths. Verified recipe (VMware machines are *linked clones*,
+**For a self-contained box** (no host repo / SMB / credential prompt at `vagrant up`), bake the pinned lbabus
+checkout into the box so the provisioner builds from it -- `bootstrap.ps1` reuses a box-baked
+`C:\cleanroom-src\lbabus` only when its HEAD is the pinned commit, and clones the pinned tag otherwise. Verified recipe (VMware machines are *linked clones*,
 so the delta + base disk must be consolidated into one standalone disk -- a box cannot reference its parent):
 
 ```powershell
 # 1. In the running guest, bake the source (no host dependency thereafter):
-#    Copy-Item <repo>\tools\collab-cli C:\cleanroom-src\tools\collab-cli -Recurse
+#    git clone --branch <pinned tag> https://github.com/svelderrainruiz/lbabus C:\cleanroom-src\lbabus   (tag and commit: release-components.json lbabusRelease)
 # 2. Halt the guest, then consolidate its linked-clone chain into one standalone disk (-t 0 = single growable):
 vagrant halt
 $clone = ".vagrant\machines\default\vmware_desktop\<machine-id>"
@@ -88,10 +88,10 @@ file as ANSI, so a non-ASCII byte (e.g. an em-dash) corrupts and breaks the pars
 `vagrant provision`: toolchain installed, `lbabus` built, `selfcheck: PASS` (rg/git/gh/glab/dotnet all
 above-pin), and `AGENTS.md` materialized in the guest home.
 
-For an **unattended / self-contained** boot (no host repo, no SMB credential prompt) set
-`CLEANROOM_NO_SYNC=1` to disable the synced folder; the provisioner then builds from a **box-baked**
-source at `C:\cleanroom-src\tools\collab-cli` (bake it in before `vagrant package` -- see "Package a base
-box" above), falling back to the SMB synced folder (`C:\vagrant-src`) on a dev host that syncs its tree.
+For an **unattended / self-contained** boot (no host repo, no SMB credential prompt) note that no synced folder is used any more
+(`CLEANROOM_NO_SYNC` is a no-op); the provisioner builds from a **box-baked** pinned checkout at
+`C:\cleanroom-src\lbabus` (bake it in before `vagrant package` -- see "Package a base box" above) or clones the
+pinned tag. Both are checked against the pinned commit.
 
 ## Knobs (env)
 
@@ -100,7 +100,7 @@ box" above), falling back to the SMB synced folder (`C:\vagrant-src`) on a dev h
 | `CLEANROOM_BOX` | `vihs/labview-cleanroom` | operator-supplied base box (licensed LabVIEW) |
 | `CLEANROOM_MEM` | `8192` | guest RAM (MB) |
 | `CLEANROOM_CPUS` | `4` | guest vCPUs |
-| `CLEANROOM_NO_SYNC` | (unset) | when set, disable the SMB synced folder (unattended boot, no host credential prompt); pre-stage source at `C:\vagrant-src` |
+| `CLEANROOM_NO_SYNC` | (unset) | no-op: the source share is gone (the bootstrap clones the pinned lbabus tag) |
 
 ## LINUX / VirtualBox parity (`Vagrantfile.virtualbox`)
 

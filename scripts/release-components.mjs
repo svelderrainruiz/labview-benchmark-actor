@@ -175,9 +175,10 @@ export function verifyStagedReleaseMetadata({ staged, unstaged, previous, curren
   const reasons = [];
   const changed = (prefixes) => staged.some((file) => prefixes.some((prefix) => file === prefix || file.startsWith(`${prefix}/`)));
   const agentsChanged = changed(['extension-agents', 'release-risk-baseline.json', 'standards-score-baseline.json']);
-  // Release-governance files live in tools/release-governance, outside the lbabus tree, so sealing the
-  // release agreement or enrolling reviewer keys never changes lbabus's identity.
-  const lbabusChanged = staged.some((file) => file === 'tools/collab-cli' || file.startsWith('tools/collab-cli/'));
+  // lbabus is consumed only as the release pinned in release-components.json, so a change of the pin is the change
+  // of the component: its version must move with it.
+  const lbabusChanged = previous.lbabusRelease?.tag !== current.lbabusRelease?.tag
+    || previous.lbabusRelease?.commit !== current.lbabusRelease?.commit;
   const tasksChanged = changed([
     'extension-tasks',
     'media/human-task-runner.mjs',
@@ -248,8 +249,6 @@ function previousComponents() {
     });
     const previousPackage = JSON.parse(fromHead('package.json'));
     const previousAgents = JSON.parse(fromHead('extension-agents/agents.manifest.json'));
-    const previousLbabus = fromHead('tools/collab-cli/LbaBus.csproj')
-      .match(/<Version>([^<]+)<\/Version>/)?.[1] ?? '';
     const previousTasks = fromHead('src/humanTasks.ts')
       .match(/HUMAN_TASKS_VERSION\s*=\s*'([^']+)'/)?.[1] ?? '';
     let previousExperimentGovernance = '';
@@ -261,7 +260,7 @@ function previousComponents() {
     return {
       extension: previousPackage.version,
       agents: previousAgents.version,
-      lbabus: previousLbabus,
+      lbabus: '',
       humanTasks: previousTasks,
       experimentGovernance: previousExperimentGovernance,
     };

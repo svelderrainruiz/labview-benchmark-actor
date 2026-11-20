@@ -30,7 +30,8 @@ TCP_PORT="${TCP_PORT:-7420}"
 UDP_PORT="${UDP_PORT:-7421}"
 
 here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-MESH_ACTOR_SRC="${MESH_ACTOR_SRC:-$here/../../../../tools/collab-cli/ci/mesh-actor.sh}"
+# Default: mesh-actor.sh from the pinned lbabus release (fetch-lbabus.mjs fails unless tag object and commit match the pin).
+MESH_ACTOR_SRC="${MESH_ACTOR_SRC:-$(node "$here/../../../../scripts/fetch-lbabus.mjs" source)/tools/collab-cli/ci/mesh-actor.sh}"
 UNIT_SRC="${UNIT_SRC:-$here/lba-mesh.service}"
 [ -f "$MESH_ACTOR_SRC" ] || { echo "[abort] mesh-actor.sh not found at $MESH_ACTOR_SRC (set MESH_ACTOR_SRC)" >&2; exit 1; }
 [ -f "$UNIT_SRC" ] || { echo "[abort] lba-mesh.service not found at $UNIT_SRC (set UNIT_SRC)" >&2; exit 1; }

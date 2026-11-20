@@ -3,8 +3,8 @@
 #
 # WINDOWS HOSTS ONLY: requires the Windows-container engine (Docker Desktop switched to Windows containers, or a
 # Windows Server host). It CANNOT build on a Linux Docker engine -- this lane is Windows-specific by design
-# (its counterpart is the Vagrant VMware/VirtualBox lane). Build from the REPO ROOT so the shared bootstrap and
-# the collab-cli source are in the build context. First HOST-EXTRACT the NI offline feed(s) into the build
+# (its counterpart is the Vagrant VMware/VirtualBox lane). Build from the REPO ROOT so the shared bootstrap is
+# in the build context. First HOST-EXTRACT the NI offline feed(s) into the build
 # context (Hyper-V isolation cannot Mount-DiskImage in-container -- see README.md), then:
 #
 #   # stage the extracted feeds (licensed/community artifacts; gitignored):
@@ -36,10 +36,9 @@ RUN New-Item -ItemType Directory -Force C:\tools\git | Out-Null; `
     [Environment]::SetEnvironmentVariable('PATH', ($p + ';C:\tools\git\cmd'), 'Machine')
 
 # Shared clean-room assets: the SAME bootstrap.ps1 the Vagrant lanes run, the Docker-Windows-only scripts, and
-# the collab-cli source (built in the clean room, never downloaded -- "build it on bootstrap", per Vagrant lane).
+# (lbabus itself is cloned at the pinned tag and commit by bootstrap.ps1 and built in the clean room.)
 COPY cleanroom/bootstrap.ps1 C:/cleanroom/bootstrap.ps1
 COPY cleanroom/docker-windows/ C:/cleanroom/docker-windows/
-COPY tools/collab-cli/ C:/cleanroom-src/tools/collab-cli/
 
 # 1. EXPANSION -- install LabVIEW 2026 32-bit + the LabVIEW CLI from a HOST-EXTRACTED NI offline feed.
 #    Under Hyper-V isolation (the Win11-client default) in-container Mount-DiskImage FAILS ("A virtual disk

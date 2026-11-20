@@ -6,6 +6,9 @@
 # labview-benchmark-actor bits: the extension .vsix (from the gated `ext-v*` Release), the lbabus
 # CLI, and a scratch workspace. See README.md for obtaining/registering the box.
 #
+require "json"
+LBABUS_PIN = JSON.parse(File.read(File.expand_path("../release-components.json", __dir__)))["lbabusRelease"]
+
 # DUAL-PROVIDER. Pick one:
 #   VAGRANT_CWD=reviewer-workstation vagrant up --provider virtualbox      # Linux/Ubuntu (LINUX lane; validated here)
 #   VAGRANT_CWD=reviewer-workstation vagrant up --provider vmware_desktop  # Windows/VMware (WIN lane)
@@ -86,7 +89,9 @@ Vagrant.configure("2") do |config|
     env: {
       "REVIEWER_EXT_TAG"    => ENV.fetch("REVIEWER_EXT_TAG", "latest"),
       "REVIEWER_REPO"       => ENV.fetch("REVIEWER_REPO", "svelderrainruiz/labview-benchmark-actor"),
-      "REVIEWER_LBABUS_TAG" => ENV.fetch("REVIEWER_LBABUS_TAG", "latest"),
+      # lbabus is consumed only as the release pinned in release-components.json (tag + SHA-256 of the win-x64 binary).
+      "REVIEWER_LBABUS_TAG"    => LBABUS_PIN["tag"],
+      "REVIEWER_LBABUS_SHA256" => LBABUS_PIN["assets"].fetch("lbabus-#{LBABUS_PIN['tag'].delete_prefix('v')}-win-x64.exe"),
     }
 
   # On-demand reviewer smoke-check (NEVER auto-runs -- invoke explicitly with

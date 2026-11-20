@@ -82,7 +82,7 @@ big agent (Claude) --intent + iterate model--> lba-coordinator (ollama) --collab
   `CLAIM|ACK|HANDOFF|DONE|PROGRESS|NOTE|HELLO`. Only infra addressing differs (Linux `docker0` bridge
   `172.17.0.1` vs WIN nat gateway `172.21.96.1`); Linux port-publish works cleanly (no Windows `hnsCall` glitch).
 
-## The `lbabus net` surface (`tools/collab-cli/Net.cs`)
+## The `lbabus net` surface (`tools/collab-cli/Net.cs` in the pinned lbabus release)
 
 - `listen|serve` — `--tcp <port>` `--udp <port>` `--bind <0.0.0.0>` `--echo` `--count <n>` (`0`=∞) `--session`
 - `send` — `--host` `--tcp|--port` `--type` `--message|--message-file` `--task` `--session` `--seq` `--ackof` `--await <s>`

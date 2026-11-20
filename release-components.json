@@ -1,22 +1,22 @@
 {
   "schema": "labview-benchmark-actor/release-components@1",
-  "extension": "1.6.6",
-  "agents": "0.3.28",
-  "lbabus": "0.17.0",
+  "extension": "1.6.7",
+  "agents": "0.3.29",
+  "lbabus": "0.17.1",
   "lbabusRelease": {
     "repository": "https://github.com/svelderrainruiz/lbabus",
-    "tag": "v0.17.0",
-    "tagObject": "758cb218e709ed0eb6dc5b3a579d1cbbd8cc2141",
-    "commit": "1e08fa4c23fc5998f68b973cf0cd7e22a26db697",
+    "tag": "v0.17.1",
+    "tagObject": "3749b2c563b89a8cf945da80bd5a5947aeac5c11",
+    "commit": "8d00f968dacb27c601d311b563ffd0a6b5d38e03",
     "assets": {
-      "LabViewBenchmarkActor.CollabBus.0.17.0.nupkg": "18bb8d33110d64f058f66d53c36d7607fa5972ccfc95a0b18ad35c14c3ffa6fe",
-      "lbabus-0.17.0-linux-x64": "642a30aa789e69d15c26309b9db95cc8417c6feab8c7277f36596479d4c73bac",
-      "lbabus-0.17.0-win-x64.exe": "a407ac2f9d6f6acec90487d20f6e4fa06caa27484eb4a93472e4e40ac75d9726",
-      "SHA256SUMS": "a947dd998a2e24e1d31ff830e6e9e0521f158ea9923a69bab609eec92e7a87af"
+      "LabViewBenchmarkActor.CollabBus.0.17.1.nupkg": "abc11e6a1938e44b1cc5b21157f7a69064980d71c4b027bdf81c654f2fe8d027",
+      "lbabus-0.17.1-linux-x64": "796e6aba7a8adcd132f48b367358f24a673ec8b3b8a0b078ddec29ed9f51c566",
+      "lbabus-0.17.1-win-x64.exe": "6b63d20637fdaeb82ae0cc2a1ae93918ca4036b2f808d53c9b08784023c9fbb4",
+      "SHA256SUMS": "0a7da671c8ecddf2e6d00469265fe2152c83d1f354a86706c8b43d042d634b45"
     }
   },
   "humanTasks": "1.0.7",
-  "experimentGovernance": "1.0.1",
+  "experimentGovernance": "1.0.2",
   "canonicalDistribution": "github-release",
   "marketplaceChannel": "stable",
   "governance": {

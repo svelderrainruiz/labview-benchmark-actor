@@ -30,6 +30,7 @@ import { summarizeViAnalyzerReport } from './vi-analyzer/viAnalyzerResult.mjs';
 import { validateViAnalyzerReport } from './vi-analyzer/validate-vi-analyzer-report.mjs';
 import { checkVsixLinks, REQUIRED_LINKS } from '../scripts/verify-vsix-links.mjs';
 import { validateLbabusProvisioningPin } from '../scripts/verify-ubuntu-golden-box.mjs';
+import { verifyPinContract } from '../scripts/lbabus-pin.mjs';
 import { parseAsciiReport, parseSummary } from './vi-analyzer/parse-vi-analyzer-ascii.mjs';
 import { verifyManifest as verifyExtensionAgentsManifest, agentsSha256, readManifest as readExtensionAgentsManifest, AGENTS_MD as EXTENSION_AGENTS_MD } from '../scripts/agentsManifest.mjs';
 import { normalizeZipTimestamps } from '../scripts/normalize-vsix.mjs';
@@ -803,9 +804,8 @@ check('cleanroom-provisioner-scripts-pure-ascii', () => {
 });
 
 // Typed mesh actors must send only to listener-capable peers and wait only for emitter-capable peers.
-// The worker selftest ships with the vendored lbabus mirror (ADR-0088); this repository owns the mesh
-// Vagrantfile, so its typed-peer wiring is asserted here rather than in the vendored script.
-// Bash is available in Linux CI and local WSL; Windows runners may not expose it as an executable.
+// The worker selftest (mesh-actor-typed-peers.selftest.sh) runs in lbabus's own CI (`selftests` job); this
+// repository owns the mesh Vagrantfile, so its typed-peer wiring is asserted here.
 check('mesh-typed-peer-routing', () => {
   const vagrantfile = readFileSync(join(pkgRoot, 'cleanroom', 'ubuntu-labview', 'mesh', 'Vagrantfile'), 'utf8');
   const wiring = [
@@ -815,13 +815,7 @@ check('mesh-typed-peer-routing', () => {
     'normalized_mesh_node_type(x)',
   ];
   for (const marker of wiring) assert(vagrantfile.includes(marker), `mesh Vagrantfile lost typed-peer wiring: ${marker}`);
-  try {
-    execFileSync('bash', ['tools/collab-cli/ci/mesh-actor-typed-peers.selftest.sh'], { cwd: pkgRoot, stdio: 'pipe' });
-  } catch (error) {
-    if (error.code === 'ENOENT') return { skipped: 'bash is unavailable on this host', vagrantfileWiring: `${wiring.length}/${wiring.length}` };
-    throw error;
-  }
-  return { selftest: 'mesh-actor-typed-peers 3/3', vagrantfileWiring: `${wiring.length}/${wiring.length}`, proves: 'source targets listeners; listeners await emitters; empty typed lists remain empty; the mesh Vagrantfile wires typed listener/emitter lists' };
+  return { vagrantfileWiring: `${wiring.length}/${wiring.length}`, proves: 'the mesh Vagrantfile wires typed listener/emitter lists (the worker selftest runs in lbabus CI)' };
 });
 
 // The Ubuntu clean room builds lbabus from source on first boot. Its pin must be the lbabus release this
@@ -1517,31 +1511,6 @@ check('docs-stamp-and-no-id-renumbering', () => {
   return { ids: ids.length, lanes: ['architecture', 'cm', 'requirements', 'testing'] };
 });
 
-// 17b. The collab-cli CLI embeds the CANONICAL requirements (SRS + RTM) BY REFERENCE, so `lbabus docs
-//      show srs|rtm` surfaces the exact requirements THIS build carries and they stay aligned with the
-//      build. Static wiring guard (dep-free, no dotnet): the embed cannot silently regress; the embed
-//      round-trip itself is the ci-docs / verify-linux gate.
-check('collab-cli-embeds-canonical-requirements', () => {
-  const csproj = readFileSync(join(pkgRoot, 'tools', 'collab-cli', 'LbaBus.csproj'), 'utf8');
-  for (const [inc, logical] of [
-    ['../../docs/requirements/srs.md', 'docs.requirements.srs.md'],
-    ['../../docs/requirements/rtm.csv', 'docs.requirements.rtm.csv'],
-  ]) {
-    assert(csproj.includes(`Include="${inc}"`), `csproj must embed ${inc} by reference`);
-    assert(csproj.includes(`<LogicalName>${logical}</LogicalName>`), `csproj must pin the ${logical} manifest name`);
-  }
-  // The canonical sources the CLI embeds must exist on disk.
-  for (const rel of ['srs.md', 'rtm.csv']) {
-    assert(existsSync(join(pkgRoot, 'docs', 'requirements', rel)), `docs/requirements/${rel} must exist`);
-  }
-  // The docs command registry must key both requirement docs so `docs show srs|rtm` resolves.
-  const docs = readFileSync(join(pkgRoot, 'tools', 'collab-cli', 'Docs.cs'), 'utf8');
-  for (const id of ['"srs"', '"rtm"', '"guide"']) {
-    assert(docs.includes(id), `Docs.cs registry must define the ${id} doc`);
-  }
-  return { embedded: ['srs', 'rtm'], surfacedBy: 'lbabus docs show <id>' };
-});
-
 // 17c. GitFlow branch governance (LBA-REQ-016) is documented so the authoritative repo-standards-review CM
 //      gate stays PASS: the CM plan must state all three branch rules (the 9 GitFlow signals), the merge
 //      method by branch type, and ADR-0010 must record the decision. Dep-free static guard against regression.
@@ -1728,15 +1697,6 @@ check('human-task-shortcuts', () => {
     rawCollector.includes('$GuestPassword = $env:LBA_VM_PASS') && rawCollector.includes('there is no built-in default'),
     'raw reviewer collector must take the guest password from LBA_VM_PASS and fail closed when empty',
   );
-  const dependencies = readFileSync(join(pkgRoot, 'tools', 'collab-cli', 'Dependencies.cs'), 'utf8');
-  for (const productSource of [
-    join('tools', 'collab-cli', 'AgentGuards.cs'),
-    join('tools', 'collab-cli', 'Agents.cs'),
-    join('tools', 'collab-cli', 'GitHubGraphQL.cs'),
-  ]) {
-    assert(readFileSync(join(pkgRoot, productSource), 'utf8').includes('Preflight.ResolveCommand'), `${productSource} bypasses the stable dependency resolver`);
-  }
-  assert(dependencies.includes('internal static string ResolveCommand'), 'stable dependency resolver is not class-level reusable code');
   const collector = readFileSync(join(pkgRoot, 'reviewer-workstation', 'collect-review-raw.ps1'), 'utf8');
   for (const proof of ['reviewTarget', 'candidate', 'commands', 'taskDefinitions', 'agents', 'capabilities', 'reviewerSettings', 'screenshotpng']) {
     assert(collector.includes(proof), `raw review collector lacks ${proof} evidence`);
@@ -1760,7 +1720,6 @@ check('release-component-versioning', () => {
   const pkg = readJson('package.json');
   const lock = readJson('package-lock.json');
   const agentsManifest = readJson(join('extension-agents', 'agents.manifest.json'));
-  const lbabus = readFileSync(join(pkgRoot, 'tools', 'collab-cli', 'LbaBus.csproj'), 'utf8');
   const tasks = readFileSync(join(pkgRoot, 'src', 'humanTasks.ts'), 'utf8');
   const hook = readFileSync(join(pkgRoot, '.githooks', 'pre-commit'), 'utf8');
   const workflow = readFileSync(join(pkgRoot, '.github', 'workflows', 'extension-release.yml'), 'utf8').replace(/\r\n/g, '\n');
@@ -1775,7 +1734,6 @@ check('release-component-versioning', () => {
   assert(versions.schema === 'labview-benchmark-actor/release-components@1', 'release component schema mismatch');
   assert(pkg.version === versions.extension && lock.version === versions.extension && lock.packages[''].version === versions.extension, 'extension package versions drifted');
   assert(agentsManifest.version === versions.agents, 'AGENTS version drifted');
-  assert(lbabus.includes(`<Version>${versions.lbabus}</Version>`), 'lbabus version drifted');
   assert(tasks.includes(`HUMAN_TASKS_VERSION = '${versions.humanTasks}'`), 'human task version drifted');
   assert(versions.canonicalDistribution === 'github-release' && versions.marketplaceChannel === 'stable', 'distribution policy drifted');
   assert(/^[0-9a-f]{40}$/.test(versions.governance.standardsReviewCommit), 'standards-review commit is not pinned');
@@ -1818,27 +1776,27 @@ check('release-component-versioning', () => {
   return { extension: versions.extension, agents: versions.agents, lbabus: versions.lbabus, humanTasks: versions.humanTasks };
 });
 
-check('lbabus-vendored-mirror', () => {
-  // ADR-0088: tools/collab-cli is lbabus's tagged release tree, byte for byte, plus this repository's
-  // release-governance files. Compared through the index, so a checkout's line endings cannot matter.
-  const pin = readJson(join('tools', 'lbabus-vendor.json'));
-  const versions = readJson('release-components.json');
-  assert(pin.schema === 'labview-benchmark-actor/lbabus-vendor@1' && pin.repository === 'https://github.com/svelderrainruiz/lbabus', 'the lbabus vendor pin must name the lbabus repository');
-  assert(pin.tag === `v${versions.lbabus}` && /^[0-9a-f]{40}$/.test(pin.commit), 'the vendored lbabus tag must match the lbabus version in release-components.json');
-  assert(pin.tag === versions.lbabusRelease.tag && pin.commit === versions.lbabusRelease.commit, 'the vendored lbabus tag and commit must equal the lbabusRelease pin in release-components.json');
-  const governance = new Set(['release-agreement.json', 'reviewer-allowlist.json', 'record-release-agreement.mjs', 'record-release-agreement.selftest.mjs',
-    'verify-composite-release.mjs', 'verify-release-agreement.mjs', 'verify-visual-review.mjs'].map((f) => `tools/release-governance/${f}`));
-  const index = new Map(execFileSync('git', ['ls-files', '-s', '--', 'tools/collab-cli'], { cwd: pkgRoot, encoding: 'utf8' })
-    .split('\n').filter(Boolean).map((line) => { const [meta, path] = line.split('\t'); const [mode, blob] = meta.split(' '); return [path, { mode, blob }]; }));
-  const pinned = Object.entries(pin.files);
-  assert(pinned.length > 0, 'the lbabus vendor pin lists no files');
-  for (const [path, want] of pinned) {
-    const have = index.get(path);
-    assert(have && have.blob === want.blob && have.mode === want.mode, `${path} differs from lbabus ${pin.tag}`);
-  }
-  const extra = [...index.keys()].filter((path) => !pin.files[path] && !governance.has(path));
-  assert(extra.length === 0, `tools/collab-cli has files that are not in lbabus ${pin.tag}: ${extra.join(', ')}`);
-  return { tag: pin.tag, commit: pin.commit.slice(0, 9), vendored: pinned.length, governance: governance.size };
+// ADR-0088 as amended by #57 slice 3: lbabus is consumed only as the release pinned in release-components.json. The
+// checks that used to read the in-tree copy run in lbabus's own CI (ci/source-guards.sh and the harness cases).
+// This gate binds the pin to the extension's AGENTS contract and to every default that repeats it, and fails when
+// an in-tree copy comes back. scripts/fetch-lbabus.mjs checks the digests and the commit when a consumer fetches.
+check('lbabus-pin-matches-agents-contract', () => {
+  const components = readJson('release-components.json');
+  const manifest = readJson('cleanroom/ubuntu-labview/cleanroom-manifest.json');
+  const provisioner = readFileSync(join(pkgRoot, 'cleanroom', 'ubuntu-labview', 'provision-lbabus-fromsource.sh'), 'utf8');
+  const bootstrap = readFileSync(join(pkgRoot, 'cleanroom', 'bootstrap.ps1'), 'utf8');
+  const first = (text, pattern, what) => { const m = text.match(pattern); assert(m, `cannot read ${what}`); return m[1]; };
+  const consumers = [
+    { name: 'cleanroom-manifest.json', tag: manifest.lbabus.source_ref, commit: manifest.lbabus.source_commit },
+    { name: 'provision-lbabus-fromsource.sh', tag: first(provisioner, /REF="\$\{LBABUS_REF:-([^}]+)\}"/, 'the provisioner tag default'), commit: first(provisioner, /EXPECT_COMMIT="\$\{LBABUS_EXPECT_COMMIT:-([^}]+)\}"/, 'the provisioner commit default') },
+    { name: 'cleanroom/bootstrap.ps1', tag: first(bootstrap, /\$LbabusTag\s*=\s*'([^']+)'/, 'the bootstrap tag default'), commit: first(bootstrap, /\$LbabusCommit\s*=\s*'([^']+)'/, 'the bootstrap commit default') },
+  ];
+  const inTreeCopyPaths = ['tools/collab-cli', 'tools/lbabus-vendor.json'].filter((path) => existsSync(join(pkgRoot, path)));
+  const agentsText = readFileSync(join(pkgRoot, 'extension-agents', 'AGENTS.md'), 'utf8');
+  const result = verifyPinContract({ components, agentsText, consumers, inTreeCopyPaths });
+  assert(result.ok, `lbabus pin: ${result.reasons.join('; ')}`);
+  execFileSync(process.execPath, [join(pkgRoot, 'test', 'lbabus-pin.mjs')], { stdio: 'pipe' });
+  return { tag: components.lbabusRelease.tag, commit: components.lbabusRelease.commit.slice(0, 9), consumers: consumers.map((c) => c.name), inTreeCopy: 'absent', controls: 'wrong digest, wrong commit, wrong tag object, wrong AGENTS version fail closed' };
 });
 
 check('no-vihs-prefix', () => {
@@ -1933,7 +1891,7 @@ check('experiment-lifecycle-local-kpi', () => {
   assert(result.kpi.total === 62 && result.kpi.governed === 62 && result.kpi.ungoverned === 0, 'experiment governance KPI is not 62/62');
   assert(result.kpi.forbiddenProductionReferences === 0, 'prohibited experiments reach production surfaces');
   assert(result.kpi.prototypes === 1 && result.kpi.superseded === 2, 'prototype/superseded lifecycle baseline drifted');
-  assert(readJson(join('experiments', 'governance-overrides.json')).version === '1.0.1', 'experiment-governance/KPI version drifted');
+  assert(readJson(join('experiments', 'governance-overrides.json')).version === '1.0.2', 'experiment-governance/KPI version drifted');
   const pkg = readJson('package.json');
   assert(pkg.scripts?.['ci:local:quick'] === 'node scripts/local-continuous-kpi.mjs --quick', 'quick local KPI command missing');
   assert(pkg.scripts?.['ci:local'] === 'node scripts/local-continuous-kpi.mjs', 'full local KPI command missing');
@@ -3412,10 +3370,8 @@ check('closed-loop-readback', () => {
   assert(r.loopbackProof.ok === true && r.loopbackProof.matchingTaskClosesLoop === true && r.loopbackProof.wrongTaskFailsClosed === true && r.loopbackProof.semanticVerdictTypeOverNet === true, 'loopback proof: loop closes, wrong task fails closed, semantic verdict type rides net');
   assert(Array.isArray(r.liveDrives) && r.liveDrives.length === 3 && r.liveDrives.every((d) => d.frame.senderId === 'WIN'), 'three live drives from the reviewer VM (senderId WIN)');
   assert(r.liveDrives.map((d) => d.frame.type).join(',') === 'DONE,DONE,NOTE', 'live drives: closed loop, release-review, verdict announcement');
-  // option A (ADR-0039): the net envelope type set carries the semantic verdict statuses so a verdict rides net directly.
-  const netSrc = readFileSync(join(here, '..', 'tools', 'collab-cli', 'Net.cs'), 'utf8');
-  const typesLine = netSrc.split('\n').find((l) => l.includes('"CLAIM"') && l.includes('"HELLO"')) || '';
-  for (const t of ['RESOLVED', 'REFINE', 'BLOCKED']) { assert(typesLine.includes(`"${t}"`), `net Types set includes ${t}`); }
+  // option A (ADR-0039): the semantic verdict statuses ride net directly; lbabus's harness case
+  // net-verdict-types-roundtrip-over-tcp asserts the envelope types (moved from a Net.cs source check, #57).
   return { selftest: 'await-agent-reply 9/9 + timeout 3/3', loopback: r.loopbackProof.ok, liveDrives: r.liveDrives.length, netVerdictTypes: 'RESOLVED/REFINE/BLOCKED' };
 });
 
@@ -3505,9 +3461,7 @@ check('net-coordination-log', () => {
   const r = JSON.parse(readFileSync(join(here, 'net-coordination', 'net-coordination-log-receipt.json'), 'utf8'));
   assert(r.schema === 'labview-benchmark-actor/net-coordination-log-proof@1' && r.requirement === 'LBA-REQ-060', 'committed net-coordination receipt shape');
   assert(r.cases.postToLogToPollRoundTrip === true && r.cases.typeFilterNote === true && r.cases.typeFilterResolved === true && r.cases.pollWithoutLogGraceful === true && r.ok === true, 'post->log->poll round-trip + type filter + poll-without-log graceful no-op');
-  const netSrc = readFileSync(join(here, '..', 'tools', 'collab-cli', 'Net.cs'), 'utf8');
-  assert(/"poll"\s*=>\s*CmdPoll/.test(netSrc), 'net dispatch routes poll -> CmdPoll');
-  assert(netSrc.includes('private static int CmdPoll(') && netSrc.includes('a.Get("log")'), 'CmdPoll reads the local --log receive-log');
+  // The poll dispatch and the --log read side are asserted by lbabus's own CI (net-poll-* cases, source-guards.sh).
   return { receipt: r.ok, model: 'live-only net (no GitHub Discussion)', cases: Object.keys(r.cases).length };
 });
 
@@ -3578,33 +3532,16 @@ check('release-no-discussion-announce', () => {
 // loopback). Source-asserts the CLI graceful branches + the net default (the runtime net poll graceful is also
 // covered by the net-coordination-log receipt; npm test covers the extension/MCP default flip).
 check('net-default-graceful', () => {
-  const net = readFileSync(join(here, '..', 'tools', 'collab-cli', 'Net.cs'), 'utf8');
-  assert(net.includes('skip-if-no-peer') && /no peer configured/.test(net), 'net send --skip-if-no-peer degrades gracefully (exit 0)');
-  assert(/no receive-log configured/.test(net) && net.includes('ADR-0045'), 'net poll with no receive-log degrades gracefully (exit 0)');
+  // The CLI's graceful branches are lbabus harness cases (net-send-skip-if-no-peer-exits-0-with-hint,
+  // net-poll-without-log-configured-exits-0-with-hint); this gate keeps the extension side.
   const ext = readFileSync(join(here, '..', 'src', 'extension.ts'), 'utf8');
   assert(ext.includes('--skip-if-no-peer') && /'net', 'send'/.test(ext), 'the extension routes the send side via --skip-if-no-peer (graceful no-op) when no peer is configured');
   return { gracefulPoll: true, gracefulSend: true };
 });
 
-// LBA-REQ-067 / ADR-0047: off-Discussions step 8 (final) -- the GitHub-Discussion transport is removed from the
-// lbabus CLI itself. Program.cs no longer dispatches init/post/poll/wait/delta; GitHubGraphQL is a REST-only
-// client (releases for selfcheck + issue comments for defect); the live-only net TCP bus is the sole coordination
-// transport. Source-asserts the removal; the CLI build + smoke test cover the runtime.
-check('cli-no-discussion-transport', () => {
-  const prog = readFileSync(join(here, '..', 'tools', 'collab-cli', 'Program.cs'), 'utf8');
-  for (const cmd of ['"init"', '"post"', '"poll"', '"wait"', '"delta"']) {
-    assert(!prog.includes(`${cmd} =>`), `Program.cs no longer dispatches ${cmd} (Discussion transport removed)`);
-  }
-  assert(!/\bCmdPost\b|\bCmdPoll\b|\bCmdWait\b|\bCmdInit\b|\bCmdDelta\b/.test(prog), 'the Discussion command methods are removed from Program.cs');
-  assert(prog.includes('"net" => NetCommands.Run'), 'the live-only net coordination transport is intact');
-  assert(prog.includes('"defect" => CmdDefect') && prog.includes('CmdSelfCheck'), 'the GitHub-API keepers (defect + selfcheck) remain');
-  const gh = readFileSync(join(here, '..', 'tools', 'collab-cli', 'GitHubGraphQL.cs'), 'utf8');
-  assert(!/FindDiscussion|CreateDiscussion|EnsureDiscussion/.test(gh) && !gh.includes('addDiscussionComment') && !gh.includes('DiscussionRef'), 'GitHubGraphQL has no Discussion GraphQL surface');
-  assert(gh.includes('ListReleaseTags') && gh.includes('AddIssueComment'), 'GitHubGraphQL keeps the REST bits for selfcheck (releases) + defect (issue comment)');
-  const cfg = readFileSync(join(here, '..', 'tools', 'collab-cli', 'Config.cs'), 'utf8');
-  assert(!cfg.includes('Category') && !cfg.includes('Title') && !cfg.includes('AddressesMe'), 'Config drops the discussion-only fields (Category/Title/AddressesMe)');
-  return { removed: ['init', 'post', 'poll', 'wait', 'delta'], graphql: 'REST-only', transport: 'net' };
-});
+// LBA-REQ-067 / ADR-0047: the GitHub-Discussion transport is removed from the lbabus CLI. The checks (Program.cs
+// dispatch, REST-only GitHubGraphQL, Config fields) run in lbabus's CI: the cli-help-lists-no-discussion-subcommands
+// case and ci/source-guards.sh (#57 slice 3).
 
 // LBA-REQ-011 (extended): the frame-correlator CLICK-TO-MARKER wiring. Browser-free self-test (the built document
 // embeds the click-to-marker runtime + the authoritative classifyPointerGesture / resolveMarkerImageGrab spec the

@@ -30,7 +30,10 @@ $registryPath = Join-Path $cleanroomRoot 'mesh-actors.csv'
 $manifestPath = Join-Path $cleanroomRoot 'cleanroom-manifest.json'
 $vagrantfilePath = Join-Path $meshRoot 'Vagrantfile'
 $provisionerPath = Join-Path $cleanroomRoot 'provision-lbabus-fromsource.sh'
-$meshWorkerPath = Join-Path $repoRoot 'tools\collab-cli\ci\mesh-actor.sh'
+# The mesh worker is the pinned lbabus release's mesh-actor.sh (fetch-lbabus.mjs fails unless tag object and commit match the pin).
+$pinnedLbabus = (& node (Join-Path $repoRoot 'scripts\fetch-lbabus.mjs') source | Select-Object -Last 1)
+if ($LASTEXITCODE -ne 0 -or -not $pinnedLbabus) { throw 'cannot check out the pinned lbabus source' }
+$meshWorkerPath = Join-Path $pinnedLbabus 'tools\collab-cli\ci\mesh-actor.sh'
 $receiptPath = Join-Path $meshRoot '.vagrant\provision-cycle-receipt.json'
 $receiptSchema = 'labview-benchmark-actor/mesh-provision-cycle@2'
 

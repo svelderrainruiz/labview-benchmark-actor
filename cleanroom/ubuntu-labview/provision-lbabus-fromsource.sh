@@ -38,8 +38,8 @@ DEST="${LBABUS_DEST:-/usr/local/bin/lbabus}"
 EMIT="${LBABUS_EMIT:-/usr/local/bin/emit-boot-marker.sh}"  # PATH-standard, next to lbabus; where mesh-actor.sh expects it
 SDK_PKG="${DOTNET_SDK_PKG:-dotnet-sdk-8.0}"          # Ubuntu 24.04 ships this; net8.0 builds natively
 REPO_URL="${LBABUS_REPO_URL:-https://github.com/svelderrainruiz/lbabus}"  # PUBLIC
-REF="${LBABUS_REF:-v0.17.0}"                         # cleanroom baseline; env may pin a tag or commit explicitly
-EXPECT_COMMIT="${LBABUS_EXPECT_COMMIT:-1e08fa4c23fc5998f68b973cf0cd7e22a26db697}"   # the commit release-components.json pins; empty disables the check
+REF="${LBABUS_REF:-v0.17.1}"                         # cleanroom baseline; env may pin a tag or commit explicitly
+EXPECT_COMMIT="${LBABUS_EXPECT_COMMIT:-8d00f968dacb27c601d311b563ffd0a6b5d38e03}"   # the commit release-components.json pins; empty disables the check
 SRC_DIR="${LBABUS_SRC_DIR:-}"                        # optional: bake a LOCAL tools/collab-cli instead of cloning
 RID="${LBABUS_RID:-linux-x64}"
 

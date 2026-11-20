@@ -27,6 +27,26 @@ follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project
   Upgrading from a version without this fix needs a one-time workaround: run any `LabVIEW Benchmark Actor:` command,
   then reload the window.
 
+## [1.6.7] - Unreleased
+
+### Changed
+
+- Consume lbabus only as the pinned release (#57 slice 3). The in-tree copy (`tools/collab-cli/`) and its vendor pin
+  (`tools/lbabus-vendor.json`) are deleted; `release-components.json` pins lbabus 0.17.1 (tag object `3749b2c5`, commit
+  `8d00f968`, SHA-256 of the package, both binaries and `SHA256SUMS`). 0.17.1 carries the harness cases and the source
+  guards that replace the checks this repository ran against its copy; they now run in lbabus's own CI
+  (`ci/source-guards.sh`, svelderrainruiz/lbabus#25).
+  - `scripts/fetch-lbabus.mjs` fetches the pinned binary (SHA-256 and attestation checked) or the pinned source (tag object
+    and commit checked) and fails closed on a mismatch. Reviewer staging, the reviewer VM provisioning, the clean-room
+    bootstraps (Windows and Docker-Windows clone the pinned tag and verify the commit), the mesh scripts, the codespace
+    witness and the proof scripts use it instead of building the in-tree project.
+  - The `lbabus-vendored-mirror` gate is replaced by `lbabus-pin-matches-agents-contract`: the pin is well formed, the AGENTS
+    contract (0.3.29) names the pinned version, every default that repeats the pin matches it, and no in-tree copy may
+    return. The source-reading gates (`collab-cli-embeds-canonical-requirements`, `cli-no-discussion-transport` and the
+    `Net.cs`, `Program.cs` assertions) moved to lbabus.
+  - The release classifier treats a changed pin as an lbabus change. RTM CodeRefs that named the deleted tree point at the
+    pin until the slice 4 requirement rewrite. Experiment governance 1.0.2 (the `hardware-capability` replacement).
+
 ## [1.6.6] - Unreleased
 
 ### Changed

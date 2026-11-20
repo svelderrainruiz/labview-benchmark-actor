@@ -74,7 +74,7 @@ corrected nipkg flags (`--include-recommended`; `--system` is feed-add-only).
 
 Switch Docker Desktop to **Windows containers**, then **host-extract the NI offline feed(s)** into the build
 context (Hyper-V isolation cannot `Mount-DiskImage` in-container — see below), and build from the **repo root**
-(context must include the shared `bootstrap.ps1` + `tools/collab-cli`):
+(context must include the shared `bootstrap.ps1`; lbabus is cloned at the pinned tag and commit during the build):
 
 ```powershell
 # 1. Host-extract the offline feeds into the build context (licensed/community artifacts; gitignored):

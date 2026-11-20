@@ -115,17 +115,15 @@ try {
   vagrant upload $candidateReceiptPath 'C:/lba-review/workspace/candidate-receipt.json' $Machine | Out-Null
   if ($LASTEXITCODE -ne 0) { throw "Could not upload the candidate KPI receipt ($LASTEXITCODE)." }
 
-  # The reviewer is a real mesh actor, not just a visual shell. Publish a framework-dependent Windows apphost
-  # from this exact repository and install it into a stable user-PATH location before exercising capabilities.
+  # The reviewer is a real mesh actor, not just a visual shell. Fetch the PINNED lbabus win-x64 release binary
+  # (SHA-256 and attestation checked by scripts/fetch-lbabus.mjs) and install it into a stable user-PATH location.
   $lbabusTemp = Join-Path ([IO.Path]::GetTempPath()) "lba-reviewer-lbabus-$PID"
   $lbabusPublish = Join-Path $lbabusTemp 'publish'
   $lbabusZip = Join-Path $lbabusTemp 'lbabus-win-x64.zip'
   New-Item -ItemType Directory -Path $lbabusPublish -Force | Out-Null
-  Step 'publish reviewer lbabus Windows apphost'
-  dotnet publish (Join-Path $repoRoot 'tools\collab-cli\LbaBus.csproj') `
-    --configuration Release --runtime win-x64 --self-contained false `
-    -p:UseAppHost=true --output $lbabusPublish --nologo --verbosity quiet
-  if ($LASTEXITCODE -ne 0) { throw "lbabus publish failed ($LASTEXITCODE)." }
+  Step 'fetch the pinned reviewer lbabus Windows binary'
+  node (Join-Path $repoRoot 'scripts\fetch-lbabus.mjs') binary --rid win-x64 --attest --out (Join-Path $lbabusPublish 'lbabus.exe')
+  if ($LASTEXITCODE -ne 0) { throw "pinned lbabus fetch failed ($LASTEXITCODE)." }
   Compress-Archive -Path (Join-Path $lbabusPublish '*') -DestinationPath $lbabusZip
   vagrant upload $lbabusZip 'C:/Windows/Temp/lbabus-win-x64.zip' $Machine | Out-Null
   vagrant upload (Join-Path $PSScriptRoot 'bin\guest-install-lbabus.ps1') 'C:/Windows/Temp/lba-guest-install-lbabus.ps1' $Machine | Out-Null

@@ -10,6 +10,8 @@ OUT="${OUT:-$HOME/lba-net/publish}"
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO="$(cd "$HERE/../.." && pwd)"
 
-dotnet publish "$REPO/tools/collab-cli/LbaBus.csproj" -c Release -r "$RID" \
-  --self-contained true -p:PublishSingleFile=true -o "$OUT"
-echo "published self-contained lbabus ($RID) -> $OUT/lbabus"
+# The self-contained single-file binary is the pinned lbabus release asset (SHA-256 checked by the helper).
+mkdir -p "$OUT"
+case "$RID" in win-x64) EXE=lbabus.exe ;; *) EXE=lbabus ;; esac
+node "$REPO/scripts/fetch-lbabus.mjs" binary --rid "$RID" --out "$OUT/$EXE" >/dev/null
+echo "staged pinned self-contained lbabus ($RID) -> $OUT/$EXE"
