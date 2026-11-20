@@ -4,7 +4,7 @@
 Needs only Python 3.9+ and Git. Run it at the repository root, in a clean checkout, after
 `node scripts/wikiEvidence.mjs` wrote `wiki-jest-report.json` and `.repo-standards-review/observations.py
 evidence --format jest-json` turned it into `wiki-evidence.json` (the `Wiki Canonical Test Pages` CI job does
-both). It builds the wiki twice (generate, then `observations.py stimulus` and `generate`), requires the two builds to be
+both). The canonical block is in `.wiki-canonical.json`, merged into `.wiki-generator.json` at run time. It builds the wiki twice (generate, then `observations.py stimulus` and `generate`), requires the two builds to be
 byte-identical, at least one canonical page and no `Pending:` placeholder, and runs `observations.py check
 --member-commit` on the committed result. It prints the stub pages by reason. Exit 0 when all hold.
 The evidence is execution evidence at one commit; it does not say the member is verified.
@@ -40,10 +40,24 @@ def run(*command: str) -> subprocess.CompletedProcess[str]:
     return done
 
 
-def build(wiki: Path, evidence: str) -> dict:
+CANONICAL = Path(".wiki-canonical.json")
+
+
+def canonical_config(destination: Path) -> Path:
+    """Write .wiki-generator.json plus the canonical block of .wiki-canonical.json.
+
+    The default configuration stays free of the evidence: the wiki-vault gate and wiki-publish generate without it,
+    and the evidence is produced by running those gates."""
+    config = json.loads(Path(".wiki-generator.json").read_text(encoding="utf-8"))
+    config["testPlan"] = {**config["testPlan"], "canonical": json.loads(CANONICAL.read_text(encoding="utf-8"))}
+    destination.write_text(json.dumps(config, indent=2) + "\n", encoding="utf-8")
+    return destination
+
+
+def build(wiki: Path, evidence: str, config: Path) -> dict:
     wiki.mkdir()
     run("git", "-C", str(wiki), "init", "-q", "-b", "main")
-    generated = run(sys.executable, str(KIT / "wiki_generate.py"), "--member-root", ".", "--out", str(wiki))
+    generated = run(sys.executable, str(KIT / "wiki_generate.py"), "--member-root", ".", "--config", str(config), "--out", str(wiki))
     summary = json.loads(generated.stdout)
     run(sys.executable, str(KIT / "observations.py"), "stimulus", "--wiki", str(wiki), "--evidence", evidence,
         "--member", MEMBER, "--artifact-section", ARTIFACT_SECTION,
@@ -63,7 +77,7 @@ def stub_reasons(wiki_tree: dict[str, bytes], evidence: str) -> collections.Coun
     status: dict[str, set] = collections.defaultdict(set)
     for case in document["cases"]:
         status[case["file"]].add(case["status"])
-    patterns = [re.compile(p) for p in json.loads(Path(".wiki-generator.json").read_text(encoding="utf-8"))["testPlan"]["canonical"]["testFiles"]]
+    patterns = [re.compile(p) for p in json.loads(CANONICAL.read_text(encoding="utf-8"))["testFiles"]]
     rows = list(csv.DictReader(Path("docs/requirements/rtm.csv").open(encoding="utf-8", newline="")))
     reasons: collections.Counter = collections.Counter()
     for path, data in wiki_tree.items():
@@ -86,11 +100,16 @@ def stub_reasons(wiki_tree: dict[str, bytes], evidence: str) -> collections.Coun
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("--evidence", default="wiki-evidence.json", help="evidence file named by testPlan.canonical (default: wiki-evidence.json)")
+    parser.add_argument("--emit-config", metavar="FILE", help="write the merged generator configuration to FILE and exit")
     options = parser.parse_args()
+    if options.emit_config:
+        print(f"PASS: wrote {canonical_config(Path(options.emit_config))}")
+        return 0
     with tempfile.TemporaryDirectory() as temp:
         first, second = Path(temp) / "first", Path(temp) / "second"
-        summary = build(first, options.evidence)
-        build(second, options.evidence)
+        config = canonical_config(Path(temp) / "wiki-generator.canonical.json")
+        summary = build(first, options.evidence, config)
+        build(second, options.evidence, config)
         built = tree(first)
         if built != tree(second):
             sys.exit("FAIL: two builds of the wiki differ")
