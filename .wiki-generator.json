@@ -9,7 +9,16 @@
   "srs": { "path": "requirements/srs.md", "style": "blocks" },
   "rtm": { "path": "requirements/rtm.csv", "idColumn": "ReqID", "columns": ["Status"] },
   "architecture": { "overview": "architecture/overview.md", "adrDir": "architecture/adr", "adrIndex": "architecture/adr/README.md" },
-  "testPlan": { "path": "testing/test-plan.md", "idColumn": "ID" },
+  "testPlan": {
+    "path": "testing/test-plan.md",
+    "idColumn": "ID",
+    "canonical": {
+      "evidence": ["wiki-evidence.json"],
+      "artifactSection": "CodeRef",
+      "testFiles": ["\\.selftest\\.mjs$", "^test/[^/]+\\.mjs$"],
+      "notRunReason": "no gate of experiments/verify-local-gates.mjs and no step of npm test ran it in this evidence"
+    }
+  },
   "names": {
     "information-for-users/plan.md": "Information-For-Users-Plan",
     "proposals/cli-embedded-requirements.md": "Proposal-CLI-Embedded-Requirements",
