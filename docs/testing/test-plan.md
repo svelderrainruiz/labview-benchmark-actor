@@ -168,6 +168,25 @@ gate rather than trusted as static files.
 - The workflow is **dormant** while the package is a subtree and activates at
   the standalone repository root (LBA-REQ-008, `docs/cm/cm-plan.md` move step 2).
 
+## Wiki canonical test pages (evidence adapter)
+
+The `Wiki Canonical Test Pages` CI job turns the real execution results into `rsr/test-evidence@1` evidence so
+that a wiki test page can be canonical. It adds no tests and skips none. `node scripts/wikiEvidence.mjs` runs
+`node experiments/verify-local-gates.mjs` and each `node <file>` step of `npm test` once, at the current commit:
+every gate is a case of `experiments/verify-local-gates.mjs`; every tracked script a gate launches (recorded at run
+time by `scripts/wikiEvidenceTrace.mjs`, not guessed from the source) is a case of that script, passing only when its
+gate passed; each `npm test` step is one case that passes when the process exits 0. `observations.py evidence
+--format jest-json` converts the report, and `python3 scripts/check_wiki_canonical.py` builds the wiki twice from
+`docs/` with the canonical block of `.wiki-canonical.json` (merged into `.wiki-generator.json` at run time, so the
+`wiki-vault` gate and `wiki-publish` keep generating without evidence), and requires identical output, no
+`Pending:` placeholder and `observations.py check` passing.
+
+A test page is canonical only when a file in the `CodeRef` of a requirement that links it ran and passed at the
+same commit and no such file failed. A page whose requirements name no file that ran stays a stub: for example
+a verifier script that no gate launches, a receipt, a document, or a Planned or Superseded requirement. The
+evidence is execution evidence at a commit on one platform (linux-x64); it does not say the extension is verified,
+and the lanes in `docs/testing/not-executed.json` are not run.
+
 ## Entry / exit criteria (29119-2)
 
 - **Entry:** the run-result schema and bus message schema are frozen for the

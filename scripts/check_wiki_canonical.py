@@ -92,6 +92,8 @@ def stub_reasons(wiki_tree: dict[str, bytes], evidence: str) -> collections.Coun
             reasons["linked requirement is Planned or Superseded (no implementation to run)"] += 1
         elif any(any(p.search(t) for p in patterns) for t in tokens):
             reasons["a linked test file exists but no gate or npm test step ran it"] += 1
+        elif any(re.search(r"(^|/)verify-[^/]*\.m?js$", t) for t in tokens):
+            reasons["a linked verifier script exists but no gate launched it"] += 1
         else:
             reasons["linked requirements name no test file or gate (only code, receipts or docs)"] += 1
     return reasons

@@ -6,6 +6,14 @@ follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project
 
 ## [Unreleased]
 
+### Added
+
+- Wiki evidence adapter (VITechnologies/projectbuddy#318 M3): `scripts/wikiEvidence.mjs` runs the local gates and the
+  `npm test` steps and writes a Jest-compatible report, `scripts/check_wiki_canonical.py` builds the wiki twice with the
+  canonical block of `.wiki-canonical.json` and checks it, and the `Wiki Canonical Test Pages` job runs both. Test pages
+  whose requirements name a file that ran and passed become canonical (execution evidence at the commit, linux-x64);
+  the others stay stubs. The vendored generator is unchanged.
+
 ### Changed
 
 - Re-vendor the shared wiki generator from repo-standards-review v0.14.0 (`wiki_generate.py`, sha256
