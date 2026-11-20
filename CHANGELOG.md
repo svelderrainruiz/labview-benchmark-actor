@@ -20,6 +20,10 @@ follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project
 
 ### Changed
 
+- Move the governance pin to `repo-standards-review` v0.15.0 (#99, ADR-0087 amended). The kit pin and
+  `governance.standardsReviewVersion` move together. The v0.15.0 workbench deep run (measured here) scores 25/25, with all
+  six gates PASS/High and DoD 5/5; a v0.12.0 control run on the same tree gives the same raw score `babbeba2…898e`, which
+  both baselines now retain. `release-components.json`, the agent contract (0.3.30) and the stamps name v0.15.0.
 - Re-vendor the shared wiki generator from repo-standards-review v0.14.0 (`wiki_generate.py`, sha256
   `a5767d9cb380b419a8ffc8103738be76628a07a80ad130884713795d7039fbb1`). Its `--out` now refuses the member root, its
   parents and an unrelated non-empty directory, and the `wiki-vault` gate asserts it again (LBA-REQ-103, T-103, ADR-0090).

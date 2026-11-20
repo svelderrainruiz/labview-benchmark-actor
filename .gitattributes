@@ -15,6 +15,7 @@ git-hooks/** text=auto eol=lf
 # same bytes on every platform.
 .repo-standards-review.json text eol=lf
 .cruft.json text eol=lf
+.wiki-generator.json text eol=lf
 *.py text=auto eol=lf
 cleanroom/ubuntu-labview/*.ps1 text=auto eol=lf
 experiments/multi-vm-topology/**/*.ps1 text=auto eol=lf

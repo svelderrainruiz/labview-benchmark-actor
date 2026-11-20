@@ -21,7 +21,8 @@ Commands:
   order, as `` `file` › describe chain › title ``. When that would put the page
   over the 16,384-byte page budget or the 16,384-character registry-text budget,
   it names whole files instead (`` `file` ``, a file item), largest first, until
-  the page fits. A page without test-case items gets a new Required observation;
+  the page fits. A page without test-case items gets a new Required observation,
+  which keeps the page's own `Not verified here:` paragraphs below the list;
   otherwise only its list of test-case items is replaced. A link from a requirement's
   `TestID` section asserts no coverage: the new observation's lead-in declares the linked
   requirements `not verified here`. Only with `--coverage-map <file.json>`, a person's
@@ -465,7 +466,9 @@ def generated_body(body: str, items: list[str], requirements: list[str], evidenc
         prefix = lines[first][:indent]
         return "\n".join(lines[:first] + [prefix + item for item in items] + lines[last + 1:])
     lead_in = lead_in_for(requirements, list(verified))
-    return f"{lead_in}\n\n" + "\n".join(items)
+    # A "Not verified here:" paragraph that the page already holds survives the replacement, after the list.
+    kept = [paragraph for paragraph in re.split(r"\n\n+", body.strip("\n")) if paragraph.startswith("Not verified here:")]
+    return "\n\n".join([lead_in, "\n".join(items), *kept])
 
 
 def page_ids(paths: list, ids: list[str], stem) -> list:
