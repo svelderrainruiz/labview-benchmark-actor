@@ -27,7 +27,7 @@ REASONS = frozenset({
     "body-too-large", "body-not-json", "duplicate-key", "too-deep", "schema-invalid", "not-a-fork",
     "commit-missing", "base-commit-missing", "path-invalid", "not-a-regular-file", "file-too-large", "total-too-large",
     "fetch-failed", "hash-mismatch", "evidence-missing", "evidence-invalid", "evidence-commit-mismatch", "platform-mismatch",
-    "test-unknown", "result-mismatch", "config-invalid"})
+    "test-unknown", "result-mismatch", "config-invalid", "evidence-commit-unrelated", "internal-error"})
 SLUG = re.compile(r"^[A-Za-z0-9](?:[A-Za-z0-9-]{0,38})/[A-Za-z0-9._-]{1,100}$")
 SHA = re.compile(r"^[0-9a-f]{40}$")
 RANK = {"passed": 1, "skipped": 0, "failed": 2}
@@ -130,28 +130,40 @@ def is_id(value: object) -> bool:
     return isinstance(value, int) and not isinstance(value, bool)
 
 
+def attempt(call, *args):
+    try:
+        return call(*args)
+    except Exception:
+        return None
+
+
+DUMMY_REPO, DUMMY_LOGIN = "octocat/Hello-World", "octocat"
+
+
 def authorized(event: dict, allowlist: object, limits: dict, net) -> bool:
     """The fork owner is listed, and the issue author is that owner or a public member of the owning organisation.
 
-    Every failure, including an exception, is the same False: the caller reports one undifferentiated outcome."""
-    try:
-        entries = parse_allowlist(allowlist)
-        issue = event.get("issue") or {}
-        user = issue.get("user") or {}
-        if not entries or not is_id(user.get("id")) or not isinstance(user.get("login"), str) or not LOGIN.fullmatch(user["login"]):
-            return False
-        fork = parse_body(issue.get("body"), limits).get("fork")
-        if not isinstance(fork, str) or not SLUG.fullmatch(fork):
-            return False
-        owner = fork.split("/")[0]
-        info = net.repo(fork)
-        if not info or str(info.get("owner_login", "")).lower() != owner.lower() or not is_id(info.get("owner_id")):
-            return False
-        if not any(login == owner.lower() and (pinned is None or pinned == info["owner_id"]) for login, pinned in entries):
-            return False
-        return user["id"] == info["owner_id"] or bool(net.public_member(owner, user["login"]))
-    except Exception:
-        return False
+    Every path makes the same two API calls, with fixed dummies when a real value is missing, and combines the checks
+    without early returns, so neither the result nor the timing tells which part failed or whether a login is listed."""
+    entries = parse_allowlist(allowlist)
+    issue = event.get("issue") if isinstance(event, dict) else None
+    issue = issue if isinstance(issue, dict) else {}
+    user = issue.get("user") if isinstance(issue.get("user"), dict) else {}
+    author_id, login = user.get("id"), user.get("login")
+    author_ok = is_id(author_id) and isinstance(login, str) and bool(LOGIN.fullmatch(login))
+    record = attempt(parse_body, issue.get("body"), limits)
+    fork = record.get("fork") if isinstance(record, dict) else None
+    fork_ok = isinstance(fork, str) and bool(SLUG.fullmatch(fork))
+    slug = fork if fork_ok else DUMMY_REPO
+    owner = slug.split("/")[0]
+    info = attempt(net.repo, slug)
+    member = attempt(net.public_member, owner, login if author_ok else DUMMY_LOGIN)
+    info = info if isinstance(info, dict) else {}
+    owner_id = info.get("owner_id")
+    owner_ok = is_id(owner_id) and str(info.get("owner_login", "")).lower() == owner.lower()
+    listed = any(name == owner.lower() and (pinned is None or pinned == owner_id) for name, pinned in entries)
+    related = (author_id == owner_id) or member is True
+    return bool(entries) & author_ok & fork_ok & owner_ok & listed & related
 
 
 def safe_path(path: str) -> bool:
@@ -247,7 +259,15 @@ def verify(event: dict, *, upstream: str, schema: dict, canonical: dict, tracked
         raise Reject("commit-missing")
     if not base_exists:
         raise Reject("base-commit-missing")
-    blobs = fetch_evidence(net, fork, submission["fork_commit"], submission["evidence"], limits)
+    try:
+        relation = net.compare(fork, submission["fork_commit"], submission["evidence_commit"])
+    except Exception:
+        raise Reject("fetch-failed") from None
+    if relation is None:
+        raise Reject("commit-missing")
+    if relation not in ("ahead", "identical"):
+        raise Reject("evidence-commit-unrelated")
+    blobs = fetch_evidence(net, fork, submission["evidence_commit"], submission["evidence"], limits)
     check_evidence(observations, canonical, blobs, submission, upstream_tests(tracked, canonical))
     return "ok"
 
@@ -258,13 +278,13 @@ class GitHubApi:
     def __init__(self, token: str | None) -> None:
         self.token = token
 
-    def get(self, path: str):
+    def get(self, path: str, limit: int = 2 << 20):
         request = urllib.request.Request("https://api.github.com" + path, headers={"Accept": "application/vnd.github+json"})
         if self.token:
             request.add_header("Authorization", "Bearer " + self.token)
         try:
             with urllib.request.urlopen(request, timeout=20) as response:
-                data = response.read(2 << 20)
+                data = response.read(limit)
         except urllib.error.HTTPError as error:
             if error.code in (404, 422):
                 return None
@@ -296,8 +316,18 @@ class GitHubApi:
         return self.get(f"/repos/{slug}/commits/{sha}") is not None
 
     def file(self, slug: str, path: str, ref: str):
-        document = self.get(f"/repos/{slug}/contents/{path}?ref={ref}")
-        return document if isinstance(document, dict) else {"type": "dir", "size": 0}
+        return as_file(self.get(f"/repos/{slug}/contents/{path}?ref={ref}"))
+
+    def compare(self, slug: str, base: str, head: str):
+        document = self.get(f"/repos/{slug}/compare/{base}...{head}?per_page=1", limit=8 << 20)
+        return document.get("status") if isinstance(document, dict) else None
+
+
+def as_file(document: object):
+    """A missing path is None, a directory listing is a dir; only a dict can be a file."""
+    if document is None:
+        return None
+    return document if isinstance(document, dict) else {"type": "dir", "size": 0}
 
 
 def emit(lines: dict) -> None:
@@ -331,11 +361,14 @@ def main() -> int:
             raise Reject("config-invalid")
         schema = load_json(ROOT / "scripts" / "wiki-submission.schema.json")
         canonical = load_json(ROOT / ".wiki-canonical.json")
-        tracked = os.popen("git -C " + str(ROOT) + " ls-files").read().split("\n")
+        with os.popen("git -C " + str(ROOT) + " ls-files") as listing:
+            tracked = listing.read().split("\n")
         reason = verify(event, upstream=upstream, schema=schema, canonical=canonical, tracked=tracked, net=net,
                         observations=load_observations())
     except Reject as error:
         reason = error.code
+    except BaseException:
+        reason = "internal-error"
     assert reason in REASONS
     emit({"verdict": "attested" if reason == "ok" else "not-attested", "reason": reason, "upstream": sha})
     return 0

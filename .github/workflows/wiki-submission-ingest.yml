@@ -1,7 +1,9 @@
 name: Wiki Submission Ingest
 
 # fork-and-wiki S2 (#112). A partner fork files an issue titled "[wiki-submission] ..." whose body is an
-# rsr/wiki-submission@1 JSON document. The gate job authorizes the submitter against an Actions secret and is the
+# rsr/wiki-submission@1 JSON document. The workflow also runs for an issue that already carries a verdict label,
+# so renaming the title cannot leave a stale attestation: the verifier then answers not-a-submission and the report
+# job swaps the label. The gate job authorizes the submitter against an Actions secret and is the
 # only job that can read it; every authorization failure gives one undifferentiated outcome. The verify job treats
 # the submission as data: it checks out upstream only, at the commit this workflow runs from, and reads the issue
 # from the event file; it never checks out or runs fork code and never interpolates event text into a shell. The
@@ -21,7 +23,7 @@ permissions: {}
 jobs:
   gate:
     name: Authorize submitter
-    if: startsWith(github.event.issue.title, '[wiki-submission]')
+    if: startsWith(github.event.issue.title, '[wiki-submission]') || contains(github.event.issue.labels.*.name, 'wiki-attested') || contains(github.event.issue.labels.*.name, 'wiki-not-attested')
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -68,7 +70,7 @@ jobs:
   report:
     name: Report verdict
     needs: [gate, verify]
-    if: always() && needs.gate.result == 'success' && (needs.gate.outputs.authorized == 'no' || needs.verify.result == 'success')
+    if: always() && needs.gate.result != 'skipped' && (needs.gate.outputs.authorized != 'yes' || needs.verify.result != 'skipped')
     runs-on: ubuntu-latest
     permissions:
       issues: write
@@ -76,8 +78,8 @@ jobs:
       GH_TOKEN: ${{ github.token }}
       GH_REPO: ${{ github.repository }}
       ISSUE: ${{ github.event.issue.number }}
-      VERDICT: ${{ needs.gate.outputs.authorized == 'yes' && needs.verify.outputs.verdict || 'not-attested' }}
-      REASON: ${{ needs.gate.outputs.authorized == 'yes' && needs.verify.outputs.reason || 'not-authorized' }}
+      VERDICT: ${{ needs.gate.outputs.authorized == 'yes' && needs.verify.result == 'success' && needs.verify.outputs.verdict || 'not-attested' }}
+      REASON: ${{ needs.gate.outputs.authorized != 'yes' && 'not-authorized' || needs.verify.result == 'success' && needs.verify.outputs.reason || 'internal-error' }}
       UPSTREAM: ${{ github.sha }}
     steps:
       - name: Label and comment with fixed text

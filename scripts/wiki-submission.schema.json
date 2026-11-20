@@ -4,11 +4,12 @@
   "description": "A fork's claim that its tests ran at one commit. Every value is data: none is executed, interpolated into a shell, or echoed back. The verifier reads these limits from this file.",
   "type": "object",
   "additionalProperties": false,
-  "required": ["schema", "fork", "fork_commit", "upstream_base", "generator", "platform", "tests", "evidence", "lineage"],
+  "required": ["schema", "fork", "fork_commit", "evidence_commit", "upstream_base", "generator", "platform", "tests", "evidence", "lineage"],
   "properties": {
     "schema": { "const": "rsr/wiki-submission@1" },
     "fork": { "type": "string", "pattern": "^[A-Za-z0-9](?:[A-Za-z0-9-]{0,38})/[A-Za-z0-9._-]{1,100}$" },
     "fork_commit": { "type": "string", "pattern": "^[0-9a-f]{40}$" },
+    "evidence_commit": { "type": "string", "pattern": "^[0-9a-f]{40}$" },
     "upstream_base": { "type": "string", "pattern": "^[0-9a-f]{40}$" },
     "generator": { "type": "string", "pattern": "^[0-9]{1,4}\\.[0-9]{1,4}\\.[0-9]{1,4}$" },
     "platform": { "type": "string", "pattern": "^[a-z0-9][a-z0-9_-]{0,31}$" },

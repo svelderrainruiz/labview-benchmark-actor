@@ -77,14 +77,20 @@ local producer are not built yet. The intended design is:
    an unset or empty list rejects every submission, and the list is not
    published. You must be that owner, or a public member of the owning
    organisation, to submit.
-2. Run the tests on your fork at a pushed commit and commit the resulting
-   `wiki-evidence.json` (`rsr/test-evidence@1`, one platform).
+2. Run the tests on your fork at a pushed commit (`fork_commit`) and commit the
+   resulting `wiki-evidence.json` (`rsr/test-evidence@1`, one platform) in a
+   later commit (`evidence_commit`): the generator records the commit it ran
+   at, which cannot be the commit that adds the evidence file itself. The
+   evidence must record `commit == fork_commit`, and `evidence_commit` must be
+   `fork_commit` or ahead of it in your fork.
 3. Open an issue on the upstream titled `[wiki-submission] <anything>` whose
    body is **only** one JSON document of schema `rsr/wiki-submission@1`
    (`scripts/wiki-submission.schema.json`): your fork, the full 40-hex fork
-   commit, the upstream base commit, generator version, platform, the test ids
+   commit and evidence commit, the upstream base commit, generator version,
+   platform, the test ids
    with their results, the evidence files with their sha256, and the lineage
-   (source repository and commit). Editing the issue re-runs verification.
+   (source repository and commit). Editing the issue re-runs verification;
+   renaming the title away from the prefix withdraws an earlier attestation.
 4. The workflow answers with the label `wiki-attested` or `wiki-not-attested`
    and a fixed comment that names the upstream commit that verified it and a
    reason code.

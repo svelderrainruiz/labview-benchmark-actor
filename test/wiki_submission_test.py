@@ -18,7 +18,7 @@ import wiki_submission as ws  # noqa: E402
 
 UPSTREAM = "example-org/upstream-repo"
 FORK = "example-partner/upstream-repo"
-FORK_SHA, BASE_SHA = "a" * 40, "b" * 40
+FORK_SHA, BASE_SHA, EVID_SHA = "a" * 40, "b" * 40, "f" * 40
 SCHEMA = json.loads((ROOT / "scripts" / "wiki-submission.schema.json").read_text(encoding="utf-8"))
 CANONICAL = {"evidence": ["wiki-evidence.json"], "testFiles": ["\\.selftest\\.mjs$", "^test/[^/]+\\.mjs$"]}
 TRACKED = ["README.md", "test/alpha.mjs", "test/beta.mjs", "tools/x.selftest.mjs"]
@@ -41,7 +41,9 @@ class FakeNet:
         self.files = files
         self.info = {"fork": True, "parents": [UPSTREAM], "owner_id": 4242, "owner_login": "Example-Partner"}
         self.members = set()
-        self.commits = {(FORK, FORK_SHA), (UPSTREAM, BASE_SHA)}
+        self.commits = {(FORK, FORK_SHA), (FORK, EVID_SHA), (UPSTREAM, BASE_SHA)}
+        self.evidence_ref = EVID_SHA
+        self.relation = "ahead"
         self.calls = []
         self.__dict__.update(changes)
 
@@ -57,8 +59,14 @@ class FakeNet:
         self.calls.append(("commit", slug))
         return (slug, sha) in self.commits
 
+    def compare(self, slug, base, head):
+        self.calls.append(("compare", slug))
+        return self.relation if (slug, base) in self.commits and (slug, head) in self.commits else None
+
     def file(self, slug, path, ref):
         self.calls.append(("file", path))
+        if slug != FORK or ref != self.evidence_ref:
+            return None
         data = self.files.get(path)
         if data is None:
             return None
@@ -68,7 +76,7 @@ class FakeNet:
 
 
 def submission(blob, **changes):
-    document = {"schema": "rsr/wiki-submission@1", "fork": FORK, "fork_commit": FORK_SHA, "upstream_base": BASE_SHA,
+    document = {"schema": "rsr/wiki-submission@1", "fork": FORK, "fork_commit": FORK_SHA, "evidence_commit": EVID_SHA, "upstream_base": BASE_SHA,
                 "generator": "1.2.3", "platform": "linux-x64",
                 "tests": [{"id": "test/alpha.mjs", "result": "passed"}, {"id": "test/beta.mjs", "result": "skipped"}],
                 "evidence": [{"path": "wiki-evidence.json", "sha256": hashlib.sha256(blob).hexdigest()}],
@@ -150,7 +158,7 @@ class Authorization(unittest.TestCase):
                       "example-partner;other", 5, ["example-partner"]):
             ok, net = auth(allow)
             self.assertFalse(ok, repr(allow))
-            self.assertEqual(net.calls, [], repr(allow))
+            self.assertEqual([call[0] for call in net.calls], ["repo", "member"], repr(allow))
 
     def test_rejection_happens_before_any_evidence_fetch(self):
         for allow in ("other-login", "example-partner:999"):
@@ -213,6 +221,84 @@ class Authorization(unittest.TestCase):
         self.assertNotIn("github.event.issue.body", workflow)
         self.assertNotIn("github.event.issue.user", workflow)
         self.assertEqual(workflow.count("github.event.issue.title"), 1)
+
+
+class Hardening(unittest.TestCase):
+    def test_every_authorization_path_makes_the_same_api_calls(self):
+        member = {"id": 7, "login": "some-member"}
+        stranger = event_for(user={"id": 7, "login": "stranger"})
+        scenarios = [("example-partner", None), ("example-partner:4242", None), ("other-login", None), ("example-partner:999", None),
+                     (None, None), ("", None), ("a,,b", None), ("example-partner", stranger), ("example-partner", event_for(user=member)),
+                     ("example-partner", event_for("not json")), ("example-partner", event_for(json.dumps({"fork": "../x"}))),
+                     ("example-partner", {"issue": None}), ("example-partner", event_for(user={"id": True, "login": "x"}))]
+        shapes = set()
+        for allow, event in scenarios:
+            ok, net = auth(allow, event)
+            shapes.add(tuple(call[0] for call in net.calls))
+        self.assertEqual(shapes, {("repo", "member")})
+        for allow in ("example-partner", "other-login", None):
+            net = FakeNet({})
+            ws.authorized(event_for(), allow, SCHEMA["x-limits"], net)
+            self.assertEqual(len(net.calls), 2)
+
+    def test_edited_title_runs_the_verifier_and_withdraws_the_verdict(self):
+        event = event_for()
+        event["issue"]["title"] = "renamed"
+        self.assertEqual(run(submission(evidence()), title="renamed")[0], "not-a-submission")
+        code, out, err, output = cli("verify", event, None, FakeNet({}))
+        self.assertEqual(json.loads(out), {"verdict": "not-attested", "reason": "not-a-submission", "upstream": "e" * 40})
+        workflow = (ROOT / ".github" / "workflows" / "wiki-submission-ingest.yml").read_text(encoding="utf-8")
+        condition = next(line for line in workflow.splitlines() if "github.event.issue.title" in line)
+        self.assertIn("startsWith(github.event.issue.title, '[wiki-submission]')", condition)
+        self.assertIn("contains(github.event.issue.labels.*.name, 'wiki-attested')", condition)
+        self.assertIn("contains(github.event.issue.labels.*.name, 'wiki-not-attested')", condition)
+
+    def test_report_runs_when_verify_fails_and_never_keeps_an_attestation(self):
+        workflow = (ROOT / ".github" / "workflows" / "wiki-submission-ingest.yml").read_text(encoding="utf-8")
+        self.assertIn("needs.verify.result != 'skipped'", workflow)
+        self.assertIn("needs.verify.result == 'success' && needs.verify.outputs.verdict || 'not-attested'", workflow)
+        self.assertIn("|| 'internal-error'", workflow)
+
+    def test_deep_nesting_and_any_exception_end_as_not_attested(self):
+        depth = SCHEMA["x-limits"]["bodyBytes"] // 2
+        code, out, err, output = cli("verify", event_for("[" * depth + "]" * depth), None, FakeNet({}))
+        self.assertEqual(json.loads(out)["verdict"], "not-attested")
+        self.assertEqual(json.loads(out)["reason"], "too-deep")
+        for error in (RecursionError, RuntimeError, MemoryError, KeyError):
+            with mock.patch.object(ws, "verify", side_effect=error("attacker text")):
+                code, out, err, output = cli("verify", event_for(), None, FakeNet({}))
+            self.assertEqual((code, json.loads(out)["verdict"], json.loads(out)["reason"]), (0, "not-attested", "internal-error"))
+            self.assertNotIn("attacker", out + err + output)
+
+    def test_evidence_is_fetched_at_the_evidence_commit_and_tied_to_the_fork_commit(self):
+        blob = evidence()
+        body = submission(blob)
+        self.assertEqual(run(body)[0], "ok")
+        self.assertEqual(run(body, net=FakeNet({"wiki-evidence.json": blob}, evidence_ref=FORK_SHA))[0], "evidence-missing")
+        for relation in ("behind", "diverged", "other"):
+            self.assertEqual(run(body, net=FakeNet({"wiki-evidence.json": blob}, relation=relation))[0], "evidence-commit-unrelated")
+        net = FakeNet({"wiki-evidence.json": blob}, commits={(FORK, FORK_SHA), (UPSTREAM, BASE_SHA)})
+        self.assertEqual(run(body, net=net)[0], "commit-missing")
+        same = submission(blob, evidence_commit=FORK_SHA)
+        self.assertEqual(run(same, net=FakeNet({"wiki-evidence.json": blob}, evidence_ref=FORK_SHA, relation="identical"))[0], "ok")
+        missing = {key: value for key, value in body.items() if key != "evidence_commit"}
+        self.assertEqual(run(missing)[0], "schema-invalid")
+        self.assertEqual(run(submission(blob, evidence_commit="main"))[0], "schema-invalid")
+        stale = evidence(commit=EVID_SHA)
+        self.assertEqual(run(submission(stale), blob=stale)[0], "evidence-commit-mismatch")
+
+    def test_a_missing_evidence_file_maps_to_evidence_missing_through_the_real_client(self):
+        stub = ws.GitHubApi(None)
+        stub.get = lambda path, limit=0: None
+        self.assertIsNone(ws.as_file(None))
+        self.assertEqual(ws.as_file([{"name": "x"}]), {"type": "dir", "size": 0})
+        self.assertEqual(ws.as_file({"type": "file"}), {"type": "file"})
+
+        class Real(FakeNet):
+            def file(self, slug, path, ref):
+                return stub.file(slug, path, ref)
+
+        self.assertEqual(run(submission(evidence()), net=Real({}))[0], "evidence-missing")
 
 
 class WikiSubmission(unittest.TestCase):
