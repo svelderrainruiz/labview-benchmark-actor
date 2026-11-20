@@ -50,15 +50,17 @@ upstream wiki.
   fork at your commit. Anything that did not run there is shown as not run, not as
   passed.
 
-## Sending evidence upstream (planned, not built)
+## Sending evidence upstream (issues built, pull requests planned)
 
-Nothing in this section exists yet. The intended design is:
+The submission **issue** path is built ([ADR-0091](../architecture/adr/ADR-0091-verify-fork-wiki-submissions-as-data.md)).
+The pull request path for page changes, the lineage field on pages and the
+local producer are not built yet. The intended design is:
 
 - A fork submits evidence to the upstream through an **issue** (a form with a
   structured record), and through a **pull request** for page changes, with
   evidence files attached.
-- The upstream keeps a partner **allow-list**. It ships **empty**, so by default
-  no submission is accepted.
+- The upstream keeps a private partner **allow-list**. It is unset by default,
+  so by default no submission is accepted.
 - Only **attested** evidence counts: the upstream re-verifies the submitted
   evidence with its own pinned verifier code, in an isolated job, against its own
   test definitions. The fork's scripts are never run with upstream privileges, and
@@ -66,3 +68,36 @@ Nothing in this section exists yet. The intended design is:
   *not attested*.
 - Each page carries a **lineage** field (source repository and commit) that the
   fork owns; the upstream records only submissions it accepted.
+
+### How a partner submits an issue
+
+1. The upstream operator lists your fork's owner (your user or organisation
+   login, optionally pinned to its numeric account id) in the upstream's
+   private partner allow-list. Nothing is enabled until the operator does so:
+   an unset or empty list rejects every submission, and the list is not
+   published. You must be that owner, or a public member of the owning
+   organisation, to submit.
+2. Run the tests on your fork at a pushed commit (`fork_commit`) and commit the
+   resulting `wiki-evidence.json` (`rsr/test-evidence@1`, one platform) in a
+   later commit (`evidence_commit`): the generator records the commit it ran
+   at, which cannot be the commit that adds the evidence file itself. The
+   evidence must record `commit == fork_commit`, and `evidence_commit` must be
+   `fork_commit` or ahead of it in your fork.
+3. Open an issue on the upstream titled `[wiki-submission] <anything>` whose
+   body is **only** one JSON document of schema `rsr/wiki-submission@1`
+   (`scripts/wiki-submission.schema.json`): your fork, the full 40-hex fork
+   commit and evidence commit, the upstream base commit, generator version,
+   platform, the test ids
+   with their results, the evidence files with their sha256, and the lineage
+   (source repository and commit). Editing the issue re-runs verification;
+   renaming the title away from the prefix withdraws an earlier attestation.
+4. The workflow answers with the label `wiki-attested` or `wiki-not-attested`
+   and a fixed comment that names the upstream commit that verified it and a
+   reason code.
+
+**What attested means.** The fork owner is a listed partner and you are that owner or a public member of it, the fork is a fork of
+this repository, the evidence files fetched from your fork at that commit match
+the declared sha256 and size limits, and the test ids, results, commit and
+platform agree with this repository's own test files and canonical evidence
+rules. Nothing from your fork is checked out or run, and none of your text is
+echoed back. Attested is not a claim that your code is correct.
