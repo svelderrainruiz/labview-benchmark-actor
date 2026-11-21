@@ -1,0 +1,13 @@
+{
+  "schema": "rsr/test-evidence@1",
+  "commit": "fd871e5e4b08b3e2754dfe4db3d4fab1508f4712",
+  "platform": "linux-x64",
+  "format": "jest-json",
+  "cases": [
+    {
+      "file": "test/branch-coverage.mjs",
+      "name": "synthetic case",
+      "status": "passed"
+    }
+  ]
+}

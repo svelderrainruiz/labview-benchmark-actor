@@ -1,0 +1,11 @@
+{
+  "attested": "2026-11-21",
+  "evidence_sha256": "c4824dfb8c85b56ebd2b321e098d664ae9845601161db4314733cc6fcef29f95",
+  "platform": "linux-x64",
+  "schema": "rsr/wiki-lineage@1",
+  "submission": 116,
+  "tests": [
+    "test/branch-coverage.mjs"
+  ],
+  "upstream_commit": "23f781a528f98c35e0c44d090675caae2381ed85"
+}
