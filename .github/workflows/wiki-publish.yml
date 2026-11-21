@@ -25,6 +25,8 @@ on:
       - 'scripts/wikiEvidence.mjs'
       - 'scripts/wikiEvidenceTrace.mjs'
       - 'scripts/check_wiki_canonical.py'
+      - 'scripts/wiki_lineage.py'
+      - 'wiki-evidence/**'
       - '.repo-standards-review/wiki_generate.py'
       - '.github/workflows/wiki-publish.yml'
   workflow_dispatch:

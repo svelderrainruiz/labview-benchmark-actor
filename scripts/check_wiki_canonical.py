@@ -24,6 +24,9 @@ import sys
 import tempfile
 from pathlib import Path
 
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import wiki_lineage  # noqa: E402
+
 sys.dont_write_bytecode = True
 KIT = Path(".repo-standards-review")
 STEPS = ["npm ci", "npm run compile"]
@@ -65,6 +68,7 @@ def build(wiki: Path, evidence: str, config: Path, existing: bool = False) -> di
         "--member", MEMBER, "--artifact-section", ARTIFACT_SECTION,
         *[x for step in STEPS for x in ("--step", step)], "--command", COMMAND)
     run(sys.executable, str(KIT / "observations.py"), "generate", "--wiki", str(wiki), "--evidence", evidence)
+    wiki_lineage.apply(wiki, Path("."))
     return summary
 
 
