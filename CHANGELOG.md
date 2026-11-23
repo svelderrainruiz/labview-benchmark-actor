@@ -8,6 +8,8 @@ follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project
 
 ### Added
 
+- Local Ollama models can call the actor's MCP tools without an editor. The Node CLI
+  defaults to three read-only tools and offers a receipt-producing `--self-test` (#119, ADR-0092).
 - Fork and wiki guide: say how to enable Actions on a fork through the API, that the job succeeds without the
   `repoUrl` edit but links to the upstream, and that the generated Home page replaces the first page.
 - Fork and wiki guide (`docs/information-for-users/fork-and-wiki-guide.md`): bootstrap checklist for publishing a fork's own

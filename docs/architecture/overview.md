@@ -197,6 +197,8 @@ multi-VM / Codespace topology.
 - The actor exposes its tools (host capabilities, benchmark series, bus
   poll / post) to a coding agent through a Model Context Protocol server
   (LBA-REQ-019, ADR-0012).
+- A standalone Node client exposes permitted tools from the same stdio server to a local
+  Ollama chat model, without an editor or additional listener (LBA-REQ-019, ADR-0092).
 - The MCP server preserves those four core tools and exposes active capture as
   bounded, read-only pathless resources: opaque run identity, explicit lifecycle,
   ordered frame/sample metadata, and frame bytes only on a requested validated

@@ -643,6 +643,9 @@ progressively.
     dependency-free stdio entry (`runBenchmarkActorMcpServer.ts`).
   - The bundled tool-doc check keeps `docs/mcp-tools.md` in sync with the
     published registry.
+  - A local Ollama client can discover and call those tools without the editor.
+    Only the three read-only core tools are enabled by default. A fake chat endpoint
+    exercises the real stdio server and the self-test receipt (`test/ollama-mcp-bridge.mjs`, ADR-0092).
   - Gated: `test/mcp-server.mjs` (pure-core, activation, and stdio legs) and
     `scripts/mcpToolDoc.mjs --check` run under `npm test`, all deterministic and
     host-free (no real VS Code, no display, no live `lbabus`).

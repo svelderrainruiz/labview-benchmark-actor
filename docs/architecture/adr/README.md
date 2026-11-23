@@ -100,6 +100,7 @@
 | [ADR-0089](ADR-0089-generate-the-wiki-as-an-obsidian-vault.md) | Generate the repository wiki as an Obsidian vault from docs/ | LINUX | Superseded | LBA-REQ-103 |
 | [ADR-0090](ADR-0090-generate-the-wiki-with-the-shared-generator.md) | Generate the repository wiki with the shared repo-standards-review generator | LINUX | Accepted | LBA-REQ-103 |
 | [ADR-0091](ADR-0091-verify-fork-wiki-submissions-as-data.md) | Verify fork wiki submissions as data | LINUX | Accepted | LBA-REQ-104 |
+| [ADR-0092](ADR-0092-local-ollama-mcp-bridge.md) | Let a local Ollama model call the bundled MCP server | WIN | Accepted | LBA-REQ-019 |
 
 Numbering is split by owner to avoid collisions: WIN takes 0001–0002 (+0005, 0006, 0007, 0008, 0009),
 LINUX takes 0003–0004 (+0010, 0011, 0012, 0013, 0014, 0015, 0016, 0017, 0018, 0019, 0020, 0021, 0022, 0023, 0024). Add new ADRs by extending your own range.

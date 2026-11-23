@@ -25,7 +25,7 @@
 | LBA-REQ-016 | GitFlow branch governance | Proven | §3.8 Configuration-management & assurance | ADR-0010 | T-016 | 5 |
 | LBA-REQ-017 | LabVIEW authoring-lane dependency manifest | Proven | §3.8 Configuration-management & assurance | — | T-017 | 3 |
 | LBA-REQ-018 | Provider-delegated cleanroom AI uplift | Proven | §3.7 Agentic-infrastructure | ADR-0011 | T-018 | 17 |
-| LBA-REQ-019 | MCP server agent tool surface | Proven | §3.7 Agentic-infrastructure | ADR-0012 | T-019 | 7 |
+| LBA-REQ-019 | MCP server agent tool surface | Proven | §3.7 Agentic-infrastructure | ADR-0012, ADR-0092 | T-019 | 10 |
 | LBA-REQ-020 | Bidirectional release sign-off | Proven | §3.8 Configuration-management & assurance | — | T-020 | 5 |
 | LBA-REQ-021 | Test-to-requirement correspondence gate | Proven | §3.8 Configuration-management & assurance | ADR-0013 | T-021 | 3 |
 | LBA-REQ-022 | Generated traceability matrix | Proven | §3.8 Configuration-management & assurance | ADR-0013 | T-022 | 3 |
