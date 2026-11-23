@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
 import { generateKeyPairSync } from 'node:crypto';
-import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, realpathSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { test } from 'node:test';
@@ -424,7 +424,8 @@ test('keyless attest workflow validates the dispatch bundle and tag as data', ()
   const script = runBodies(read('../.github/workflows/acg-keyless-attest.yml')).find(body => body.includes('DISPATCH_BUNDLE'));
   assert.ok(script);
   const fallback = 'experiments/acg-transparency/release-provenance-bundle.json';
-  const scratch = mkdtempSync(join(tmpdir(), 'keyless-inputs-'));
+  // Long names: the Windows runner temp directory is an 8.3 short name (RUNNER~1) that realpath expands.
+  const scratch = realpathSync.native(mkdtempSync(join(tmpdir(), 'keyless-inputs-')));
   const outside = mkdtempSync(join(tmpdir(), 'keyless-outside-'));
   const output = join(scratch, 'inputs-output');
   try {
@@ -432,8 +433,8 @@ test('keyless attest workflow validates the dispatch bundle and tag as data', ()
     for (const file of [fallback, 'other.json', 'a..b.json']) writeFileSync(join(scratch, file), '{}');
     mkdirSync(join(scratch, 'dir.json'));
     writeFileSync(join(outside, 'x.json'), '{}');
-    // The temporary checkout as bash itself names it, so Git Bash on Windows compares like with like.
-    const workspace = spawnSync('bash', ['-c', 'pwd -P'], { cwd: scratch, encoding: 'utf8' }).stdout.trim();
+    // The temporary checkout as the workflow's own realpath names it, so Git Bash on Windows compares like with like.
+    const workspace = spawnSync('bash', ['-c', 'realpath -e .'], { cwd: scratch, encoding: 'utf8' }).stdout.trim();
     assert.ok(workspace);
     const run = (bundle, tag, env = {}) => {
       rmSync(output, { force: true });
