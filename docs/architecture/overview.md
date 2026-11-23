@@ -402,6 +402,7 @@ Detailed decisions are recorded as ADRs in [adr/](adr/README.md):
 | [ADR-0089](adr/ADR-0089-generate-the-wiki-as-an-obsidian-vault.md) | Generate the repository wiki as an Obsidian vault from docs/ | LINUX |
 | [ADR-0090](adr/ADR-0090-generate-the-wiki-with-the-shared-generator.md) | Generate the repository wiki with the shared repo-standards-review generator | LINUX |
 | [ADR-0091](adr/ADR-0091-verify-fork-wiki-submissions-as-data.md) | Verify fork wiki submissions as data | LINUX |
+| [ADR-0093](adr/ADR-0093-digest-only-reviewer-infrastructure.md) | Publish only the digest of the reviewer infrastructure receipt | LINUX |
 | [ADR-0007](adr/ADR-0007-image-derived-timing-binary-strip.md) | Image-derived timing binds to the pixel-decoded binary strip (cross-platform) | WIN |
 | [ADR-0008](adr/ADR-0008-interactive-ollama-drive-mirrored-build-coordination.md) | Interactive host-Ollama drive + mirrored build-coordination over `lbabus` | WIN |
 | [ADR-0009](adr/ADR-0009-absorb-mprr-model-self-owned.md) | Absorb the mprr ring/timing model as self-owned (retire the external `svelderrainruiz/mprr`) | WIN |

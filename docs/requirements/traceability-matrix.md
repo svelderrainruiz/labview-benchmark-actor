@@ -63,7 +63,7 @@
 | LBA-REQ-054 | Benchmark Observatory (suite-wide coverage + determinism map) | Proven | §3.2 Deployment | ADR-0034 | T-054 | 4 |
 | LBA-REQ-055 | Handoff Beacon -- capture-status (human-in-the-loop signal) | Proven | §3.2 Deployment | ADR-0035 | T-055 | 9 |
 | LBA-REQ-056 | Handoff Beacon -- agent->human request (human-step barrier) | Proven | §3.2 Deployment | ADR-0036 | T-056 | 7 |
-| LBA-REQ-057 | Handoff Beacon -- reviewer visual verdict (signed human PASS/FAIL) | Proven | §3.2 Deployment | ADR-0037 | T-057 | 14 |
+| LBA-REQ-057 | Handoff Beacon -- reviewer visual verdict (signed human PASS/FAIL) | Proven | §3.2 Deployment | ADR-0037, ADR-0093 | T-057 | 14 |
 | LBA-REQ-058 | Handoff Beacon -- reviewer verdict bus announcement | Proven | §3.2 Deployment | ADR-0038 | T-058 | 6 |
 | LBA-REQ-059 | Host<->VM-agent closed loop over the lbabus net TCP bus | Proven | §3.2 Deployment | ADR-0039 | T-059 | 7 |
 | LBA-REQ-060 | Live-only net coordination -- the receive-log + net poll read side | Proven | §3.2 Deployment | ADR-0040 | T-060 | 3 |
@@ -77,7 +77,7 @@
 | LBA-REQ-068 | Net-only live VM-agent drive (govern the released-CLI closed loop as a committed receipt) | Proven | §3.2 Deployment | ADR-0049 | T-068 | 6 |
 | LBA-REQ-069 | Release-with-review drive (bind the net-staged candidate to the signed + announced verdict) | Proven | §3.2 Deployment | ADR-0050 | T-069 | 7 |
 | LBA-REQ-070 | Composite release decision (bind the machine corroboration gate to the human visual gate over one net-staged candidate) | Proven | §3.2 Deployment | ADR-0051 | T-070 | 8 |
-| LBA-REQ-071 | Enforce the composite release decision in the extension release workflow | Proven | §3.2 Deployment | ADR-0052, ADR-0073 | T-071 | 4 |
+| LBA-REQ-071 | Enforce the composite release decision in the extension release workflow | Proven | §3.2 Deployment | ADR-0052, ADR-0073, ADR-0093 | T-071 | 6 |
 | LBA-REQ-072 | Cross-plane launch-benchmark parity (identity is the spec, not the series) | Proven | §3.2 Deployment | ADR-0053 | T-072 | 6 |
 | LBA-REQ-073 | Mesh-run cross-plane fulfillment (the North Star loop) | Proven | §3.2 Deployment | ADR-0054 | T-073 | 5 |
 | LBA-REQ-074 | GitHub-native mesh-run dispatch transport (repository_dispatch) | Proven | §3.2 Deployment | ADR-0055 | T-074 | 6 |

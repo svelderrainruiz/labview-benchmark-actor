@@ -10,6 +10,7 @@ follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project
 
 - Local Ollama models can call the actor's MCP tools without an editor. The Node CLI
   defaults to three read-only tools and offers a receipt-producing `--self-test` (#119, ADR-0092).
+- Extension release pre-flight and CI now require a signed reviewer infrastructure receipt digest from 1.6.7. The receipt stays private.
 - Fork and wiki guide: say how to enable Actions on a fork through the API, that the job succeeds without the
   `repoUrl` edit but links to the upstream, and that the generated Home page replaces the first page.
 - Fork and wiki guide (`docs/information-for-users/fork-and-wiki-guide.md`): bootstrap checklist for publishing a fork's own
@@ -41,6 +42,9 @@ follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project
 
 ### Fixed
 
+- Release-path workflows and the keyless-attest action pass expressions to the shell only through `env:`.
+  `acg-keyless-attest.yml` checks `bundle` and `tag` against anchored patterns before use, and refuses a bundle
+  reached through a symlink or resolving outside the checkout.
 - Activate on `onStartupFinished` so the MCP server provider re-registers every session and VS Code refreshes its
   cached server definition after an upgrade (#88). Before, the agent host could launch the previous version's
   removed path and report `LabVIEW Benchmark Actor: MCP tools ... are unavailable` (`MODULE_NOT_FOUND`).

@@ -31,6 +31,11 @@
 2. Bump changed component versions and the extension in `release-components.json`, synchronize
    package/component sources, and stamp `## [X.Y.Z]` in `CHANGELOG.md`. The repository precommit
    hook requires these release metadata files to be staged in their final state.
+   **From 1.6.7:** the release operator checks the full reviewer infrastructure receipt against the
+   selected baseline in private, before signing. Hash the exact retained receipt bytes with SHA-256.
+   Put only the [three-field record](reviewer-infrastructure.schema.json) in `release-components.json`
+   before building: `schema` is `reviewer-infrastructure@1`, `baseline` is the baseline version (e.g.
+   `v0.1.0`), and `receiptSha256` is the 64-character lowercase hex digest. Keep the receipt private.
 3. On the pinned node, build the normalized artifact: `npm run package`, from a clean
    `git worktree` of the candidate commit so no ignored local file is packaged (#55). Capture
    the candidate `commit` and the packaged `vsixSha256`. Packaging fails closed unless every
@@ -76,6 +81,11 @@ for the correlated `DONE` while the in-VM sender reports the staged identity, an
 from the attestation (`cross-plane-run`, `attestation-sha256`) plus the `windows-stage` task. The VM password comes from
 `LBA_VM_PASS` or `~/.config/lba/vm-pass` and reaches VBoxManage only as a private `--passwordfile`. `--dry-run`
 prints the plan, and the command refuses to overwrite an existing staged frame without `--force`.
+
+When the infrastructure record is present, the stage command adds its digest to those evidence entries.
+If setting the target manually, preserve the stage evidence and add exactly one
+`--evidence "reviewer-infrastructure-receipt-sha256:<receiptSha256>"` to the same `set-target` command.
+Before signing, the reviewer confirms the target carries the digest of the privately checked receipt.
 
 The steps it composes, for diagnosis: after the WIN reviewer agent reports its stage task, await its correlated
 `DONE` frame and then build the composite-ready artifact:
@@ -170,8 +180,13 @@ key material). Then:
    forcing a new extension or `lbabus` identity.
 3. **Preflight.** `npm run lba -- release-preflight X.Y.Z` must be all green: it asserts
    the local node equals `.nvmrc`, `package.json` + `CHANGELOG.md` are at `X.Y.Z`, the
-   composite receipt `candidate.version == X.Y.Z`, and the three live publish gates clear
-   (`scripts/lba.mjs`).
+   composite receipt `candidate.version == X.Y.Z`, and the live publish gates clear. Both preflight and
+   the workflow's `agreement` job run `scripts/verify-reviewer-infrastructure.mjs` against the sealed
+   candidate. A pass proves the signed verdict commits to the public digest, not that the infrastructure
+   matches the receipt. Published releases are not re-checked.
+   The visual key must have `validFrom` and `validThrough` both equal to `X.Y.Z` and the `visual`
+   purpose. Ranges are insufficient for this gate. Supply stable versions without leading zeros;
+   pre-release versions and duplicate JSON member names are rejected.
 
 ## 6. Reconcile + merge to main
 

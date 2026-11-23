@@ -1,0 +1,9 @@
+{
+  "extension": "1.6.7",
+  "reviewerInfrastructure": {
+    "schema": "reviewer-infrastructure@1",
+    "baseline": "v0.1.0",
+    "receiptSha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "receiptSha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+  }
+}
