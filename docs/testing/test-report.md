@@ -296,7 +296,7 @@ The controlled state of the repository's configuration items, derived from the r
 | — Status: Planned | 2 | rtm.csv |
 | — Status: Proven | 101 | rtm.csv |
 | — Status: Superseded | 1 | rtm.csv |
-| Architecture decisions (ADRs) | 92 | docs/architecture/adr/README.md |
+| Architecture decisions (ADRs) | 93 | docs/architecture/adr/README.md |
 | Governed gates | 220 | experiments/verify-local-gates.mjs |
 | Correspondence rules | 7 | experiments/reqs-coverage/verify-correspondences.mjs |
 | Governed test items | 104 | docs/testing/test-plan.md |
@@ -316,4 +316,4 @@ the same correspondence graph (ADR-0013).
 `node experiments/reqs-coverage/generate-test-report.mjs` rewrites this file; `--check` (the
 `test-report-current` gate) fails closed on drift, so the report can never silently lag the apparatus.
 
-_Generated from 220 gates, 7 correspondence rules, 104 requirements, 92 ADRs, 104 test items._
+_Generated from 220 gates, 7 correspondence rules, 104 requirements, 93 ADRs, 104 test items._
