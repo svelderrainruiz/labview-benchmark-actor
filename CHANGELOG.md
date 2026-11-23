@@ -42,8 +42,9 @@ follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project
 
 ### Fixed
 
-- Release workflows and the keyless-attest action pass dispatch and action inputs to the shell only through `env:`.
-  `acg-keyless-attest.yml` checks `bundle` and `tag` against anchored patterns before use.
+- Release-path workflows and the keyless-attest action pass expressions to the shell only through `env:`.
+  `acg-keyless-attest.yml` checks `bundle` and `tag` against anchored patterns before use, and refuses a bundle
+  reached through a symlink or resolving outside the checkout.
 - Activate on `onStartupFinished` so the MCP server provider re-registers every session and VS Code refreshes its
   cached server definition after an upgrade (#88). Before, the agent host could launch the previous version's
   removed path and report `LabVIEW Benchmark Actor: MCP tools ... are unavailable` (`MODULE_NOT_FOUND`).

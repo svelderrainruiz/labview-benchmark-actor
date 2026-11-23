@@ -52,10 +52,13 @@ jobs:
           echo "$RUNNER_OS .vsix sha256: $sha"
       - name: Stage sha + .vsix for comparison
         shell: bash
+        env:
+          MATRIX_OS: ${{ matrix.os }}
+          VSIX_SHA256: ${{ steps.sha.outputs.sha256 }}
         run: |
           mkdir -p out-artifacts
-          printf '%s' "${{ steps.sha.outputs.sha256 }}" > "out-artifacts/${{ matrix.os }}.sha256"
-          cp labview-benchmark-actor.vsix "out-artifacts/${{ matrix.os }}.vsix"
+          printf '%s' "$VSIX_SHA256" > "out-artifacts/${MATRIX_OS}.sha256"
+          cp labview-benchmark-actor.vsix "out-artifacts/${MATRIX_OS}.vsix"
       - uses: actions/upload-artifact@v4
         with:
           name: vsix-${{ matrix.os }}

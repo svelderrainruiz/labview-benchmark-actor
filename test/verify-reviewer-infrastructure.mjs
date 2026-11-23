@@ -5,6 +5,7 @@ import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, 
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { test } from 'node:test';
+import { fileURLToPath } from 'node:url';
 import { runInNewContext } from 'node:vm';
 import {
   buildReviewerVerdict, generateEnrolledKeypair, signReviewerVerdict,
@@ -223,41 +224,109 @@ test('pre-flight exits nonzero when only the infrastructure verifier fails', () 
   }
 });
 
-// Every run: value, inline or block scalar, with all of its more-indented continuation lines.
-function runBodies(yaml) {
-  const lines = yaml.split('\n');
-  return lines.flatMap((line, i) => {
-    const match = /^(\s*(?:-\s+)?)run:(?:\s+(.*))?$/.exec(line);
-    if (!match) return [];
-    const head = match[2] ?? '';
-    const rest = [];
-    for (let j = i + 1; j < lines.length && !(lines[j].trim() && lines[j].search(/\S/) <= match[1].length); j++) {
-      rest.push(lines[j]);
-    }
-    const pad = Math.min(...rest.filter(l => l.trim()).map(l => l.search(/\S/)));
-    const body = /^[|>][-+1-9]*\s*(?:#.*)?$/.test(head) ? [] : [head];
-    return [[...body, ...rest.map(l => l.slice(pad))].join('\n')];
-  });
+// A line-based decoder for run values in workflow and action YAML, without a YAML dependency. It fails
+// closed: a run-like key, alias, tag, escape or multi-line flow collection it cannot decode throws.
+const blockHeader = /^[|>][-+1-9]*[ \t]*(?:#.*)?$/;
+const runKey = /^([ \t]*(?:-[ \t]+)*)(?:"run"|'run'|run)[ \t]*:(?:[ \t]+(.*?))?[ \t]*$/i;
+const runCandidate = /(?:^|[[{,?])[ \t]*(?:-[ \t]*)*(?:[!&]\S*[ \t]+)*["']?run["']?[ \t]*:/i;
+const opaqueKey = /(?:^|[[{,])[ \t]*(?:-[ \t]+)*\?(?:[ \t]|$)|"[^"\n]*\\[^"\n]*"[ \t]*:(?:[ \t]|$)/;
+const otherBlock = /^([ \t]*(?:-[ \t]+)*)([^\s#].*?:[ \t]+)?[|>][-+1-9]*[ \t]*(?:#.*)?$/;
+
+function opensMultilineFlow(line) {
+  const start = /(?:^[ \t]*(?:-[ \t]+)*|:[ \t]+)(?=[[{])/.exec(line);
+  if (!start) return false;
+  let depth = 0;
+  for (let k = start.index + start[0].length; k < line.length; k++) {
+    const c = line[k];
+    if ((c === '"' || c === "'") && /[\s[{,:]/.test(line[k - 1])) {
+      const quoted = (c === '"' ? /^"(?:[^"\\]|\\.)*"/ : /^'(?:[^']|'')*'/).exec(line.slice(k));
+      if (!quoted) return true;
+      k += quoted[0].length - 1;
+    } else if (c === '#' && /\s/.test(line[k - 1])) break;
+    else if (c === '[' || c === '{') depth++;
+    else if (c === ']' || c === '}') depth--;
+  }
+  return depth !== 0;
 }
 
-// Every workflow file the release procedure names, plus every composite action.
-function releasePathFiles() {
-  const named = new Set([...read('../docs/release/release-procedure.md').matchAll(/[\w.-]+\.ya?ml\b/g)].map(m => m[0]));
-  const workflows = [...named].map(name => `.github/workflows/${name}`).filter(f => existsSync(new URL(`../${f}`, import.meta.url)));
-  const actions = readdirSync(new URL('../.github/actions/', import.meta.url), { withFileTypes: true })
-    .filter(d => d.isDirectory())
-    .flatMap(d => ['action.yml', 'action.yaml'].map(f => `.github/actions/${d.name}/${f}`))
-    .filter(f => existsSync(new URL(`../${f}`, import.meta.url)));
-  return [...workflows, ...actions];
+function runBodies(yaml, file = 'yaml') {
+  const lines = yaml.split('\n');
+  const indentOf = l => l.search(/\S/);
+  const blockEnd = (from, col) => {
+    let j = from;
+    while (j < lines.length && !(lines[j].trim() && indentOf(lines[j]) <= col)) j++;
+    return j;
+  };
+  const bodies = [];
+  let scalarEnd = 0;
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+    if (!line.trim() || /^[ \t]*#/.test(line)) continue;
+    const unrecognised = () => new Error(`unrecognised run form at ${file}:${i + 1}`);
+    const run = runKey.exec(line);
+    if (run) {
+      const head = run[2] ?? '';
+      const end = blockEnd(i + 1, run[1].length);
+      const rest = lines.slice(i + 1, end);
+      const value = head || (rest.find(l => l.trim()) ?? '').trim();
+      if (/^[*&!{[@`%]/.test(value) || (/^[|>]/.test(value) && !blockHeader.test(value))
+          || (value.startsWith('"') && [head, ...rest].join('\n').includes('\\'))) throw unrecognised();
+      const pad = Math.min(...rest.filter(l => l.trim()).map(indentOf));
+      bodies.push([...(blockHeader.test(head) ? [] : [head]), ...rest.map(l => l.slice(pad))].join('\n'));
+      i = end - 1;
+      continue;
+    }
+    if (runCandidate.test(line) || opaqueKey.test(line) || (i >= scalarEnd && opensMultilineFlow(line))) throw unrecognised();
+    const scalar = i >= scalarEnd && otherBlock.exec(line);
+    if (scalar) scalarEnd = blockEnd(i + 1, scalar[2] ? scalar[1].length : scalar[1].trimEnd().length - 1);
+  }
+  return bodies;
+}
+
+// The workflows the release procedure and runbook name, every composite action, and every
+// repository-local `uses: ./...` they reach, transitively.
+function releasePathFiles(root = fileURLToPath(new URL('../', import.meta.url))) {
+  const exists = rel => existsSync(join(root, rel));
+  const text = rel => readFileSync(join(root, rel), 'utf8').replaceAll('\r\n', '\n');
+  const queue = [];
+  for (const doc of ['docs/release/release-procedure.md', 'docs/release/release-runbook.md']) {
+    for (const [name] of text(doc).matchAll(/[\w.-]+\.ya?ml\b/g)) {
+      assert.ok(exists(`.github/workflows/${name}`), `${doc} names ${name}, which is not a workflow`);
+      queue.push(`.github/workflows/${name}`);
+    }
+  }
+  const actionFile = dir => ['action.yml', 'action.yaml'].map(f => `${dir}/${f}`).find(exists);
+  if (exists('.github/actions')) {
+    for (const d of readdirSync(join(root, '.github', 'actions'), { withFileTypes: true })) {
+      if (d.isDirectory() && actionFile(`.github/actions/${d.name}`)) queue.push(actionFile(`.github/actions/${d.name}`));
+    }
+  }
+  const seen = new Set();
+  while (queue.length) {
+    const rel = queue.shift();
+    if (seen.has(rel)) continue;
+    seen.add(rel);
+    for (const [, ref] of text(rel).matchAll(/(?:^|[[{,])[ \t]*(?:-[ \t]*)*["']?uses["']?[ \t]*:[ \t]*["']?\.\/([^\s"',}\]#@]*)/gim)) {
+      const target = ref.replace(/\/+$/, '');
+      const file = /\.ya?ml$/.test(target) ? target : actionFile(target);
+      assert.ok(file && exists(file), `${rel} uses ./${ref}, which does not resolve to a workflow or action file`);
+      queue.push(file);
+    }
+  }
+  return [...seen].sort();
 }
 
 test('release-path workflows and composite actions never interpolate expressions into run bodies', () => {
   const files = releasePathFiles();
-  for (const required of ['.github/workflows/extension-release.yml', '.github/workflows/acg-keyless-attest.yml', '.github/actions/keyless-attest/action.yml']) {
+  for (const required of [
+    '.github/workflows/extension-release.yml', '.github/workflows/acg-keyless-attest.yml',
+    '.github/workflows/acg-cross-plane-corroboration.yml', '.github/workflows/vsix-cross-plane-repro.yml',
+    '.github/actions/keyless-attest/action.yml',
+  ]) {
     assert.ok(files.includes(required), `the scan covers ${required}`);
   }
   for (const file of files) {
-    const bodies = runBodies(read(`../${file}`));
+    const bodies = runBodies(read(`../${file}`), file);
     assert.ok(bodies.length > 0, `${file} has run bodies to scan`);
     for (const body of bodies) assert.doesNotMatch(body, /\$\{\{/, `${file} interpolates an expression into a run body`);
   }
@@ -286,21 +355,91 @@ test('release-path workflows and composite actions never interpolate expressions
   assert.match(attest, /TAG: \$\{\{ steps\.validated\.outputs\.tag \}\}/);
 });
 
+test('run scanner decodes or rejects every run key form and never passes one silently', () => {
+  const expression = '${{ inputs.tag }}';
+  for (const yaml of [
+    `steps:\n  - "run": >-\n      echo "${expression}"`,
+    `steps:\n  - 'RUN' : |\n      echo "${expression}"`,
+    `steps:\n  - name: x\n    run:\n      echo "${expression}"`,
+  ]) {
+    const bodies = runBodies(yaml, 'fixture.yml');
+    assert.equal(bodies.length, 1, yaml);
+    assert.ok(bodies[0].includes(expression), yaml);
+  }
+  for (const [yaml, line] of [
+    [`steps:\n  - { name: x, run: echo "${expression}" }`, 2],
+    ['steps:\n  - { name: x, run: echo clean }', 2],
+    ['steps:\n  - {run: echo clean}', 2],
+    ['steps: [run: echo clean]', 1],
+    ['steps:\n  - {\n      name: x,\n      run: echo\n  clean }', 2],
+    ['steps:\n  - "\\x72un": echo clean', 2],
+    ['steps:\n  - ? run\n    : echo clean', 2],
+    ['steps:\n  - !!str run: echo clean', 2],
+    ['steps:\n  - &step run: echo clean', 2],
+    ['steps:\n  - run: *cmd', 2],
+    ['steps:\n  - run:\n      *cmd', 2],
+    ['steps:\n  - run: !!str echo clean', 2],
+    ['steps:\n  - run: [echo, clean]', 2],
+    ['steps:\n  - run: "echo \\x24{{ inputs.tag }}"', 2],
+    ['steps:\n  - run: "echo $\\\n      {{ inputs.tag }}"', 2],
+    ['steps:\n  - run:x', 2],
+  ]) {
+    assert.throws(() => runBodies(yaml, 'fixture.yml'), new RegExp(`^Error: unrecognised run form at fixture\\.yml:${line}$`), yaml);
+  }
+  assert.deepEqual(runBodies('on: [push]\njobs:\n  a:\n    runs-on: x\n    steps:\n      - name: Run it\n        run: echo "a, run: b"'), ['echo "a, run: b"']);
+  assert.deepEqual(runBodies('x:\n  script: |\n    if (a) {\n      run: 1\n  - run: echo ok'), ['1', 'echo ok']);
+});
+
+test('release-path scan follows repository-local uses references transitively and fails closed', () => {
+  const root = mkdtempSync(join(tmpdir(), 'release-path-'));
+  const put = (rel, body) => {
+    mkdirSync(join(root, rel, '..'), { recursive: true });
+    writeFileSync(join(root, rel), body);
+  };
+  try {
+    put('docs/release/release-procedure.md', 'Run `.github/workflows/a.yml`.\n');
+    put('docs/release/release-runbook.md', 'Then dispatch `b.yml`.\n');
+    put('.github/workflows/a.yml', 'jobs:\n  call:\n    uses: ./.github/workflows/c.yml\n');
+    put('.github/workflows/b.yml', 'jobs:\n  x:\n    steps:\n      - uses: "./tools/act/"\n');
+    put('.github/workflows/c.yml', 'jobs:\n  x:\n    steps:\n      - {uses: ./.github/actions/d}\n');
+    put('.github/actions/d/action.yml', 'runs:\n  using: composite\n  steps:\n    - uses: ./tools/e\n');
+    put('tools/act/action.yaml', 'runs:\n  using: composite\n');
+    put('tools/e/action.yml', 'runs:\n  using: composite\n');
+    put('.github/workflows/unnamed.yml', 'jobs: {}\n');
+    assert.deepEqual(releasePathFiles(root), [
+      '.github/actions/d/action.yml', '.github/workflows/a.yml', '.github/workflows/b.yml',
+      '.github/workflows/c.yml', 'tools/act/action.yaml', 'tools/e/action.yml',
+    ]);
+    put('tools/e/action.yml', 'runs:\n  using: composite\n  steps:\n    - uses: ./.github/actions/missing\n');
+    assert.throws(() => releasePathFiles(root), /tools\/e\/action\.yml uses \.\/\.github\/actions\/missing, which does not resolve/);
+    put('tools/e/action.yml', 'runs:\n  using: composite\n');
+    put('docs/release/release-runbook.md', 'Then dispatch `gone.yml`.\n');
+    assert.throws(() => releasePathFiles(root), /release-runbook\.md names gone\.yml, which is not a workflow/);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
 test('keyless attest workflow validates the dispatch bundle and tag as data', () => {
   const script = runBodies(read('../.github/workflows/acg-keyless-attest.yml')).find(body => body.includes('DISPATCH_BUNDLE'));
   assert.ok(script);
   const fallback = 'experiments/acg-transparency/release-provenance-bundle.json';
   const scratch = mkdtempSync(join(tmpdir(), 'keyless-inputs-'));
+  const outside = mkdtempSync(join(tmpdir(), 'keyless-outside-'));
   const output = join(scratch, 'inputs-output');
   try {
     mkdirSync(join(scratch, 'experiments', 'acg-transparency'), { recursive: true });
     for (const file of [fallback, 'other.json', 'a..b.json']) writeFileSync(join(scratch, file), '{}');
     mkdirSync(join(scratch, 'dir.json'));
-    const run = (bundle, tag) => {
+    writeFileSync(join(outside, 'x.json'), '{}');
+    // The temporary checkout as bash itself names it, so Git Bash on Windows compares like with like.
+    const workspace = spawnSync('bash', ['-c', 'pwd -P'], { cwd: scratch, encoding: 'utf8' }).stdout.trim();
+    assert.ok(workspace);
+    const run = (bundle, tag, env = {}) => {
       rmSync(output, { force: true });
       const result = spawnSync('bash', ['-c', script], {
         cwd: scratch, encoding: 'utf8',
-        env: { ...process.env, DISPATCH_BUNDLE: bundle, DISPATCH_TAG: tag, LC_ALL: 'C', GITHUB_OUTPUT: 'inputs-output' },
+        env: { ...process.env, DISPATCH_BUNDLE: bundle, DISPATCH_TAG: tag, LC_ALL: 'C', GITHUB_OUTPUT: 'inputs-output', GITHUB_WORKSPACE: workspace, ...env },
       });
       assert.ifError(result.error);
       const written = existsSync(output) ? readFileSync(output, 'utf8').replaceAll('\r\n', '\n') : '';
@@ -320,7 +459,9 @@ test('keyless attest workflow validates the dispatch bundle and tag as data', ()
       'other.json; id', '$(id).json', 'other.json\nx.json', 'other .json', 'other.txt', 'missing.json', 'dir.json'];
     if (process.platform !== 'win32') {
       symlinkSync('other.json', join(scratch, 'link.json'));
-      badBundles.push('link.json');
+      symlinkSync(outside, join(scratch, 'experiments', 'link'));
+      symlinkSync('experiments/acg-transparency', join(scratch, 'inner'));
+      badBundles.push('link.json', 'experiments/link/x.json', 'inner/release-provenance-bundle.json');
     }
     const badTags = ['acg-attest-v01.0.0', 'v1.0.0', 'acg-attest-v1.0.0-rc.1', 'acg-attest-v1.0.0; id', 'acg-attest-v1.0.0\nx', '$(id)', ' acg-attest-v1.0.0'];
     for (const [bundle, tag] of [...badBundles.map(b => [b, '']), ...badTags.map(t => ['', t])]) {
@@ -328,8 +469,14 @@ test('keyless attest workflow validates the dispatch bundle and tag as data', ()
       assert.equal(result.status, 1, `${JSON.stringify([bundle, tag])}: ${result.stderr}`);
       assert.equal(result.written, '');
     }
+    for (const elsewhere of [`${workspace}/experiments`, '']) {
+      const result = run('other.json', '', { GITHUB_WORKSPACE: elsewhere });
+      assert.equal(result.status, 1, `workspace ${JSON.stringify(elsewhere)}: ${result.stderr}`);
+      assert.equal(result.written, '');
+    }
   } finally {
     rmSync(scratch, { recursive: true, force: true });
+    rmSync(outside, { recursive: true, force: true });
   }
 });
 

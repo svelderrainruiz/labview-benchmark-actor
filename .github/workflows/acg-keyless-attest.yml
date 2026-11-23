@@ -61,6 +61,22 @@ jobs:
             echo "::error::bundle must be a repository-relative .json path of letters, digits, '_', '.', '-' and '/'." >&2
             exit 1
           fi
+          # -f follows symlinks, so refuse any symlinked component and require the real path inside the checkout.
+          IFS=/ read -r -a parts <<< "$bundle"
+          prefix=""
+          for part in "${parts[@]}"; do
+            prefix="${prefix:+$prefix/}$part"
+            if [ -L "$prefix" ]; then
+              echo "::error::provenance bundle path component is a symlink: $prefix" >&2
+              exit 1
+            fi
+          done
+          workspace="$(realpath -e -- "$GITHUB_WORKSPACE")" || { echo "::error::GITHUB_WORKSPACE does not resolve." >&2; exit 1; }
+          resolved="$(realpath -e -- "$bundle")" || { echo "::error::provenance bundle does not resolve: $bundle" >&2; exit 1; }
+          if [[ "$resolved" != "$workspace/"* ]]; then
+            echo "::error::provenance bundle resolves outside the checkout: $bundle" >&2
+            exit 1
+          fi
           if [ -L "$bundle" ] || [ ! -f "$bundle" ]; then
             echo "::error::provenance bundle is not a regular file: $bundle" >&2
             exit 1
