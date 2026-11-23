@@ -89,9 +89,9 @@ function render() {
   lines.push('text, and the exit code. A name the server did not list is recorded as `unlisted` with `nameSha256`, never');
   lines.push('as text. It contains no raw arguments, results or environment. Exit 0 means at least one call and all');
   lines.push('succeeded; 1 means no call, a failed call, or a complete Ollama reply that is unusable: any non-2xx status');
-  lines.push('(redirects are never followed), a body that is not JSON, or JSON of the wrong shape (for example a');
-  lines.push('missing model); 2 means the MCP server failed or no complete Ollama reply arrived (refused, DNS, timeout,');
-  lines.push('or a connection dropped before the body was complete).');
+  lines.push('(redirects are never followed), a body that cannot be decoded (for example bad gzip) or is not JSON, or');
+  lines.push('JSON of the wrong shape (for example a missing model); 2 means the MCP server failed or no complete Ollama');
+  lines.push('reply arrived (refused, DNS, timeout, or a connection dropped before the body was complete).');
   lines.push('`--max-turns` bounds chat requests (default 8). At the limit the last calls are');
   lines.push('still counted; if there was no final reply, the final text hash is that of the empty string.');
   lines.push('');

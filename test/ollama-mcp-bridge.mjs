@@ -25,13 +25,15 @@ let replies;
 let versionReply;
 let redirectHits = 0;
 let port;
+// Sent inside the prefix of a cut-off body, before the socket is destroyed: it must never be echoed.
+const CUT_MARKER = 'CUT_PREFIX_MARKER_' + 'sent-before-the-cut-'.repeat(3);
 
 // A scripted raw reply: { status, body, headers } or { truncate: true } (headers plus half a body, then reset).
 function send(res, reply) {
   if (reply.truncate) {
-    const whole = JSON.stringify({ message: done });
-    res.writeHead(200, { 'Content-Length': String(whole.length) });
-    res.write(whole.slice(0, whole.length >> 1), () => res.socket.destroy());
+    const sent = `{"version":"${CUT_MARKER}","message":{"role":"assistant","content":"${CUT_MARKER}`;
+    res.writeHead(200, { 'Content-Length': String(sent.length * 2) });
+    res.write(sent, () => res.socket.destroy());
     return;
   }
   res.writeHead(reply.status, reply.headers ?? {});
@@ -157,6 +159,21 @@ try {
   assert.match(requests[1].messages[2].content, /not allowed/i);
   console.log('unlisted-tool-name-redacted: PASS');
 
+  // assistant-turn-replayed-verbatim: thinking, call ids and function.index go back to Ollama unchanged.
+  const thinking = 'THINKING_MARKER_' + 'private-reasoning-'.repeat(4);
+  const callId = 'CALL_ID_MARKER_' + 'call-0-'.repeat(4);
+  const index = 731_942_068;
+  const rich = { role: 'assistant', content: '', thinking,
+    tool_calls: [{ id: callId, function: { index, name: 'get_host_capabilities', arguments: {} } }] };
+  script(rich, done);
+  const richRun = await run(['--self-test']);
+  receipt(richRun, 0);
+  assert.deepEqual(requests[1].messages[1], rich);
+  for (const out of [richRun.stdout, richRun.stderr]) {
+    for (const value of [thinking, callId, String(index)]) assert.equal(out.includes(value), false, value);
+  }
+  console.log('assistant-turn-replayed-verbatim: PASS');
+
   // chat-404-exit-1: both services answered, so a chat HTTP error is a failed self-test, not unreachable.
   const body = 'CHAT_BODY_MARKER model "test-model" not found';
   script({ status: 404, body });
@@ -187,6 +204,12 @@ try {
   console.log('fake-counts-post-after-queue-empty: PASS');
 
   // A complete but unusable response means Ollama was reached: exit 1, never the body in the output.
+  // A full Content-Length body that is not valid data for its Content-Encoding, closed cleanly.
+  const undecodable = encoding => {
+    const body = 'not compressed data at all, CHAT_BODY_MARKER';
+    return { status: 200, body, headers: { 'Content-Encoding': encoding,
+      'Content-Length': String(Buffer.byteLength(body)) } };
+  };
   const unusable = [
     ['version-null-exit-1', () => { versionReply = { status: 200, body: 'null' }; }, 0],
     ['chat-null-exit-1', () => { replies.push({ status: 200, body: 'null' }); }, 1],
@@ -194,7 +217,10 @@ try {
     ['tool-call-without-function-exit-1', () => { replies.push({ role: 'assistant', content: '',
       tool_calls: [{ CHAT_BODY_MARKER: true }] }); }, 1],
     ['redirect-302-exit-1', () => { replies.push({ status: 302, body: 'CHAT_BODY_MARKER',
-      headers: { Location: '/redirect-target' } }); }, 1]
+      headers: { Location: '/redirect-target' } }); }, 1],
+    ['bad-gzip-version-exit-1', () => { versionReply = undecodable('gzip'); }, 0],
+    ['bad-gzip-chat-exit-1', () => { replies.push(undecodable('gzip')); }, 1],
+    ['bad-brotli-chat-exit-1', () => { replies.push(undecodable('br')); }, 1]
   ];
   for (const [name, setup, chats] of unusable) {
     script();
@@ -207,6 +233,7 @@ try {
       assert.match(result.stderr, /HTTP 302/);
       assert.equal(redirectHits, 0, 'the redirect target is never requested');
     }
+    if (name.startsWith('bad-')) assert.match(result.stderr, /undecodable body/, name);
     console.log(`${name}: PASS`);
   }
 
@@ -217,7 +244,7 @@ try {
     else replies.push({ truncate: true });
     const result = await run(['--self-test']);
     assert.equal(receipt(result, 2).finalTextSha256, hash(''), where);
-    assert.equal(result.stderr.includes('Probe'), false);
+    for (const out of [result.stdout, result.stderr]) assert.equal(out.includes(CUT_MARKER), false, where);
   }
   console.log('body-cut-mid-stream-exit-2: PASS');
 

@@ -78,13 +78,30 @@ type Json = Record<string, unknown>;
 const isObject = (value: unknown): value is Json =>
   value !== null && typeof value === 'object' && !Array.isArray(value);
 
+// zlib codes are Z_*; brotli codes are ERR_* with a numeric errno, unlike Node's own ERR_* stream errors.
+function decoderFailed(error: unknown): boolean {
+  for (let link = error, depth = 0; isObject(link) && depth < 8; link = link.cause, depth++) {
+    const code = link.code;
+    if (typeof code === 'string' &&
+        (code.startsWith('Z_') || (code.startsWith('ERR_') && typeof link.errno === 'number'))) return true;
+  }
+  return false;
+}
+
 async function api(endpoint: URL, path: string, body?: object): Promise<unknown> {
   // Network failures here, including a body cut off mid-read, propagate as plain errors (exit 2).
   const response = await fetch(new URL(path, endpoint), {
     redirect: 'manual', signal: AbortSignal.timeout(300_000),
     ...(body && { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
   });
-  const text = await response.text();
+  let text: string;
+  try {
+    text = await response.text();
+  } catch (error) {
+    // The whole body arrived but its Content-Encoding is invalid: reached, unusable.
+    if (decoderFailed(error)) throw new OllamaAnswered('undecodable body');
+    throw error;
+  }
   // The body is model or server text: never printed, only the status code.
   if (response.status < 200 || response.status > 299) throw new OllamaAnswered(`HTTP ${response.status}`);
   try { return JSON.parse(text) as unknown; } catch { throw new OllamaAnswered('invalid JSON'); }
@@ -101,15 +118,14 @@ function chatMessage(body: unknown): Message {
   }
   if (message.tool_calls === undefined) return { role: 'assistant', content: message.content };
   if (!Array.isArray(message.tool_calls)) throw new OllamaAnswered('invalid message');
-  const toolCalls: ToolCall[] = [];
   for (const call of message.tool_calls as unknown[]) {
     if (!isObject(call) || !isObject(call.function) || typeof call.function.name !== 'string' ||
         !(isObject(call.function.arguments) || typeof call.function.arguments === 'string')) {
       throw new OllamaAnswered('invalid tool call');
     }
-    toolCalls.push({ function: { name: call.function.name, arguments: call.function.arguments } });
   }
-  return { role: 'assistant', content: message.content, tool_calls: toolCalls };
+  // Validated: replay it as Ollama sent it (thinking, call ids, function.index); only arguments are normalized.
+  return message as unknown as Message;
 }
 
 interface CallRecord { name: string; nameSha256?: string; argumentsSha256: string; ok: boolean }

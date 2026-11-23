@@ -31,9 +31,9 @@ Ollama version, each call name, SHA-256 of its JSON arguments and success flag, 
 text, and the exit code. A name the server did not list is recorded as `unlisted` with `nameSha256`, never
 as text. It contains no raw arguments, results or environment. Exit 0 means at least one call and all
 succeeded; 1 means no call, a failed call, or a complete Ollama reply that is unusable: any non-2xx status
-(redirects are never followed), a body that is not JSON, or JSON of the wrong shape (for example a
-missing model); 2 means the MCP server failed or no complete Ollama reply arrived (refused, DNS, timeout,
-or a connection dropped before the body was complete).
+(redirects are never followed), a body that cannot be decoded (for example bad gzip) or is not JSON, or
+JSON of the wrong shape (for example a missing model); 2 means the MCP server failed or no complete Ollama
+reply arrived (refused, DNS, timeout, or a connection dropped before the body was complete).
 `--max-turns` bounds chat requests (default 8). At the limit the last calls are
 still counted; if there was no final reply, the final text hash is that of the empty string.
 
