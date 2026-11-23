@@ -27,7 +27,7 @@
 //   next-ids                     print the next free requirement id and ADR id
 //   init                         plan (or --run) the one-command First Win golden-VM onboarding (LBA-REQ-033)
 //   mesh-run                     agent-drive one mesh run: ingest a live dispatch + returned receipts, then cross-plane corroborate + compare
-//   release-preflight <X.Y.Z>    release doctor: node major + version + CHANGELOG + the 3 publish agreement gates
+//   release-preflight <X.Y.Z>    release doctor: node major + version + CHANGELOG + the publish agreement gates
 //   release <X.Y.Z>             resumable status driver: per-phase completion + the exact next actionable step (#409)
 //   release <X.Y.Z> --dry-run    print the full governed-release phase plan (ordering + deps + the 2 signings) + preflight
 //   release-verify-published <X.Y.Z>  confirm the VS Code Marketplace listing shows the version live after publish (#412)
@@ -60,7 +60,7 @@ import { reviewedVsixSha256 } from './verify-published-vsix.mjs';
 import { canonicalRepo, ghRepoArgs } from './canonical-repo.mjs';
 import { decideAutonomousN3 } from '../experiments/mesh-fulfillment/autonomousN3Controller.mjs';
 
-export const ITERATION = 36; // bump when you refine this tool (see the banner above)
+export const ITERATION = 37; // bump when you refine this tool (see the banner above)
 
 const here = dirname(fileURLToPath(import.meta.url));
 export const repoRoot = resolve(here, '..');
@@ -178,7 +178,7 @@ export function governCheck(id) {
 // .vsix is byte-reproducible ONLY WITHIN a node major -- a node-22 build has a different sha256 than a node-24
 // build, so a review/candidate captured on node 22 fails the reviewed==shipped gate (verify-published-vsix).
 // These pure, deterministic checks catch that (+ version/CHANGELOG drift) BEFORE a publish; the `release-preflight`
-// command layers the 3 live publish agreement gates on top.
+// command layers the live publish agreement gates on top.
 export function releasePreflightStatic({ version, nodeVersion, pkgVersion, changelog, nvmrc, compositeVersion }) {
   const major = Number(String(nodeVersion).replace(/^v/, '').split('.')[0]);
   const escaped = String(version).replace(/\./g, '\\.');
@@ -568,7 +568,7 @@ export function signingCommands({ station, reviewerId, reviewerKeyPath, version,
   const id = reviewerId || '<reviewer-id>';
   const keyPath = purpose === 'visual' ? '<enrolled-quorum-key.pem>' : reviewerKeyPath || '<enrolled-quorum-key.pem>';
   // The visual verdict is ALWAYS rendered + signed in the VM (the extension reads reviewerKeyPath there).
-  const visual = `LBA_VM_PASS=… reviewer-workstation/render-verdict.sh set-target --version ${ver} --commit <sha> --vsix-sha256 <sha256>  →  run "Render Reviewer Verdict" in the VM  →  reviewer-workstation/render-verdict.sh collect --version ${ver} --out ~/lba-vm-share/visual-verdict-${ver}.json`;
+  const visual = `Use the evidence-bound target from lba release-stage-win ${ver}  →  run "Render Reviewer Verdict" in the VM  →  reviewer-workstation/render-verdict.sh collect --version ${ver} --out ~/lba-vm-share/visual-verdict-${ver}.json`;
   let quorum;
   if (station === STATIONS.VM) {
     // Key lives in the VM -> sign IN the VM. Invoke via `cmd /c` from the repo clone so guestcontrol does not
@@ -747,7 +747,7 @@ export const COMMANDS = {
     run: () => { console.log(`next requirement: ${nextRequirementId()}`); console.log(`next ADR:         ${nextAdrId()}`); },
   },
   'release-preflight': {
-    desc: 'release doctor: node major + version + CHANGELOG + the 3 publish agreement gates for a target version',
+    desc: 'release doctor: node major + version + CHANGELOG + the publish agreement gates for a target version',
     run: (args) => {
       const version = args[0];
       if (!/^\d+\.\d+\.\d+/.test(version || '')) { console.error('usage: lba release-preflight X.Y.Z'); process.exit(2); }
@@ -763,10 +763,14 @@ export const COMMANDS = {
         ['release-agreement WIN+LINUX agreed', 'tools/release-governance/verify-release-agreement.mjs'],
         ['signed reviewer visual verdict', 'tools/release-governance/verify-visual-review.mjs'],
         ['composite release decision', 'tools/release-governance/verify-composite-release.mjs'],
+        ['reviewer infrastructure record', 'scripts/verify-reviewer-infrastructure.mjs'],
       ].map(([label, rel]) => {
-        let ok = false;
-        try { execFileSync(process.execPath, [join(repoRoot, rel), '--component', 'extension', version], { stdio: 'pipe' }); ok = true; } catch { ok = false; }
-        return { label, ok, note: ok ? '' : 'not yet satisfied' };
+        try {
+          execFileSync(process.execPath, [join(repoRoot, rel), '--component', 'extension', version], { stdio: 'pipe' });
+          return { label, ok: true };
+        } catch (error) {
+          return { label, ok: false, note: error.stderr?.toString().trim() || error.message };
+        }
       });
       const all = [...statics, ...gates];
       for (const c of all) console.log(`  ${c.ok ? '\u2713' : '\u2717'} ${c.label}${c.note ? '  (' + c.note + ')' : ''}`);

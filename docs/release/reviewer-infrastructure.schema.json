@@ -1,0 +1,12 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "reviewerInfrastructure field of release-components.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema", "baseline", "receiptSha256"],
+  "properties": {
+    "schema": { "const": "reviewer-infrastructure@1" },
+    "baseline": { "type": "string", "pattern": "^v\\d+\\.\\d+\\.\\d+$" },
+    "receiptSha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" }
+  }
+}

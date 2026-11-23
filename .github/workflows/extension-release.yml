@@ -95,6 +95,11 @@ jobs:
         # composite decision gates the publish (ADR-0052 enforces ADR-0051/LBA-REQ-070).
         run: node tools/release-governance/verify-composite-release.mjs --component extension "${{ steps.ver.outputs.version }}"
 
+      - name: Verify reviewer infrastructure digest in the signed verdict
+        env:
+          VERSION: ${{ steps.ver.outputs.version }}
+        run: node scripts/verify-reviewer-infrastructure.mjs --component extension "$VERSION"
+
   release:
     needs: [build, agreement]
     runs-on: ubuntu-latest

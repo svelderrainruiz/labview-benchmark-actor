@@ -91,6 +91,7 @@ function fakeIo({ vmState = 'running', guestSha = vsixSha256, installed = true, 
 }
 
 const options = (overrides = {}) => ({
+  components: { extension: version },
   version, vm: 'reviewer', commit, vsix: '/c/candidate.vsix', attestation: '/c/attestation.json', share,
   visualKey: '/c/visual.pem', passwordFile: '/c/vm-pass', extensionId, ...overrides,
 });
@@ -122,7 +123,10 @@ ok('builders: task id, sender identity, PS5-tolerant install, per-version key, n
 // Happy path.
 {
   const io = fakeIo();
-  const result = await stageWin(options(), io);
+  const receiptSha256 = 'c'.repeat(64);
+  const result = await stageWin(options({ components: { extension: version, reviewerInfrastructure: {
+    schema: 'reviewer-infrastructure@1', baseline: 'v0.1.0', receiptSha256,
+  } } }), io);
   const frame = JSON.parse(String(io.files.get(stagePaths({ share, version }).stagedFrame)));
   assert.equal(frame.matched, true);
   assert.deepEqual(frame.candidate, { component: 'extension', version, commit, vsixSha256 });
@@ -137,7 +141,9 @@ ok('builders: task id, sender identity, PS5-tolerant install, per-version key, n
   }
   const target = io.calls.find((c) => c.cmd === 'bash');
   assert.equal(target.env.LBA_VM_PASS, 'secret', 'set-target receives the trimmed password through the environment');
-  assert.deepEqual(target.args.filter((a, i) => target.args[i - 1] === '--evidence'), evidenceFromAttestation(attestation, { commit, taskId: task }));
+  assert.deepEqual(target.args.filter((a, i) => target.args[i - 1] === '--evidence'), [
+    ...evidenceFromAttestation(attestation, { commit, taskId: task }), `reviewer-infrastructure-receipt-sha256:${receiptSha256}`,
+  ]);
   assert.ok(![...io.files.keys()].some((k) => k.startsWith(scratchDir)), 'the scratch password copy is removed');
   ok('happy path: ordered staging, staged frame bound to the candidate, evidence-bound set-target, scratch removed');
 }

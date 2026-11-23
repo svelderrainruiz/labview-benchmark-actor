@@ -24,6 +24,7 @@ import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { validateReceipt as validateAttestation } from '../experiments/acg-quorum/cross-plane-attestation.mjs';
 import { buildReleaseStage } from './record-release-stage.mjs';
+import { reviewerInfrastructureEvidence } from '../scripts/verify-reviewer-infrastructure.mjs';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const repoRoot = resolve(here, '..');
@@ -268,6 +269,10 @@ export async function stageWin(options, io = defaultIo()) {
   if (options.vsixSha256) need(options.vsixSha256 === vsixSha256, `--vsix hashes to ${vsixSha256}, not ${options.vsixSha256}`);
   const taskId = stageTaskId({ version, commit });
   const evidence = evidenceFromAttestation(JSON.parse(io.readFile(attestationPath, 'utf8')), { commit, taskId });
+  if (setTarget) {
+    const entry = reviewerInfrastructureEvidence(version, options.components);
+    if (entry) evidence.push(`${entry.kind}:${entry.ref}`);
+  }
   const paths = stagePaths({ share, version });
   need(force || !io.exists(paths.stagedFrame), `${paths.stagedFrame} already exists; refusing to overwrite release evidence (pass --force)`);
 
@@ -393,6 +398,7 @@ export async function main(argv = process.argv.slice(2)) {
   const home = homedir();
   const result = await stageWin({
     version,
+    components: JSON.parse(readFileSync(join(repoRoot, 'release-components.json'), 'utf8')),
     vm: a.vm || process.env.LBA_REVIEWER_VM,
     commit: a.commit,
     vsix: a.vsix,
