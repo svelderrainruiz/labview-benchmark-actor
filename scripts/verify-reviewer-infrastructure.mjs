@@ -10,9 +10,12 @@ export const REQUIRED_FROM = '1.6.7';
 const kind = 'reviewer-infrastructure-receipt-sha256';
 const versionPattern = /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$/;
 
-function beforeRequiredVersion(version) {
-  const actual = version.split('.').map(BigInt);
-  const required = REQUIRED_FROM.split('.').map(BigInt);
+// Integer components, not locale collation: ICU numeric collation splits digit runs longer than 254.
+export function beforeRequiredVersion(version, requiredFrom = REQUIRED_FROM) {
+  const [actual, required] = [version, requiredFrom].map(v => {
+    if (typeof v !== 'string' || !versionPattern.test(v)) throw new Error(`not a stable X.Y.Z version: ${JSON.stringify(v)}`);
+    return v.split('.').map(BigInt);
+  });
   const different = actual.findIndex((part, i) => part !== required[i]);
   return different !== -1 && actual[different] < required[different];
 }

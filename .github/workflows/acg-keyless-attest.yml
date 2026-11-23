@@ -20,7 +20,7 @@ on:
   workflow_dispatch:
     inputs:
       tag:
-        description: Tag for the immutable prerelease to create with the provenance assets (blank = artifact only)
+        description: Tag acg-attest-vX.Y.Z for the immutable prerelease to create with the provenance assets (blank = artifact only)
         required: false
         default: ''
       bundle:
@@ -47,17 +47,34 @@ jobs:
       - name: Install cosign
         uses: sigstore/cosign-installer@v3
 
-      - name: Resolve the provenance bundle
-        id: bundle
+      # The dispatch inputs reach the shell only as env data, are validated once against anchored
+      # patterns, and later steps read only the validated outputs.
+      - name: Validate the dispatch inputs
+        id: validated
+        env:
+          DISPATCH_BUNDLE: ${{ inputs.bundle }}
+          DISPATCH_TAG: ${{ inputs.tag }}
+          LC_ALL: C
         run: |
-          BUNDLE="${{ github.event.inputs.bundle }}"
-          if [ -z "$BUNDLE" ]; then BUNDLE="experiments/acg-transparency/release-provenance-bundle.json"; fi
-          test -f "$BUNDLE" || { echo "provenance bundle not found: $BUNDLE" >&2; exit 1; }
-          echo "path=$BUNDLE" >> "$GITHUB_OUTPUT"
+          bundle="${DISPATCH_BUNDLE:-experiments/acg-transparency/release-provenance-bundle.json}"
+          if [[ ! "$bundle" =~ ^[A-Za-z0-9_][A-Za-z0-9_.-]*(/[A-Za-z0-9_][A-Za-z0-9_.-]*)*\.json$ ]]; then
+            echo "::error::bundle must be a repository-relative .json path of letters, digits, '_', '.', '-' and '/'." >&2
+            exit 1
+          fi
+          if [ -L "$bundle" ] || [ ! -f "$bundle" ]; then
+            echo "::error::provenance bundle is not a regular file: $bundle" >&2
+            exit 1
+          fi
+          tag="$DISPATCH_TAG"
+          if [ -n "$tag" ] && [[ ! "$tag" =~ ^acg-attest-v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$ ]]; then
+            echo "::error::tag must be blank or acg-attest-vX.Y.Z without leading zeros." >&2
+            exit 1
+          fi
+          { echo "bundle=${bundle}"; echo "tag=${tag}"; } >> "$GITHUB_OUTPUT"
 
       - name: Keyless sign-blob (Fulcio cert + rekor entry)
         env:
-          BUNDLE: ${{ steps.bundle.outputs.path }}
+          BUNDLE: ${{ steps.validated.outputs.bundle }}
         run: |
           cosign sign-blob --yes \
             --output-certificate release-provenance.pem \
@@ -83,13 +100,14 @@ jobs:
           if-no-files-found: error
 
       - name: Create the immutable prerelease with the provenance assets
-        if: ${{ github.event.inputs.tag != '' }}
+        if: ${{ steps.validated.outputs.tag != '' }}
         env:
           GH_TOKEN: ${{ github.token }}
+          TAG: ${{ steps.validated.outputs.tag }}
         run: |
-          gh release create "${{ github.event.inputs.tag }}" \
+          gh release create "$TAG" \
             release-provenance.sigstore release-provenance.pem release-provenance.sig \
             --prerelease \
-            --target "${{ github.ref_name }}" \
-            --title "ACG keyless attestation ${{ github.event.inputs.tag }}" \
+            --target "$GITHUB_REF_NAME" \
+            --title "ACG keyless attestation $TAG" \
             --notes "Keyless-signed corroboration provenance (cosign, GitHub Actions OIDC -> a short-lived Fulcio certificate + a public rekor entry). The .sigstore bundle (cert + rekor SET + inclusion proof), certificate, and signature are attached AT CREATION (the org enforces immutable releases). Signed bundle: experiments/acg-transparency/release-provenance-bundle.json."

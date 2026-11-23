@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
 import { generateKeyPairSync } from 'node:crypto';
-import { existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { test } from 'node:test';
@@ -9,7 +9,9 @@ import { runInNewContext } from 'node:vm';
 import {
   buildReviewerVerdict, generateEnrolledKeypair, signReviewerVerdict,
 } from '../experiments/handoff-beacon/reviewerVerdict.mjs';
-import { parseUniqueJson, readJson, verifyReviewerInfrastructure as verify } from '../scripts/verify-reviewer-infrastructure.mjs';
+import {
+  beforeRequiredVersion, parseUniqueJson, readJson, verifyReviewerInfrastructure as verify,
+} from '../scripts/verify-reviewer-infrastructure.mjs';
 
 const version = '1.6.7';
 const reviewer = 'test-signer';
@@ -50,6 +52,20 @@ test('accepts only stable versions without leading zeros', () => {
   for (const v of ['1.6.7-rc.1', '1.6.7+build', '01.6.7', '1.6.7\n']) {
     assert.throws(() => verify({ version: v, components: { extension: v } }), /requested X.Y.Z candidate version/);
   }
+});
+
+test('release boundary compares integer components where locale collation disagrees', () => {
+  // Plain collation orders 1.6.10 before 1.6.9; ICU numeric collation splits digit runs longer than 254.
+  const ten254 = `1.6.1${'0'.repeat(254)}`;
+  const nines254 = `1.6.${'9'.repeat(254)}`;
+  for (const [earlier, later] of [['1.6.9', '1.6.10'], ['1.9.0', '1.10.0'], ['1.6.6', '1.6.7'], [nines254, ten254]]) {
+    assert.equal(beforeRequiredVersion(earlier, later), true, `${earlier.length}-char ${earlier.slice(0, 8)} before ${later.slice(0, 8)}`);
+    assert.equal(beforeRequiredVersion(later, earlier), false, `${later.length}-char ${later.slice(0, 8)} not before ${earlier.slice(0, 8)}`);
+  }
+  assert.equal(beforeRequiredVersion('1.6.7', '1.6.7'), false);
+  assert.equal(beforeRequiredVersion('1.6.6'), true);
+  assert.equal(beforeRequiredVersion('1.6.7'), false);
+  for (const bad of ['1.6.7-rc.1', '01.6.7', '1.6', undefined]) assert.throws(() => beforeRequiredVersion(bad), /not a stable X\.Y\.Z version/);
 });
 
 for (const [name, patch, reason] of [
@@ -207,34 +223,114 @@ test('pre-flight exits nonzero when only the infrastructure verifier fails', () 
   }
 });
 
-function runBodies(workflow) {
-  const lines = workflow.split('\n');
+// Every run: value, inline or block scalar, with all of its more-indented continuation lines.
+function runBodies(yaml) {
+  const lines = yaml.split('\n');
   return lines.flatMap((line, i) => {
-    const match = /^(\s*)(?:-\s+)?run:\s*(.*)$/.exec(line);
+    const match = /^(\s*(?:-\s+)?)run:(?:\s+(.*))?$/.exec(line);
     if (!match) return [];
-    if (!/^[|>][-+]?$/.test(match[2])) return [match[2]];
-    const body = [];
-    for (let j = i + 1; j < lines.length; j++) {
-      if (lines[j].trim() && lines[j].search(/\S/) <= match[1].length) break;
-      body.push(lines[j].slice(match[1].length + 2));
+    const head = match[2] ?? '';
+    const rest = [];
+    for (let j = i + 1; j < lines.length && !(lines[j].trim() && lines[j].search(/\S/) <= match[1].length); j++) {
+      rest.push(lines[j]);
     }
-    return [body.join('\n')];
+    const pad = Math.min(...rest.filter(l => l.trim()).map(l => l.search(/\S/)));
+    const body = /^[|>][-+1-9]*\s*(?:#.*)?$/.test(head) ? [] : [head];
+    return [[...body, ...rest.map(l => l.slice(pad))].join('\n')];
   });
 }
 
-test('release workflow never interpolates expressions into run bodies', () => {
-  const workflow = read('../.github/workflows/extension-release.yml');
-  const bodies = runBodies(workflow);
-  assert.ok(bodies.length > 10);
-  for (const body of bodies) assert.doesNotMatch(body, /\$\{\{/);
-  for (const expression of ['${{ inputs.version }}', '${{ github.event.inputs.version }}']) {
-    for (const yaml of [`run: echo "${expression}"`, `run: |\n  echo "${expression}"`]) {
-      assert.ok(runBodies(yaml).some(body => /\$\{\{/.test(body)));
-    }
+// Every workflow file the release procedure names, plus every composite action.
+function releasePathFiles() {
+  const named = new Set([...read('../docs/release/release-procedure.md').matchAll(/[\w.-]+\.ya?ml\b/g)].map(m => m[0]));
+  const workflows = [...named].map(name => `.github/workflows/${name}`).filter(f => existsSync(new URL(`../${f}`, import.meta.url)));
+  const actions = readdirSync(new URL('../.github/actions/', import.meta.url), { withFileTypes: true })
+    .filter(d => d.isDirectory())
+    .flatMap(d => ['action.yml', 'action.yaml'].map(f => `.github/actions/${d.name}/${f}`))
+    .filter(f => existsSync(new URL(`../${f}`, import.meta.url)));
+  return [...workflows, ...actions];
+}
+
+test('release-path workflows and composite actions never interpolate expressions into run bodies', () => {
+  const files = releasePathFiles();
+  for (const required of ['.github/workflows/extension-release.yml', '.github/workflows/acg-keyless-attest.yml', '.github/actions/keyless-attest/action.yml']) {
+    assert.ok(files.includes(required), `the scan covers ${required}`);
   }
+  for (const file of files) {
+    const bodies = runBodies(read(`../${file}`));
+    assert.ok(bodies.length > 0, `${file} has run bodies to scan`);
+    for (const body of bodies) assert.doesNotMatch(body, /\$\{\{/, `${file} interpolates an expression into a run body`);
+  }
+  for (const expression of ['${{ inputs.tag }}', '${{ github.event.inputs.bundle }}']) {
+    for (const yaml of [
+      `run: echo "${expression}"`,
+      `run: |\n  echo "${expression}"`,
+      `run: | # note\n  echo "${expression}"`,
+      `run: |2\n    echo "${expression}"`,
+      `- run: >-\n    echo "${expression}"`,
+      `run: echo one\n  "${expression}"`,
+      `steps:\n  - shell: bash\n    run: |\n      dir="${expression}"`,
+    ]) assert.ok(runBodies(yaml).some(body => body.includes(expression)), yaml);
+  }
+  assert.deepEqual(runBodies('env:\n  TAG: ${{ inputs.tag }}\nrun: echo "$TAG"\nname: next'), ['echo "$TAG"']);
+
+  const workflow = read('../.github/workflows/extension-release.yml');
+  assert.ok(runBodies(workflow).length > 10);
   assert.equal((workflow.match(/- name: Derive version/g) || []).length, 1);
   assert.match(workflow, /DISPATCH_VERSION: \$\{\{ inputs\.version \}\}/);
   assert.match(workflow, /VERSION: \$\{\{ needs\.agreement\.outputs\.version \}\}/);
+  const attest = read('../.github/workflows/acg-keyless-attest.yml');
+  assert.deepEqual(attest.match(/\$\{\{[^}]*inputs\.[^}]*\}\}/g), ['${{ inputs.bundle }}', '${{ inputs.tag }}']);
+  assert.match(attest, /DISPATCH_BUNDLE: \$\{\{ inputs\.bundle \}\}\n\s+DISPATCH_TAG: \$\{\{ inputs\.tag \}\}\n\s+LC_ALL: C\n/);
+  assert.match(attest, /BUNDLE: \$\{\{ steps\.validated\.outputs\.bundle \}\}/);
+  assert.match(attest, /TAG: \$\{\{ steps\.validated\.outputs\.tag \}\}/);
+});
+
+test('keyless attest workflow validates the dispatch bundle and tag as data', () => {
+  const script = runBodies(read('../.github/workflows/acg-keyless-attest.yml')).find(body => body.includes('DISPATCH_BUNDLE'));
+  assert.ok(script);
+  const fallback = 'experiments/acg-transparency/release-provenance-bundle.json';
+  const scratch = mkdtempSync(join(tmpdir(), 'keyless-inputs-'));
+  const output = join(scratch, 'inputs-output');
+  try {
+    mkdirSync(join(scratch, 'experiments', 'acg-transparency'), { recursive: true });
+    for (const file of [fallback, 'other.json', 'a..b.json']) writeFileSync(join(scratch, file), '{}');
+    mkdirSync(join(scratch, 'dir.json'));
+    const run = (bundle, tag) => {
+      rmSync(output, { force: true });
+      const result = spawnSync('bash', ['-c', script], {
+        cwd: scratch, encoding: 'utf8',
+        env: { ...process.env, DISPATCH_BUNDLE: bundle, DISPATCH_TAG: tag, LC_ALL: 'C', GITHUB_OUTPUT: 'inputs-output' },
+      });
+      assert.ifError(result.error);
+      const written = existsSync(output) ? readFileSync(output, 'utf8').replaceAll('\r\n', '\n') : '';
+      return { ...result, written };
+    };
+    for (const [bundle, tag, expected] of [
+      ['', '', `bundle=${fallback}\ntag=\n`],
+      [fallback, 'acg-attest-v0.0.3', `bundle=${fallback}\ntag=acg-attest-v0.0.3\n`],
+      ['other.json', 'acg-attest-v1.10.0', 'bundle=other.json\ntag=acg-attest-v1.10.0\n'],
+      ['a..b.json', '', 'bundle=a..b.json\ntag=\n'],
+    ]) {
+      const result = run(bundle, tag);
+      assert.equal(result.status, 0, result.stderr);
+      assert.equal(result.written, expected);
+    }
+    const badBundles = ['../other.json', '/etc/other.json', '-x.json', './other.json', 'a/../other.json', 'experiments//x.json',
+      'other.json; id', '$(id).json', 'other.json\nx.json', 'other .json', 'other.txt', 'missing.json', 'dir.json'];
+    if (process.platform !== 'win32') {
+      symlinkSync('other.json', join(scratch, 'link.json'));
+      badBundles.push('link.json');
+    }
+    const badTags = ['acg-attest-v01.0.0', 'v1.0.0', 'acg-attest-v1.0.0-rc.1', 'acg-attest-v1.0.0; id', 'acg-attest-v1.0.0\nx', '$(id)', ' acg-attest-v1.0.0'];
+    for (const [bundle, tag] of [...badBundles.map(b => [b, '']), ...badTags.map(t => ['', t])]) {
+      const result = run(bundle, tag);
+      assert.equal(result.status, 1, `${JSON.stringify([bundle, tag])}: ${result.stderr}`);
+      assert.equal(result.written, '');
+    }
+  } finally {
+    rmSync(scratch, { recursive: true, force: true });
+  }
 });
 
 test('release workflow derives one fully validated stable version', () => {

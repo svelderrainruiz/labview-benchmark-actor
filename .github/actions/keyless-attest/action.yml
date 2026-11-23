@@ -18,9 +18,11 @@ runs:
 
     - name: Keyless-sign the release artifacts (Fulcio cert + public rekor entry)
       shell: bash
+      env:
+        ARTIFACTS_DIR: ${{ inputs.artifacts-dir }}
       run: |
         set -eu
-        dir="${{ inputs.artifacts-dir }}"
+        dir="$ARTIFACTS_DIR"
         test -d "$dir" || { echo "keyless-attest: artifacts dir not found: $dir" >&2; exit 1; }
         shopt -s nullglob
         signed=0
