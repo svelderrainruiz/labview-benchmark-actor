@@ -184,6 +184,9 @@ key material). Then:
    the workflow's `agreement` job run `scripts/verify-reviewer-infrastructure.mjs` against the sealed
    candidate. A pass proves the signed verdict commits to the public digest, not that the infrastructure
    matches the receipt. Published releases are not re-checked.
+   The visual key must have `validFrom` and `validThrough` both equal to `X.Y.Z` and the `visual`
+   purpose. Ranges are insufficient for this gate. Supply stable versions without leading zeros;
+   pre-release versions and duplicate JSON member names are rejected.
 
 ## 6. Reconcile + merge to main
 

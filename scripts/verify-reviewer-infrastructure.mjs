@@ -8,7 +8,14 @@ import { verifyReleaseAgreement } from '../tools/release-governance/verify-relea
 
 export const REQUIRED_FROM = '1.6.7';
 const kind = 'reviewer-infrastructure-receipt-sha256';
-const versionPattern = /^\d+\.\d+\.\d+$/;
+const versionPattern = /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$/;
+
+function beforeRequiredVersion(version) {
+  const actual = version.split('.').map(BigInt);
+  const required = REQUIRED_FROM.split('.').map(BigInt);
+  const different = actual.findIndex((part, i) => part !== required[i]);
+  return different !== -1 && actual[different] < required[different];
+}
 
 // Used both to prepare the review target and to check what the reviewer actually signed.
 export function reviewerInfrastructureEvidence(version, components) {
@@ -17,7 +24,7 @@ export function reviewerInfrastructureEvidence(version, components) {
   }
   const record = components.reviewerInfrastructure;
   if (!Object.hasOwn(components, 'reviewerInfrastructure')) {
-    if (version.localeCompare(REQUIRED_FROM, 'en', { numeric: true }) < 0) return null;
+    if (beforeRequiredVersion(version)) return null;
     throw new Error(`reviewerInfrastructure is required from ${REQUIRED_FROM}`);
   }
   if (!record || typeof record !== 'object' || Array.isArray(record)
@@ -46,10 +53,10 @@ export function verifyReviewerInfrastructure({ version, components, agreement, c
   const target = record?.verdict?.target;
   if (target?.component !== component || target.version !== version) throw new Error('agreement verdict must name the requested candidate');
 
-  // Legacy bare PEM entries have no version or purpose. Let the existing visual gate
-  // evaluate only scoped enrollments from the independent, committed allowlist.
+  // This gate requires an exact-release enrollment, not a legacy PEM or a version range.
   const scoped = Object.fromEntries(Object.entries(allowlist ?? {}).map(([id, keys]) =>
-    [id, [keys].flat().filter(k => k && typeof k === 'object' && !Array.isArray(k))]));
+    [id, [keys].flat().filter(k => k && typeof k === 'object' && !Array.isArray(k)
+      && k.validFrom === version && k.validThrough === version)]));
   const visual = verifyVisualReview({ record, reviewerAllowlist: scoped });
   if (!visual.publish) throw new Error(`signed visual verdict: ${visual.reasons.join('; ')}`);
 
@@ -71,9 +78,28 @@ export function verifyReviewerInfrastructure({ version, components, agreement, c
   }
 }
 
-function readJson(file) {
-  try { return JSON.parse(readFileSync(new URL(`../${file}`, import.meta.url), 'utf8')); }
-  catch { throw new Error(`cannot read or parse ${file}`); }
+export function parseUniqueJson(text) {
+  // JSON.parse owns grammar validation; scan the original tokens before exposing its
+  // result so duplicate names (including escaped spellings) cannot silently overwrite.
+  const value = JSON.parse(text);
+  const stack = [];
+  for (const match of text.matchAll(/"(?:\\.|[^"\\])*"|[{}[\]]/gs)) {
+    const token = match[0];
+    if (token === '{' || token === '[') stack.push(token === '{' ? new Set() : null);
+    else if (token === '}' || token === ']') stack.pop();
+    else if (/^\s*:/.test(text.slice(match.index + token.length))) {
+      const name = JSON.parse(token);
+      const names = stack.at(-1);
+      if (names.has(name)) throw new Error(`duplicate JSON member ${JSON.stringify(name)}`);
+      names.add(name);
+    }
+  }
+  return value;
+}
+
+export function readJson(file) {
+  try { return parseUniqueJson(readFileSync(new URL(`../${file}`, import.meta.url), 'utf8')); }
+  catch (error) { throw new Error(`cannot read or parse ${file}: ${error.message}`, { cause: error }); }
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {

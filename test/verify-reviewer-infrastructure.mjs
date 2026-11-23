@@ -1,10 +1,15 @@
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { spawnSync } from 'node:child_process';
+import { generateKeyPairSync } from 'node:crypto';
+import { existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { test } from 'node:test';
+import { runInNewContext } from 'node:vm';
 import {
   buildReviewerVerdict, generateEnrolledKeypair, signReviewerVerdict,
 } from '../experiments/handoff-beacon/reviewerVerdict.mjs';
-import { verifyReviewerInfrastructure as verify } from '../scripts/verify-reviewer-infrastructure.mjs';
+import { parseUniqueJson, readJson, verifyReviewerInfrastructure as verify } from '../scripts/verify-reviewer-infrastructure.mjs';
 
 const version = '1.6.7';
 const reviewer = 'test-signer';
@@ -38,6 +43,12 @@ test('permits a missing field before the first required release', () => {
 test('rejects a missing field at the boundary and beyond', () => {
   for (const v of [version, '1.6.10', '1.10.0', '2.0.0']) {
     assert.throws(() => verify({ version: v, components: { extension: v } }), /reviewerInfrastructure is required/);
+  }
+});
+
+test('accepts only stable versions without leading zeros', () => {
+  for (const v of ['1.6.7-rc.1', '1.6.7+build', '01.6.7', '1.6.7\n']) {
+    assert.throws(() => verify({ version: v, components: { extension: v } }), /requested X.Y.Z candidate version/);
   }
 });
 
@@ -81,6 +92,7 @@ test('rejects evidence inserted after signing', () => {
 for (const [name, patch] of [
   ['another version', { validFrom: '1.6.8', validThrough: '1.6.8' }],
   ['another purpose', { purposes: ['quorum'] }],
+  ['a range containing the candidate', { validFrom: '1.6.0', validThrough: '1.7.0' }],
 ]) {
   test(`rejects a key enrolled for ${name}`, () => {
     const f = fixture();
@@ -121,13 +133,136 @@ test('rejects a different signed verdict for the same candidate', () => {
   assert.throws(() => verify(f), /same signed visual verdict/);
 });
 
+test('rejects an enrolled EC key labelled ed25519', () => {
+  const f = fixture();
+  const { privateKey, publicKey } = generateKeyPairSync('ec', { namedCurve: 'prime256v1' });
+  const privateKeyPem = privateKey.export({ type: 'pkcs8', format: 'pem' });
+  const publicKeyPem = publicKey.export({ type: 'spki', format: 'pem' });
+  const record = agreementRelease(f).visualReview;
+  record.signOff = signReviewerVerdict(record.verdict, { privateKeyPem, reviewer });
+  f.allowlist[reviewer][0].publicKeyPem = publicKeyPem;
+  assert.throws(() => verify(f), /sign-off public key must be ed25519/);
+});
+
+test('rejects duplicate receiptSha256 in a raw file', () => {
+  assert.throws(() => readJson('test/fixtures/reviewer-infrastructure-duplicate.json'), /duplicate JSON member "receiptSha256"/);
+});
+
+test('rejects duplicate JSON names at any depth including escaped spellings', () => {
+  for (const text of [
+    '{"x":1,"x":2}',
+    '{"verdict":{"evidence":[{"ref":"a","ref":"b"}]}}',
+    '{"x":1,"\\u0078":2}',
+    '{"":1,"":2}',
+  ]) assert.throws(() => parseUniqueJson(text), /duplicate JSON member/);
+  for (const text of [
+    '{"a":[{"ref":"a"},{"ref":"b"}],"b":{"ref":"c"}}',
+    '{"quoted\\\"name":"braces {}, comma, colon: and escaped slash \\\\","other":null}',
+    '[true,false,null,1,-0.2e3,"text"]',
+  ]) assert.deepEqual(parseUniqueJson(text), JSON.parse(text));
+  assert.throws(() => parseUniqueJson('{"x":}'), SyntaxError);
+});
+
+const read = file => readFileSync(new URL(file, import.meta.url), 'utf8').replaceAll('\r\n', '\n');
+function preflightSource() {
+  const source = read('../scripts/lba.mjs');
+  const start = source.indexOf("  'release-preflight': {");
+  const end = source.indexOf('\n  release: {', start);
+  assert.ok(start >= 0 && end > start, 'bound the actual pre-flight command only');
+  return source.slice(start, end);
+}
+
 test('pre-flight and agreement job run the same verifier for the requested version', () => {
-  const read = file => readFileSync(new URL(file, import.meta.url), 'utf8').replaceAll('\r\n', '\n');
-  const cli = read('../scripts/lba.mjs').split("  'release-preflight': {")[1].split("\n  'release': {")[0];
+  const cli = preflightSource();
   assert.match(cli, /\['reviewer infrastructure record', 'scripts\/verify-reviewer-infrastructure\.mjs'\]/);
   assert.match(cli, /execFileSync\(process\.execPath, \[join\(repoRoot, rel\), '--component', 'extension', version\]/);
   const workflow = read('../.github/workflows/extension-release.yml');
   const job = workflow.split('\n  agreement:\n')[1].split('\n  release:\n')[0];
   assert.match(job, /VERSION: \$\{\{ steps\.ver\.outputs\.version \}\}\s+run: node scripts\/verify-reviewer-infrastructure\.mjs --component extension "\$VERSION"/);
   assert.match(workflow, /\n  release:\n    needs: \[build, agreement\]/);
+});
+
+test('pre-flight exits nonzero when only the infrastructure verifier fails', () => {
+  for (const fails of [false, true]) {
+    const calls = [];
+    const exits = [];
+    const commands = runInNewContext(`({${preflightSource()}})`, {
+      releasePreflightStatic: () => [],
+      read: () => JSON.stringify({ version, candidate: { version } }),
+      repoRoot: '.', join: (...parts) => parts.join('/'),
+      execFileSync: (_node, args) => {
+        calls.push(args);
+        if (fails && args[0].endsWith('/verify-reviewer-infrastructure.mjs')) throw new Error('fixture gate failure');
+      },
+      discoverSigningStation: () => ({}), readReviewerAllowlist: () => ({}),
+      signingStatus: () => ({ ok: true, station: 'UNKNOWN' }),
+      STATIONS: { UNKNOWN: 'UNKNOWN' },
+      console: { log() {}, error() {} },
+      process: { execPath: 'node', version: 'v24.19.0', exit: code => exits.push(code) },
+    });
+    commands['release-preflight'].run([version]);
+    assert.equal(calls.length, 4);
+    assert.equal(calls.filter(args => args[0].endsWith('/verify-reviewer-infrastructure.mjs')).length, 1);
+    assert.deepEqual(exits, fails ? [1] : []);
+  }
+});
+
+function runBodies(workflow) {
+  const lines = workflow.split('\n');
+  return lines.flatMap((line, i) => {
+    const match = /^(\s*)(?:-\s+)?run:\s*(.*)$/.exec(line);
+    if (!match) return [];
+    if (!/^[|>][-+]?$/.test(match[2])) return [match[2]];
+    const body = [];
+    for (let j = i + 1; j < lines.length; j++) {
+      if (lines[j].trim() && lines[j].search(/\S/) <= match[1].length) break;
+      body.push(lines[j].slice(match[1].length + 2));
+    }
+    return [body.join('\n')];
+  });
+}
+
+test('release workflow never interpolates expressions into run bodies', () => {
+  const workflow = read('../.github/workflows/extension-release.yml');
+  const bodies = runBodies(workflow);
+  assert.ok(bodies.length > 10);
+  for (const body of bodies) assert.doesNotMatch(body, /\$\{\{/);
+  for (const expression of ['${{ inputs.version }}', '${{ github.event.inputs.version }}']) {
+    for (const yaml of [`run: echo "${expression}"`, `run: |\n  echo "${expression}"`]) {
+      assert.ok(runBodies(yaml).some(body => /\$\{\{/.test(body)));
+    }
+  }
+  assert.equal((workflow.match(/- name: Derive version/g) || []).length, 1);
+  assert.match(workflow, /DISPATCH_VERSION: \$\{\{ inputs\.version \}\}/);
+  assert.match(workflow, /VERSION: \$\{\{ needs\.agreement\.outputs\.version \}\}/);
+});
+
+test('release workflow derives one fully validated stable version', () => {
+  const script = runBodies(read('../.github/workflows/extension-release.yml')).find(body => body.includes('DISPATCH_VERSION'));
+  assert.ok(script);
+  const scratch = mkdtempSync(join(tmpdir(), 'reviewer-version-'));
+  const output = join(scratch, 'version-output');
+  try {
+    const run = (input, ref) => {
+      rmSync(output, { force: true });
+      const result = spawnSync('bash', ['-c', script], {
+        cwd: scratch, encoding: 'utf8',
+        env: { ...process.env, DISPATCH_VERSION: input, GITHUB_REF_NAME: ref, GITHUB_OUTPUT: 'version-output' },
+      });
+      assert.ifError(result.error);
+      const written = existsSync(output) ? readFileSync(output, 'utf8').replaceAll('\r\n', '\n') : '';
+      return { ...result, written };
+    };
+    for (const input of ['1.6.7', '1.6.10', '1.10.0', '1.6.7-rc.1', '01.6.7', '1.6.7\n2.0.0', '1.6.7; true']) {
+      const result = run(input, 'feature');
+      const good = ['1.6.7', '1.6.10', '1.10.0'].includes(input);
+      assert.equal(result.status, good ? 0 : 1, result.stderr);
+      assert.equal(result.written, good ? `version=${input}\n` : '');
+    }
+    const tag = run('', 'ext-v1.6.7');
+    assert.equal(tag.status, 0, tag.stderr);
+    assert.equal(tag.written, 'version=1.6.7\n');
+  } finally {
+    rmSync(scratch, { recursive: true, force: true });
+  }
 });

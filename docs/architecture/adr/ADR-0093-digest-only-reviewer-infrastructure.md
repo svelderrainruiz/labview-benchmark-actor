@@ -14,8 +14,11 @@ Publishing the full receipt would expose operational details unrelated to verify
 The release operator privately validates and retains the receipt. Publish its SHA-256 and baseline
 in the [release record](../../release/reviewer-infrastructure.schema.json), and include the digest
 once in the visual verdict evidence **before** signing. Pre-flight and CI check the signed verdict
-against the version's enrolled visual key and bind it to the same candidate and verdict in both
+against an Ed25519 visual key enrolled for that exact version (not a range) and bind it to the same candidate and verdict in both
 the agreement and the composite decision.
+
+Release versions are stable numeric major/minor/patch triples; pre-release versions are rejected.
+All gate input documents reject duplicate JSON member names at every depth.
 
 ## Consequences
 
