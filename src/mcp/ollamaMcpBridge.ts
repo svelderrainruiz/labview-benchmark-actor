@@ -71,30 +71,55 @@ function openServer() {
   return { list, request, close() { child.stdin.end(); child.kill(); } };
 }
 
-// Ollama answered with an HTTP status, so it was reached: a failure from here on is exit 1, not 2.
+// A complete HTTP response arrived, so Ollama was reached: a failure from here on is exit 1, not 2.
 class OllamaAnswered extends Error {}
 
-async function api(endpoint: URL, path: string, body?: object) {
+type Json = Record<string, unknown>;
+const isObject = (value: unknown): value is Json =>
+  value !== null && typeof value === 'object' && !Array.isArray(value);
+
+async function api(endpoint: URL, path: string, body?: object): Promise<unknown> {
+  // Network failures here, including a body cut off mid-read, propagate as plain errors (exit 2).
   const response = await fetch(new URL(path, endpoint), {
-    redirect: 'error', signal: AbortSignal.timeout(300_000),
+    redirect: 'manual', signal: AbortSignal.timeout(300_000),
     ...(body && { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
   });
-  // The body is never read on failure and never printed: it is model or server text.
-  if (!response.ok) throw new OllamaAnswered(`HTTP ${response.status}`);
-  try { return await response.json() as unknown; } catch { throw new OllamaAnswered('invalid JSON'); }
+  const text = await response.text();
+  // The body is model or server text: never printed, only the status code.
+  if (response.status < 200 || response.status > 299) throw new OllamaAnswered(`HTTP ${response.status}`);
+  try { return JSON.parse(text) as unknown; } catch { throw new OllamaAnswered('invalid JSON'); }
 }
 
 interface ToolCall { function: { name: string; arguments: unknown } }
-interface Message { role: string; content: string; tool_calls?: ToolCall[]; tool_name?: string }
+interface Message { role: 'assistant'; content: string; tool_calls?: ToolCall[] }
+
+function chatMessage(body: unknown): Message {
+  if (!isObject(body) || !isObject(body.message)) throw new OllamaAnswered('invalid message');
+  const message = body.message;
+  if (message.role !== 'assistant' || typeof message.content !== 'string') {
+    throw new OllamaAnswered('invalid message');
+  }
+  if (message.tool_calls === undefined) return { role: 'assistant', content: message.content };
+  if (!Array.isArray(message.tool_calls)) throw new OllamaAnswered('invalid message');
+  const toolCalls: ToolCall[] = [];
+  for (const call of message.tool_calls as unknown[]) {
+    if (!isObject(call) || !isObject(call.function) || typeof call.function.name !== 'string' ||
+        !(isObject(call.function.arguments) || typeof call.function.arguments === 'string')) {
+      throw new OllamaAnswered('invalid tool call');
+    }
+    toolCalls.push({ function: { name: call.function.name, arguments: call.function.arguments } });
+  }
+  return { role: 'assistant', content: message.content, tool_calls: toolCalls };
+}
+
 interface CallRecord { name: string; nameSha256?: string; argumentsSha256: string; ok: boolean }
 
-function argumentsOf(raw: unknown): Record<string, unknown> | undefined {
+function argumentsOf(raw: unknown): Json | undefined {
   let value = raw;
   if (typeof raw === 'string') {
     try { value = JSON.parse(raw); } catch { return undefined; }
   }
-  return value !== null && typeof value === 'object' && !Array.isArray(value) ?
-    value as Record<string, unknown> : undefined;
+  return isObject(value) ? value : undefined;
 }
 
 async function run(config: ReturnType<typeof options>) {
@@ -112,18 +137,14 @@ async function run(config: ReturnType<typeof options>) {
     const allowed = new Set(tools.map(tool => tool.function.name));
     const known = new Set(receipt.toolsListed);
     stage = 'Ollama version';
-    const { version } = await api(config.endpoint, '/api/version') as { version?: unknown };
-    if (typeof version !== 'string') throw new OllamaAnswered('missing version');
-    receipt.ollamaVersion = version;
-    const messages: Message[] = [{ role: 'user', content: config.prompt }];
+    const about = await api(config.endpoint, '/api/version');
+    if (!isObject(about) || typeof about.version !== 'string') throw new OllamaAnswered('missing version');
+    receipt.ollamaVersion = about.version;
+    const messages: object[] = [{ role: 'user', content: config.prompt }];
     for (let turn = 0; turn < config.maxTurns; turn++) {
       stage = 'Ollama chat';
-      const { message } = await api(config.endpoint, '/api/chat',
-        { model: config.model, stream: false, messages, tools }) as { message?: Message };
-      if (message?.role !== 'assistant' || typeof message.content !== 'string' ||
-          (message.tool_calls !== undefined && !Array.isArray(message.tool_calls))) {
-        throw new OllamaAnswered('invalid message');
-      }
+      const message = chatMessage(await api(config.endpoint, '/api/chat',
+        { model: config.model, stream: false, messages, tools }));
       if (!message.tool_calls?.length) {
         finalText = message.content;
         break;
@@ -131,7 +152,6 @@ async function run(config: ReturnType<typeof options>) {
       messages.push(message);
       for (const call of message.tool_calls) {
         const { name, arguments: raw } = call.function;
-        if (typeof name !== 'string') throw new OllamaAnswered('invalid tool call');
         const args = argumentsOf(raw);
         const argumentsSha256 = sha256(JSON.stringify(args ?? raw ?? null));
         // A name the server did not list is model text: keep only its digest.

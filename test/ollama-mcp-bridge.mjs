@@ -22,11 +22,31 @@ const toolCall = (name, args = {}) => ({ function: { name, arguments: args } });
 const calls = (...tool_calls) => ({ role: 'assistant', content: '', tool_calls });
 const requests = [];
 let replies;
+let versionReply;
+let redirectHits = 0;
 let port;
+
+// A scripted raw reply: { status, body, headers } or { truncate: true } (headers plus half a body, then reset).
+function send(res, reply) {
+  if (reply.truncate) {
+    const whole = JSON.stringify({ message: done });
+    res.writeHead(200, { 'Content-Length': String(whole.length) });
+    res.write(whole.slice(0, whole.length >> 1), () => res.socket.destroy());
+    return;
+  }
+  res.writeHead(reply.status, reply.headers ?? {});
+  res.end(reply.body ?? '{}');
+}
 
 const fake = createServer(async (req, res) => {
   res.setHeader('Content-Type', 'application/json');
-  if (req.method === 'GET' && req.url === '/api/version') return res.end('{"version":"test-1"}');
+  if (req.url === '/redirect-target') {
+    redirectHits++;
+    return res.end('{"version":"redirected","message":{"role":"assistant","content":""}}');
+  }
+  if (req.method === 'GET' && req.url === '/api/version') {
+    return versionReply ? send(res, versionReply) : res.end('{"version":"test-1"}');
+  }
   if (req.method !== 'POST' || req.url !== '/api/chat') {
     res.writeHead(400);
     return res.end('{}');
@@ -36,10 +56,7 @@ const fake = createServer(async (req, res) => {
   for await (const chunk of req) text += chunk;
   requests.push(JSON.parse(text));
   const reply = replies.shift();
-  if (!reply || reply.status) {
-    res.writeHead(reply?.status ?? 400);
-    return res.end(reply?.body ?? '{}');
-  }
+  if (!reply || reply.status || reply.truncate) return send(res, reply ?? { status: 400 });
   res.end(JSON.stringify({ message: reply }));
 });
 
@@ -57,6 +74,8 @@ function run(args, script = join(bundle, entry), env = {}) {
 function script(...steps) {
   replies = steps;
   requests.length = 0;
+  versionReply = undefined;
+  redirectHits = 0;
 }
 function receipt(result, code) {
   assert.equal(result.code, code, result.stderr);
@@ -158,6 +177,49 @@ try {
   assert.equal(receipt(refused, 2).ollamaVersion, '');
   assert.equal(refused.stderr.includes('CHAT_BODY_MARKER'), false);
   console.log('connection-refused-exit-2: PASS');
+
+  // fake-counts-post-after-queue-empty: the fake itself must count a chat POST it has no reply for.
+  script();
+  const extra = await fetch(`http://127.0.0.1:${port}/api/chat`, { method: 'POST', body: '{}' });
+  await extra.text();
+  assert.equal(extra.status, 400);
+  assert.equal(requests.length, 1);
+  console.log('fake-counts-post-after-queue-empty: PASS');
+
+  // A complete but unusable response means Ollama was reached: exit 1, never the body in the output.
+  const unusable = [
+    ['version-null-exit-1', () => { versionReply = { status: 200, body: 'null' }; }, 0],
+    ['chat-null-exit-1', () => { replies.push({ status: 200, body: 'null' }); }, 1],
+    ['chat-non-json-exit-1', () => { replies.push({ status: 200, body: 'CHAT_BODY_MARKER <html>' }); }, 1],
+    ['tool-call-without-function-exit-1', () => { replies.push({ role: 'assistant', content: '',
+      tool_calls: [{ CHAT_BODY_MARKER: true }] }); }, 1],
+    ['redirect-302-exit-1', () => { replies.push({ status: 302, body: 'CHAT_BODY_MARKER',
+      headers: { Location: '/redirect-target' } }); }, 1]
+  ];
+  for (const [name, setup, chats] of unusable) {
+    script();
+    setup();
+    const result = await run(['--self-test']);
+    assert.deepEqual(receipt(result, 1).toolCalls, [], name);
+    assert.equal(requests.length, chats, name);
+    for (const out of [result.stdout, result.stderr]) assert.equal(out.includes('CHAT_BODY_MARKER'), false, name);
+    if (name.startsWith('redirect')) {
+      assert.match(result.stderr, /HTTP 302/);
+      assert.equal(redirectHits, 0, 'the redirect target is never requested');
+    }
+    console.log(`${name}: PASS`);
+  }
+
+  // body-cut-mid-stream-exit-2: headers arrived but the body never completed, so Ollama was not reached.
+  for (const where of ['version', 'chat']) {
+    script();
+    if (where === 'version') versionReply = { truncate: true };
+    else replies.push({ truncate: true });
+    const result = await run(['--self-test']);
+    assert.equal(receipt(result, 2).finalTextSha256, hash(''), where);
+    assert.equal(result.stderr.includes('Probe'), false);
+  }
+  console.log('body-cut-mid-stream-exit-2: PASS');
 
   for (const file of [entry, 'benchmarkActorMcpServer.js']) await copyFile(join(bundle, file), join(cwd, file));
   assert.deepEqual(receipt(await run(['--self-test'], join(cwd, entry)), 2).toolsListed, []);
