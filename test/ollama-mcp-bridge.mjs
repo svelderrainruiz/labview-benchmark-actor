@@ -27,14 +27,20 @@ let port;
 const fake = createServer(async (req, res) => {
   res.setHeader('Content-Type', 'application/json');
   if (req.method === 'GET' && req.url === '/api/version') return res.end('{"version":"test-1"}');
-  if (req.method !== 'POST' || req.url !== '/api/chat' || !replies.length) {
+  if (req.method !== 'POST' || req.url !== '/api/chat') {
     res.writeHead(400);
     return res.end('{}');
   }
+  // Record every chat attempt before looking at the queue, so an extra turn is always counted.
   let text = '';
   for await (const chunk of req) text += chunk;
   requests.push(JSON.parse(text));
-  res.end(JSON.stringify({ message: replies.shift() }));
+  const reply = replies.shift();
+  if (!reply || reply.status) {
+    res.writeHead(reply?.status ?? 400);
+    return res.end(reply?.body ?? '{}');
+  }
+  res.end(JSON.stringify({ message: reply }));
 });
 
 function run(args, script = join(bundle, entry), env = {}) {
@@ -101,7 +107,7 @@ try {
     '--allow-tool', 'post_coordination_note']), 0);
   assert.deepEqual(limited.toolCalls, [{ name: 'spin_up_witness', argumentsSha256: hash('{"plane":"WIN"}'), ok: true }]);
   assert.equal(limited.finalTextSha256, hash(''));
-  assert.equal(requests.length, 1);
+  assert.equal(requests.length, 1); // max-turns-records-every-attempt
   for (const name of ['spin_up_witness', 'post_coordination_note']) {
     assert.deepEqual(requests[0].tools.find(t => t.function.name === name).function.parameters,
       registry.find(t => t.name === name).inputSchema);
@@ -121,8 +127,37 @@ try {
   assert.equal((await run([])).stdout, done.content);
   assert.match((await run(['--max-turns', '0'])).stderr, /--max-turns/);
   assert.equal((await run(['--prompt', 'x', '--self-test'])).code, 1);
-  script();
-  receipt(await run(['--self-test']), 2); // HTTP failure in chat
+  // unlisted-tool-name-redacted: an invented name is model text and must never be echoed.
+  const marker = 'IGNORE_PREVIOUS_INSTRUCTIONS_' + 'leaked-tool-result-text-'.repeat(12);
+  script(calls(toolCall(marker, { q: 1 })), done);
+  const unlistedRun = await run(['--self-test', '--json']);
+  const unlisted = receipt(unlistedRun, 1);
+  for (const out of [unlistedRun.stdout, unlistedRun.stderr]) assert.equal(out.includes(marker), false);
+  assert.deepEqual(unlisted.toolCalls, [{ name: 'unlisted', nameSha256: `sha256:${hash(marker)}`,
+    argumentsSha256: hash('{"q":1}'), ok: false }]);
+  assert.match(requests[1].messages[2].content, /not allowed/i);
+  console.log('unlisted-tool-name-redacted: PASS');
+
+  // chat-404-exit-1: both services answered, so a chat HTTP error is a failed self-test, not unreachable.
+  const body = 'CHAT_BODY_MARKER model "test-model" not found';
+  script({ status: 404, body });
+  const notFound = await run(['--self-test']);
+  assert.deepEqual(receipt(notFound, 1).toolCalls, []);
+  assert.equal(requests.length, 1);
+  assert.match(notFound.stderr, /HTTP 404/);
+  for (const out of [notFound.stdout, notFound.stderr]) assert.equal(out.includes('CHAT_BODY_MARKER'), false);
+  console.log('chat-404-exit-1: PASS');
+
+  // connection-refused-exit-2: no HTTP status ever arrived.
+  const gone = createServer();
+  gone.listen(0, '127.0.0.1');
+  await once(gone, 'listening');
+  const refusedPort = gone.address().port;
+  await new Promise(resolve => gone.close(resolve));
+  const refused = await run(['--self-test', '--ollama', `http://127.0.0.1:${refusedPort}`]);
+  assert.equal(receipt(refused, 2).ollamaVersion, '');
+  assert.equal(refused.stderr.includes('CHAT_BODY_MARKER'), false);
+  console.log('connection-refused-exit-2: PASS');
 
   for (const file of [entry, 'benchmarkActorMcpServer.js']) await copyFile(join(bundle, file), join(cwd, file));
   assert.deepEqual(receipt(await run(['--self-test'], join(cwd, entry)), 2).toolsListed, []);

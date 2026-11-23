@@ -28,9 +28,11 @@ The server inherits the usual bus configuration. A denied call returns an error 
 
 `--self-test` asks for a capability probe. Its JSON receipt lists all discovered tool names, the model and
 Ollama version, each call name, SHA-256 of its JSON arguments and success flag, the SHA-256 of the final
-text, and the exit code. It contains no raw arguments, results or environment. Exit 0 means at least one
-call and all succeeded; 1 means no call or a failed call; 2 means a service was unavailable or returned
-an invalid response. `--max-turns` bounds chat requests (default 8). At the limit the last calls are
+text, and the exit code. A name the server did not list is recorded as `unlisted` with `nameSha256`, never
+as text. It contains no raw arguments, results or environment. Exit 0 means at least one call and all
+succeeded; 1 means no call, a failed call, or an Ollama HTTP error or invalid reply (for example a missing
+model); 2 means the MCP server failed or Ollama could not be connected to (refused, DNS, timeout).
+`--max-turns` bounds chat requests (default 8). At the limit the last calls are
 still counted; if there was no final reply, the final text hash is that of the empty string.
 
 ## Active capture resources

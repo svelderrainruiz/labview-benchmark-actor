@@ -71,18 +71,22 @@ function openServer() {
   return { list, request, close() { child.stdin.end(); child.kill(); } };
 }
 
+// Ollama answered with an HTTP status, so it was reached: a failure from here on is exit 1, not 2.
+class OllamaAnswered extends Error {}
+
 async function api(endpoint: URL, path: string, body?: object) {
   const response = await fetch(new URL(path, endpoint), {
     redirect: 'error', signal: AbortSignal.timeout(300_000),
     ...(body && { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
   });
-  if (!response.ok) throw new Error(`Ollama HTTP ${response.status}`);
-  return response.json();
+  // The body is never read on failure and never printed: it is model or server text.
+  if (!response.ok) throw new OllamaAnswered(`HTTP ${response.status}`);
+  try { return await response.json() as unknown; } catch { throw new OllamaAnswered('invalid JSON'); }
 }
 
 interface ToolCall { function: { name: string; arguments: unknown } }
 interface Message { role: string; content: string; tool_calls?: ToolCall[]; tool_name?: string }
-interface CallRecord { name: string; argumentsSha256: string; ok: boolean }
+interface CallRecord { name: string; nameSha256?: string; argumentsSha256: string; ok: boolean }
 
 function argumentsOf(raw: unknown): Record<string, unknown> | undefined {
   let value = raw;
@@ -106,9 +110,10 @@ async function run(config: ReturnType<typeof options>) {
     const tools = listed.filter(tool => config.allow.has(tool.name)).map(({ name, description, inputSchema }) =>
       ({ type: 'function', function: { name, description, parameters: inputSchema } }));
     const allowed = new Set(tools.map(tool => tool.function.name));
+    const known = new Set(receipt.toolsListed);
     stage = 'Ollama version';
     const { version } = await api(config.endpoint, '/api/version') as { version?: unknown };
-    if (typeof version !== 'string') throw new Error('Missing Ollama version');
+    if (typeof version !== 'string') throw new OllamaAnswered('missing version');
     receipt.ollamaVersion = version;
     const messages: Message[] = [{ role: 'user', content: config.prompt }];
     for (let turn = 0; turn < config.maxTurns; turn++) {
@@ -117,7 +122,7 @@ async function run(config: ReturnType<typeof options>) {
         { model: config.model, stream: false, messages, tools }) as { message?: Message };
       if (message?.role !== 'assistant' || typeof message.content !== 'string' ||
           (message.tool_calls !== undefined && !Array.isArray(message.tool_calls))) {
-        throw new Error('Invalid Ollama message');
+        throw new OllamaAnswered('invalid message');
       }
       if (!message.tool_calls?.length) {
         finalText = message.content;
@@ -126,9 +131,12 @@ async function run(config: ReturnType<typeof options>) {
       messages.push(message);
       for (const call of message.tool_calls) {
         const { name, arguments: raw } = call.function;
-        if (typeof name !== 'string') throw new Error('Missing tool name');
+        if (typeof name !== 'string') throw new OllamaAnswered('invalid tool call');
         const args = argumentsOf(raw);
-        const record = { name, argumentsSha256: sha256(JSON.stringify(args ?? raw ?? null)), ok: false };
+        const argumentsSha256 = sha256(JSON.stringify(args ?? raw ?? null));
+        // A name the server did not list is model text: keep only its digest.
+        const record: CallRecord = known.has(name) ? { name, argumentsSha256, ok: false } :
+          { name: 'unlisted', nameSha256: `sha256:${sha256(name)}`, argumentsSha256, ok: false };
         toolCalls.push(record);
         // Ollama expects an object when the assistant turn is replayed, even for a rejected call.
         call.function.arguments = args ?? {};
@@ -153,9 +161,12 @@ async function run(config: ReturnType<typeof options>) {
     }
     receipt.finalTextSha256 = sha256(finalText);
     receipt.exitCode = (config.selfTest && !toolCalls.length) || toolCalls.some(call => !call.ok) ? 1 : 0;
-  } catch {
+  } catch (error) {
     // Network errors and server diagnostics can include local paths or endpoint credentials.
-    console.error(`${stage} failed: unavailable service or invalid response.`);
+    if (error instanceof OllamaAnswered) {
+      receipt.exitCode = 1;
+      console.error(`${stage} failed: Ollama answered with ${error.message}.`);
+    } else console.error(`${stage} failed: unavailable service or invalid response.`);
   } finally {
     server.close();
   }

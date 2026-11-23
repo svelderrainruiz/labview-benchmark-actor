@@ -86,9 +86,11 @@ function render() {
   lines.push('');
   lines.push('`--self-test` asks for a capability probe. Its JSON receipt lists all discovered tool names, the model and');
   lines.push('Ollama version, each call name, SHA-256 of its JSON arguments and success flag, the SHA-256 of the final');
-  lines.push('text, and the exit code. It contains no raw arguments, results or environment. Exit 0 means at least one');
-  lines.push('call and all succeeded; 1 means no call or a failed call; 2 means a service was unavailable or returned');
-  lines.push('an invalid response. `--max-turns` bounds chat requests (default 8). At the limit the last calls are');
+  lines.push('text, and the exit code. A name the server did not list is recorded as `unlisted` with `nameSha256`, never');
+  lines.push('as text. It contains no raw arguments, results or environment. Exit 0 means at least one call and all');
+  lines.push('succeeded; 1 means no call, a failed call, or an Ollama HTTP error or invalid reply (for example a missing');
+  lines.push('model); 2 means the MCP server failed or Ollama could not be connected to (refused, DNS, timeout).');
+  lines.push('`--max-turns` bounds chat requests (default 8). At the limit the last calls are');
   lines.push('still counted; if there was no final reply, the final text hash is that of the empty string.');
   lines.push('');
   lines.push('## Active capture resources');
