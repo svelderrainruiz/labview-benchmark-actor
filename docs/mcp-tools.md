@@ -5,6 +5,34 @@
 
 The extension contributes a Model Context Protocol server (provider `labviewBenchmarkActor`, server `labview-benchmark-actor`, protocol `2025-06-18`) exposing the following tools to Copilot agent mode. The server is a dependency-free stdio JSON-RPC process launched by the extension; the tools that shell `lbabus` degrade gracefully when the CLI is absent.
 
+## Using the tools from a local Ollama model
+
+With Ollama running and a tool-capable model installed, use plain Node from the project root.
+For the capability probe, put `lbabus` on PATH or set `LBA_LBABUS_PATH` to its executable.
+These commands work in Windows PowerShell 5.1 and PowerShell 7:
+
+```powershell
+npm.cmd ci
+npm.cmd run compile
+node out/mcp/ollamaMcpBridge.js --model qwen3 --self-test
+$LASTEXITCODE
+```
+
+Use `--prompt "Show the benchmark series"` for a normal chat; `--json` prints a receipt instead of the final text.
+The bridge connects to `http://127.0.0.1:11434` by default (`--ollama` overrides `OLLAMA_HOST`).
+Tool results go to that endpoint, so use a model service you trust. No listener or editor is needed.
+
+Enabled by default: `get_host_capabilities`, `get_benchmark_series`, `poll_coordination_bus`.
+Use repeated `--allow-tool <name>` options to enable other listed tools, including the bus write.
+The server inherits the usual bus configuration. A denied call returns an error to the model.
+
+`--self-test` asks for a capability probe. Its JSON receipt lists all discovered tool names, the model and
+Ollama version, each call name, SHA-256 of its JSON arguments and success flag, the SHA-256 of the final
+text, and the exit code. It contains no raw arguments, results or environment. Exit 0 means at least one
+call and all succeeded; 1 means no call or a failed call; 2 means a service was unavailable or returned
+an invalid response. `--max-turns` bounds chat requests (default 8). At the limit the last calls are
+still counted; if there was no final reply, the final text hash is that of the empty string.
+
 ## Active capture resources
 
 The same server lists bounded, pathless `lba-capture://session/{runId}` metadata resources and supports `resources/read` for session state, ordered frame/sample batches, and explicitly requested PNG frames. Batch and frame URI templates are listed by `resources/templates/list`; frame reads require the SHA-256 returned by a batch. The extension passes its Global Storage root only through the stdio process environment. Reads never control capture. See ADR-0084 / LBA-REQ-101.

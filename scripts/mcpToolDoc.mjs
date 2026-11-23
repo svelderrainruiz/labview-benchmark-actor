@@ -20,6 +20,7 @@ if (!existsSync(corePath)) {
 }
 const { BENCHMARK_ACTOR_MCP_TOOLS, BENCHMARK_ACTOR_MCP_PROTOCOL_VERSION, BENCHMARK_ACTOR_MCP_SERVER_NAME } =
   require(corePath);
+const { OLLAMA_DEFAULT_TOOLS } = require(corePath);
 
 // Fold in the ACG corroboration-grid tools staged into the bundle (out/acg-mcp-bundle/), so the generated
 // reference matches what the SINGLE server's tools/list actually publishes (LBA-REQ-029).
@@ -65,6 +66,30 @@ function render() {
       `exposing the following tools to Copilot agent mode. The server is a dependency-free stdio JSON-RPC ` +
       `process launched by the extension; the tools that shell \`lbabus\` degrade gracefully when the CLI is absent.`
   );
+  lines.push('');
+  lines.push('## Using the tools from a local Ollama model');
+  lines.push('');
+  lines.push('With Ollama running and a tool-capable model installed, use plain Node from the project root.');
+  lines.push('For the capability probe, put `lbabus` on PATH or set `LBA_LBABUS_PATH` to its executable.');
+  lines.push('These commands work in Windows PowerShell 5.1 and PowerShell 7:');
+  lines.push('');
+  lines.push('```powershell', 'npm.cmd ci', 'npm.cmd run compile',
+    'node out/mcp/ollamaMcpBridge.js --model qwen3 --self-test', '$LASTEXITCODE', '```');
+  lines.push('');
+  lines.push('Use `--prompt "Show the benchmark series"` for a normal chat; `--json` prints a receipt instead of the final text.');
+  lines.push('The bridge connects to `http://127.0.0.1:11434` by default (`--ollama` overrides `OLLAMA_HOST`).');
+  lines.push('Tool results go to that endpoint, so use a model service you trust. No listener or editor is needed.');
+  lines.push('');
+  lines.push(`Enabled by default: ${[...OLLAMA_DEFAULT_TOOLS].map(name => `\`${name}\``).join(', ')}.`);
+  lines.push('Use repeated `--allow-tool <name>` options to enable other listed tools, including the bus write.');
+  lines.push('The server inherits the usual bus configuration. A denied call returns an error to the model.');
+  lines.push('');
+  lines.push('`--self-test` asks for a capability probe. Its JSON receipt lists all discovered tool names, the model and');
+  lines.push('Ollama version, each call name, SHA-256 of its JSON arguments and success flag, the SHA-256 of the final');
+  lines.push('text, and the exit code. It contains no raw arguments, results or environment. Exit 0 means at least one');
+  lines.push('call and all succeeded; 1 means no call or a failed call; 2 means a service was unavailable or returned');
+  lines.push('an invalid response. `--max-turns` bounds chat requests (default 8). At the limit the last calls are');
+  lines.push('still counted; if there was no final reply, the final text hash is that of the empty string.');
   lines.push('');
   lines.push('## Active capture resources');
   lines.push('');
