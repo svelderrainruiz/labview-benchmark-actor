@@ -27,13 +27,21 @@ let redirectHits = 0;
 let port;
 // Sent inside the prefix of a cut-off body, before the socket is destroyed: it must never be echoed.
 const CUT_MARKER = 'CUT_PREFIX_MARKER_' + 'sent-before-the-cut-'.repeat(3);
+// Neither valid gzip nor valid brotli; it carries both markers so a leak of any decoded or raw byte shows.
+const CORRUPT = `not compressed data at all, CHAT_BODY_MARKER ${CUT_MARKER}`;
 
-// A scripted raw reply: { status, body, headers } or { truncate: true } (headers plus half a body, then reset).
+// A scripted raw reply: { status, body, headers, short } or { truncate: true } (headers plus half a body, then
+// reset). With short, Content-Length claims that many bytes more than the body, and the socket is destroyed.
 function send(res, reply) {
   if (reply.truncate) {
     const sent = `{"version":"${CUT_MARKER}","message":{"role":"assistant","content":"${CUT_MARKER}`;
     res.writeHead(200, { 'Content-Length': String(sent.length * 2) });
     res.write(sent, () => res.socket.destroy());
+    return;
+  }
+  if (reply.short) {
+    res.writeHead(reply.status, { ...reply.headers, 'Content-Length': String(Buffer.byteLength(reply.body) + reply.short) });
+    res.write(reply.body, () => res.socket.destroy());
     return;
   }
   res.writeHead(reply.status, reply.headers ?? {});
@@ -203,13 +211,7 @@ try {
   assert.equal(requests.length, 1);
   console.log('fake-counts-post-after-queue-empty: PASS');
 
-  // A complete but unusable response means Ollama was reached: exit 1, never the body in the output.
-  // A full Content-Length body that is not valid data for its Content-Encoding, closed cleanly.
-  const undecodable = encoding => {
-    const body = 'not compressed data at all, CHAT_BODY_MARKER';
-    return { status: 200, body, headers: { 'Content-Encoding': encoding,
-      'Content-Length': String(Buffer.byteLength(body)) } };
-  };
+  // A fully read and decoded but unusable response means Ollama was reached: exit 1, never the body in the output.
   const unusable = [
     ['version-null-exit-1', () => { versionReply = { status: 200, body: 'null' }; }, 0],
     ['chat-null-exit-1', () => { replies.push({ status: 200, body: 'null' }); }, 1],
@@ -217,10 +219,7 @@ try {
     ['tool-call-without-function-exit-1', () => { replies.push({ role: 'assistant', content: '',
       tool_calls: [{ CHAT_BODY_MARKER: true }] }); }, 1],
     ['redirect-302-exit-1', () => { replies.push({ status: 302, body: 'CHAT_BODY_MARKER',
-      headers: { Location: '/redirect-target' } }); }, 1],
-    ['bad-gzip-version-exit-1', () => { versionReply = undecodable('gzip'); }, 0],
-    ['bad-gzip-chat-exit-1', () => { replies.push(undecodable('gzip')); }, 1],
-    ['bad-brotli-chat-exit-1', () => { replies.push(undecodable('br')); }, 1]
+      headers: { Location: '/redirect-target' } }); }, 1]
   ];
   for (const [name, setup, chats] of unusable) {
     script();
@@ -233,20 +232,36 @@ try {
       assert.match(result.stderr, /HTTP 302/);
       assert.equal(redirectHits, 0, 'the redirect target is never requested');
     }
-    if (name.startsWith('bad-')) assert.match(result.stderr, /undecodable body/, name);
     console.log(`${name}: PASS`);
   }
 
-  // body-cut-mid-stream-exit-2: headers arrived but the body never completed, so Ollama was not reached.
-  for (const where of ['version', 'chat']) {
+  // A body that could not be read in full or decoded is exit 2 with one fixed diagnostic, never its bytes.
+  // fetch cannot tell a corrupt encoding from a cut transfer, so a complete corrupt body is 2 as well.
+  const corrupt = (encoding, short = 0) => ({ status: 200, body: CORRUPT, short,
+    headers: { 'Content-Encoding': encoding, 'Content-Length': String(Buffer.byteLength(CORRUPT)) } });
+  const unreadable = [
+    ['bad-gzip-complete-exit-2', 'version', corrupt('gzip')],
+    ['bad-gzip-complete-exit-2', 'chat', corrupt('gzip')],
+    ['bad-brotli-complete-exit-2', 'chat', corrupt('br')],
+    ['bad-gzip-truncated-exit-2', 'version', corrupt('gzip', 65)],
+    ['bad-gzip-truncated-exit-2', 'chat', corrupt('gzip', 65)],
+    ['body-cut-mid-stream-exit-2', 'version', { truncate: true }],
+    ['body-cut-mid-stream-exit-2', 'chat', { truncate: true }]
+  ];
+  for (const [name, where, reply] of unreadable) {
     script();
-    if (where === 'version') versionReply = { truncate: true };
-    else replies.push({ truncate: true });
+    if (where === 'version') versionReply = reply;
+    else replies.push(reply);
     const result = await run(['--self-test']);
-    assert.equal(receipt(result, 2).finalTextSha256, hash(''), where);
-    for (const out of [result.stdout, result.stderr]) assert.equal(out.includes(CUT_MARKER), false, where);
+    const label = `${name} (${where})`;
+    assert.equal(receipt(result, 2).finalTextSha256, hash(''), label);
+    assert.equal(requests.length, where === 'chat' ? 1 : 0, label);
+    assert.match(result.stderr, new RegExp(`^Ollama ${where} failed: body could not be read or decoded\\.$`, 'm'), label);
+    for (const out of [result.stdout, result.stderr]) {
+      for (const leak of [CUT_MARKER, 'CHAT_BODY_MARKER', 'not compressed']) assert.equal(out.includes(leak), false, label);
+    }
+    console.log(`${label}: PASS`);
   }
-  console.log('body-cut-mid-stream-exit-2: PASS');
 
   for (const file of [entry, 'benchmarkActorMcpServer.js']) await copyFile(join(bundle, file), join(cwd, file));
   assert.deepEqual(receipt(await run(['--self-test'], join(cwd, entry)), 2).toolsListed, []);

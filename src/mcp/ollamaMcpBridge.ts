@@ -71,25 +71,17 @@ function openServer() {
   return { list, request, close() { child.stdin.end(); child.kill(); } };
 }
 
-// A complete HTTP response arrived, so Ollama was reached: a failure from here on is exit 1, not 2.
+// The body was read in full and decoded, so Ollama was reached: a failure from here on is exit 1, not 2.
 class OllamaAnswered extends Error {}
+// A transfer failure and a content-encoding failure look alike through fetch, so both are exit 2.
+class BodyUnread extends Error {}
 
 type Json = Record<string, unknown>;
 const isObject = (value: unknown): value is Json =>
   value !== null && typeof value === 'object' && !Array.isArray(value);
 
-// zlib codes are Z_*; brotli codes are ERR_* with a numeric errno, unlike Node's own ERR_* stream errors.
-function decoderFailed(error: unknown): boolean {
-  for (let link = error, depth = 0; isObject(link) && depth < 8; link = link.cause, depth++) {
-    const code = link.code;
-    if (typeof code === 'string' &&
-        (code.startsWith('Z_') || (code.startsWith('ERR_') && typeof link.errno === 'number'))) return true;
-  }
-  return false;
-}
-
 async function api(endpoint: URL, path: string, body?: object): Promise<unknown> {
-  // Network failures here, including a body cut off mid-read, propagate as plain errors (exit 2).
+  // Connection failures before any status propagate as plain errors (exit 2).
   const response = await fetch(new URL(path, endpoint), {
     redirect: 'manual', signal: AbortSignal.timeout(300_000),
     ...(body && { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
@@ -97,10 +89,9 @@ async function api(endpoint: URL, path: string, body?: object): Promise<unknown>
   let text: string;
   try {
     text = await response.text();
-  } catch (error) {
-    // The whole body arrived but its Content-Encoding is invalid: reached, unusable.
-    if (decoderFailed(error)) throw new OllamaAnswered('undecodable body');
-    throw error;
+  } catch {
+    // The error may quote body bytes, so it is dropped for a fixed diagnostic.
+    throw new BodyUnread();
   }
   // The body is model or server text: never printed, only the status code.
   if (response.status < 200 || response.status > 299) throw new OllamaAnswered(`HTTP ${response.status}`);
@@ -202,7 +193,8 @@ async function run(config: ReturnType<typeof options>) {
     if (error instanceof OllamaAnswered) {
       receipt.exitCode = 1;
       console.error(`${stage} failed: Ollama answered with ${error.message}.`);
-    } else console.error(`${stage} failed: unavailable service or invalid response.`);
+    } else if (error instanceof BodyUnread) console.error(`${stage} failed: body could not be read or decoded.`);
+    else console.error(`${stage} failed: unavailable service or invalid response.`);
   } finally {
     server.close();
   }
