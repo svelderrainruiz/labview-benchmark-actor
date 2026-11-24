@@ -87,6 +87,22 @@ If setting the target manually, preserve the stage evidence and add exactly one
 `--evidence "reviewer-infrastructure-receipt-sha256:<receiptSha256>"` to the same `set-target` command.
 Before signing, the reviewer confirms the target carries the digest of the privately checked receipt.
 
+### Hyper-V reviewer guest (#124)
+
+On a Windows host that runs the reviewer guest under Hyper-V, use the scripts in `reviewer-workstation/hyperv/`
+(see its README for prerequisites and every parameter). Run them elevated, with `-CandidateRepo` pointing at the
+candidate checkout and `-Credential` holding the guest account. Same artifacts and gate fields as above:
+
+```
+.\reviewer-workstation\hyperv\win-plane-validate.ps1 -VMName <vm> -Credential $c -CandidateRepo <candidate> -Branch release/X.Y.Z
+.\reviewer-workstation\hyperv\release-stage-win.ps1 -VMName <vm> -Credential $c -Version X.Y.Z -Commit <sha> -Vsix <vsix> `
+   -Attestation <attestation.json> -CandidateRepo <candidate> -VisualKey <visual.pem> -SwitchName <switch> -LbabusExe <lbabus.exe>
+.\reviewer-workstation\hyperv\render-verdict.ps1 collect -VMName <vm> -Credential $c -Version X.Y.Z -Out <verdict.json>
+.\reviewer-workstation\hyperv\render-quorum.ps1 all -VMName <vm> -Credential $c -Version X.Y.Z -Attestation <attestation.json> -CandidateRepo <candidate>
+```
+
+Add `-WhatIf` to any of them to print the ordered plan without running it.
+
 The steps it composes, for diagnosis: after the WIN reviewer agent reports its stage task, await its correlated
 `DONE` frame and then build the composite-ready artifact:
 

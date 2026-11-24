@@ -72,16 +72,11 @@ case "$sub" in
       [[ -n "$staged" ]] || { echo "render-verdict: --vsix-sha256 given but no candidate .vsix is staged in the VM at ${guest_vsix} -- stage it first (stage-local-vsix.ps1)" >&2; exit 1; }
       node "${here}/verify-staged-vsix.mjs" --candidate-sha256 "$vsix" --staged-sha256 "$staged" >&2
     fi
-    # Build review-target.json locally (node JSON-escapes the evidence refs), then drop it into the VM handoff dir.
-    # Each --evidence ARG is ONE entry, and a ref MAY contain spaces (e.g. "run-42: 495 frames @12fps/1866ms,
-    # peakCpu 100%"). Pass the array NEWLINE-delimited (a ref is single-line) so element boundaries survive --
-    # NOT space-split, which shreds a multi-word ref into many bogus single-word entries.
+    # Build review-target.json locally (build-review-target.mjs is shared with the Hyper-V driver; each --evidence
+    # ARG is ONE "<kind>:<ref>" entry and a ref MAY contain spaces), then drop it into the VM handoff dir.
     tmp="$(mktemp -d)"
-    EVID="$(printf '%s\n' "${evidence[@]:-}")"
-    COMP="$component" VER="$version" COMMIT="$commit" VSIX="$vsix" EVID="$EVID" node -e '
-      const ev = (process.env.EVID || "").split("\n").map((s) => s.trim()).filter(Boolean).map((s) => { const i = s.indexOf(":"); return { kind: i > 0 ? s.slice(0, i) : "note", ref: i > 0 ? s.slice(i + 1) : s }; });
-      process.stdout.write(JSON.stringify({ component: process.env.COMP, version: process.env.VER, commit: process.env.COMMIT || null, vsixSha256: process.env.VSIX || null, evidence: ev }, null, 2));
-    ' > "$tmp/review-target.json"
+    ev_args=(); for e in "${evidence[@]:-}"; do [[ -n "$e" ]] && ev_args+=(--evidence "$e"); done
+    node "${here}/build-review-target.mjs" --component "$component" --version "$version" --commit "$commit" --vsix-sha256 "$vsix" ${ev_args[@]+"${ev_args[@]}"} > "$tmp/review-target.json"
     gc run --exe 'C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe' --wait-stdout --wait-stderr -- \
       -NoLogo -NoProfile -NonInteractive -Command "New-Item -ItemType Directory -Force -Path '${guest_handoff}' | Out-Null" >/dev/null 2>&1
     gc copyto --target-directory "${guest_handoff}\\" "$tmp/review-target.json" >/dev/null
