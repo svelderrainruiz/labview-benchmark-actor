@@ -10,6 +10,8 @@ PowerShell 5.1 and PowerShell 7 both work.
 - The guest is running, has the Guest Service Interface enabled (`Enable-VMIntegrationService -VMName <vm> -Name 'Guest Service Interface'`), and has Node, npm and git.
 - A guest credential, passed as `-Credential` (`Get-Credential`). It is never read from a file. The guest user defaults to the credential's account name; override with `-GuestUser`.
 - `node` on the host, a checkout of the candidate (`-CandidateRepo`) and, for staging, the pinned `lbabus` win-x64 exe (`node scripts/fetch-lbabus.mjs binary --rid win-x64 --out <file>`). The script refuses an exe that does not match the pinned hash.
+- `-Branch` (for `win-plane-validate.ps1`) must be a local branch with full history in `-CandidateRepo`. A remote-only ref or a shallow clone fails at `git bundle create`.
+- The session must be an elevated administrator or a member of Hyper-V Administrators. Every driver checks this before the first `Get-VM` and exits 6 otherwise; `-WhatIf` needs no elevation.
 - Pass the VM with exactly one of `-VMId <guid>` or `-VMName <name>`.
 - Add `-WhatIf` (alias of `-DryRun`) to print the ordered plan without touching Hyper-V, the firewall or the network.
 
@@ -31,7 +33,7 @@ interface, the port and the guest, and removes it when the step ends, also on fa
 Find the address the guest reaches with
 `(Get-NetIPAddress -InterfaceAlias 'vEthernet (<switch>)' -AddressFamily IPv4).IPAddress`, or pass `-SwitchName`.
 The guest address is `-GuestAddress` (an IP) or else the VM's IPv4 address on the host subnet; with neither the step
-exits 2. `-HostAddress` and `-GuestAddress` must be IP addresses, and `-VMName` must match the VM name exactly.
+exits 2. `-HostAddress` and `-GuestAddress` must be IPv4 addresses (IPv6 is not supported), and `-VMName` must match the VM name exactly.
 Before any guest change the step refuses (exit 6) when the port is already in use or a leftover `lba-stage-<port>-*`
 rule exists (remove it yourself; a concurrent run may own it).
 
@@ -39,8 +41,9 @@ rule exists (remove it yourself; a concurrent run may own it).
 
 The tooling (guest scripts, evidence builders) comes from the checkout that holds this driver. The candidate's
 `release-components.json`, version and VSIX come from `-CandidateRepo`. The evidence and pin rule files
-`scripts/verify-reviewer-infrastructure.mjs`, `scripts/lbabus-pin.mjs` and
-`experiments/acg-quorum/cross-plane-attestation.mjs` must be byte-equal in both, else the step exits 2 naming the file.
+listed in `tooling-compare.json` (the static import closure of the evidence builders, plus the record step) must be
+byte-equal in both, else the step exits 2 naming the file. The release data files the builders read are excluded, each
+with a reason in that file; the selftest fails if the closure gains a file that is neither compared nor excluded.
 
 Each guest program is also bounded inside the guest (it is stopped there on timeout), because a guest process can
 survive a host-side job stop.

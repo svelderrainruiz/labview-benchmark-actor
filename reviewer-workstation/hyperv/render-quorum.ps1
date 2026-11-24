@@ -39,6 +39,7 @@ Invoke-LbaMain {
   $id = $null
   if ($needsGuest) {
     Assert-LbaCredential $Credential
+    Assert-LbaElevated
     $id = Resolve-LbaVmId -VMId $VMId -VMName $VMName
     Assert-LbaVmRunning -VMId $id -RequireFileCopy:($Action -in 'stage', 'all')
   }

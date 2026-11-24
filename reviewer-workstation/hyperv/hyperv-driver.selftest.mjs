@@ -7,9 +7,9 @@
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
-import { chmodSync, copyFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { chmodSync, copyFileSync, cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { dirname, join } from 'node:path';
+import { dirname, join, posix as pathPosix } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { buildReviewTarget, parseEvidence } from '../build-review-target.mjs';
 import { buildStageSender, stageIdentity } from '../release-stage-win.mjs';
@@ -28,7 +28,8 @@ const components = JSON.parse(readFileSync(join(root, 'release-components.json')
 const version = components.extension;
 components.reviewerInfrastructure = { schema: 'reviewer-infrastructure@1', baseline: 'v0.1.0', receiptSha256: 'a'.repeat(64) };
 // The tooling and evidence rule files the stage driver compares with the candidate, copied so the fixture agrees.
-const COMPARED = ['scripts/verify-reviewer-infrastructure.mjs', 'scripts/lbabus-pin.mjs', 'experiments/acg-quorum/cross-plane-attestation.mjs'];
+const compareList = JSON.parse(readFileSync(join(here, 'tooling-compare.json'), 'utf8'));
+const COMPARED = compareList.compared;
 const sha = (text) => createHash('sha256').update(text).digest('hex');
 const lbabusAsset = expectedAssetNames(components.lbabus)['win-x64'];
 components.lbabusRelease = { ...(components.lbabusRelease ?? {}), assets: { ...(components.lbabusRelease?.assets ?? {}), [lbabusAsset]: sha('fake lbabus') } };
@@ -81,7 +82,7 @@ test('H4', 'win-plane-validate bundles, ships, runs the candidate validator in t
   const r = ps('win-plane-validate.ps1', ['-VMId', vmId, '-CandidateRepo', here.replace(/reviewer-workstation.*$/, ''), '-Branch', 'release/1.6.7', '-OutFile', join(work, 'w.json'), '-WhatIf']);
   assert.equal(r.status, 0, r.stderr);
   const o = ops(r.plan);
-  assert.deepEqual(o.filter((x) => x !== 'guest-run' && x !== 'copy-to-guest').slice(0, 3), ['check-vm', 'host-run', 'host-run']);
+  assert.deepEqual(o.filter((x) => x !== 'guest-run' && x !== 'copy-to-guest').slice(0, 4), ['check-elevation', 'check-vm', 'host-run', 'host-run']);
   assert.match(r.plan.find((s) => s.op === 'host-run').detail, /bundle create .*release\/1\.6\.7/);
   assert.ok(r.plan.some((s) => s.op === 'guest-run' && /-File C:\\lba-validate\\win-plane-validate\.ps1 -Bundle C:\\lba-validate\\rel\.bundle -Branch release\/1\.6\.7/.test(s.detail)));
   assert.equal(o.at(-1), 'host-write');
@@ -199,6 +200,7 @@ function Write-Call($m) { Add-Content -LiteralPath "$d/calls.log" -Value $m }
 function Get-VM { param($Id, [Parameter(ValueFromRemainingArguments)]$rest) Write-Call 'Get-VM'; [pscustomobject]@{ Id = [guid]$env:T_VMID; Name = 'vm'; State = 'Running' } }
 function Get-VMIntegrationService { param($VM, $Name, $ErrorAction) [pscustomobject]@{ Enabled = ($env:T_GSI -ne '0') } }
 function Get-VMNetworkAdapter { param($VM, $ErrorAction) [pscustomobject]@{ IPAddresses = @($env:T_GUEST_IPS -split ',') } }
+function whoami.exe { if ($env:T_ELEVATED -eq '0') { '"lab\\u","User","S-1-5-32-544","Group used for deny only"' } else { '"BUILTIN\\Administrators","Alias","S-1-5-32-544","Mandatory group, Enabled by default, Enabled group, Group owner"' } }
 function Get-NetIPAddress { param($IPAddress, $InterfaceAlias, $AddressFamily, $ErrorAction) [pscustomobject]@{ IPAddress = '172.20.0.1'; InterfaceAlias = 'vEthernet (Lab)'; PrefixLength = 24 } }
 function Get-NetTCPConnection { param($State, $LocalPort, $ErrorAction) if ($env:T_BUSY -eq '1' -or (Test-Path "$d/listening")) { [pscustomobject]@{ LocalPort = $LocalPort } } }
 function New-NetFirewallRule { param($DisplayName, $Direction, $Action, $Protocol, $LocalPort, $LocalAddress, $InterfaceAlias, $RemoteAddress, $Profile, $ErrorAction)
@@ -230,7 +232,7 @@ $p.Credential = [pscredential]::new('lab\\\\reviewer', (ConvertTo-SecureString '
 exit $LASTEXITCODE
 `;
 
-function live(name, { env = {}, params = {}, script = 'release-stage-win.ps1', fw = [], extra = {} } = {}) {
+function live(name, { env = {}, params = {}, script = 'release-stage-win.ps1', fw = [], extra = {}, bare = false } = {}) {
   const dir = join(work, `live-${name}`);
   mkdirSync(dir, { recursive: true });
   const fake = join(dir, 'node');
@@ -247,7 +249,7 @@ esac
 `);
   chmodSync(fake, 0o755);
   writeFileSync(join(dir, 'fw.state'), fw.map((x) => `${x}\n`).join(''));
-  writeFileSync(join(dir, 'params.json'), JSON.stringify({
+  writeFileSync(join(dir, 'params.json'), JSON.stringify(bare ? { VMId: vmId, ...params } : {
     VMId: vmId, Version: version, Commit: commit, Vsix: join(work, 'candidate.vsix'), Attestation: attestationPath, CandidateRepo: candidate,
     VisualKey: join(work, 'visual.pem'), HostAddress: '172.20.0.1', LbabusExe: join(work, 'lbabus.exe'), Share: join(dir, 'share'), Node: fake, TimeoutSec: 20, ...params,
   }));
@@ -256,7 +258,7 @@ esac
   const r = spawnSync('pwsh', ['-NoProfile', '-NonInteractive', '-File', join(dir, 'wrapper.ps1')], {
     encoding: 'utf8',
     env: {
-      ...process.env, T_DIR: dir, T_VMID: vmId, T_GSI: '1', T_GUEST_IPS: 'fe80::1,172.20.0.5,10.9.9.9', T_GUEST_LBABUS_SHA: sha('fake lbabus'),
+      ...process.env, T_DIR: dir, T_VMID: vmId, T_GSI: '1', T_ELEVATED: '1', T_GUEST_IPS: 'fe80::1,172.20.0.5,10.9.9.9', T_GUEST_LBABUS_SHA: sha('fake lbabus'),
       T_GUEST_VSIX_SHA: stageEnvSha, T_VSIX_SHA: stageEnvSha, T_SENDER_OK: '0', T_EXT_ID: `${pkg.publisher}.${pkg.name}`, T_VERSION: version, ...env,
     },
   });
@@ -342,12 +344,89 @@ liveTest('H19', 'the tooling and the candidate must agree on the evidence and pi
   assert.equal(r.status, 2, r.stderr);
   assert.match(r.stderr, /scripts[\\/]lbabus-pin\.mjs differs between the tooling tree and -CandidateRepo/);
   noGuestChange(r);
+  copyFileSync(join(candidate, 'scripts', 'lbabus-pin.mjs'), join(other, 'scripts', 'lbabus-pin.mjs'));
   rmSync(join(other, 'scripts', 'verify-reviewer-infrastructure.mjs'));
   const missing = live('candidate-missing', { params: { CandidateRepo: other } });
   assert.equal(missing.status, 2);
   assert.match(missing.stderr, /verify-reviewer-infrastructure\.mjs is missing from -CandidateRepo/);
   const dry = ps('release-stage-win.ps1', stageArgs.map((a) => (a === candidate ? other : a)));
   assert.equal(dry.status, 2, 'the comparison also runs in dry-run');
+});
+
+// The static import graph (relative import/from specifiers and readJson('<file>') literals) of the evidence builders.
+function importClosure(base, roots) {
+  const seen = new Set();
+  const queue = [...roots];
+  while (queue.length) {
+    const f = queue.pop();
+    if (seen.has(f)) continue;
+    seen.add(f);
+    if (!/\.m?js$/.test(f)) continue;
+    const src = readFileSync(join(base, f), 'utf8');
+    for (const m of src.matchAll(/(?:from|import)\s*\(?\s*['"](\.[^'"]+)['"]/g)) queue.push(pathPosix.normalize(pathPosix.join(pathPosix.dirname(f), m[1])));
+    for (const m of src.matchAll(/readJson\(\s*'([^']+)'\s*\)/g)) queue.push(m[1]);
+  }
+  return [...seen].sort();
+}
+
+test('H25', 'the compared tooling set covers the import closure of the evidence builders; each exclusion has a reason', () => {
+  const excluded = Object.keys(compareList.excluded);
+  for (const f of excluded) assert.ok(String(compareList.excluded[f]).length > 20, `${f} needs a reason`);
+  assert.deepEqual(COMPARED.filter((f) => excluded.includes(f)), [], 'a file is either compared or excluded');
+  const missing = importClosure(root, compareList.roots).filter((f) => !COMPARED.includes(f) && !excluded.includes(f));
+  assert.deepEqual(missing, [], `in the closure but neither compared nor excluded: ${missing.join(', ')}`);
+  for (const f of COMPARED) assert.ok(existsSync(join(root, f)), `${f} is listed but does not exist`);
+});
+
+test('H26', 'a one-byte change in any compared file is refused in dry-run, naming the file', () => {
+  const same = ps('release-stage-win.ps1', stageArgs);
+  assert.equal(same.status, 0, same.stderr);
+  for (const f of COMPARED) {
+    const other = join(work, 'candidate-byte');
+    rmSync(other, { recursive: true, force: true });
+    cpSync(candidate, other, { recursive: true });
+    writeFileSync(join(other, f), `${readFileSync(join(candidate, f), 'utf8')} `);
+    const r = ps('release-stage-win.ps1', stageArgs.map((a) => (a === candidate ? other : a)));
+    assert.equal(r.status, 2, `${f}: ${r.stderr}`);
+    assert.ok(r.stderr.replaceAll('\\', '/').includes(`${f} differs between the tooling tree and -CandidateRepo`), r.stderr);
+  }
+}, { needsPwsh: true });
+
+liveTest('H27', 'every driver refuses a session that is not elevated before any Get-VM; dry-run needs no elevation', () => {
+  const cases = [
+    ['release-stage-win.ps1', {}],
+    ['render-verdict.ps1', { Action: 'set-target', Version: version, Commit: commit, VsixSha256: 'a'.repeat(64) }],
+    ['render-quorum.ps1', { Action: 'stage', Version: version, Attestation: attestationPath, CandidateRepo: candidate }],
+    ['win-plane-validate.ps1', { CandidateRepo: root, Branch: 'release/1.0.0' }],
+  ];
+  for (const [script, params] of cases) {
+    const r = live(`elevation-${script}`, { script, env: { T_ELEVATED: '0' }, params, bare: script !== 'release-stage-win.ps1' });
+    assert.equal(r.status, 6, `${script}: ${r.stderr}`);
+    assert.match(r.stderr, /neither an elevated administrator nor a member of Hyper-V Administrators/);
+    assert.ok(!/Get-VM/.test(r.calls), `${script} must not reach Get-VM`);
+  }
+  const ok = live('elevation-ok', { env: { T_ELEVATED: '1', T_BUSY: '1' } });
+  assert.doesNotMatch(ok.stderr, /Hyper-V Administrators/);
+  const dry = ps('release-stage-win.ps1', stageArgs);
+  assert.equal(dry.status, 0, dry.stderr);
+});
+
+liveTest('H28', 'only IPv4 addresses are accepted, and a busy port leaves LBABUS untouched', () => {
+  const v6 = live('ipv6-host', { params: { HostAddress: '::1' } });
+  assert.equal(v6.status, 2, v6.stderr);
+  assert.match(v6.stderr, /-HostAddress is not an IP address/);
+  const v6g = live('ipv6-guest', { params: { GuestAddress: 'fe80::1' } });
+  assert.equal(v6g.status, 2, v6g.stderr);
+  const dir = join(work, 'envcheck');
+  mkdirSync(dir, { recursive: true });
+  const script = `Import-Module '${join(here, 'LbaHyperV.psm1')}' -Force
+function Get-NetTCPConnection { [pscustomobject]@{ LocalPort = 1 } }
+$env:LBABUS = 'before'
+Start-LbaPlan
+try { Start-LbaListener -Node 'node' -Script 's' -Lbabus 'x' -TaskId 't' -Port 7420 -TimeoutSec 5 -Out 'o' -LogDir '${dir}' } catch { 'threw' }
+$env:LBABUS`;
+  const r = spawnSync('pwsh', ['-NoProfile', '-Command', script], { encoding: 'utf8' });
+  assert.equal(r.stdout.trim().split('\n').join('|'), 'threw|before', r.stderr);
 });
 
 liveTest('H20', 'a guest program that exits non-zero or outlives its guest-side bound fails the step, naming it', () => {

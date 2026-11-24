@@ -23,8 +23,10 @@ fields as the VirtualBox scripts. Only the transport changes: PowerShell Direct 
 - The host address is a parameter (no default); the VirtualBox default is unchanged.
 - The pinned `lbabus` hash is checked on the host and again in the guest before it is used.
 - Tooling runs from the driver's checkout; the candidate's `release-components.json`, version and VSIX come from
-  `-CandidateRepo`. The evidence and pin rule files (`verify-reviewer-infrastructure.mjs`, `lbabus-pin.mjs`,
-  `cross-plane-attestation.mjs`) must be byte-equal in both or the step exits 2.
+  `-CandidateRepo`. The evidence builders' import closure (listed in
+  `tooling-compare.json`; release data files excluded with reasons) must be byte-equal in both or the step exits 2.
+- Each driver checks for an elevated administrator or Hyper-V Administrators before the first `Get-VM` (not
+  `#requires`, which would block `-WhatIf`); only IPv4 addresses are accepted.
 - The firewall rule is always scoped to the guest address (`-GuestAddress`, else the VM's address on the host subnet).
   A busy port or a leftover rule is refused before any guest change.
 - Each guest program is bounded in the guest as well as on the host, since a guest process can outlive a host job stop.

@@ -51,8 +51,9 @@ Invoke-LbaMain {
   Assert-LbaArgument ($Commit -match '^[0-9a-f]{40}$') '-Commit must be a full 40-character sha'
   Assert-LbaArgument ($TcpPort -gt 0 -and $TcpPort -lt 65536) "-TcpPort is not a port: $TcpPort"
   foreach ($f in @($Vsix, $Attestation, $VisualKey, $LbabusExe)) { Assert-LbaArgument (Test-Path -LiteralPath $f) "$f does not exist" }
-  Assert-LbaToolingMatchesCandidate -ToolingRoot $toolingRoot -CandidateRoot $CandidateRepo -Files @('scripts\verify-reviewer-infrastructure.mjs', 'scripts\lbabus-pin.mjs', 'experiments\acg-quorum\cross-plane-attestation.mjs')
+  Assert-LbaToolingMatchesCandidate -ToolingRoot $toolingRoot -CandidateRoot $CandidateRepo -Files @((Get-Content -Raw -LiteralPath (Join-Path $PSScriptRoot 'tooling-compare.json') | ConvertFrom-Json).compared)
   Assert-LbaCredential $Credential
+  Assert-LbaElevated
   $id = Resolve-LbaVmId -VMId $VMId -VMName $VMName
   $hostAddr = Resolve-LbaHostAddress -HostAddress $HostAddress -SwitchName $SwitchName
   $user = Get-LbaGuestUser -Credential $Credential -GuestUser $GuestUser

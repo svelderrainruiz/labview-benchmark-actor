@@ -29,6 +29,7 @@ Invoke-LbaMain {
   Assert-LbaArgument ($Version -match '^\d+\.\d+\.\d+$') "-Version must be X.Y.Z, got $Version"
   Assert-LbaArgument ($Component -match '^[a-z][a-z0-9-]*$') "-Component is not a component name: $Component"
   Assert-LbaCredential $Credential
+  Assert-LbaElevated
   $id = Resolve-LbaVmId -VMId $VMId -VMName $VMName
   $user = Get-LbaGuestUser -Credential $Credential -GuestUser $GuestUser
   Assert-LbaVmRunning -VMId $id -RequireFileCopy:($Action -eq 'set-target')

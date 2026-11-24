@@ -1,0 +1,27 @@
+{
+  "roots": [
+    "scripts/verify-reviewer-infrastructure.mjs",
+    "scripts/lbabus-pin.mjs",
+    "experiments/acg-quorum/cross-plane-attestation.mjs",
+    "reviewer-workstation/record-release-stage.mjs"
+  ],
+  "compared": [
+    "docs/release/reviewer-infrastructure.schema.json",
+    "experiments/acg-provenance/attest.mjs",
+    "experiments/acg-quorum/compare-witnesses.mjs",
+    "experiments/acg-quorum/cross-plane-attestation.mjs",
+    "experiments/handoff-beacon/reviewerVerdict.mjs",
+    "reviewer-workstation/record-release-stage.mjs",
+    "reviewer-workstation/release-with-review-drive.mjs",
+    "scripts/lbabus-pin.mjs",
+    "scripts/verify-reviewer-infrastructure.mjs",
+    "tools/release-governance/verify-release-agreement.mjs",
+    "tools/release-governance/verify-visual-review.mjs"
+  ],
+  "excluded": {
+    "release-components.json": "candidate release data, read by the evidence builder and different for every release by design",
+    "tools/release-governance/release-agreement.json": "candidate release data, read by the evidence builder and different for every release by design",
+    "reviewer-workstation/composite-release-decision-receipt.json": "candidate release data, read by the evidence builder and different for every release by design",
+    "tools/release-governance/reviewer-allowlist.json": "candidate release data, read by the evidence builder and different for every release by design"
+  }
+}

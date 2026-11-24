@@ -26,6 +26,7 @@ Invoke-LbaMain {
   Assert-LbaArgument ($Branch -match '^[A-Za-z0-9._/-]+$' -and $Branch -notmatch '^-|\.\.|/$') "-Branch is not a plain branch name: $Branch"
   Assert-LbaArgument (Test-Path -LiteralPath (Join-Path $CandidateRepo 'reviewer-workstation\win-plane-validate.ps1')) "-CandidateRepo $CandidateRepo is not a checkout of the candidate"
   Assert-LbaCredential $Credential
+  Assert-LbaElevated
   $id = Resolve-LbaVmId -VMId $VMId -VMName $VMName
   $guestDir = 'C:\lba-validate'
   $guestBundle = "$guestDir\rel.bundle"

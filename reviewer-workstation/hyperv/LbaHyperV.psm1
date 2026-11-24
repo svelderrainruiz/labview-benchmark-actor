@@ -72,6 +72,18 @@ function Get-LbaGuestUser {
   return 'vagrant'
 }
 
+# The Hyper-V cmdlets and firewall rules need an elevated administrator or a member of Hyper-V Administrators. This is
+# checked rather than declared with #requires, which would also stop -WhatIf for an unelevated user.
+function Assert-LbaElevated {
+  [CmdletBinding()] param()
+  Add-LbaStep 'check-elevation' 'host' 'administrator (elevated) or Hyper-V Administrators'
+  if ($script:DryRun) { return }
+  $groups = @()
+  try { $groups = @(whoami.exe /groups /fo csv /nh 2>$null) } catch { $groups = @() }
+  $ok = @($groups | Where-Object { $_ -match 'S-1-5-32-(544|578)"' -and $_ -notmatch 'deny only' })
+  if ($ok.Count -eq 0) { throw 'LBA_HOST: this session is neither an elevated administrator nor a member of Hyper-V Administrators; run it from an elevated PowerShell' }
+}
+
 function Resolve-LbaVmId {
   [CmdletBinding()] param([string]$VMId, [string]$VMName)
   Assert-LbaArgument ([bool]$VMId -ne [bool]$VMName) 'give exactly one of -VMId or -VMName'
@@ -252,7 +264,7 @@ function Test-LbaIpAddress {
   [CmdletBinding()] param([string]$Text)
   $parsed = $null
   if (-not [ipaddress]::TryParse($Text, [ref]$parsed)) { return $false }
-  return ($Text -match '^\d+\.\d+\.\d+\.\d+$') -or ($Text -match ':')
+  return ($Text -match '^\d+\.\d+\.\d+\.\d+$')
 }
 
 function Test-LbaSameSubnet {
@@ -357,9 +369,9 @@ function Start-LbaListener {
   Add-LbaStep 'listener-start' $Node (($arguments -join ' ') + " (LBABUS=$Lbabus)")
   if ($script:DryRun) { return $null }
   $err = Join-Path $LogDir 'listener.err'
+  if (Test-LbaPortInUse -Port $Port) { throw "LBA_HOST: tcp $Port is already in use on this host; stop the stale listener first (Get-NetTCPConnection -State Listen -LocalPort $Port)" }
   $previous = $env:LBABUS
   $env:LBABUS = $Lbabus
-  if (Test-LbaPortInUse -Port $Port) { throw "LBA_HOST: tcp $Port is already in use on this host; stop the stale listener first (Get-NetTCPConnection -State Listen -LocalPort $Port)" }
   $hidden = @{}
   if ($PSVersionTable.PSEdition -eq 'Desktop' -or $IsWindows) { $hidden.WindowStyle = 'Hidden' }
   try { $p = Start-Process -FilePath $Node -ArgumentList (ConvertTo-LbaArgumentString -Arguments $arguments) -PassThru @hidden -RedirectStandardError $err -RedirectStandardOutput (Join-Path $LogDir 'listener.out') }
@@ -409,6 +421,6 @@ function Set-LbaReviewTarget {
 }
 
 Export-ModuleMember -Function Start-LbaPlan, Test-LbaDryRun, Add-LbaStep, Get-LbaPlan, Write-LbaPlan, Invoke-LbaMain, Assert-LbaArgument, Assert-LbaCredential,
-  Get-LbaGuestUser, Resolve-LbaVmId, Assert-LbaVmRunning, Invoke-LbaJob, ConvertTo-LbaArgumentString, Invoke-LbaGuestProgram, Test-LbaIpAddress, Resolve-LbaGuestAddress, Assert-LbaNoStaleRule, Assert-LbaToolingMatchesCandidate, Invoke-LbaGuest, Copy-LbaToGuest, Copy-LbaFromGuest, Get-LbaGuestSha256,
+  Get-LbaGuestUser, Resolve-LbaVmId, Assert-LbaVmRunning, Invoke-LbaJob, ConvertTo-LbaArgumentString, Invoke-LbaGuestProgram, Test-LbaIpAddress, Assert-LbaElevated, Resolve-LbaGuestAddress, Assert-LbaNoStaleRule, Assert-LbaToolingMatchesCandidate, Invoke-LbaGuest, Copy-LbaToGuest, Copy-LbaFromGuest, Get-LbaGuestSha256,
   Get-LbaHostSha256, Invoke-LbaHost, Get-LbaSwitchAddress, Resolve-LbaHostAddress, Test-LbaPortInUse, Open-LbaListener, Close-LbaListener,
   Start-LbaListener, Stop-LbaListener, Set-LbaReviewTarget
