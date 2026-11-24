@@ -9,7 +9,8 @@
 //   node reviewer-workstation/release-stage-win.mjs <X.Y.Z> --vm <name> --commit <sha> --vsix <path> \
 //        --attestation <attestation-X.Y.Z.json> [--share ~/lba-vm-share] [--visual-key <pem>] \
 //        [--password-file ~/.config/lba/vm-pass] [--reviewer reviewer@vi-tech.nl] [--timeout 300] \
-//        [--no-set-target] [--force] [--dry-run]
+//        [--no-set-target] [--force] [--dry-run] [--host <address the guest reaches the host on, default 10.0.2.2>] \
+//        [--candidate-root <checkout of the candidate, default this repository>]
 //
 // The VM password comes from --password-file (default ~/.config/lba/vm-pass) or LBA_VM_PASS. VBoxManage receives it
 // as a --passwordfile, never on a command line, and it is never printed. Guest runs pass no argv0 after `--`: this
@@ -54,6 +55,8 @@ export function stageTaskId({ version, commit } = {}) {
 // The in-guest sender: re-hashes the staged VSIX and sends the structured release-stage@1 identity as a DONE frame.
 export function buildStageSender({ version, commit, vsixSha256, guestVsix = GUEST_VSIX, lbabusExe = GUEST_LBABUS, host = NAT_HOST, tcp = BUS_TCP } = {}) {
   need(SHA256.test(String(vsixSha256)), `invalid VSIX sha256: ${vsixSha256}`);
+  need(/^[A-Za-z0-9.:-]+$/.test(String(host)), `invalid host address: ${host}`);
+  need(Number.isInteger(tcp) && tcp > 0 && tcp < 65536, `invalid tcp port: ${tcp}`);
   const task = stageTaskId({ version, commit });
   const lit = (value) => JSON.stringify(value);
   return [
@@ -164,6 +167,19 @@ export function evidenceFromAttestation(attestation, { commit, taskId } = {}) {
   return [`cross-plane-run:${attestation.provenance.runId}`, `attestation-sha256:${attestation.digest}`, `windows-stage:${taskId}`];
 }
 
+// What the stage must prove and bind, independent of the hypervisor: the task id, the VSIX hash and the review-target
+// evidence. Both the VirtualBox driver and the Hyper-V driver take it from here so the rules live in one place.
+export function stageIdentity({ version, commit, vsix, attestation, components, setTarget = true } = {}, readFile = readFileSync) {
+  const vsixSha256 = createHash('sha256').update(readFile(vsix)).digest('hex');
+  const taskId = stageTaskId({ version, commit });
+  const evidence = evidenceFromAttestation(JSON.parse(readFile(attestation, 'utf8')), { commit, taskId });
+  if (setTarget) {
+    const entry = reviewerInfrastructureEvidence(version, components);
+    if (entry) evidence.push(`${entry.kind}:${entry.ref}`);
+  }
+  return { vsixSha256, taskId, evidence };
+}
+
 export function stagePaths({ share, version } = {}) {
   return {
     readback: join(share, `stage-readback-${version}.json`),
@@ -256,7 +272,7 @@ function guestFail(step, result) {
 
 export async function stageWin(options, io = defaultIo()) {
   const { version, vm, commit, vsix, attestation: attestationPath, share, visualKey, reviewerId = 'reviewer@vi-tech.nl',
-    user = 'vagrant', timeout = 300, setTarget = true, force = false, dryRun = false, extensionId } = options;
+    user = 'vagrant', timeout = 300, setTarget = true, force = false, dryRun = false, extensionId, host = NAT_HOST } = options;
   need(SEMVER.test(String(version)), 'usage: release-stage-win <X.Y.Z> --vm <name> --commit <sha> --vsix <path> --attestation <file>');
   need(Number.isInteger(timeout) && timeout > 0, `--timeout must be a positive whole number of seconds, got ${timeout}`);
   need(vm, '--vm <name> is required (or set LBA_REVIEWER_VM)');
@@ -265,14 +281,8 @@ export async function stageWin(options, io = defaultIo()) {
   need(attestationPath && io.exists(attestationPath), `--attestation ${attestationPath} does not exist`);
   need(visualKey && io.exists(visualKey), `visual key ${visualKey} does not exist; enroll the ${version} reviewer keys first`);
 
-  const vsixSha256 = createHash('sha256').update(io.readFile(vsix)).digest('hex');
+  const { vsixSha256, taskId, evidence } = stageIdentity({ version, commit, vsix, attestation: attestationPath, components: options.components, setTarget }, io.readFile);
   if (options.vsixSha256) need(options.vsixSha256 === vsixSha256, `--vsix hashes to ${vsixSha256}, not ${options.vsixSha256}`);
-  const taskId = stageTaskId({ version, commit });
-  const evidence = evidenceFromAttestation(JSON.parse(io.readFile(attestationPath, 'utf8')), { commit, taskId });
-  if (setTarget) {
-    const entry = reviewerInfrastructureEvidence(version, options.components);
-    if (entry) evidence.push(`${entry.kind}:${entry.ref}`);
-  }
   const paths = stagePaths({ share, version });
   need(force || !io.exists(paths.stagedFrame), `${paths.stagedFrame} already exists; refusing to overwrite release evidence (pass --force)`);
 
@@ -300,7 +310,7 @@ export async function stageWin(options, io = defaultIo()) {
     const sender = join(scratch, `lba-send-stage-${version}.mjs`);
     const install = join(scratch, `lba-install-${version}.ps1`);
     const configure = join(scratch, `lba-configure-visual-${version}.ps1`);
-    io.writeFile(sender, buildStageSender({ version, commit, vsixSha256 }));
+    io.writeFile(sender, buildStageSender({ version, commit, vsixSha256, host }));
     io.writeFile(install, buildInstallScript({ extensionId, version, user }));
     io.writeFile(configure, buildConfigureVisual({ extensionId, version, reviewerId, user }));
 
@@ -394,11 +404,13 @@ function parseArgs(argv) {
 export async function main(argv = process.argv.slice(2)) {
   const a = parseArgs(argv);
   const version = a.positionals[0];
-  const pkg = JSON.parse(readFileSync(join(repoRoot, 'package.json'), 'utf8'));
+  const candidateRoot = a['candidate-root'] ? resolve(a['candidate-root']) : repoRoot;
+  const pkg = JSON.parse(readFileSync(join(candidateRoot, 'package.json'), 'utf8'));
   const home = homedir();
   const result = await stageWin({
     version,
-    components: JSON.parse(readFileSync(join(repoRoot, 'release-components.json'), 'utf8')),
+    components: JSON.parse(readFileSync(join(candidateRoot, 'release-components.json'), 'utf8')),
+    host: a.host || NAT_HOST,
     vm: a.vm || process.env.LBA_REVIEWER_VM,
     commit: a.commit,
     vsix: a.vsix,

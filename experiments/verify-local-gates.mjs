@@ -3361,6 +3361,15 @@ check('release-stage-win', () => {
   return { selftest: 'release-stage-win 4/4 (builders, ordered happy path, 9 fail-closed cases, dry run)' };
 });
 
+// LBA-REQ-069 / ADR-0094 (#124): the Hyper-V reviewer driver. The selftest runs each PowerShell step in dry-run mode,
+// so the order (verify, stage, firewall open, listen, send, close, record), the guest paths and the fail-closed exits
+// are asserted without a hypervisor; the pwsh cases are reported as skipped when pwsh is absent.
+check('hyperv-driver', () => {
+  const out = execFileSync(process.execPath, [join(here, '..', 'reviewer-workstation', 'hyperv', 'hyperv-driver.selftest.mjs')], { stdio: 'pipe' }).toString();
+  assert(/hyperv-driver selftest: (\d+)\/\1 passed/.test(out), `hyperv-driver selftest did not pass: ${out.trim().slice(-300)}`);
+  return { selftest: out.trim().split('\n').at(-1) };
+});
+
 // LBA-REQ-059 / ADR-0039: the host<->VM-agent CLOSED LOOP over lbabus net TCP. A pure parser self-test (no
 // network/VM), the committed live+loopback receipt, and the semantic verdict types on the net envelope (option A):
 // the host awaits the VM agent's correlated reply over TCP and the reviewer verdict announces as a first-class

@@ -8,6 +8,8 @@ follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project
 
 ### Added
 
+- A Windows host running Hyper-V can run the WIN-plane validate, release-stage, verdict and quorum steps
+  against a reviewer guest with the PowerShell driver in `reviewer-workstation/hyperv/` (#124, ADR-0094).
 - Local Ollama models can call the actor's MCP tools without an editor. The Node CLI
   defaults to three read-only tools and offers a receipt-producing `--self-test` (#119, ADR-0092).
 - Extension release pre-flight and CI now require a signed reviewer infrastructure receipt digest from 1.6.7. The receipt stays private.
