@@ -6,6 +6,10 @@ follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project
 
 ## [Unreleased]
 
+## [1.6.7] - 2026-11-23
+
+1.6.1 to 1.6.6 were not released separately; their changes ship in 1.6.7.
+
 ### Added
 
 - Local Ollama models can call the actor's MCP tools without an editor. The Node CLI
@@ -25,6 +29,87 @@ follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project
 
 ### Changed
 
+- Move the RSR consumer kit and the governance pin to `repo-standards-review` v0.6.0
+  (VITechnologies/projectbuddy#332, ADR-0087 amended).
+  - `cruft update` applied cleanly. The kit's rules are unchanged for this repository.
+  - The v0.6.0 workbench deep run scores 25/25, with all six gates PASS/High, DoD 5/5 and no contradictions.
+    Its raw score is byte-identical to a v0.4.2 workbench run on the same tree, so the standard's scoring is
+    unchanged. The static baseline is re-captured as raw score `46e48d9a…a265` because this repository changed
+    since the 2026-11-14 capture.
+  - Both baselines, `release-components.json`, the agent contract (0.3.22) and the stamps now name v0.6.0.
+- Move the RSR consumer kit and the governance pin to `repo-standards-review` v0.8.0
+  (VITechnologies/projectbuddy#346, ADR-0087 amended).
+  - `cruft update` applied cleanly. The kit's rules are unchanged for this repository. v0.8.0 adds the ecosystem
+    wiki standard `@3` and `@4`, which are test-page content rules, with no layout or finding changes.
+  - The v0.8.0 workbench deep run scores 25/25, with all six gates PASS/High, DoD 5/5 and no contradictions.
+    Its raw score `46e48d9a…a265` is byte-identical to the v0.6.0 re-capture, and a v0.6.0 workbench control run
+    on the same tree gives the same bytes, so the score is unchanged and only the source identity moves.
+  - Both baselines, `release-components.json`, the agent contract (0.3.23) and the stamps now name v0.8.0.
+- Move the RSR consumer kit and the governance pin to `repo-standards-review` v0.9.0
+  (VITechnologies/projectbuddy#348, ADR-0087 amended).
+  - `cruft update` applied cleanly. The kit's rules are unchanged for this repository. v0.9.0 moves the ecosystem
+    wiki standard to `@5`, which adds wiki profile `rsr/wiki-profile@2` (several ID prefixes per scope,
+    `idPrefixes`) and an observation rule, with no layout or finding changes.
+  - The v0.9.0 workbench deep run scores 25/25, with all six gates PASS/High, DoD 5/5 and no contradictions.
+    Its raw score `46e48d9a…a265` is byte-identical to the v0.6.0 re-capture, and a v0.8.0 workbench control run
+    on the same tree gives the same bytes, so the score is unchanged and only the source identity moves.
+  - Both baselines, `release-components.json`, the agent contract (0.3.24) and the stamps now name v0.9.0.
+- Move the RSR consumer kit and the governance pin to `repo-standards-review` v0.10.0
+  (VITechnologies/projectbuddy#364, #84, ADR-0087 amended).
+  - `cruft update` applied cleanly. It adds the kit's reference observation checker,
+    `.repo-standards-review/observations.py` (SHA-256 `816d10c9…c585`), which CI does not run and which
+    `.vscodeignore` already keeps out of the VSIX. The kit's rules are unchanged for this repository. v0.10.0 moves
+    the ecosystem wiki standard to `@6`: test-case items in a test page's observation name the runner's test cases
+    verbatim, and a new observation check, outside conformance, has three findings. There are no layout or
+    scoring changes.
+  - The v0.10.0 workbench deep run scores 25/25, with all six gates PASS/High, DoD 5/5 and no contradictions.
+    Its raw score `46e48d9a…a265` is byte-identical to the v0.6.0 re-capture, and a v0.9.0 workbench control run
+    on the same tree gives the same bytes, so the score is unchanged and only the source identity moves.
+  - Both baselines, `release-components.json`, the agent contract (0.3.25) and the stamps now name v0.10.0.
+- Move the governance pin to `repo-standards-review` v0.12.0 (VITechnologies/projectbuddy#387, ADR-0087 amended).
+  - The v0.12.0 workbench deep run (measured here) scores 25/25, with all six gates PASS/High, DoD 5/5 and no
+    contradictions. Its raw score `46e48d9a…a265` is byte-identical to the retained baseline, so only the source
+    identity moves. Both baselines, `release-components.json`, the agent contract (0.3.27) and the stamps name v0.12.0.
+
+- Move the RSR consumer kit and the governance pin to `repo-standards-review` v0.11.0
+  (VITechnologies/projectbuddy#369, #86, ADR-0087 amended).
+  - `cruft update` applied cleanly. It updates the kit's reference observation checker,
+    `.repo-standards-review/observations.py` (SHA-256 `c0857eb2…93fa`), which now reads pytest JUnit reports, adds
+    a `stimulus` command and refuses document types and entity declarations in reports. CI still does not run it,
+    and `.vscodeignore` still keeps it out of the VSIX. The kit's rules are unchanged for this repository. v0.11.0
+    moves the ecosystem wiki standard to `@7`: a test-case item may name only its test file, which requires every
+    test case of that file to pass, and a test file that its runner cannot load counts as one failing
+    `(load error)` test case. There are no layout or scoring changes.
+  - The v0.11.0 workbench deep run scores 25/25, with all six gates PASS/High, DoD 5/5 and no contradictions.
+    Its raw score `46e48d9a…a265` is byte-identical to the v0.6.0 re-capture, and a v0.10.0 workbench control run
+    on the same tree gives the same bytes, so the score is unchanged and only the source identity moves.
+  - Both baselines, `release-components.json`, the agent contract (0.3.26) and the stamps now name v0.11.0.
+- Consume lbabus 0.17.0, pinned by tag, tag object, commit and SHA-256 asset digests in `release-components.json`
+  (`lbabusRelease`) instead of reading `<Version>` from `tools/collab-cli/LbaBus.csproj` (#57, ADR-0088).
+  - 0.17.0 makes `net listen --bind` fail closed on an empty, hostname or invalid IP value (svelderrainruiz/lbabus#12);
+    0.16.0 does not. The vendored mirror, the agent contract (0.3.28), the Ubuntu clean-room pin (now also checked by
+    commit) and the vendor pin move together.
+  - The release-governance files moved to `tools/release-governance/` (#57 slice 1). The in-repository lbabus
+    release and Windows verify workflows (`collab-cli-release.yml`, `lbabus-verify-windows.yml`) are retired: lbabus's
+    own repository now runs those gates, and `lbabus-vendored-mirror` proves this tree equals its verified tag.
+- Consume lbabus only as the pinned release (#57 slice 3). The in-tree copy (`tools/collab-cli/`) and its vendor pin
+  (`tools/lbabus-vendor.json`) are deleted; `release-components.json` pins lbabus 0.17.1 (tag object `3749b2c5`, commit
+  `8d00f968`, SHA-256 of the package, both binaries and `SHA256SUMS`). 0.17.1 carries the harness cases and the source
+  guards that replace the checks this repository ran against its copy; they now run in lbabus's own CI
+  (`ci/source-guards.sh`, svelderrainruiz/lbabus#25).
+  - `scripts/fetch-lbabus.mjs` fetches the pinned binary (SHA-256 and attestation checked) or the pinned source (tag object
+    and commit checked) and fails closed on a mismatch. Reviewer staging, the reviewer VM provisioning, the clean-room
+    bootstraps (Windows and Docker-Windows clone the pinned tag and verify the commit), the mesh scripts, the codespace
+    witness and the proof scripts use it instead of building the in-tree project.
+  - The `lbabus-vendored-mirror` gate is replaced by `lbabus-pin-matches-agents-contract`: the pin is well formed, the AGENTS
+    contract (0.3.29) names the pinned version, every default that repeats the pin matches it, and no in-tree copy may
+    return. The source-reading gates (`collab-cli-embeds-canonical-requirements`, `cli-no-discussion-transport` and the
+    `Net.cs`, `Program.cs` assertions) moved to lbabus.
+  - Proof status: the hosted proofs (gates and the codespace witness) ran. The VirtualBox lane (P2) and the Windows lanes
+    (P3 peer, P4 Docker-Windows, P5 Windows VM guest) are NOT executed; no result is claimed for them
+    (`docs/testing/not-executed.json`).
+  - The release classifier treats a changed pin as an lbabus change. RTM CodeRefs that named the deleted tree point at the
+    pin until the slice 4 requirement rewrite. Experiment governance 1.0.2 (the `hardware-capability` replacement).
 - Move the governance pin to `repo-standards-review` v0.15.0 (#99, ADR-0087 amended). The kit pin and
   `governance.standardsReviewVersion` move together. The v0.15.0 workbench deep run (measured here) scores 25/25, with all
   six gates PASS/High and DoD 5/5; a v0.12.0 control run on the same tree gives the same raw score `babbeba2…898e`, which
@@ -50,122 +135,6 @@ follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project
   removed path and report `LabVIEW Benchmark Actor: MCP tools ... are unavailable` (`MODULE_NOT_FOUND`).
   Upgrading from a version without this fix needs a one-time workaround: run any `LabVIEW Benchmark Actor:` command,
   then reload the window.
-
-## [1.6.7] - Unreleased
-
-### Changed
-
-- Consume lbabus only as the pinned release (#57 slice 3). The in-tree copy (`tools/collab-cli/`) and its vendor pin
-  (`tools/lbabus-vendor.json`) are deleted; `release-components.json` pins lbabus 0.17.1 (tag object `3749b2c5`, commit
-  `8d00f968`, SHA-256 of the package, both binaries and `SHA256SUMS`). 0.17.1 carries the harness cases and the source
-  guards that replace the checks this repository ran against its copy; they now run in lbabus's own CI
-  (`ci/source-guards.sh`, svelderrainruiz/lbabus#25).
-  - `scripts/fetch-lbabus.mjs` fetches the pinned binary (SHA-256 and attestation checked) or the pinned source (tag object
-    and commit checked) and fails closed on a mismatch. Reviewer staging, the reviewer VM provisioning, the clean-room
-    bootstraps (Windows and Docker-Windows clone the pinned tag and verify the commit), the mesh scripts, the codespace
-    witness and the proof scripts use it instead of building the in-tree project.
-  - The `lbabus-vendored-mirror` gate is replaced by `lbabus-pin-matches-agents-contract`: the pin is well formed, the AGENTS
-    contract (0.3.29) names the pinned version, every default that repeats the pin matches it, and no in-tree copy may
-    return. The source-reading gates (`collab-cli-embeds-canonical-requirements`, `cli-no-discussion-transport` and the
-    `Net.cs`, `Program.cs` assertions) moved to lbabus.
-  - Proof status: the hosted proofs (gates and the codespace witness) ran. The VirtualBox lane (P2) and the Windows lanes
-    (P3 peer, P4 Docker-Windows, P5 Windows VM guest) are NOT executed; no result is claimed for them
-    (`docs/testing/not-executed.json`).
-  - The release classifier treats a changed pin as an lbabus change. RTM CodeRefs that named the deleted tree point at the
-    pin until the slice 4 requirement rewrite. Experiment governance 1.0.2 (the `hardware-capability` replacement).
-
-## [1.6.6] - Unreleased
-
-### Changed
-
-- Consume lbabus 0.17.0, pinned by tag, tag object, commit and SHA-256 asset digests in `release-components.json`
-  (`lbabusRelease`) instead of reading `<Version>` from `tools/collab-cli/LbaBus.csproj` (#57, ADR-0088).
-  - 0.17.0 makes `net listen --bind` fail closed on an empty, hostname or invalid IP value (svelderrainruiz/lbabus#12);
-    0.16.0 does not. The vendored mirror, the agent contract (0.3.28), the Ubuntu clean-room pin (now also checked by
-    commit) and the vendor pin move together.
-  - The release-governance files moved to `tools/release-governance/` (#57 slice 1). The in-repository lbabus
-    release and Windows verify workflows (`collab-cli-release.yml`, `lbabus-verify-windows.yml`) are retired: lbabus's
-    own repository now runs those gates, and `lbabus-vendored-mirror` proves this tree equals its verified tag.
-
-## [1.6.5] - Unreleased
-
-### Changed
-
-- Move the governance pin to `repo-standards-review` v0.12.0 (VITechnologies/projectbuddy#387, ADR-0087 amended).
-  - The v0.12.0 workbench deep run (measured here) scores 25/25, with all six gates PASS/High, DoD 5/5 and no
-    contradictions. Its raw score `46e48d9a…a265` is byte-identical to the retained baseline, so only the source
-    identity moves. Both baselines, `release-components.json`, the agent contract (0.3.27) and the stamps name v0.12.0.
-
-- Move the RSR consumer kit and the governance pin to `repo-standards-review` v0.11.0
-  (VITechnologies/projectbuddy#369, #86, ADR-0087 amended).
-  - `cruft update` applied cleanly. It updates the kit's reference observation checker,
-    `.repo-standards-review/observations.py` (SHA-256 `c0857eb2…93fa`), which now reads pytest JUnit reports, adds
-    a `stimulus` command and refuses document types and entity declarations in reports. CI still does not run it,
-    and `.vscodeignore` still keeps it out of the VSIX. The kit's rules are unchanged for this repository. v0.11.0
-    moves the ecosystem wiki standard to `@7`: a test-case item may name only its test file, which requires every
-    test case of that file to pass, and a test file that its runner cannot load counts as one failing
-    `(load error)` test case. There are no layout or scoring changes.
-  - The v0.11.0 workbench deep run scores 25/25, with all six gates PASS/High, DoD 5/5 and no contradictions.
-    Its raw score `46e48d9a…a265` is byte-identical to the v0.6.0 re-capture, and a v0.10.0 workbench control run
-    on the same tree gives the same bytes, so the score is unchanged and only the source identity moves.
-  - Both baselines, `release-components.json`, the agent contract (0.3.26) and the stamps now name v0.11.0.
-
-## [1.6.4] - Unreleased
-
-### Changed
-
-- Move the RSR consumer kit and the governance pin to `repo-standards-review` v0.10.0
-  (VITechnologies/projectbuddy#364, #84, ADR-0087 amended).
-  - `cruft update` applied cleanly. It adds the kit's reference observation checker,
-    `.repo-standards-review/observations.py` (SHA-256 `816d10c9…c585`), which CI does not run and which
-    `.vscodeignore` already keeps out of the VSIX. The kit's rules are unchanged for this repository. v0.10.0 moves
-    the ecosystem wiki standard to `@6`: test-case items in a test page's observation name the runner's test cases
-    verbatim, and a new observation check, outside conformance, has three findings. There are no layout or
-    scoring changes.
-  - The v0.10.0 workbench deep run scores 25/25, with all six gates PASS/High, DoD 5/5 and no contradictions.
-    Its raw score `46e48d9a…a265` is byte-identical to the v0.6.0 re-capture, and a v0.9.0 workbench control run
-    on the same tree gives the same bytes, so the score is unchanged and only the source identity moves.
-  - Both baselines, `release-components.json`, the agent contract (0.3.25) and the stamps now name v0.10.0.
-
-## [1.6.3] - Unreleased
-
-### Changed
-
-- Move the RSR consumer kit and the governance pin to `repo-standards-review` v0.9.0
-  (VITechnologies/projectbuddy#348, ADR-0087 amended).
-  - `cruft update` applied cleanly. The kit's rules are unchanged for this repository. v0.9.0 moves the ecosystem
-    wiki standard to `@5`, which adds wiki profile `rsr/wiki-profile@2` (several ID prefixes per scope,
-    `idPrefixes`) and an observation rule, with no layout or finding changes.
-  - The v0.9.0 workbench deep run scores 25/25, with all six gates PASS/High, DoD 5/5 and no contradictions.
-    Its raw score `46e48d9a…a265` is byte-identical to the v0.6.0 re-capture, and a v0.8.0 workbench control run
-    on the same tree gives the same bytes, so the score is unchanged and only the source identity moves.
-  - Both baselines, `release-components.json`, the agent contract (0.3.24) and the stamps now name v0.9.0.
-
-## [1.6.2] - Unreleased
-
-### Changed
-
-- Move the RSR consumer kit and the governance pin to `repo-standards-review` v0.8.0
-  (VITechnologies/projectbuddy#346, ADR-0087 amended).
-  - `cruft update` applied cleanly. The kit's rules are unchanged for this repository. v0.8.0 adds the ecosystem
-    wiki standard `@3` and `@4`, which are test-page content rules, with no layout or finding changes.
-  - The v0.8.0 workbench deep run scores 25/25, with all six gates PASS/High, DoD 5/5 and no contradictions.
-    Its raw score `46e48d9a…a265` is byte-identical to the v0.6.0 re-capture, and a v0.6.0 workbench control run
-    on the same tree gives the same bytes, so the score is unchanged and only the source identity moves.
-  - Both baselines, `release-components.json`, the agent contract (0.3.23) and the stamps now name v0.8.0.
-
-## [1.6.1] - Unreleased
-
-### Changed
-
-- Move the RSR consumer kit and the governance pin to `repo-standards-review` v0.6.0
-  (VITechnologies/projectbuddy#332, ADR-0087 amended).
-  - `cruft update` applied cleanly. The kit's rules are unchanged for this repository.
-  - The v0.6.0 workbench deep run scores 25/25, with all six gates PASS/High, DoD 5/5 and no contradictions.
-    Its raw score is byte-identical to a v0.4.2 workbench run on the same tree, so the standard's scoring is
-    unchanged. The static baseline is re-captured as raw score `46e48d9a…a265` because this repository changed
-    since the 2026-11-14 capture.
-  - Both baselines, `release-components.json`, the agent contract (0.3.22) and the stamps now name v0.6.0.
 
 ## [1.6.0] - 2026-11-15
 
