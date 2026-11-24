@@ -6,12 +6,14 @@
 
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
-import { copyFileSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { createHash } from 'node:crypto';
+import { chmodSync, copyFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { buildReviewTarget, parseEvidence } from '../build-review-target.mjs';
 import { buildStageSender, stageIdentity } from '../release-stage-win.mjs';
+import { expectedAssetNames } from '../../scripts/lbabus-pin.mjs';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const root = join(here, '..', '..');
@@ -25,10 +27,16 @@ const work = mkdtempSync(join(tmpdir(), 'lba-hyperv-'));
 const components = JSON.parse(readFileSync(join(root, 'release-components.json'), 'utf8'));
 const version = components.extension;
 components.reviewerInfrastructure = { schema: 'reviewer-infrastructure@1', baseline: 'v0.1.0', receiptSha256: 'a'.repeat(64) };
-const candidate = join(work, 'candidate');
+// The tooling and evidence rule files the stage driver compares with the candidate, copied so the fixture agrees.
+const COMPARED = ['scripts/verify-reviewer-infrastructure.mjs', 'scripts/lbabus-pin.mjs', 'experiments/acg-quorum/cross-plane-attestation.mjs'];
+const sha = (text) => createHash('sha256').update(text).digest('hex');
+const lbabusAsset = expectedAssetNames(components.lbabus)['win-x64'];
+components.lbabusRelease = { ...(components.lbabusRelease ?? {}), assets: { ...(components.lbabusRelease?.assets ?? {}), [lbabusAsset]: sha('fake lbabus') } };
+const candidate = join(work, 'candidate repo'); // a space in the path, as a real checkout may have
 mkdirSync(join(candidate, 'reviewer-workstation'), { recursive: true });
 copyFileSync(join(root, 'package.json'), join(candidate, 'package.json'));
 writeFileSync(join(candidate, 'release-components.json'), JSON.stringify(components));
+for (const f of COMPARED) { mkdirSync(dirname(join(candidate, f)), { recursive: true }); copyFileSync(join(root, f), join(candidate, f)); }
 writeFileSync(join(work, 'candidate.vsix'), 'fake vsix');
 writeFileSync(join(work, 'visual.pem'), 'fake key');
 writeFileSync(join(work, 'lbabus.exe'), 'fake lbabus');
@@ -45,7 +53,7 @@ const stageArgs = ['-VMId', vmId, '-Version', version, '-Commit', commit, '-Vsix
   '-VisualKey', join(work, 'visual.pem'), '-HostAddress', '172.20.0.1', '-LbabusExe', join(work, 'lbabus.exe'), '-Share', join(work, 'share'), '-WhatIf'];
 
 const cases = [];
-const test = (id, name, fn, { needsPwsh = false } = {}) => cases.push({ id, name, fn, needsPwsh });
+const test = (id, name, fn, { needsPwsh = false, needsPosix = false } = {}) => cases.push({ id, name, fn, needsPwsh, needsPosix });
 
 test('H1', 'the sender keeps the VirtualBox NAT host by default and takes a Hyper-V host and port', () => {
   const base = { taskId: 't', commit, version, vsixSha256: 'a'.repeat(64), evidence: [] };
@@ -180,11 +188,231 @@ Invoke-LbaMain { Close-LbaListener -Name 'lba-stage-x' }`;
   assert.match(r.stderr, /firewall rule lba-stage-x is still present/);
 }, { needsPwsh: true });
 
+// ---- live paths: the real script and module code run with the Hyper-V, firewall and network cmdlets stubbed ----
+// A wrapper dot-defines function stubs (a function shadows a cmdlet) and runs the step script with a fake credential;
+// the stubs log every call to calls.log, keep firewall state in fw.state and read their answers from T_* variables.
+const posix = process.platform !== 'win32';
+const stageEnvSha = sha('fake vsix');
+const WRAPPER = (stage, dir) => `$ErrorActionPreference = 'Stop'
+$d = $env:T_DIR
+function Write-Call($m) { Add-Content -LiteralPath "$d/calls.log" -Value $m }
+function Get-VM { param($Id, [Parameter(ValueFromRemainingArguments)]$rest) Write-Call 'Get-VM'; [pscustomobject]@{ Id = [guid]$env:T_VMID; Name = 'vm'; State = 'Running' } }
+function Get-VMIntegrationService { param($VM, $Name, $ErrorAction) [pscustomobject]@{ Enabled = ($env:T_GSI -ne '0') } }
+function Get-VMNetworkAdapter { param($VM, $ErrorAction) [pscustomobject]@{ IPAddresses = @($env:T_GUEST_IPS -split ',') } }
+function Get-NetIPAddress { param($IPAddress, $InterfaceAlias, $AddressFamily, $ErrorAction) [pscustomobject]@{ IPAddress = '172.20.0.1'; InterfaceAlias = 'vEthernet (Lab)'; PrefixLength = 24 } }
+function Get-NetTCPConnection { param($State, $LocalPort, $ErrorAction) if ($env:T_BUSY -eq '1' -or (Test-Path "$d/listening")) { [pscustomobject]@{ LocalPort = $LocalPort } } }
+function New-NetFirewallRule { param($DisplayName, $Direction, $Action, $Protocol, $LocalPort, $LocalAddress, $InterfaceAlias, $RemoteAddress, $Profile, $ErrorAction)
+  Write-Call "New-NetFirewallRule $DisplayName"; Add-Content -LiteralPath "$d/rules.log" -Value ($PSBoundParameters | ConvertTo-Json -Compress -Depth 3); Add-Content -LiteralPath "$d/fw.state" -Value $DisplayName }
+function Remove-NetFirewallRule { param($DisplayName, $ErrorAction)
+  Write-Call "Remove-NetFirewallRule $DisplayName"; $keep = @(Get-Content -LiteralPath "$d/fw.state" -ErrorAction SilentlyContinue | Where-Object { $_ -ne $DisplayName }); Set-Content -LiteralPath "$d/fw.state" -Value $keep }
+function Get-NetFirewallRule { param($DisplayName, $ErrorAction) Get-Content -LiteralPath "$d/fw.state" -ErrorAction SilentlyContinue | Where-Object { $_ -like $DisplayName } | ForEach-Object { [pscustomobject]@{ DisplayName = $_ } } }
+function taskkill.exe { Write-Call "taskkill $($args -join ' ')"; Stop-Process -Id ([int]$args[1]) -Force -ErrorAction SilentlyContinue }
+function Copy-VMFile { param($VM, $SourcePath, $DestinationPath, [switch]$CreateFullPath, $FileSource, [switch]$Force, [switch]$AsJob) Write-Call "Copy-VMFile $DestinationPath"; Start-Job { 1 } }
+function Invoke-Command { param($VMId, $Credential, $ScriptBlock, $ArgumentList, [switch]$AsJob)
+  $a = @($ArgumentList); $out = @()
+  if ($ScriptBlock.ToString() -match 'Get-FileHash') {
+    Write-Call "Invoke-Command sha256 $($a[0])"
+    if ($a[0] -like '*lbabus.exe') { $out = @($env:T_GUEST_LBABUS_SHA) } elseif ($a[0] -like '*candidate.vsix') { $out = @($env:T_GUEST_VSIX_SHA) }
+  } elseif ($ScriptBlock.ToString() -match 'taskkill') {
+    Write-Call "Invoke-Command program $($a[1])"
+    $exit = 'LBA_EXIT=0'
+    if ($env:T_EXIT_ALL) { $exit = $env:T_EXIT_ALL }
+    if ($a[1] -match 'lba-install') { $out = @("INSTALLED=$($env:T_EXT_ID)@$($env:T_VERSION)") }
+    elseif ($a[1] -match 'lba-configure') { $out = @('STALE_VERDICT_CLEARED=True') }
+    elseif ($a[1] -match 'lba-send-stage' -and $env:T_SENDER_OK -eq '1') { $out = @("STAGED_SHA256=$($env:T_VSIX_SHA)") }
+    $out += $exit
+  } else { Write-Call 'Invoke-Command other' }
+  Start-Job -ScriptBlock { param($o) $o } -ArgumentList (,@($out))
+}
+$p = ConvertFrom-Json -AsHashtable (Get-Content -Raw -LiteralPath "$d/params.json")
+$p.Credential = [pscredential]::new('lab\\\\reviewer', (ConvertTo-SecureString 'x' -AsPlainText -Force))
+& '${stage}' @p
+exit $LASTEXITCODE
+`;
+
+function live(name, { env = {}, params = {}, script = 'release-stage-win.ps1', fw = [], extra = {} } = {}) {
+  const dir = join(work, `live-${name}`);
+  mkdirSync(dir, { recursive: true });
+  const fake = join(dir, 'node');
+  writeFileSync(fake, `#!/bin/sh
+case "$1" in
+  *await-agent-reply.mjs)
+    printf '%s\\n' "$@" > "$T_DIR/listener.argv"
+    echo $$ > "$T_DIR/listener.pid"
+    echo listening >&2
+    : > "$T_DIR/listening"
+    exec sleep 20 ;;
+  *) exec "${process.execPath}" "$@" ;;
+esac
+`);
+  chmodSync(fake, 0o755);
+  writeFileSync(join(dir, 'fw.state'), fw.map((x) => `${x}\n`).join(''));
+  writeFileSync(join(dir, 'params.json'), JSON.stringify({
+    VMId: vmId, Version: version, Commit: commit, Vsix: join(work, 'candidate.vsix'), Attestation: attestationPath, CandidateRepo: candidate,
+    VisualKey: join(work, 'visual.pem'), HostAddress: '172.20.0.1', LbabusExe: join(work, 'lbabus.exe'), Share: join(dir, 'share'), Node: fake, TimeoutSec: 20, ...params,
+  }));
+  writeFileSync(join(dir, 'wrapper.ps1'), WRAPPER(join(here, script), dir));
+  const pkg = JSON.parse(readFileSync(join(root, 'package.json'), 'utf8'));
+  const r = spawnSync('pwsh', ['-NoProfile', '-NonInteractive', '-File', join(dir, 'wrapper.ps1')], {
+    encoding: 'utf8',
+    env: {
+      ...process.env, T_DIR: dir, T_VMID: vmId, T_GSI: '1', T_GUEST_IPS: 'fe80::1,172.20.0.5,10.9.9.9', T_GUEST_LBABUS_SHA: sha('fake lbabus'),
+      T_GUEST_VSIX_SHA: stageEnvSha, T_VSIX_SHA: stageEnvSha, T_SENDER_OK: '0', T_EXT_ID: `${pkg.publisher}.${pkg.name}`, T_VERSION: version, ...env,
+    },
+  });
+  const read = (f) => (existsSync(join(dir, f)) ? readFileSync(join(dir, f), 'utf8') : '');
+  const pid = Number(read('listener.pid').trim());
+  if (pid) { try { process.kill(pid); } catch { /* already stopped */ } }
+  return { ...r, calls: read('calls.log'), rules: read('rules.log').trim().split('\n').filter(Boolean).map((l) => JSON.parse(l)), fwState: read('fw.state').trim(), argv: read('listener.argv').trim().split('\n').filter(Boolean), dir };
+}
+const noGuestChange = (r) => assert.ok(!/Invoke-Command (program|other)|Copy-VMFile|New-NetFirewallRule/.test(r.calls), r.calls);
+const liveTest = (id, name, fn) => test(id, name, fn, { needsPwsh: true, needsPosix: true });
+
+liveTest('H14', 'a failure after the listener starts closes the firewall rule and stops the listener (the finally path)', () => {
+  const r = live('fail-after-open');
+  assert.equal(r.status, 4, r.stderr);
+  assert.match(r.stderr, /the in-guest sender did not report the staged hash/);
+  assert.match(r.calls, /New-NetFirewallRule lba-stage-7420-/);
+  assert.match(r.calls, /Remove-NetFirewallRule lba-stage-7420-/, 'the firewall rule is removed on failure');
+  assert.equal(r.fwState, '', 'no rule is left behind');
+  assert.match(r.calls, new RegExp(`taskkill /PID ${r.argv.length ? '\\d+' : 'x'} /T /F`), 'the listener is stopped on failure');
+  assert.ok(r.calls.indexOf('taskkill') > r.calls.indexOf('New-NetFirewallRule'));
+});
+
+liveTest('H15', 'the firewall rule is scoped by local address, interface, local port and the guest address read from the VM', () => {
+  const r = live('rule-scope');
+  assert.equal(r.rules.length, 1, r.stderr);
+  const rule = r.rules[0];
+  assert.equal(rule.LocalAddress, '172.20.0.1');
+  assert.equal(rule.InterfaceAlias, 'vEthernet (Lab)');
+  assert.equal(rule.LocalPort, 7420);
+  assert.deepEqual([].concat(rule.RemoteAddress), ['172.20.0.5'], 'only the guest address on the host subnet');
+  assert.equal(rule.Direction, 'Inbound');
+  assert.equal(rule.Action, 'Allow');
+  const given = live('rule-scope-given', { params: { GuestAddress: '172.20.0.9' } });
+  assert.deepEqual([].concat(given.rules[0].RemoteAddress), ['172.20.0.9']);
+});
+
+liveTest('H16', 'a busy port is refused before any guest change, and a leftover rule or a missing guest address too', () => {
+  const busy = live('busy', { env: { T_BUSY: '1' } });
+  assert.equal(busy.status, 6, busy.stderr);
+  assert.match(busy.stderr, /tcp 7420 is already in use/);
+  noGuestChange(busy);
+  assert.ok(!existsSync(join(busy.dir, 'share')), 'the share is not created before the checks');
+  const stale = live('stale-rule', { fw: ['lba-stage-7420-deadbeef'] });
+  assert.equal(stale.status, 6, stale.stderr);
+  assert.match(stale.stderr, /lba-stage-7420-deadbeef/);
+  noGuestChange(stale);
+  const none = live('no-guest-address', { env: { T_GUEST_IPS: 'fe80::1,10.9.9.9' } });
+  assert.equal(none.status, 2, none.stderr);
+  assert.match(none.stderr, /no IPv4 address on the subnet of 172\.20\.0\.1/);
+  noGuestChange(none);
+  const off = live('no-gsi', { env: { T_GSI: '0' } });
+  assert.equal(off.status, 4, off.stderr);
+  assert.match(off.stderr, /Guest Service Interface is not enabled.*Enable-VMIntegrationService/);
+  noGuestChange(off);
+});
+
+liveTest('H17', 'the pinned lbabus is enforced on the host and in the guest before anything is sent', () => {
+  writeFileSync(join(work, 'other-lbabus.exe'), 'not the pinned exe');
+  const host = live('lbabus-host', { params: { LbabusExe: join(work, 'other-lbabus.exe') } });
+  assert.equal(host.status, 5, host.stderr);
+  assert.match(host.stderr, /-LbabusExe hashes to/);
+  noGuestChange(host);
+  const guest = live('lbabus-guest', { env: { T_GUEST_LBABUS_SHA: 'e'.repeat(64) } });
+  assert.equal(guest.status, 5, guest.stderr);
+  assert.match(guest.stderr, /lbabus in the guest hashes to/);
+  assert.ok(!/New-NetFirewallRule/.test(guest.calls), 'no rule is opened for an unpinned guest lbabus');
+});
+
+liveTest('H18', 'a guest VSIX that is not the candidate bytes is refused before the listener or the firewall are used', () => {
+  const r = live('vsix-hash', { env: { T_GUEST_VSIX_SHA: 'f'.repeat(64) } });
+  assert.equal(r.status, 5, r.stderr);
+  assert.match(r.stderr, /the VSIX in the guest hashes to/);
+  assert.ok(!/New-NetFirewallRule/.test(r.calls) && r.argv.length === 0, 'no rule and no listener');
+});
+
+liveTest('H19', 'the tooling and the candidate must agree on the evidence and pin rule files, else exit 2 naming the file', () => {
+  const other = join(work, 'candidate-differs');
+  mkdirSync(join(other, 'scripts'), { recursive: true });
+  for (const f of ['package.json', 'release-components.json']) copyFileSync(join(candidate, f), join(other, f));
+  for (const f of COMPARED) { mkdirSync(dirname(join(other, f)), { recursive: true }); copyFileSync(join(candidate, f), join(other, f)); }
+  writeFileSync(join(other, 'scripts', 'lbabus-pin.mjs'), `${readFileSync(join(root, 'scripts', 'lbabus-pin.mjs'), 'utf8')}\n// edited\n`);
+  const r = live('candidate-differs', { params: { CandidateRepo: other } });
+  assert.equal(r.status, 2, r.stderr);
+  assert.match(r.stderr, /scripts[\\/]lbabus-pin\.mjs differs between the tooling tree and -CandidateRepo/);
+  noGuestChange(r);
+  rmSync(join(other, 'scripts', 'verify-reviewer-infrastructure.mjs'));
+  const missing = live('candidate-missing', { params: { CandidateRepo: other } });
+  assert.equal(missing.status, 2);
+  assert.match(missing.stderr, /verify-reviewer-infrastructure\.mjs is missing from -CandidateRepo/);
+  const dry = ps('release-stage-win.ps1', stageArgs.map((a) => (a === candidate ? other : a)));
+  assert.equal(dry.status, 2, 'the comparison also runs in dry-run');
+});
+
+liveTest('H20', 'a guest program that exits non-zero or outlives its guest-side bound fails the step, naming it', () => {
+  const bad = live('guest-exit', { env: { T_EXIT_ALL: 'LBA_EXIT=7' } });
+  assert.equal(bad.status, 4, bad.stderr);
+  assert.match(bad.stderr, /install the extension exited 7/);
+  const slow = live('guest-timeout', { env: { T_EXIT_ALL: 'LBA_GUEST_TIMEOUT=1' } });
+  assert.equal(slow.status, 3, slow.stderr);
+  assert.match(slow.stderr, /install the extension did not finish within 300 s; its process tree was stopped in the guest/);
+  const missing = live('guest-no-exit', { env: { T_EXIT_ALL: 'nothing' } });
+  assert.equal(missing.status, 4);
+  assert.match(missing.stderr, /reported no exit code/);
+});
+
+liveTest('H21', 'the guest-side runner reports the exit code, and stops a program that outlives its bound', () => {
+  const dir = join(work, 'runner');
+  mkdirSync(dir, { recursive: true });
+  const script = `Import-Module '${join(here, 'LbaHyperV.psm1')}' -Force
+function taskkill.exe { Add-Content -LiteralPath '${join(dir, 'k.log')}' -Value "taskkill $($args -join ' ')"; Stop-Process -Id ([int]$args[1]) -Force }
+$m = Get-Module LbaHyperV
+(& $m { & $script:GuestRunner 'sh' '-c "echo out; exit 3"' 10 }) -join '|'
+(& $m { & $script:GuestRunner 'sleep' '30' 1 }) -join '|'`;
+  const r = spawnSync('pwsh', ['-NoProfile', '-NonInteractive', '-Command', script], { encoding: 'utf8' });
+  const [done, timedOut] = r.stdout.trim().split('\n');
+  assert.match(done, /out\|LBA_EXIT=3/, r.stdout + r.stderr);
+  assert.match(timedOut, /LBA_GUEST_TIMEOUT=1/);
+  assert.match(readFileSync(join(dir, 'k.log'), 'utf8'), /taskkill \/PID \d+ \/T \/F/);
+});
+
+test('H22', 'a path with a space reaches the host listener and the guest as one argument', () => {
+  const script = `Import-Module '${join(here, 'LbaHyperV.psm1')}' -Force
+ConvertTo-LbaArgumentString -Arguments @('C:\\a b\\x.mjs', '--task', 'plain', 'q"uote', 'C:\\dir with space\\', '')`;
+  const r = spawnSync('pwsh', ['-NoProfile', '-NonInteractive', '-Command', script], { encoding: 'utf8' });
+  assert.equal(r.stdout.trim(), '"C:\\a b\\x.mjs" --task plain "q\\"uote" "C:\\dir with space\\\\" ""', r.stderr);
+  const r2 = live('space-path');
+  assert.deepEqual(r2.argv.slice(0, 1), [join(candidate, 'reviewer-workstation', 'await-agent-reply.mjs')], r2.stderr);
+}, { needsPwsh: true, needsPosix: true });
+
+test('H23', 'win-plane-validate refuses a branch that git would read as an option or a range; addresses must be IPs; a VM name is exact', () => {
+  const v = (branch) => ps('win-plane-validate.ps1', ['-VMId', vmId, '-CandidateRepo', here.replace(/reviewer-workstation.*$/, ''), '-Branch', branch, '-OutFile', join(work, 'w.json'), '-WhatIf']).status;
+  assert.equal(v('--output=x'), 2);
+  assert.equal(v('a..b'), 2);
+  assert.equal(v('release/1.6.7'), 0);
+  assert.equal(ps('release-stage-win.ps1', stageArgs.map((a) => (a === '172.20.0.1' ? 'host.example' : a))).status, 2);
+  assert.equal(ps('release-stage-win.ps1', [...stageArgs, '-GuestAddress', 'guest.example']).status, 2);
+  const script = `Import-Module '${join(here, 'LbaHyperV.psm1')}' -Force; Start-LbaPlan
+function Get-VM { param($Name, $ErrorAction) [pscustomobject]@{ Id = [guid]'${vmId}'; Name = 'Lab' }; [pscustomobject]@{ Id = [guid]'aaaaaaaa-2222-3333-4444-555555555555'; Name = 'Lab2' } }
+Resolve-LbaVmId -VMName 'Lab'; Invoke-LbaMain { Resolve-LbaVmId -VMName 'la*' }`;
+  const r = spawnSync('pwsh', ['-NoProfile', '-NonInteractive', '-Command', script], { encoding: 'utf8' });
+  assert.match(r.stdout, new RegExp(vmId));
+  assert.equal(r.status, 2, 'a wildcard matches nothing');
+}, { needsPwsh: true });
+
+test('H24', 'the release-components extension must equal the candidate version even without a review target', () => {
+  const wrong = { ...components, extension: '0.0.1' };
+  for (const setTarget of [true, false]) {
+    assert.throws(() => stageIdentity({ version, commit, vsix: join(work, 'candidate.vsix'), attestation: attestationPath, components: wrong, setTarget }, (p, e) => readFileSync(p, e)), /is not the candidate version/);
+  }
+});
+
 let passed = 0;
 let skipped = 0;
 try {
   for (const c of cases) {
-    if (c.needsPwsh && !havePwsh) { skipped += 1; console.log(`skip ${c.id} ${c.name} (pwsh not installed)`); continue; }
+    if ((c.needsPwsh && !havePwsh) || (c.needsPosix && !posix)) { skipped += 1; console.log(`skip ${c.id} ${c.name} (needs pwsh${c.needsPosix ? ' on a POSIX host' : ''})`); continue; }
     try { c.fn(); passed += 1; console.log(`ok ${c.id} ${c.name}`); } catch (error) { console.log(`FAIL ${c.id} ${c.name}\n${error.stack}`); process.exitCode = 1; }
   }
 } finally { rmSync(work, { recursive: true, force: true }); }

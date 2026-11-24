@@ -5,11 +5,16 @@
   Stages the candidate VSIX in the guest and proves the guest holds the exact bytes, installs it, points the extension
   at the per-version visual key, captures the guest's correlated release-stage@1 DONE frame over lbabus TCP, records
   staged-frame-WIN-<version>.json, and binds the review target to the candidate and its evidence.
-  The guest-side scripts, the task id and the evidence come from stage-guest-scripts.mjs, the same code the
-  VirtualBox driver uses; the frame is recorded by the candidate's record-release-stage.mjs.
+  The sender, install and configure scripts, the task id, the evidence and the pin come from this tooling tree
+  (stage-guest-scripts.mjs, the code the VirtualBox driver uses); the candidate supplies package.json,
+  release-components.json and the host scripts that gate the result (record-release-stage, await-agent-reply,
+  verify-staged-vsix). Before any guest change the sha256 of the evidence and pin rule files
+  (scripts/verify-reviewer-infrastructure.mjs, scripts/lbabus-pin.mjs, experiments/acg-quorum/cross-plane-attestation.mjs)
+  must be equal in the tooling tree and in -CandidateRepo, else exit 2.
   The host listener binds all interfaces (lbabus has no bind option), so an inbound firewall rule scoped to
   -HostAddress, its interface, -TcpPort and the guest address is opened for the step and removed when it ends,
-  on success and on failure. Run elevated on the Hyper-V host.
+  on success and on failure. The guest address is -GuestAddress or, when omitted, the VM's IPv4 address on the
+  host's subnet; with neither the step refuses (exit 2) before any guest change. Run elevated on the Hyper-V host.
   Find the host address the guest reaches on a Hyper-V switch with
     (Get-NetIPAddress -InterfaceAlias 'vEthernet (<switch>)' -AddressFamily IPv4).IPAddress
   or pass -SwitchName and let the script read it.
@@ -46,6 +51,7 @@ Invoke-LbaMain {
   Assert-LbaArgument ($Commit -match '^[0-9a-f]{40}$') '-Commit must be a full 40-character sha'
   Assert-LbaArgument ($TcpPort -gt 0 -and $TcpPort -lt 65536) "-TcpPort is not a port: $TcpPort"
   foreach ($f in @($Vsix, $Attestation, $VisualKey, $LbabusExe)) { Assert-LbaArgument (Test-Path -LiteralPath $f) "$f does not exist" }
+  Assert-LbaToolingMatchesCandidate -ToolingRoot $toolingRoot -CandidateRoot $CandidateRepo -Files @('scripts\verify-reviewer-infrastructure.mjs', 'scripts\lbabus-pin.mjs', 'experiments\acg-quorum\cross-plane-attestation.mjs')
   Assert-LbaCredential $Credential
   $id = Resolve-LbaVmId -VMId $VMId -VMName $VMName
   $hostAddr = Resolve-LbaHostAddress -HostAddress $HostAddress -SwitchName $SwitchName
@@ -71,7 +77,13 @@ Invoke-LbaMain {
       if ($have -ne $plan.lbabus.sha256) { throw "LBA_GATE: -LbabusExe hashes to $have, not the pinned $($plan.lbabus.asset) $($plan.lbabus.sha256)" }
     } else { Add-LbaStep 'host-check' $LbabusExe "sha256 equals the pinned $($plan.lbabus.asset) $($plan.lbabus.sha256)" }
 
-    Assert-LbaVmRunning -VMId $id
+    # Everything that can refuse on the host or the guest state comes before the first guest change.
+    Assert-LbaVmRunning -VMId $id -RequireFileCopy
+    $guestAddr = Resolve-LbaGuestAddress -GuestAddress $GuestAddress -VMId $id -HostAddress $hostAddr
+    # A stale listener would ACK the sender in place of ours: the port must start free.
+    if (Test-LbaPortInUse -Port $TcpPort) { throw "LBA_HOST: tcp $TcpPort is already in use on this host; stop the stale listener first (Get-NetTCPConnection -State Listen -LocalPort $TcpPort)" }
+    Assert-LbaNoStaleRule -Port $TcpPort
+    if (-not (Test-LbaDryRun)) { New-Item -ItemType Directory -Force -Path $Share | Out-Null }
     $g = $plan.guest
     foreach ($dir in @($g.dir, $g.keyDir, (Split-Path -Parent $g.lbabus))) {
       [void](Invoke-LbaGuest -Name "mkdir $dir" -VMId $id -Credential $Credential -ArgumentList @($dir) -Describe "New-Item -ItemType Directory -Force '$dir'" -ScriptBlock { param($d) New-Item -ItemType Directory -Force -Path $d | Out-Null })
@@ -93,28 +105,18 @@ Invoke-LbaMain {
     $staged = Get-LbaGuestSha256 -VMId $id -Credential $Credential -Path $g.vsix
     if (-not (Test-LbaDryRun) -and $staged -ne $plan.vsixSha256) { throw "LBA_GATE: the VSIX in the guest hashes to '$staged', not $($plan.vsixSha256)" }
 
-    $installOut = Invoke-LbaGuest -Name 'install the extension' -VMId $id -Credential $Credential -ArgumentList @("$($g.dir)\lba-install-$Version.ps1") `
-      -Describe "powershell -NoProfile -ExecutionPolicy Bypass -File $($g.dir)\lba-install-$Version.ps1" -ScriptBlock {
-        param($f) & powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File $f 2>&1 | ForEach-Object { "$_" }
-      }
+    $installOut = Invoke-LbaGuestProgram -Name 'install the extension' -VMId $id -Credential $Credential -Exe $g.powershell `
+      -Arguments @('-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-File', "$($g.dir)\lba-install-$Version.ps1") -TimeoutSec 300
     $want = "INSTALLED=$($plan.extensionId)@$Version"
     if (-not (Test-LbaDryRun) -and -not (($installOut -join "`n") -match [regex]::Escape($want))) { throw "LBA_GUEST: the guest did not confirm $want" }
-    $confOut = Invoke-LbaGuest -Name 'configure the visual reviewer key' -VMId $id -Credential $Credential -ArgumentList @("$($g.dir)\lba-configure-visual-$Version.ps1") `
-      -Describe "powershell -NoProfile -ExecutionPolicy Bypass -File $($g.dir)\lba-configure-visual-$Version.ps1" -ScriptBlock {
-        param($f) & powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File $f 2>&1 | ForEach-Object { "$_" }
-      }
+    $confOut = Invoke-LbaGuestProgram -Name 'configure the visual reviewer key' -VMId $id -Credential $Credential -Exe $g.powershell `
+      -Arguments @('-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-File', "$($g.dir)\lba-configure-visual-$Version.ps1") -TimeoutSec 120
     if (-not (Test-LbaDryRun) -and -not (($confOut -join "`n") -match 'STALE_VERDICT_CLEARED=True')) { throw "LBA_GUEST: visual key configuration failed: $(($confOut | Select-Object -Last 2) -join ' | ')" }
 
-    # A stale listener would ACK the sender in place of ours: the port must start free.
-    if (Test-LbaPortInUse -Port $TcpPort) { throw "LBA_HOST: tcp $TcpPort is already in use on this host; stop the stale listener first (Get-NetTCPConnection -State Listen -LocalPort $TcpPort)" }
-    New-Item -ItemType Directory -Force -Path $Share | Out-Null
-    $rule = Open-LbaListener -Port $TcpPort -LocalAddress $hostAddr -RemoteAddress $GuestAddress
+    $rule = Open-LbaListener -Port $TcpPort -LocalAddress $hostAddr -RemoteAddress $guestAddr
     $listener = Start-LbaListener -Node $Node -Script (Join-Path $CandidateRepo 'reviewer-workstation\await-agent-reply.mjs') -Lbabus $LbabusExe -TaskId $plan.taskId `
       -Port $TcpPort -TimeoutSec $TimeoutSec -Out $readback -LogDir $work
-    $sent = Invoke-LbaGuest -Name 'send the DONE frame' -VMId $id -Credential $Credential -TimeoutSec $TimeoutSec -ArgumentList @($g.node, "$($g.dir)\lba-send-stage-$Version.mjs") `
-      -Describe "$($g.node) $($g.dir)\lba-send-stage-$Version.mjs" -ScriptBlock {
-        param($nodeExe, $file) & $nodeExe $file 2>&1 | ForEach-Object { "$_" }
-      }
+    $sent = Invoke-LbaGuestProgram -Name 'send the DONE frame' -VMId $id -Credential $Credential -Exe $g.node -Arguments @("$($g.dir)\lba-send-stage-$Version.mjs") -TimeoutSec $TimeoutSec
     if (-not (Test-LbaDryRun)) {
       if (-not (($sent -join "`n") -match [regex]::Escape("STAGED_SHA256=$($plan.vsixSha256)"))) { throw "LBA_GUEST: the in-guest sender did not report the staged hash: $(($sent | Select-Object -Last 2) -join ' | ')" }
       if (-not $listener.WaitForExit($TimeoutSec * 1000)) { throw "LBA_TIMEOUT: the host listener did not correlate $($plan.taskId) within $TimeoutSec s" }

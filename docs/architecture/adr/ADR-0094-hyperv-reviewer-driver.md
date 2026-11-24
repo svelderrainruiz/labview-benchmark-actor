@@ -22,8 +22,12 @@ fields as the VirtualBox scripts. Only the transport changes: PowerShell Direct 
   (`stage-guest-scripts.mjs`, `build-review-target.mjs`); there is no second copy to drift.
 - The host address is a parameter (no default); the VirtualBox default is unchanged.
 - The pinned `lbabus` hash is checked on the host and again in the guest before it is used.
-- The candidate's own validators and guest scripts are read from the candidate checkout (`-CandidateRepo`), because the
-  stage evidence depends on the candidate's `release-components.json`.
+- Tooling runs from the driver's checkout; the candidate's `release-components.json`, version and VSIX come from
+  `-CandidateRepo`. The evidence and pin rule files (`verify-reviewer-infrastructure.mjs`, `lbabus-pin.mjs`,
+  `cross-plane-attestation.mjs`) must be byte-equal in both or the step exits 2.
+- The firewall rule is always scoped to the guest address (`-GuestAddress`, else the VM's address on the host subnet).
+  A busy port or a leftover rule is refused before any guest change.
+- Each guest program is bounded in the guest as well as on the host, since a guest process can outlive a host job stop.
 - The private reviewer key stays in the guest; only public sign-offs are collected.
 - `-DryRun` prints the ordered plan without touching Hyper-V, the firewall or the network, which is how CI tests it.
 
@@ -31,4 +35,4 @@ fields as the VirtualBox scripts. Only the transport changes: PowerShell Direct 
 
 Each gate still binds the candidate version, commit and VSIX hash, as before. No gate binds the commit of the
 tooling that ran the steps. Operators running this driver from a different checkout than the candidate
-must pass `-CandidateRepo`. Live Hyper-V behaviour is exercised by operators, not by CI.
+must pass `-CandidateRepo`; the compared rule files catch a tooling checkout that disagrees with the candidate. Live Hyper-V behaviour is exercised by operators, not by CI.

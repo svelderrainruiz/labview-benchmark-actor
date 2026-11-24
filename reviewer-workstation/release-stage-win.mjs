@@ -170,6 +170,7 @@ export function evidenceFromAttestation(attestation, { commit, taskId } = {}) {
 // What the stage must prove and bind, independent of the hypervisor: the task id, the VSIX hash and the review-target
 // evidence. Both the VirtualBox driver and the Hyper-V driver take it from here so the rules live in one place.
 export function stageIdentity({ version, commit, vsix, attestation, components, setTarget = true } = {}, readFile = readFileSync) {
+  need(components?.extension === version, `release-components.extension ${components?.extension} is not the candidate version ${version}`);
   const vsixSha256 = createHash('sha256').update(readFile(vsix)).digest('hex');
   const taskId = stageTaskId({ version, commit });
   const evidence = evidenceFromAttestation(JSON.parse(readFile(attestation, 'utf8')), { commit, taskId });

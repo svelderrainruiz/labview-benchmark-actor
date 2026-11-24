@@ -31,7 +31,7 @@ Invoke-LbaMain {
   Assert-LbaCredential $Credential
   $id = Resolve-LbaVmId -VMId $VMId -VMName $VMName
   $user = Get-LbaGuestUser -Credential $Credential -GuestUser $GuestUser
-  Assert-LbaVmRunning -VMId $id
+  Assert-LbaVmRunning -VMId $id -RequireFileCopy:($Action -eq 'set-target')
   if ($Action -ne 'collect') {
     Assert-LbaArgument ($VsixSha256 -match '^[0-9a-fA-F]{64}$') '-VsixSha256 must be the candidate 64-hex sha256'
     Assert-LbaArgument ([bool]$CandidateRepo) '-CandidateRepo is required (its verify-staged-vsix.mjs is the guard)'

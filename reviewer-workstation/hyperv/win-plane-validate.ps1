@@ -23,7 +23,7 @@ $ErrorActionPreference = 'Stop'
 Import-Module (Join-Path $PSScriptRoot 'LbaHyperV.psm1') -Force
 Start-LbaPlan -DryRun:$DryRun
 Invoke-LbaMain {
-  Assert-LbaArgument ($Branch -match '^[A-Za-z0-9._/-]+$') "-Branch is not a plain branch name: $Branch"
+  Assert-LbaArgument ($Branch -match '^[A-Za-z0-9._/-]+$' -and $Branch -notmatch '^-|\.\.|/$') "-Branch is not a plain branch name: $Branch"
   Assert-LbaArgument (Test-Path -LiteralPath (Join-Path $CandidateRepo 'reviewer-workstation\win-plane-validate.ps1')) "-CandidateRepo $CandidateRepo is not a checkout of the candidate"
   Assert-LbaCredential $Credential
   $id = Resolve-LbaVmId -VMId $VMId -VMName $VMName
@@ -32,18 +32,15 @@ Invoke-LbaMain {
   $guestScript = "$guestDir\win-plane-validate.ps1"
   $bundle = Join-Path ([IO.Path]::GetTempPath()) ('lba-rel-' + [guid]::NewGuid().ToString('N') + '.bundle')
   try {
-    Assert-LbaVmRunning -VMId $id
+    Assert-LbaVmRunning -VMId $id -RequireFileCopy
     [void](Invoke-LbaHost -File git -Arguments @('-C', $CandidateRepo, 'bundle', 'create', $bundle, $Branch))
     [void](Invoke-LbaHost -File git -Arguments @('-C', $CandidateRepo, 'bundle', 'verify', $bundle))
     [void](Invoke-LbaGuest -Name 'create the validation directory' -VMId $id -Credential $Credential -ArgumentList @($guestDir) -Describe "New-Item -ItemType Directory -Force '$guestDir'" -ScriptBlock { param($d) New-Item -ItemType Directory -Force -Path $d | Out-Null })
     Copy-LbaToGuest -VMId $id -Source $bundle -Destination $guestBundle
     Copy-LbaToGuest -VMId $id -Source (Join-Path $CandidateRepo 'reviewer-workstation\labview-mask.cjs') -Destination "$guestDir\labview-mask.cjs"
     Copy-LbaToGuest -VMId $id -Source (Join-Path $CandidateRepo 'reviewer-workstation\win-plane-validate.ps1') -Destination $guestScript
-    $lines = Invoke-LbaGuest -Name 'win-plane-validate' -VMId $id -Credential $Credential -TimeoutSec $TimeoutSec -ArgumentList @($guestScript, $guestBundle, $Branch) `
-      -Describe "powershell -NoProfile -ExecutionPolicy Bypass -File $guestScript -Bundle $guestBundle -Branch $Branch" -ScriptBlock {
-        param($script, $bundle, $branch)
-        & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $script -Bundle $bundle -Branch $branch 2>&1 | ForEach-Object { "$_" }
-      }
+    $lines = Invoke-LbaGuestProgram -Name 'win-plane-validate' -VMId $id -Credential $Credential -TimeoutSec $TimeoutSec -Exe 'C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe' `
+      -Arguments @('-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', $guestScript, '-Bundle', $guestBundle, '-Branch', $Branch)
     Add-LbaStep 'host-write' $OutFile 'the WINPLANE_JSON receipt; exit 0 only if winPlaneReady is true and head is the branch tip'
     if (-not (Test-LbaDryRun)) {
       $line = @($lines | Where-Object { $_ -like 'WINPLANE_JSON=*' } | Select-Object -Last 1)

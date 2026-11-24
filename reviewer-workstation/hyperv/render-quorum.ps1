@@ -40,7 +40,7 @@ Invoke-LbaMain {
   if ($needsGuest) {
     Assert-LbaCredential $Credential
     $id = Resolve-LbaVmId -VMId $VMId -VMName $VMName
-    Assert-LbaVmRunning -VMId $id
+    Assert-LbaVmRunning -VMId $id -RequireFileCopy:($Action -in 'stage', 'all')
   }
   if ($Action -in 'stage', 'verify', 'all') { Assert-LbaArgument ([bool]$Attestation -and (Test-Path -LiteralPath $Attestation)) "$Action needs -Attestation <existing host file>" }
 
@@ -50,13 +50,7 @@ Invoke-LbaMain {
   }
   if ($Action -in 'sign', 'all') {
     $cmd = "cd /d C:\lba-validate\repo && node reviewer-workstation\sign-release-quorum.mjs --key $GuestKey --reviewer $Reviewer --station WINDOWS_VM --quorum $guestAtt --out $guestSignoff"
-    $o = Invoke-LbaGuest -Name 'sign the quorum in the guest' -VMId $id -Credential $Credential -TimeoutSec $TimeoutSec -ArgumentList @($cmd) -Describe "cmd /c `"$cmd`"" -ScriptBlock {
-      param($c)
-      $r = & cmd.exe /c $c 2>&1 | ForEach-Object { "$_" }
-      $r
-      "LBA_EXIT=$LASTEXITCODE"
-    }
-    if (-not (Test-LbaDryRun) -and -not (($o -join "`n") -match 'LBA_EXIT=0')) { throw "LBA_GUEST: signing failed in the guest: $(($o | Select-Object -Last 3) -join ' | ')" }
+    [void](Invoke-LbaGuestProgram -Name 'sign the quorum in the guest' -VMId $id -Credential $Credential -TimeoutSec $TimeoutSec -Exe 'cmd.exe' -Arguments @('/c', $cmd))
   }
   if ($Action -in 'collect', 'all') {
     if (-not (Test-LbaDryRun)) { New-Item -ItemType Directory -Force -Path (Split-Path -Parent $Out) | Out-Null }

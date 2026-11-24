@@ -79,20 +79,31 @@ function Resolve-LbaVmId {
     Assert-LbaArgument ($VMId -match '^[0-9a-fA-F]{8}-([0-9a-fA-F]{4}-){3}[0-9a-fA-F]{12}$') "-VMId must be a GUID, got $VMId"
     return $VMId.ToLowerInvariant()
   }
-  if ($script:DryRun) { Add-LbaStep 'resolve-vm' $VMName 'Get-VM -Name (the id is read at run time)'; return "<id of VM $VMName>" }
-  $vms = @(Get-VM -Name $VMName -ErrorAction Stop)
+  if ($script:DryRun) { Add-LbaStep 'resolve-vm' $VMName 'Get-VM, exact case-sensitive name (the id is read at run time)'; return "<id of VM $VMName>" }
+  $vms = @(Get-VM -ErrorAction Stop | Where-Object { $_.Name -ceq $VMName })
   if ($vms.Count -ne 1) { throw "LBA_USAGE: -VMName $VMName matches $($vms.Count) VMs; use -VMId" }
   return $vms[0].Id.ToString()
 }
 
+# -RequireFileCopy also demands the Guest Service Interface, which Copy-VMFile needs.
 function Assert-LbaVmRunning {
-  [CmdletBinding()] param([Parameter(Mandatory)][string]$VMId)
-  Add-LbaStep 'check-vm' $VMId 'the VM is Running'
+  [CmdletBinding()] param([Parameter(Mandatory)][string]$VMId, [switch]$RequireFileCopy)
+  $what = 'the VM is Running'
+  if ($RequireFileCopy) { $what = 'the VM is Running and its Guest Service Interface is enabled' }
+  Add-LbaStep 'check-vm' $VMId $what
   if ($script:DryRun) { return }
   $vm = Get-VM -Id $VMId -ErrorAction Stop
   if ($vm.State -ne 'Running') { throw "LBA_GUEST: VM $VMId is $($vm.State), not Running; start it with Start-VM -Id $VMId" }
+  if ($RequireFileCopy) {
+    $svc = @(Get-VMIntegrationService -VM $vm -Name 'Guest Service Interface' -ErrorAction Stop)
+    if ($svc.Count -lt 1 -or -not $svc[0].Enabled) {
+      throw "LBA_GUEST: the Guest Service Interface is not enabled on VM $VMId; run Enable-VMIntegrationService -VM (Get-VM -Id $VMId) -Name 'Guest Service Interface'"
+    }
+  }
 }
 
+# Stopping the host job ends the PowerShell Direct call, not necessarily the process it started in the guest. Every long
+# guest program therefore runs through $script:GuestRunner, which bounds it inside the guest and stops its process tree.
 function Invoke-LbaJob {
   [CmdletBinding()] param([Parameter(Mandatory)][string]$Name, [Parameter(Mandatory)][scriptblock]$Start, [Parameter(Mandatory)][int]$TimeoutSec)
   $job = & $Start
@@ -119,6 +130,54 @@ function Invoke-LbaGuest {
   return Invoke-LbaJob -Name $Name -TimeoutSec $TimeoutSec -Start $start
 }
 
+# One command-line string for Start-Process: Windows PowerShell 5.1 (and PowerShell 7 before 7.3) joins an -ArgumentList
+# array without quoting, so an argument with a space would split. CommandLineToArgvW rules: quote it, double the
+# backslashes before a quote and at the end.
+function ConvertTo-LbaArgumentString {
+  [CmdletBinding()] param([string[]]$Arguments = @())
+  $parts = foreach ($a in $Arguments) {
+    if ($a -eq '') { '""' }
+    elseif ($a -match '[\s"]') { '"' + (($a -replace '(\\*)"', '$1$1\"') -replace '(\\+)$', '$1$1') + '"' }
+    else { $a }
+  }
+  return (@($parts) -join ' ')
+}
+
+$script:GuestRunner = {
+  param($exe, $argString, $timeoutSec)
+  $o = [IO.Path]::GetTempFileName()
+  $e = [IO.Path]::GetTempFileName()
+  try {
+    $hidden = @{}
+    if ($PSVersionTable.PSEdition -eq 'Desktop' -or $IsWindows) { $hidden.WindowStyle = 'Hidden' }
+    $p = Start-Process -FilePath $exe -ArgumentList $argString -PassThru @hidden -RedirectStandardOutput $o -RedirectStandardError $e
+    $null = $p.Handle
+    $done = $p.WaitForExit($timeoutSec * 1000)
+    if (-not $done) { & taskkill.exe /PID $p.Id /T /F 2>&1 | Out-Null }
+    Get-Content -LiteralPath $o
+    Get-Content -LiteralPath $e
+    if ($done) { "LBA_EXIT=$($p.ExitCode)" } else { 'LBA_GUEST_TIMEOUT=1' }
+  } finally { Remove-Item -LiteralPath $o, $e -Force -ErrorAction SilentlyContinue }
+}
+
+# Runs a guest program with a guest-side bound and checks its exit code. Returns its output lines.
+function Invoke-LbaGuestProgram {
+  [CmdletBinding()]
+  param([Parameter(Mandatory)][string]$Name, [Parameter(Mandatory)][string]$VMId, [pscredential]$Credential, [Parameter(Mandatory)][string]$Exe,
+        [string[]]$Arguments = @(), [int]$TimeoutSec = 120)
+  $argString = ConvertTo-LbaArgumentString -Arguments $Arguments
+  $lines = Invoke-LbaGuest -Name $Name -VMId $VMId -Credential $Credential -TimeoutSec ($TimeoutSec + 30) -ArgumentList @($Exe, $argString, $TimeoutSec) `
+    -Describe "$Exe $argString" -ScriptBlock $script:GuestRunner
+  if ($script:DryRun) { return @() }
+  $text = ($lines | ForEach-Object { "$_" }) -join "`n"
+  if ($text -match 'LBA_GUEST_TIMEOUT=1') { throw "LBA_TIMEOUT: $Name did not finish within $TimeoutSec s; its process tree was stopped in the guest" }
+  $m = [regex]::Match($text, 'LBA_EXIT=(-?\d+)')
+  if (-not $m.Success) { throw "LBA_GUEST: $Name reported no exit code" }
+  $kept = @($lines | Where-Object { "$_" -notmatch '^LBA_EXIT=' })
+  if ($m.Groups[1].Value -ne '0') { throw "LBA_GUEST: $Name exited $($m.Groups[1].Value): $(($kept | Select-Object -Last 3) -join ' | ')" }
+  return $kept
+}
+
 function Copy-LbaToGuest {
   [CmdletBinding()]
   param([Parameter(Mandatory)][string]$VMId, [Parameter(Mandatory)][string]$Source, [Parameter(Mandatory)][string]$Destination, [int]$TimeoutSec = 300)
@@ -139,7 +198,7 @@ function Copy-LbaFromGuest {
   Add-LbaStep 'copy-from-guest' $VMId "$Source -> $Destination"
   if ($script:DryRun) { return }
   Assert-LbaCredential $Credential
-  if (Test-Path -LiteralPath $Destination) { Remove-Item -LiteralPath $Destination -Force }
+  if (Test-Path -LiteralPath $Destination) { Remove-Item -LiteralPath $Destination -Force -ErrorAction Stop }
   $start = {
     Start-Job -ArgumentList @($VMId, $Credential, $Source, $Destination) -ScriptBlock {
       param($id, $account, $src, $dst)
@@ -189,14 +248,65 @@ function Get-LbaSwitchAddress {
   return $ip[0].IPAddress
 }
 
+function Test-LbaIpAddress {
+  [CmdletBinding()] param([string]$Text)
+  $parsed = $null
+  if (-not [ipaddress]::TryParse($Text, [ref]$parsed)) { return $false }
+  return ($Text -match '^\d+\.\d+\.\d+\.\d+$') -or ($Text -match ':')
+}
+
+function Test-LbaSameSubnet {
+  [CmdletBinding()] param([string]$A, [string]$B, [int]$PrefixLength)
+  $x = ([ipaddress]$A).GetAddressBytes()
+  $y = ([ipaddress]$B).GetAddressBytes()
+  if ($x.Count -ne 4 -or $y.Count -ne 4 -or $PrefixLength -lt 0 -or $PrefixLength -gt 32) { return $false }
+  for ($i = 0; $i -lt 4; $i++) {
+    $bits = [Math]::Max(0, [Math]::Min(8, $PrefixLength - 8 * $i))
+    $mask = (255 -shl (8 - $bits)) -band 255
+    if (($x[$i] -band $mask) -ne ($y[$i] -band $mask)) { return $false }
+  }
+  return $true
+}
+
+# The guest address the firewall rule is scoped to: -GuestAddress, else the VM's IPv4 addresses on the host's subnet.
+# With none, refuse: an open rule must always name its peer.
+function Resolve-LbaGuestAddress {
+  [CmdletBinding()] param([string]$GuestAddress, [Parameter(Mandatory)][string]$VMId, [Parameter(Mandatory)][string]$HostAddress)
+  if ($GuestAddress) {
+    Assert-LbaArgument (Test-LbaIpAddress $GuestAddress) "-GuestAddress is not an IP address: $GuestAddress"
+    return @($GuestAddress)
+  }
+  Add-LbaStep 'resolve-guest-address' $VMId 'the VM IPv4 addresses on the host subnet (Get-VMNetworkAdapter)'
+  if ($script:DryRun) { return @('<guest address read at run time>') }
+  $local = Get-NetIPAddress -IPAddress $HostAddress -ErrorAction Stop | Select-Object -First 1
+  $vm = Get-VM -Id $VMId -ErrorAction Stop
+  $all = @(Get-VMNetworkAdapter -VM $vm -ErrorAction Stop | ForEach-Object { $_.IPAddresses } | Where-Object { $_ -match '^\d+\.\d+\.\d+\.\d+$' })
+  $found = @($all | Where-Object { Test-LbaSameSubnet -A $_ -B $HostAddress -PrefixLength ([int]$local.PrefixLength) })
+  if ($found.Count -lt 1) { throw "LBA_USAGE: the guest reports no IPv4 address on the subnet of $HostAddress (it reports: $($all -join ', ')); start the guest network or pass -GuestAddress" }
+  return $found
+}
+
 function Resolve-LbaHostAddress {
   [CmdletBinding()] param([string]$HostAddress, [string]$SwitchName)
   if ($HostAddress) {
-    Assert-LbaArgument ($HostAddress -match '^[A-Za-z0-9.:-]+$') "-HostAddress is not an address: $HostAddress"
+    Assert-LbaArgument (Test-LbaIpAddress $HostAddress) "-HostAddress is not an IP address: $HostAddress"
     return $HostAddress
   }
   Assert-LbaArgument ([bool]$SwitchName) 'give -HostAddress (the address the guest reaches the host on) or -SwitchName (to read it from the vEthernet adapter)'
   return (Get-LbaSwitchAddress -SwitchName $SwitchName)
+}
+
+# The evidence and the lbabus pin are computed by this tooling tree but gated by the candidate. A candidate whose rule
+# files differ would compute them differently, so refuse before any guest change, naming the first file that differs.
+function Assert-LbaToolingMatchesCandidate {
+  [CmdletBinding()] param([Parameter(Mandatory)][string]$ToolingRoot, [Parameter(Mandatory)][string]$CandidateRoot, [Parameter(Mandatory)][string[]]$Files)
+  Add-LbaStep 'compare-tooling' $CandidateRoot ($Files -join ', ')
+  foreach ($f in $Files) {
+    $t = Join-Path $ToolingRoot $f
+    $c = Join-Path $CandidateRoot $f
+    if (-not (Test-Path -LiteralPath $c)) { throw "LBA_USAGE: $f is missing from -CandidateRepo; the driver's tooling tree and the candidate must agree on it" }
+    if ((Get-LbaHostSha256 -Path $t) -ne (Get-LbaHostSha256 -Path $c)) { throw "LBA_USAGE: $f differs between the tooling tree and -CandidateRepo; run the driver from a checkout that matches the candidate on it" }
+  }
 }
 
 function Test-LbaPortInUse {
@@ -205,17 +315,25 @@ function Test-LbaPortInUse {
   return [bool](Get-NetTCPConnection -State Listen -LocalPort $Port -ErrorAction SilentlyContinue)
 }
 
-# An inbound allow rule scoped to the host address, its interface, the port and (when known) the guest address.
+# A rule left by a crashed run would keep the port open to its peer: refuse to start and name it, rather than delete a rule
+# that a concurrent run may own.
+function Assert-LbaNoStaleRule {
+  [CmdletBinding()] param([Parameter(Mandatory)][int]$Port)
+  Add-LbaStep 'firewall-check' "lba-stage-$Port-*" 'no leftover lba-stage rule for this port'
+  if ($script:DryRun) { return }
+  $stale = @(Get-NetFirewallRule -DisplayName "lba-stage-$Port-*" -ErrorAction SilentlyContinue | ForEach-Object { $_.DisplayName })
+  if ($stale.Count -gt 0) { throw "LBA_HOST: leftover firewall rule(s) from an earlier run: $($stale -join ', '); remove with Remove-NetFirewallRule -DisplayName <name>" }
+}
+
+# An inbound allow rule scoped to the host address, its interface, the port and the guest address(es).
 function Open-LbaListener {
-  [CmdletBinding()] param([Parameter(Mandatory)][int]$Port, [Parameter(Mandatory)][string]$LocalAddress, [string]$RemoteAddress = '')
+  [CmdletBinding()] param([Parameter(Mandatory)][int]$Port, [Parameter(Mandatory)][string]$LocalAddress, [Parameter(Mandatory)][string[]]$RemoteAddress)
   $name = 'lba-stage-{0}-{1}' -f $Port, ([guid]::NewGuid().ToString('N').Substring(0, 8))
-  $scope = "inbound tcp $Port on $LocalAddress"
-  if ($RemoteAddress) { $scope = "$scope from $RemoteAddress" }
+  $scope = "inbound tcp $Port on $LocalAddress from $($RemoteAddress -join ',')"
   Add-LbaStep 'firewall-open' 'lba-stage-rule' $scope
   if ($script:DryRun) { return $name }
   $alias = (Get-NetIPAddress -IPAddress $LocalAddress -ErrorAction Stop | Select-Object -First 1).InterfaceAlias
-  $rule = @{ DisplayName = $name; Direction = 'Inbound'; Action = 'Allow'; Protocol = 'TCP'; LocalPort = $Port; LocalAddress = $LocalAddress; InterfaceAlias = $alias; Profile = 'Any' }
-  if ($RemoteAddress) { $rule.RemoteAddress = $RemoteAddress }
+  $rule = @{ DisplayName = $name; Direction = 'Inbound'; Action = 'Allow'; Protocol = 'TCP'; LocalPort = $Port; LocalAddress = $LocalAddress; InterfaceAlias = $alias; RemoteAddress = $RemoteAddress; Profile = 'Any' }
   [void](New-NetFirewallRule @rule -ErrorAction Stop)
   return $name
 }
@@ -241,7 +359,10 @@ function Start-LbaListener {
   $err = Join-Path $LogDir 'listener.err'
   $previous = $env:LBABUS
   $env:LBABUS = $Lbabus
-  try { $p = Start-Process -FilePath $Node -ArgumentList $arguments -PassThru -WindowStyle Hidden -RedirectStandardError $err -RedirectStandardOutput (Join-Path $LogDir 'listener.out') }
+  if (Test-LbaPortInUse -Port $Port) { throw "LBA_HOST: tcp $Port is already in use on this host; stop the stale listener first (Get-NetTCPConnection -State Listen -LocalPort $Port)" }
+  $hidden = @{}
+  if ($PSVersionTable.PSEdition -eq 'Desktop' -or $IsWindows) { $hidden.WindowStyle = 'Hidden' }
+  try { $p = Start-Process -FilePath $Node -ArgumentList (ConvertTo-LbaArgumentString -Arguments $arguments) -PassThru @hidden -RedirectStandardError $err -RedirectStandardOutput (Join-Path $LogDir 'listener.out') }
   finally { $env:LBABUS = $previous }
   $null = $p.Handle
   for ($i = 0; $i -lt 60; $i++) {
@@ -288,6 +409,6 @@ function Set-LbaReviewTarget {
 }
 
 Export-ModuleMember -Function Start-LbaPlan, Test-LbaDryRun, Add-LbaStep, Get-LbaPlan, Write-LbaPlan, Invoke-LbaMain, Assert-LbaArgument, Assert-LbaCredential,
-  Get-LbaGuestUser, Resolve-LbaVmId, Assert-LbaVmRunning, Invoke-LbaJob, Invoke-LbaGuest, Copy-LbaToGuest, Copy-LbaFromGuest, Get-LbaGuestSha256,
+  Get-LbaGuestUser, Resolve-LbaVmId, Assert-LbaVmRunning, Invoke-LbaJob, ConvertTo-LbaArgumentString, Invoke-LbaGuestProgram, Test-LbaIpAddress, Resolve-LbaGuestAddress, Assert-LbaNoStaleRule, Assert-LbaToolingMatchesCandidate, Invoke-LbaGuest, Copy-LbaToGuest, Copy-LbaFromGuest, Get-LbaGuestSha256,
   Get-LbaHostSha256, Invoke-LbaHost, Get-LbaSwitchAddress, Resolve-LbaHostAddress, Test-LbaPortInUse, Open-LbaListener, Close-LbaListener,
   Start-LbaListener, Stop-LbaListener, Set-LbaReviewTarget

@@ -27,12 +27,20 @@ Every guest call has a time bound and fails naming the step. Exit codes: 2 usage
 ## Host address and firewall
 
 The listener binds every interface, so `release-stage-win.ps1` opens an inbound rule scoped to the host address, its
-interface, the port and (with `-GuestAddress`) the guest, and removes it when the step ends, also on failure.
+interface, the port and the guest, and removes it when the step ends, also on failure.
 Find the address the guest reaches with
 `(Get-NetIPAddress -InterfaceAlias 'vEthernet (<switch>)' -AddressFamily IPv4).IPAddress`, or pass `-SwitchName`.
-The step refuses to start when the port is already in use.
+The guest address is `-GuestAddress` (an IP) or else the VM's IPv4 address on the host subnet; with neither the step
+exits 2. `-HostAddress` and `-GuestAddress` must be IP addresses, and `-VMName` must match the VM name exactly.
+Before any guest change the step refuses (exit 6) when the port is already in use or a leftover `lba-stage-<port>-*`
+rule exists (remove it yourself; a concurrent run may own it).
 
 ## Candidate checkout
 
-Release evidence depends on the candidate's `release-components.json`, so the candidate validators and guest scripts
-are read from `-CandidateRepo`, not from the checkout that holds this driver.
+The tooling (guest scripts, evidence builders) comes from the checkout that holds this driver. The candidate's
+`release-components.json`, version and VSIX come from `-CandidateRepo`. The evidence and pin rule files
+`scripts/verify-reviewer-infrastructure.mjs`, `scripts/lbabus-pin.mjs` and
+`experiments/acg-quorum/cross-plane-attestation.mjs` must be byte-equal in both, else the step exits 2 naming the file.
+
+Each guest program is also bounded inside the guest (it is stopped there on timeout), because a guest process can
+survive a host-side job stop.
