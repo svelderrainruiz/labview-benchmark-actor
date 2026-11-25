@@ -133,6 +133,7 @@ progressively.
 | LBA-REQ-102 | The system shall record an explicitly requested Windows desktop workload at a bounded operator-selected cadence without locating or launching LabVIEW. | A standalone synthetic UI live proof must not depend on NI activation or inherit an unreviewable 12-fps inference queue. | A separate Capture Desktop command records `desktop-capture` with an integer interval of 1 through 120 seconds (default 60), emits the existing pathless lifecycle/resources, and uses the existing stop/finalization path; Capture LabVIEW Launch retains its 12-fps behavior. | Host-free activation, argument, cadence, and lifecycle fixtures in `npm test`; Windows desktop execution remains a separate live-proof gate. |
 | LBA-REQ-103 | The system shall publish the repository wiki as an Obsidian vault generated from `docs/` by the shared repo-standards-review generator, in which every requirement page links its test. | The operator could not open the wiki in Obsidian (1.5.2 Marketplace rejection, #64), and hand-maintained pages drift from the governed sources, so the wiki is derived from `docs/`; the ecosystem wiki standard and its registry export need the one shared generator. | `.repo-standards-review/wiki_generate.py` under `.wiki-generator.json` passes with no problem and writes one page per RTM requirement and per test-plan item, every requirement page lists its `TestID`, two runs are byte-identical, `.obsidian/app.json` and the open-in-Obsidian how-to are present, no aliased wikilink remains outside code in the generated wiki, `--out` refuses the member root, its parent and an unrelated non-empty directory, and three negative controls fail closed; after publishing, `--check` finds no drift in a fresh wiki clone. | The `wiki-vault` gate in `verify-local-gates` (T-103); the `wiki-publish` workflow verifies the published wiki with `--check`. |
 | LBA-REQ-104 | The system shall verify a fork's wiki-submission issue against upstream's own test definitions, treating fork content strictly as data, and label it attested or not-attested, with a partner allow-list, held outside the repository, that rejects everything while unset or empty. | Only evidence that upstream re-verified without running fork code may be called attested (#112). | `scripts/wiki_submission.py` rejects an unlisted submitter first, then oversize, malformed, tampered, traversing or unknown-test submissions, and accepts a matching one, in offline fixtures; an unset or garbage allow-list rejects all, and a canary login never appears in any output or in the tree. | `node test/wiki-submission.mjs` (T-104). |
+| LBA-REQ-105 | The system shall correlate a local capture's GPU samples, agent cues and screen frames on the capture's own time base and export the frames between two markers as a local clip, returning only metadata over MCP. | A local model needs the GPU load, its own cues and the screen between two instants on one clock, without screen pixels leaving the machine (#134). | GPU samples are taken from the nvidia-smi timestamp column at the existing cadence, or recorded unavailable with a reason; `add_capture_marker` and automatic GPU cues reuse the user-click nearest-frame grab; `export_capture_clip` and the Export Clip command write an H.264 MP4 and a receipt inside the capture. | Host-free parser, cue, clip-plan, CLI, MCP and viewer fixtures in `npm test`; a real nvidia-smi parse and a real ffmpeg clip are recorded on the PR. |
 
 ---
 
@@ -633,9 +634,9 @@ progressively.
 - Acceptance Criteria:
   - The pure JSON-RPC 2.0 handler (`benchmarkActorMcpServer.ts`) answers
     `initialize`, `tools/list`, and `tools/call` over newline-delimited stdio,
-    publishing exactly four core tools — `get_host_capabilities`,
+    publishing the four core tools — `get_host_capabilities`,
     `get_benchmark_series`, `poll_coordination_bus`, `post_coordination_note` —
-    and returns `-32601` / `-32602` for an unknown method / tool.
+    plus the two capture tools of LBA-REQ-105, and returns `-32601` / `-32602` for an unknown method / tool.
   - A missing `lbabus` degrades to a soft `isError` tool result, not a transport
     crash, so the agent can act on the message.
   - The definition provider (`benchmarkActorMcpServerProvider.ts`) registers with
@@ -930,8 +931,8 @@ progressively.
   the operator step). The surface is now FOLDED into the single extension MCP server binary:
   `scripts/stage-acg-mcp.mjs` bundles the grid-tools closure into `out/acg-mcp-bundle/` (shipped in the
   `.vsix`), and `src/mcp/runBenchmarkActorMcpServer.ts` dynamically imports it so the one shipped server's
-  `tools/list` publishes all 13 tools (4 core + 9 grid); the folded stdio surface is asserted by the
-  `mcp-server` test and `docs/mcp-tools.md` is gated to 13 tools. Authored under the `repo-standards-review`
+  `tools/list` publishes all 15 tools (6 core + 9 grid); the folded stdio surface is asserted by the
+  `mcp-server` test and `docs/mcp-tools.md` is gated to 15 tools. Authored under the `repo-standards-review`
   singular-requirement directive (one `shall`).
 
 ### LBA-REQ-030: Pull requests target develop
@@ -3186,6 +3187,38 @@ progressively.
   - The ingest workflow's verify job is read-only; its report job only labels and posts a
     fixed comment.
 - Verification: `node test/wiki-submission.mjs` (T-104).
+
+### LBA-REQ-105: Correlated capture of GPU samples, agent cues and clips
+
+- Status: Planned
+- Area: Capture / agentic infrastructure (ADR-0095)
+- Statement: The system shall correlate a local capture's GPU samples, agent cues and screen frames on the capture's own time base and export the frames between two markers as a local clip, returning only metadata over MCP.
+- Rationale: A local model that drives a workload needs the GPU load, its own cues and the
+  screen between two instants on one clock. Screen frames are sensitive, so they stay on the
+  machine that holds the capture (#134).
+- Acceptance Criteria:
+  - While a capture runs, a one-shot `nvidia-smi --query-gpu=timestamp,utilization.gpu,memory.used,power.draw`
+    is sampled at the existing cadence; the sample time is the `timestamp` column, not the arrival time.
+    The index and name of every GPU are recorded once. Without nvidia-smi, or when no sample succeeds,
+    the series is recorded unavailable with the reason, never as zeros. `[N/A]` values stay null.
+  - The GPU series is persisted additively in `capture.json` (captures without it load unchanged),
+    returned by `get_benchmark_series` for a given `runId`, and charted by the frame correlator.
+  - `add_capture_marker` adds an `agent-cue` marker (label at most 80 characters) at an instant or a
+    frame index through the same `resolveMarkerImageGrab` as a user click. After a capture, GPU memory
+    rising more than 100 MiB above the first sample ("model load") and utilization rising through
+    `gpuCueThresholdPct` (default 10%, "compute") each add one debounced cue; the measured
+    utilization lag of the platform is recorded with the cue.
+  - `export_capture_clip`, the Export Clip Between Markers command and the `captureClip` CLI encode the
+    frames between two markers (default the latest two) or two frame indices, with an optional crop
+    validated against the frame size, into `clips/clip-<from>-<to>.mp4` (H.264, yuv420p, even size)
+    inside the capture, holding each frame for its real interval and capping the output at the real
+    duration. The receipt lists both markers' instants, toleranceMs, deltaMs and admitted, the inclusive
+    frame range, the frame rate, the SHA-256, the size and the duration. Markers of another capture, an
+    end before the start, an empty range, a crop outside the frame and a missing ffmpeg are rejected.
+  - The new MCP tools are not enabled by default for the Ollama bridge and return no pixels.
+- Verification: `node test/correlated-capture.mjs`, `node test/extension-activation.mjs` and
+  `node test/mcp-server.mjs` (T-105); a real nvidia-smi parse and a real ffmpeg clip on a LINUX
+  workstation are recorded on the pull request. A Windows live capture remains to be proven.
 
 ## Traceability (requirement → architecture view / test)
 

@@ -8,47 +8,12 @@
 // Deterministic: same input -> same output, so it is a re-runnable local-gate artifact.
 
 import { frameIndexOf } from './resourceUsageCorrelation.mjs';
+// The nearest-frame grab lives in its own import-free module so the extension can stage it (agent cues, #134).
+import { DEFAULT_MARKER_TOLERANCE_MS, resolveMarkerImageGrab } from './markerImageGrab.mjs';
 
 export const FRAME_MARKER_SCHEMA = 'labview-benchmark-actor/frame-marker@v2';
-export const DEFAULT_MARKER_TOLERANCE_MS = 200;
-
+export { DEFAULT_MARKER_TOLERANCE_MS, resolveMarkerImageGrab };
 export { frameIndexOf };
-
-/**
- * Grab the captured frame nearest an instant, admitting the grab ONLY within tolerance.
- *
- * @param {number} epochMs marker instant on the shared host epoch-ms axis.
- * @param {Array<{index:number, captureEpochMs:number, image?:string|null}>} frames captured frames.
- * @param {number} [toleranceMs=200] max |captureEpochMs - epochMs| that still admits the grab.
- * @returns {{nearestFrameIndex:number|null, nearestCaptureEpochMs:number|null, deltaMs:number|null, admitted:boolean, imageRef:string|null}}
- */
-export function resolveMarkerImageGrab(epochMs, frames, toleranceMs = DEFAULT_MARKER_TOLERANCE_MS) {
-  const miss = { nearestFrameIndex: null, nearestCaptureEpochMs: null, deltaMs: null, admitted: false, imageRef: null };
-  if (!(Number.isFinite(toleranceMs) && toleranceMs >= 0)) {
-    throw new Error('resolveMarkerImageGrab requires a finite toleranceMs >= 0.');
-  }
-  if (!Number.isFinite(epochMs) || !Array.isArray(frames) || frames.length === 0) {
-    return miss;
-  }
-  let best = null;
-  for (const f of frames) {
-    if (!f || !Number.isFinite(f.captureEpochMs)) continue;
-    const delta = Math.abs(f.captureEpochMs - epochMs);
-    // Deterministic tie-break: strictly-smaller delta wins; on an exact tie keep the EARLIER frame.
-    if (best === null || delta < best.delta || (delta === best.delta && f.captureEpochMs < best.frame.captureEpochMs)) {
-      best = { delta, frame: f };
-    }
-  }
-  if (best === null) return miss;
-  const admitted = best.delta <= toleranceMs;
-  return {
-    nearestFrameIndex: Number.isInteger(best.frame.index) ? best.frame.index : null,
-    nearestCaptureEpochMs: best.frame.captureEpochMs,
-    deltaMs: best.delta,
-    admitted,
-    imageRef: admitted ? (best.frame.image ?? null) : null
-  };
-}
 
 /**
  * Build a marker from a click on the raw data. The chart maps click-x -> epochMs (the same shared

@@ -115,6 +115,10 @@
         "title": "LabVIEW Benchmark Actor: Stop LabVIEW Capture"
       },
       {
+        "command": "labviewBenchmarkActor.exportClip",
+        "title": "LabVIEW Benchmark Actor: Export Clip Between Markers"
+      },
+      {
         "command": "labviewBenchmarkActor.markStepDone",
         "title": "LabVIEW Benchmark Actor: Mark Handoff Step Done"
       },
@@ -262,6 +266,19 @@
           "maximum": 120,
           "description": "Frame interval for standalone Windows desktop capture."
         },
+        "labviewBenchmarkActor.gpuCueThresholdPct": {
+          "type": "integer",
+          "default": 10,
+          "minimum": 1,
+          "maximum": 100,
+          "markdownDescription": "Automatic agent cue: add one `agent-cue` marker when a GPU's `utilization.gpu` (nvidia-smi) rises through this percentage during a capture (\"compute\"). nvidia-smi reports utilization late (measured ~0.45 s on Windows, 0.18-0.38 s on Linux; the lag is recorded on each cue), so the `memory.used` rise is the primary \"model load\" edge. Debounced: it re-arms only after staying below for 1 s."
+        },
+        "labviewBenchmarkActor.gpuCueMemoryRiseMb": {
+          "type": "integer",
+          "default": 100,
+          "minimum": 1,
+          "markdownDescription": "Automatic agent cue: add one `agent-cue` marker when a GPU's `memory.used` rises more than this many MiB above the capture's first GPU sample (\"model load\", which leads the utilization edge)."
+        },
         "labviewBenchmarkActor.ffmpegPath": {
           "type": "string",
           "default": "",
@@ -348,7 +365,7 @@
     "release:check-components": "node scripts/release-components.mjs",
     "ci:local:quick": "node scripts/local-continuous-kpi.mjs --quick",
     "ci:local": "node scripts/local-continuous-kpi.mjs",
-    "test": "npm run compile && node test/extension-activation.mjs && node test/viewer-render.mjs && node test/viewer-plain-render.mjs && node test/panels-render.mjs && node test/active-capture-mcp.mjs && node test/mcp-server.mjs && node test/ollama-mcp-bridge.mjs && node test/human-task-runner.mjs && node test/process-command.mjs && node test/lbabus-path.mjs && node test/local-kpi-core.mjs && node test/branch-coverage.mjs && node test/experiment-governance.mjs && node test/release-risk.mjs && node test/release-components.mjs && node test/verify-reviewer-infrastructure.mjs && node test/normalize-vsix.mjs && node test/verify-published-vsix.mjs && node test/wiki-submission.mjs && node scripts/mcpToolDoc.mjs --check docs/mcp-tools.md",
+    "test": "npm run compile && node test/extension-activation.mjs && node test/viewer-render.mjs && node test/viewer-plain-render.mjs && node test/panels-render.mjs && node test/active-capture-mcp.mjs && node test/correlated-capture.mjs && node test/mcp-server.mjs && node test/ollama-mcp-bridge.mjs && node test/human-task-runner.mjs && node test/process-command.mjs && node test/lbabus-path.mjs && node test/local-kpi-core.mjs && node test/branch-coverage.mjs && node test/experiment-governance.mjs && node test/release-risk.mjs && node test/release-components.mjs && node test/verify-reviewer-infrastructure.mjs && node test/normalize-vsix.mjs && node test/verify-published-vsix.mjs && node test/wiki-submission.mjs && node scripts/mcpToolDoc.mjs --check docs/mcp-tools.md",
     "package": "vsce package --out labview-benchmark-actor.vsix && node scripts/normalize-vsix.mjs labview-benchmark-actor.vsix",
     "test:coverage": "node scripts/coverage.mjs",
     "coverage:bump": "node scripts/coverage.mjs --bump"

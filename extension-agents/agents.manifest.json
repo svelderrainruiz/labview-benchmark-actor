@@ -1,5 +1,5 @@
 {
   "schema": "labview-benchmark-actor/extension-agents@v1",
-  "version": "0.3.30",
-  "sha256": "0929fe0377d38786a17e2e7a534d94f1602caa7fa4835782d1971322bb2743e7"
+  "version": "0.3.31",
+  "sha256": "7c376ff2baa4c988815f323ce28822c55c10cb6df29179f2a744d6f9eafcdd4c"
 }

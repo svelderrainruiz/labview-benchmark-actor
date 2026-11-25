@@ -192,11 +192,12 @@ workspace root.
   3. Confirm **LabVIEW Benchmark Actor: MCP tools** (`labviewBenchmarkActor`) is
      present and exposes the four core tools:
      `get_host_capabilities`, `get_benchmark_series`, `poll_coordination_bus`,
-     `post_coordination_note`, plus the nine folded corroboration-grid tools listed in
+     `post_coordination_note`, the two capture tools `export_capture_clip` and
+     `add_capture_marker`, plus the nine folded corroboration-grid tools listed in
      [../mcp-tools.md](../mcp-tools.md).
   4. Invoke **`get_benchmark_series`** and confirm it returns the bundled MPRR series
      (the same data the viewer renders in TC-06).
-- **Expected:** the server is discoverable and starts locally over stdio; all 13 tools are
+- **Expected:** the server is discoverable and starts locally over stdio; all 15 tools are
   listed; `get_benchmark_series` returns a structured series with no error. Nothing is sent to the
   internet. See [../mcp-tools.md](../mcp-tools.md) for the full tool contract.
 - **Result:** _____

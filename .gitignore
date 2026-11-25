@@ -9,6 +9,7 @@ media/agents.manifest.json
 media/benchmark-panels.mjs
 media/launch-capture.mjs
 media/frame-correlator.mjs
+media/markerImageGrab.mjs
 media/captureStatus.mjs
 media/handoffRequest.mjs
 media/reviewerVerdict.mjs

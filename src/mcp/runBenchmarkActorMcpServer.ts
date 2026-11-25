@@ -13,8 +13,12 @@ import * as path from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { promisify } from 'node:util';
 
+import { ClipRunner, clipFfmpegCommand, exportCaptureClip } from '../captureClip';
+import { appendCaptureMarker, buildAgentCueMarker, loadMarkerImageGrab, resolveCaptureDir } from '../captureMarkers';
 import {
+  AddCaptureMarkerArgs,
   BenchmarkActorMcpToolDeps,
+  ExportCaptureClipArgs,
   JsonRpcRequest,
   McpArgumentError,
   McpToolResult,
@@ -63,8 +67,39 @@ export function readServerVersion(root: string = repoRoot): string {
   }
 }
 
-/** Read the deterministic bundled mprr series and project it into a stable, hashed envelope. */
-export async function getBenchmarkSeries(root: string = repoRoot): Promise<McpToolResult> {
+export const MAX_SERIES_GPU_SAMPLES = 1000;
+
+/** The GPU series of one assembled local capture (metadata only), strided to at most 1000 samples. */
+export function captureGpuSeries(captureRoot: string, runId: string): Record<string, unknown> {
+  const capture = resolveCaptureDir(captureRoot, runId);
+  const record = JSON.parse(readFileSync(path.join(capture.dir, 'capture.json'), 'utf8')) as { startMs?: unknown; gpu?: Record<string, unknown> };
+  if (!record.gpu) {
+    return { runId: capture.runId, gpu: { available: false, reason: 'this capture predates GPU sampling (capture.json has no gpu block)' } };
+  }
+  const samples = Array.isArray(record.gpu.samples) ? record.gpu.samples : [];
+  const stride = Math.max(1, Math.ceil(samples.length / MAX_SERIES_GPU_SAMPLES));
+  return {
+    runId: capture.runId,
+    startMs: record.startMs,
+    gpu: { ...record.gpu, sampleStride: stride, samples: samples.filter((_, i) => i % stride === 0) }
+  };
+}
+
+/** Read the deterministic bundled mprr series and project it into a stable, hashed envelope. With a runId, the
+ *  envelope also carries that capture's GPU series (`capture`); without one it is unchanged. */
+export async function getBenchmarkSeries(
+  root: string = repoRoot,
+  args?: { runId?: string },
+  captureRoot: string = process.env.LBA_CAPTURE_ROOT ?? ''
+): Promise<McpToolResult> {
+  let capture: Record<string, unknown> | undefined;
+  if (args?.runId) {
+    try {
+      capture = captureGpuSeries(captureRoot, args.runId);
+    } catch (error) {
+      return { content: [{ type: 'text', text: `Tool error: capture ${args.runId} unavailable: ${errorText(error)}` }], isError: true };
+    }
+  }
   try {
     const raw = readFileSync(path.join(root, 'media', 'mprr-series.json'), 'utf8');
     const series = JSON.parse(raw) as Array<{ t: number; v: number }>;
@@ -73,7 +108,8 @@ export async function getBenchmarkSeries(root: string = repoRoot): Promise<McpTo
       schema: 'labview-benchmark-actor/benchmark-series@v1',
       points: series.length,
       seriesHash,
-      series
+      series,
+      ...(capture ? { capture } : {})
     };
     return { content: [{ type: 'text', text: JSON.stringify(envelope, null, 2) }] };
   } catch (error) {
@@ -106,10 +142,49 @@ export function postNoteArgs(message: string): string[] {
   return ['net', 'send', ...(netHosts ? ['--hosts', netHosts] : ['--skip-if-no-peer']), '--type', 'NOTE', '--message', message];
 }
 
+function jsonResult(value: unknown): McpToolResult {
+  return { content: [{ type: 'text', text: JSON.stringify(value, null, 2) }] };
+}
+function toolError(error: unknown): McpToolResult {
+  return { content: [{ type: 'text', text: `Tool error: ${errorText(error)}` }], isError: true };
+}
+
+/** The capture-mutating tools over LBA_CAPTURE_ROOT. Clips stay inside the capture directory; results are receipts. */
+export function createCaptureToolDeps(
+  captureRoot: string,
+  root: string = repoRoot,
+  options: { run?: ClipRunner; ffmpeg?: string } = {}
+): Pick<BenchmarkActorMcpToolDeps, 'exportCaptureClip' | 'addCaptureMarker'> {
+  return {
+    async exportCaptureClip(args: ExportCaptureClipArgs): Promise<McpToolResult> {
+      try {
+        const { dir } = resolveCaptureDir(captureRoot, args.runId);
+        const { runId: _runId, ...clipOptions } = args;
+        return jsonResult(await exportCaptureClip(dir, clipOptions, { ffmpeg: options.ffmpeg ?? clipFfmpegCommand(), run: options.run }));
+      } catch (error) {
+        return toolError(error);
+      }
+    },
+    async addCaptureMarker(args: AddCaptureMarkerArgs): Promise<McpToolResult> {
+      try {
+        const capture = resolveCaptureDir(captureRoot, args.runId);
+        const capturePath = path.join(capture.dir, 'capture.json');
+        const record = JSON.parse(readFileSync(capturePath, 'utf8')) as Parameters<typeof buildAgentCueMarker>[0];
+        const marker = buildAgentCueMarker(record, args, await loadMarkerImageGrab(root));
+        const count = appendCaptureMarker(capturePath, marker);
+        return jsonResult({ runId: capture.runId, markerIndex: count - 1, marker });
+      } catch (error) {
+        return toolError(error);
+      }
+    }
+  };
+}
+
 const serverDeps: BenchmarkActorMcpToolDeps = {
   serverVersion: readServerVersion(),
   getHostCapabilities: () => runLbabus(['capabilities'], 15000),
-  getBenchmarkSeries,
+  getBenchmarkSeries: (args) => getBenchmarkSeries(repoRoot, args),
+  ...createCaptureToolDeps(process.env.LBA_CAPTURE_ROOT ?? ''),
   pollCoordinationBus: ({ tail }) => runLbabus(pollBusArgs(tail), 30000),
   postCoordinationNote: ({ message }) => runLbabus(postNoteArgs(message), 20000),
   captureResources: createActiveCaptureResourceProvider(process.env.LBA_CAPTURE_ROOT ?? '')
