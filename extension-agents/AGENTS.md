@@ -135,6 +135,9 @@ Code:
   `post_coordination_note` — the same surfaces as the commands, callable programmatically. For a local capture,
   `add_capture_marker` adds an `agent-cue` marker and `export_capture_clip` encodes the clip between two markers
   inside that capture's directory; both return metadata only (receipts, hashes), never pixels.
+- **Local-model loop (no editor)** — `node out/mcp/localModelLoop.js` records a capture, prompts a local
+  Ollama model through the MCP bridge, cues prompt sent, first token, response done and the GPU rise, clips
+  around them and prints one metadata-only JSON receipt (see the command reference).
 
 ## Commands (Command Palette)
 

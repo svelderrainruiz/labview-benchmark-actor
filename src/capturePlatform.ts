@@ -1,17 +1,39 @@
+import * as path from 'node:path';
+
 export type CaptureWorkload = 'labview-launch' | 'desktop-capture';
 
 export interface CaptureMetadata {
   workload: CaptureWorkload;
   plane: 'WIN' | 'LINUX';
-  source: 'ffmpeg-gdigrab' | 'ffmpeg-x11grab' | 'gnome-shell-screencast';
+  source: CaptureSource;
   frameIntervalSeconds?: number;
+  /** #134 local-model loop: a desktop capture at a frame rate (frames per second) instead of an interval. */
+  framesPerSecond?: number;
 }
+
+export const CAPTURE_SOURCES = ['ffmpeg-gdigrab', 'ffmpeg-x11grab', 'gnome-shell-screencast', 'ffmpeg-lavfi-testsrc'] as const;
+export type CaptureSource = (typeof CAPTURE_SOURCES)[number];
+export const MAX_CAPTURE_FPS = 30;
 
 export function desktopCaptureInterval(value: unknown): number {
   if (typeof value !== 'number' || !Number.isInteger(value) || value < 1 || value > 120) {
     throw new Error('Desktop frame interval must be an integer from 1 through 120 seconds');
   }
   return value;
+}
+
+/** A desktop frame rate in frames per second: a number above 0 and at most 30. */
+export function captureFramesPerSecond(value: unknown): number {
+  if (typeof value !== 'number' || !Number.isFinite(value) || value <= 0 || value > MAX_CAPTURE_FPS) {
+    throw new Error(`Capture frame rate must be a number above 0 and at most ${MAX_CAPTURE_FPS} frames per second`);
+  }
+  return value;
+}
+
+/** The frame rate a capture was recorded at, from its capture-meta.json: framesPerSecond, else 1/interval, else 12. */
+export function captureFpsOf(meta: Pick<CaptureMetadata, 'workload' | 'frameIntervalSeconds' | 'framesPerSecond'>): number {
+  if (meta.framesPerSecond !== undefined) return captureFramesPerSecond(meta.framesPerSecond);
+  return meta.workload === 'desktop-capture' ? 1 / desktopCaptureInterval(meta.frameIntervalSeconds) : 12;
 }
 
 export function labviewCandidatesForPlatform(platform: NodeJS.Platform): string[] {
@@ -74,6 +96,17 @@ export function ffmpegCaptureArgsForPlatform(
   frameIntervalSeconds?: number,
 ): string[] {
   const frameRate = frameIntervalSeconds === undefined ? '12' : `1/${desktopCaptureInterval(frameIntervalSeconds)}`;
+  return ffmpegFrameCaptureArgs(platform, framePattern, frameRate, env, x11VideoSize);
+}
+
+/** The desktop frame-sequence capture argv (gdigrab on Windows, x11grab on Xorg) at an ffmpeg `-framerate` value. */
+export function ffmpegFrameCaptureArgs(
+  platform: NodeJS.Platform,
+  framePattern: string,
+  frameRate: string,
+  env: NodeJS.ProcessEnv = process.env,
+  x11VideoSize?: string,
+): string[] {
   if (platform === 'win32') {
     return ['-y', '-f', 'gdigrab', '-framerate', frameRate, '-i', 'desktop', framePattern];
   }
@@ -86,6 +119,13 @@ export function ffmpegCaptureArgsForPlatform(
     return ['-y', '-f', 'x11grab', '-framerate', frameRate, '-video_size', videoSize, '-draw_mouse', '0', '-i', display, framePattern];
   }
   throw new Error(`LabVIEW launch capture is unsupported on ${platform}`);
+}
+
+/** A synthetic frame-sequence capture (ffmpeg lavfi testsrc, read at its real rate) for CI and headless checks. */
+export function ffmpegTestSourceArgs(framePattern: string, framesPerSecond: number, size = '640x360'): string[] {
+  const fps = captureFramesPerSecond(framesPerSecond);
+  if (!/^[1-9]\d*x[1-9]\d*$/.test(size)) throw new Error('Test source size must be WIDTHxHEIGHT');
+  return ['-y', '-re', '-f', 'lavfi', '-i', `testsrc=size=${size}:rate=${fps}`, framePattern];
 }
 
 export function parseX11DisplaySize(xdpyinfo: string): string {
@@ -158,4 +198,68 @@ export function linuxSamplerScript(outFile: string): string {
     '  prev_ms=$ms',
     'done',
   ].join('\n');
+}
+
+// PowerShell sampler: fast System.Diagnostics.PerformanceCounter reads (NextValue() is sub-ms, unlike the old
+// ~0.8 s CIM loop) frame-locked to ~100 ms. Emits CPU %, used RAM MB, disk % busy (kept for back-compat) AND
+// per-PHYSICAL-DISK write/read THROUGHPUT in MB/s (decimal, bytes/1e6) for every physical disk. A modest
+// sustained write (e.g. ~11 MB/s) registers on the throughput curve even though % Disk Time barely moves.
+export function windowsSamplerScript(outFile: string): string {
+  const out = outFile.replace(/'/g, "''");
+  return [
+    "$ErrorActionPreference='SilentlyContinue'",
+    `$out='${out}'`,
+    'function NewPC($cat,$ctr,$inst){ try { if ($inst) { New-Object System.Diagnostics.PerformanceCounter $cat,$ctr,$inst } else { New-Object System.Diagnostics.PerformanceCounter $cat,$ctr } } catch { $null } }',
+    '$totalMb=[math]::Round((Get-CimInstance Win32_OperatingSystem).TotalVisibleMemorySize/1024,0)',
+    "$cpu=NewPC 'Processor' '% Processor Time' '_Total'",
+    "$avail=NewPC 'Memory' 'Available MBytes' $null",
+    "$dt=NewPC 'PhysicalDisk' '% Disk Time' '_Total'",
+    "$insts=@()",
+    "try { $insts=@((New-Object System.Diagnostics.PerformanceCounterCategory 'PhysicalDisk').GetInstanceNames() | Where-Object { $_ -ne '_Total' } | Sort-Object) } catch {}",
+    '$wc=@{}; $rc=@{}',
+    "foreach($i in $insts){ $wc[$i]=NewPC 'PhysicalDisk' 'Disk Write Bytes/sec' $i; $rc[$i]=NewPC 'PhysicalDisk' 'Disk Read Bytes/sec' $i }",
+    'foreach($x in @($cpu,$dt)+$wc.Values+$rc.Values){ if($x){ try{ [void]$x.NextValue() }catch{} } }',
+    'while ($true) {',
+    '  $t0=[DateTimeOffset]::UtcNow',
+    '  $c=if($cpu){[math]::Round($cpu.NextValue(),1)}else{0}',
+    '  $am=if($avail){$avail.NextValue()}else{0}',
+    '  $r=[math]::Round($totalMb-$am,1)',
+    '  $d=if($dt){[math]::Round($dt.NextValue(),1)}else{0}',
+    '  $ds=@()',
+    '  foreach($i in $insts){',
+    '    $w=if($wc[$i]){[math]::Round($wc[$i].NextValue()/1000000,3)}else{0}',
+    '    $rd=if($rc[$i]){[math]::Round($rc[$i].NextValue()/1000000,3)}else{0}',
+    '    $nm=$i.Replace(\'"\',\'\')',
+    '    $ds+=("{""name"":"""+$nm+""",""writeMBs"":"+$w+",""readMBs"":"+$rd+"}")',
+    '  }',
+    '  $ms=[DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds()',
+    '  Add-Content -Path $out -Value ("{""ms"":"+$ms+",""cpuPct"":"+$c+",""ramMb"":"+$r+",""diskPct"":"+$d+",""disks"":["+($ds -join ",")+"]}")',
+    '  $el=([DateTimeOffset]::UtcNow-$t0).TotalMilliseconds',
+    '  $sl=100-$el; if($sl -gt 0){ Start-Sleep -Milliseconds ([int]$sl) }',
+    '}',
+  ].join('\n');
+}
+
+/** The CPU/RAM/disk sampler process for a capture: bash over /proc on Linux, PowerShell counters on Windows. */
+export function resourceSamplerCommand(platform: NodeJS.Platform, outFile: string): { command: string; args: string[]; windowsHide: boolean } {
+  if (platform === 'linux') return { command: 'bash', args: ['-c', linuxSamplerScript(outFile)], windowsHide: false };
+  return { command: 'powershell', args: ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-Command', windowsSamplerScript(outFile)], windowsHide: true };
+}
+
+export const EXTENSION_ID = 'svelderrainruiz.labview-benchmark-actor';
+
+/** The captures root the installed extension uses: VS Code's globalStorage for this extension + `captures`. */
+export function defaultCapturesDir(platform: NodeJS.Platform, env: NodeJS.ProcessEnv, home: string): string {
+  const join = platform === 'win32' ? path.win32.join : path.posix.join;
+  let userDir: string;
+  if (platform === 'win32') {
+    const appData = String(env.APPDATA ?? '').trim();
+    userDir = join(appData || join(home, 'AppData', 'Roaming'), 'Code', 'User');
+  } else if (platform === 'darwin') {
+    userDir = join(home, 'Library', 'Application Support', 'Code', 'User');
+  } else {
+    const config = String(env.XDG_CONFIG_HOME ?? '').trim();
+    userDir = join(config || join(home, '.config'), 'Code', 'User');
+  }
+  return join(userDir, 'globalStorage', EXTENSION_ID, 'captures');
 }

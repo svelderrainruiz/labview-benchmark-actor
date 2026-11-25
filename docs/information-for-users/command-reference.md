@@ -80,6 +80,78 @@
 | **Verify Release Provenance** | `verifyReleaseProvenance` | Verify the attestation chain before installing a release. |
 | **Run Throughput-to-Disk Ladder** | `runThroughputLadder` | Run the C# `tpd` disk-throughput ladder and record a per-rung MBps receipt for best-effort cross-witness corroboration (no LabVIEW). |
 
+## Local-model loop (CLI, no editor)
+
+`node out/mcp/localModelLoop.js` runs the whole #134 loop in one command on the machine that holds the
+screen: it starts a capture, prompts a local Ollama model through the MCP bridge, marks the GPU rise and
+exports a clip around it. VS Code is not needed while it runs.
+
+1. Checks that ffmpeg is found (`--ffmpeg`, `LBA_FFMPEG_PATH`, PATH, WinGet), that Ollama answers at
+   `--ollama` (default `http://127.0.0.1:11434`) and that `--model` (default `qwen2.5vl:3b`) is pulled.
+2. Creates `run-<uuid>/` under `--captures-dir` and records frames at `--fps` (default 4): `gdigrab` on
+   Windows, `x11grab` on an Xorg session, or ffmpeg's lavfi `testsrc` with `--source test`. The CPU/RAM/disk
+   sampler and the nvidia-smi GPU sampler run alongside.
+3. Waits `--lead-ms` (default 2000), adds the cue "prompt sent", streams `--prompt` (and `--image <png>` for a
+   vision model) to the model, and adds "first token" and "response done" from the stream. Tools are offered
+   as the bridge does: its read-only defaults plus each `--allow-tool <name>`, and only when the model
+   reports the `tools` capability.
+4. Keeps recording `--tail-ms` (default 3000), stops, adds the automatic GPU cues (memory rise = model load,
+   utilization through `--gpu-threshold-pct`, default 10% = compute, with the platform lag) and writes
+   `capture.json` with all markers in time order.
+5. Exports `clips/clip-<from>-<to>.mp4` from the earliest of prompt sent and the first GPU cue minus 1 s to
+   response done plus 1 s, and writes `clips/loop-<from>-<to>.json`, the receipt it prints.
+
+The receipt is metadata only: capture id and directory, model name, digest, size and capabilities, prompt
+and answer SHA-256 with at most 200 characters of the answer, first-token latency, each cue's instantMs,
+offset from prompt sent and imageGrab (deltaMs, admitted, toleranceMs), the GPU edges, the GPU series
+availability or reason, the frame count and the clip's SHA-256, size and duration. Frames and clips stay on
+the machine.
+
+Use `--cold` to unload the model first, so that the capture also shows the model load. Without nvidia-smi the
+loop still completes and the receipt marks the GPU unavailable with the reason.
+
+| Exit | Meaning |
+| --- | --- |
+| 0 | Loop done; the receipt is on stdout and in `clips/`. |
+| 2 | Bad arguments (the usage is printed). |
+| 3 | Missing prerequisite: ffmpeg, Ollama unreachable, model not pulled, no desktop to record, `--cold` unload failed. No capture is created. |
+| 4 | The capture yielded no frames; the run is marked failed in `capture-status.json` and `active-capture-session.json`. |
+| 5 | The model failed or gave no complete answer; the capture is kept and `loop-receipt.json` is written. |
+| 6 | The clip failed; the capture is kept and `loop-receipt.json` is written. |
+
+Default captures folder (the installed extension's `globalStorage`, so **Open Benchmark Frame Correlator**
+can open the run):
+
+- Windows: `%APPDATA%\Code\User\globalStorage\svelderrainruiz.labview-benchmark-actor\captures`
+- Linux: `${XDG_CONFIG_HOME:-~/.config}/Code/User/globalStorage/svelderrainruiz.labview-benchmark-actor/captures`
+- macOS (`--source test` only): `~/Library/Application Support/Code/User/globalStorage/svelderrainruiz.labview-benchmark-actor/captures`
+
+**Open Benchmark Frame Correlator** opens the run whose folder name sorts last, which is not necessarily the
+newest. Extensions released before this loop (1.6.7 and older) show the frames and CPU/RAM curves but not
+the GPU curves or agent cues.
+
+### Run it on Windows
+
+The CLI is not in the 1.6.7 package, so run it from a built checkout of the repository. In PowerShell, from
+the checkout, with Ollama serving `qwen2.5vl:3b` on `127.0.0.1:11434`, ffmpeg on PATH (WinGet Links) and
+the NVIDIA driver's `nvidia-smi`:
+
+```powershell
+npm.cmd ci
+npm.cmd run compile
+C:\nvm4w\nodejs\node.exe out\mcp\localModelLoop.js --model qwen2.5vl:3b --cold
+$LASTEXITCODE
+```
+
+Add `--source test` for a dry run that records ffmpeg's test pattern instead of the screen, and
+`--prompt "..."`, `--image C:\path\shot.png`, `--fps 8`, `--lead-ms 3000` or `--tail-ms 5000` as needed.
+The run is written to
+`%APPDATA%\Code\User\globalStorage\svelderrainruiz.labview-benchmark-actor\captures\run-<uuid>\`:
+`frame-*.png`, `resources.jsonl`, `gpu.json`, `gpu.jsonl`, `capture.json`, `capture-status.json`,
+`active-capture-session.json`, `capture-meta.json`, and in `clips\` the MP4, its clip receipt and the loop
+receipt. Progress goes to stderr; stdout holds only the receipt, so
+`... | Out-File -Encoding utf8 loop-receipt.json` keeps it.
+
 ## Agent surface
 
 Every panel command above is also openable by an agent through the

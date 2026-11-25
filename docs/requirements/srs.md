@@ -134,6 +134,7 @@ progressively.
 | LBA-REQ-103 | The system shall publish the repository wiki as an Obsidian vault generated from `docs/` by the shared repo-standards-review generator, in which every requirement page links its test. | The operator could not open the wiki in Obsidian (1.5.2 Marketplace rejection, #64), and hand-maintained pages drift from the governed sources, so the wiki is derived from `docs/`; the ecosystem wiki standard and its registry export need the one shared generator. | `.repo-standards-review/wiki_generate.py` under `.wiki-generator.json` passes with no problem and writes one page per RTM requirement and per test-plan item, every requirement page lists its `TestID`, two runs are byte-identical, `.obsidian/app.json` and the open-in-Obsidian how-to are present, no aliased wikilink remains outside code in the generated wiki, `--out` refuses the member root, its parent and an unrelated non-empty directory, and three negative controls fail closed; after publishing, `--check` finds no drift in a fresh wiki clone. | The `wiki-vault` gate in `verify-local-gates` (T-103); the `wiki-publish` workflow verifies the published wiki with `--check`. |
 | LBA-REQ-104 | The system shall verify a fork's wiki-submission issue against upstream's own test definitions, treating fork content strictly as data, and label it attested or not-attested, with a partner allow-list, held outside the repository, that rejects everything while unset or empty. | Only evidence that upstream re-verified without running fork code may be called attested (#112). | `scripts/wiki_submission.py` rejects an unlisted submitter first, then oversize, malformed, tampered, traversing or unknown-test submissions, and accepts a matching one, in offline fixtures; an unset or garbage allow-list rejects all, and a canary login never appears in any output or in the tree. | `node test/wiki-submission.mjs` (T-104). |
 | LBA-REQ-105 | The system shall correlate a local capture's GPU samples, agent cues and screen frames on the capture's own time base and export the frames between two markers as a local clip, returning only metadata over MCP. | A local model needs the GPU load, its own cues and the screen between two instants on one clock, without screen pixels leaving the machine (#134). | GPU samples are taken from the nvidia-smi timestamp column at the existing cadence, or recorded unavailable with a reason; `add_capture_marker` and automatic GPU cues reuse the user-click nearest-frame grab; `export_capture_clip` and the Export Clip command write an H.264 MP4 and a receipt inside the capture. | Host-free parser, cue, clip-plan, CLI, MCP and viewer fixtures in `npm test`; a real nvidia-smi parse and a real ffmpeg clip are recorded on the PR. |
+| LBA-REQ-106 | The system shall run one local-model loop without an editor: record a desktop or test-source capture in the extension's format with CPU/RAM and GPU samples, send a prompt to a local Ollama model through the MCP bridge, mark prompt sent, first token, response done and the GPU edges, export a clip around them, and print one metadata-only receipt. | The operator needs to see what a local model does to the GPU and the screen in one command on the machine that holds the screen, Windows first, without VS Code (#134 slice 4). | `node out/mcp/localModelLoop.js` writes `run-<uuid>/capture.json` with the extension's frames, samples and markers, three loop cues and the automatic GPU cues, `clips/clip-<from>-<to>.mp4` from the earliest of prompt sent and the first GPU cue minus 1 s to response done plus 1 s, and one JSON receipt; each prerequisite failure has its own message and exit code. | Host-free argument, planning, Ollama-stream, cue-order and receipt fixtures in `npm test`; a real run with a local Ollama, nvidia-smi and ffmpeg is recorded on the PR. |
 
 ---
 
@@ -3219,6 +3220,39 @@ progressively.
 - Verification: `node test/correlated-capture.mjs`, `node test/extension-activation.mjs` and
   `node test/mcp-server.mjs` (T-105); a real nvidia-smi parse and a real ffmpeg clip on a LINUX
   workstation are recorded on the pull request. A Windows live capture remains to be proven.
+
+### LBA-REQ-106: Local-model loop in one command
+
+- Status: Planned
+- Area: Capture / agentic infrastructure (ADR-0095)
+- Statement: The system shall run one local-model loop without an editor: record a desktop or test-source capture in the extension's format with CPU/RAM and GPU samples, send a prompt to a local Ollama model through the MCP bridge, mark prompt sent, first token, response done and the GPU edges, export a clip around them, and print one metadata-only receipt.
+- Rationale: The correlated capture of LBA-REQ-105 needs VS Code to start and stop. A local model on the
+  machine that holds the screen (first a Windows 11 laptop with an NVIDIA GPU) is measured end to end only
+  when one command starts the capture, prompts the model, cues the GPU rise and clips it (#134 slice 4).
+- Acceptance Criteria:
+  - `node out/mcp/localModelLoop.js` needs no VS Code. It writes `run-<uuid>/` under `--captures-dir`
+    (default: the extension's globalStorage `captures` folder for the platform) with the extension's
+    `capture-meta.json`, `active-capture-session.json`, `capture-status.json`, frame PNGs, `resources.jsonl`,
+    `gpu.json`/`gpu.jsonl` and `capture.json` (frames[] index/tMs/image, samples, markers[] with imageGrab).
+  - Frames come from the extension's ffmpeg arguments (gdigrab on Windows, x11grab on Xorg) or from
+    `--source test` (lavfi testsrc in real time) at `--fps` (default 4); the CPU/RAM and GPU samplers run
+    alongside.
+  - After `--lead-ms` (default 2000) the prompt (and an optional `--image` PNG) goes to `--model` at
+    `--ollama` through the MCP bridge with a streamed `/api/chat`; tools are offered only from the bridge's
+    default allow-list plus `--allow-tool`, and only when the model reports the `tools` capability.
+    "prompt sent", "first token" and "response done" are agent cues on the shared nearest-frame grab.
+  - After `--tail-ms` (default 3000) everything stops, the automatic GPU cues are added, all markers are in
+    time order, and the clip covers the earliest of prompt sent and the first GPU cue minus 1 s to response
+    done plus 1 s inside `clips/`.
+  - One JSON receipt goes to stdout and next to the clip: capture id, model name, digest and capabilities,
+    per-cue instantMs, offset from prompt sent and imageGrab, GPU edges, first-token latency, clip SHA-256,
+    size and duration, frame count, and GPU availability or the reason. It holds no pixels and at most 200
+    characters of the answer.
+  - Unreachable Ollama, a missing model, missing ffmpeg or a refused desktop are reported before a capture
+    starts (exit 3); a capture without frames is marked failed (exit 4); a failed chat (exit 5) or clip
+    (exit 6) still writes the receipt; missing nvidia-smi marks the GPU unavailable and the loop completes.
+- Verification: `node test/local-model-loop.mjs` (T-106); a real loop with a local Ollama, nvidia-smi and
+  ffmpeg on a LINUX workstation is recorded on the pull request. The Windows laptop run is to be proven.
 
 ## Traceability (requirement → architecture view / test)
 
