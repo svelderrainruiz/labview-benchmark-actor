@@ -6,6 +6,8 @@ follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project
 
 ## [Unreleased]
 
+## [1.6.8] - 2026-11-25
+
 ### Added
 
 - A Windows host running Hyper-V can run the WIN-plane validate, release-stage, verdict and quorum steps
