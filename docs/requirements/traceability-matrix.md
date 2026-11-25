@@ -112,5 +112,6 @@
 | LBA-REQ-103 | Obsidian-ready wiki generated from docs | Proven | §3.8 Configuration-management & assurance | ADR-0089, ADR-0090 | T-103 | 5 |
 | LBA-REQ-104 | Fork wiki submissions are verified as data | Proven | §3.8 Configuration-management & assurance | ADR-0091 | T-104 | 6 |
 | LBA-REQ-105 | Correlated capture of GPU samples, agent cues and clips | Planned | §3.7 Agentic-infrastructure | ADR-0095 | T-105 | 15 |
+| LBA-REQ-106 | Local-model loop in one command | Planned | §3.7 Agentic-infrastructure | ADR-0095 | T-106 | 12 |
 
-_Generated for 105 requirements._
+_Generated for 106 requirements._

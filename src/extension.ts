@@ -9,8 +9,10 @@ import * as path from 'node:path';
 import { registerBenchmarkActorMcpServerProvider } from './mcp/benchmarkActorMcpServerProvider';
 import { ActiveCapturePlane, ActiveCaptureState, buildActiveCaptureSession, newCaptureRunId, writeActiveCaptureSession } from './captureSession';
 import { exportCaptureClip, parseClipArgs } from './captureClip';
-import { appendCaptureMarker, gpuCueMarkers, MarkerImageGrabFn, resolveCaptureDir } from './captureMarkers';
-import { attachGpuSeries, gpuCues, GpuCueOptions, GpuSampler, nvidiaSmiRunner, readGpuSeries, startGpuSampler } from './gpuSamples';
+import { appendCaptureMarker, MarkerImageGrabFn, resolveCaptureDir } from './captureMarkers';
+import { GpuSampler, nvidiaSmiRunner, startGpuSampler } from './gpuSamples';
+import { assembleCaptureFromDir, CaptureBuilder, LaunchCaptureRecord, readResourceSamples } from './captureAssemble';
+import { ffmpegRunnable, resolveFfmpegCommand } from './captureHost';
 import { registerHumanTasks } from './humanTasks';
 import { resolveLbabusExecutable } from './lbabusPath';
 import { reviewerStationForEnvironment } from './reviewerStation';
@@ -21,10 +23,16 @@ import {
   ffmpegCaptureArgsForPlatform,
   gnomeScreencastScript,
   labviewCandidatesForPlatform,
-  linuxSamplerScript,
   parseX11DisplaySize,
+  resourceSamplerCommand,
+  windowsSamplerScript,
   x11DisplayForCapture,
 } from './capturePlatform';
+
+// Re-exported: these moved into vscode-free modules shared with the local-model loop CLI (#134 slice 4).
+export { assembleCaptureFromDir, AssembleCaptureExtras, readResourceSamples } from './captureAssemble';
+export { ffmpegRunnable } from './captureHost';
+export const samplerScript = windowsSamplerScript;
 
 const execFileAsync = promisify(execFile);
 
@@ -481,18 +489,8 @@ function registerBenchmarkLanguageModelTools(context: vscode.ExtensionContext, o
 // the frame correlator opens: CPU/RAM/disk curves on top, a grab-and-drag red line, the real screenshot below.
 // Everything is VM-local (LBA-REQ-009); nothing is embedded in the .vsix.
 
-interface CaptureBuilder {
-  buildLaunchCapture(input: unknown): LaunchCaptureRecord;
-}
 interface CorrelatorBuilder {
   buildFrameCorrelatorHtml(model: unknown, nonce: string, cspSource: string): string;
-}
-interface LaunchCaptureRecord {
-  frameCount: number;
-  frames: Array<Record<string, unknown>>;
-  workload?: CaptureWorkload;
-  fps?: number;
-  [k: string]: unknown;
 }
 
 let captureBuilderPromise: Promise<CaptureBuilder> | undefined;
@@ -706,25 +704,6 @@ function busConfig(): { netHosts: string; netLog: string } {
     netHosts: (c.get<string>('busNetHosts', '') || '').trim(),
     netLog: (c.get<string>('busNetLog', '') || '').trim(),
   };
-}
-
-function normalizeResourceSample(sample: Record<string, unknown>): Record<string, unknown> {
-  const ms = Number(sample.ms);
-  if (Number.isFinite(ms) && ms >= 1e15) return { ...sample, ms: Math.round(ms / 1e6) };
-  return sample;
-}
-
-/** Parse a capture's resources.jsonl into the raw sample array (skipping blank/partial lines). */
-export function readResourceSamples(dir: string): Array<Record<string, unknown>> {
-  const out: Array<Record<string, unknown>> = [];
-  const resFile = path.join(dir, 'resources.jsonl');
-  if (!existsSync(resFile)) return out;
-  for (const line of readFileSync(resFile, 'utf8').split('\n')) {
-    const t = line.trim();
-    if (!t) continue;
-    try { out.push(normalizeResourceSample(JSON.parse(t) as Record<string, unknown>)); } catch { /* skip partial */ }
-  }
-  return out;
 }
 
 /** Best-effort write of the handoff capture-status beacon (never throws into the capture flow). Returns the
@@ -1080,69 +1059,8 @@ function resolveLabview(): string | null {
 // under %LOCALAPPDATA%\lba -> `ffmpeg` on PATH. resolveFfmpegChecked returns null when NONE is a spawnable binary,
 // so the capture fails FAST with an actionable prompt instead of a raw `spawn ffmpeg ENOENT` mid-run (the v1.0.0
 // Marketplace complaint: a fresh install has no ffmpeg on PATH).
-export function ffmpegRunnable(cmd: string): boolean {
-  try {
-    // `-version` is a fast, side-effect-free probe. We only care that the binary SPAWNS (no ENOENT): a present
-    // ffmpeg exits 0, and even a mismatched build still spawns. spawnSync sets `.error` (does not throw) on ENOENT.
-    return !spawnSync(cmd, ['-version'], { windowsHide: true, timeout: 5000 }).error;
-  } catch {
-    return false;
-  }
-}
-
-function findWingetPackageFfmpeg(localAppData: string): string | null {
-  const packagesRoot = path.join(localAppData, 'Microsoft', 'WinGet', 'Packages');
-  let packages;
-  try {
-    packages = readdirSync(packagesRoot, { withFileTypes: true });
-  } catch {
-    return null;
-  }
-  const findBelow = (directory: string, depth: number): string | null => {
-    if (depth > 3) return null;
-    let entries;
-    try {
-      entries = readdirSync(directory, { withFileTypes: true });
-    } catch {
-      return null;
-    }
-    for (const entry of entries) {
-      const candidate = path.join(directory, entry.name);
-      if (entry.isFile() && entry.name.toLowerCase() === 'ffmpeg.exe' && ffmpegRunnable(candidate)) return candidate;
-    }
-    for (const entry of entries) {
-      if (!entry.isDirectory()) continue;
-      const found = findBelow(path.join(directory, entry.name), depth + 1);
-      if (found) return found;
-    }
-    return null;
-  };
-  for (const packageDir of packages) {
-    if (!packageDir.isDirectory() || !/^Gyan\.FFmpeg_/i.test(packageDir.name)) continue;
-    const found = findBelow(path.join(packagesRoot, packageDir.name), 0);
-    if (found) return found;
-  }
-  return null;
-}
-
 export function resolveFfmpegChecked(): string | null {
-  const configured = captureCfg<string>('ffmpegPath', '').trim();
-  if (configured) return ffmpegRunnable(configured) ? configured : null;
-  const localAppData = process.env.LOCALAPPDATA;
-  const staged = localAppData ? path.join(localAppData, 'lba', 'ffmpeg.exe') : '';
-  if (staged && existsSync(staged)) return staged;
-  if (ffmpegRunnable('ffmpeg')) return 'ffmpeg';
-  // A winget-installed ffmpeg (the "Install ffmpeg (winget)" button installs Gyan.FFmpeg) often symlinks ffmpeg.exe
-  // into %LOCALAPPDATA%\Microsoft\WinGet\Links and adds that dir to the USER PATH. The extension-host process can
-  // retain its pre-install PATH, and some WinGet installations omit the Links shim entirely; check both the shim and
-  // the Gyan package store directly so the capture works without a VS Code or terminal restart.
-  if (localAppData) {
-    const wingetLink = path.join(localAppData, 'Microsoft', 'WinGet', 'Links', 'ffmpeg.exe');
-    if (existsSync(wingetLink) && ffmpegRunnable(wingetLink)) return wingetLink;
-    const wingetPackageFfmpeg = findWingetPackageFfmpeg(localAppData);
-    if (wingetPackageFfmpeg) return wingetPackageFfmpeg;
-  }
-  return null;
+  return resolveFfmpegCommand(captureCfg<string>('ffmpegPath', ''));
 }
 
 // When ffmpeg is missing, GUIDE the user (one-click winget, manual download, or point at an existing ffmpeg.exe)
@@ -1199,46 +1117,6 @@ async function promptInstallFfmpeg(output: vscode.OutputChannel): Promise<void> 
   }
 
   output.appendLine('capture aborted: ffmpeg not found (prompted winget install / download / set-path).');
-}
-
-// PowerShell sampler: fast System.Diagnostics.PerformanceCounter reads (NextValue() is sub-ms, unlike the old
-// ~0.8 s CIM loop) frame-locked to ~100 ms. Emits CPU %, used RAM MB, disk % busy (kept for back-compat) AND
-// per-PHYSICAL-DISK write/read THROUGHPUT in MB/s (decimal, bytes/1e6) for every physical disk. A modest
-// sustained write (e.g. ~11 MB/s) registers on the throughput curve even though % Disk Time barely moves.
-export function samplerScript(outFile: string): string {
-  const out = outFile.replace(/'/g, "''");
-  return [
-    "$ErrorActionPreference='SilentlyContinue'",
-    `$out='${out}'`,
-    'function NewPC($cat,$ctr,$inst){ try { if ($inst) { New-Object System.Diagnostics.PerformanceCounter $cat,$ctr,$inst } else { New-Object System.Diagnostics.PerformanceCounter $cat,$ctr } } catch { $null } }',
-    '$totalMb=[math]::Round((Get-CimInstance Win32_OperatingSystem).TotalVisibleMemorySize/1024,0)',
-    "$cpu=NewPC 'Processor' '% Processor Time' '_Total'",
-    "$avail=NewPC 'Memory' 'Available MBytes' $null",
-    "$dt=NewPC 'PhysicalDisk' '% Disk Time' '_Total'",
-    "$insts=@()",
-    "try { $insts=@((New-Object System.Diagnostics.PerformanceCounterCategory 'PhysicalDisk').GetInstanceNames() | Where-Object { $_ -ne '_Total' } | Sort-Object) } catch {}",
-    '$wc=@{}; $rc=@{}',
-    "foreach($i in $insts){ $wc[$i]=NewPC 'PhysicalDisk' 'Disk Write Bytes/sec' $i; $rc[$i]=NewPC 'PhysicalDisk' 'Disk Read Bytes/sec' $i }",
-    'foreach($x in @($cpu,$dt)+$wc.Values+$rc.Values){ if($x){ try{ [void]$x.NextValue() }catch{} } }',
-    'while ($true) {',
-    '  $t0=[DateTimeOffset]::UtcNow',
-    '  $c=if($cpu){[math]::Round($cpu.NextValue(),1)}else{0}',
-    '  $am=if($avail){$avail.NextValue()}else{0}',
-    '  $r=[math]::Round($totalMb-$am,1)',
-    '  $d=if($dt){[math]::Round($dt.NextValue(),1)}else{0}',
-    '  $ds=@()',
-    '  foreach($i in $insts){',
-    '    $w=if($wc[$i]){[math]::Round($wc[$i].NextValue()/1000000,3)}else{0}',
-    '    $rd=if($rc[$i]){[math]::Round($rc[$i].NextValue()/1000000,3)}else{0}',
-    '    $nm=$i.Replace(\'"\',\'\')',
-    '    $ds+=("{""name"":"""+$nm+""",""writeMBs"":"+$w+",""readMBs"":"+$rd+"}")',
-    '  }',
-    '  $ms=[DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds()',
-    '  Add-Content -Path $out -Value ("{""ms"":"+$ms+",""cpuPct"":"+$c+",""ramMb"":"+$r+",""diskPct"":"+$d+",""disks"":["+($ds -join ",")+"]}")',
-    '  $el=([DateTimeOffset]::UtcNow-$t0).TotalMilliseconds',
-    '  $sl=100-$el; if($sl -gt 0){ Start-Sleep -Milliseconds ([int]$sl) }',
-    '}',
-  ].join('\n');
 }
 
 // Cross-platform mprr capture: run the mprr visual-ring launch-trend runner against a target VBox VM (SSH-trigger
@@ -1461,13 +1339,9 @@ async function captureLaunchCommand(context: vscode.ExtensionContext, output: vs
   });
 
   // 2) CPU/RAM/disk sampler.
-  const sampler = process.platform === 'linux'
-    ? spawn('bash', ['-c', linuxSamplerScript(resourcesFile)], { stdio: 'ignore' })
-    : spawn(
-      'powershell',
-      ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-Command', samplerScript(resourcesFile)],
-      { windowsHide: true, stdio: 'ignore' }
-    );
+  const samplerCommand = resourceSamplerCommand(process.platform, resourcesFile);
+  const sampler = spawn(samplerCommand.command, samplerCommand.args,
+    samplerCommand.windowsHide ? { windowsHide: true, stdio: 'ignore' } : { stdio: 'ignore' });
 
   // 2b) GPU sampler: one-shot nvidia-smi per sample at the same cadence, stamped by nvidia-smi's own timestamp
   // on the same epoch-ms axis; no nvidia-smi => gpu.json says why (never zeros).
@@ -1610,61 +1484,6 @@ async function assembleCapture(context: vscode.ExtensionContext, dir: string): P
       memoryRiseMb: captureCfg<number>('gpuCueMemoryRiseMb', 100)
     }
   });
-}
-
-/** Optional #134 assembly extras: the shared marker grab (for automatic GPU agent cues) + the cue thresholds. */
-export interface AssembleCaptureExtras {
-  grab?: MarkerImageGrabFn;
-  gpuCue?: GpuCueOptions;
-}
-
-// Assemble the captured PNG frames + resource samples in `dir` into a launch-capture@1 record (mprr dual-packet)
-// and write capture.json. Split out from the cleanroom-gated ffmpeg CAPTURE that PRODUCES the frames, so this
-// pure file-assembly around the unit-tested builder is itself directly unit-testable with fixture frames.
-export function assembleCaptureFromDir(dir: string, builder: CaptureBuilder, extras: AssembleCaptureExtras = {}): LaunchCaptureRecord {
-  const frameFiles = readdirSync(dir)
-    .filter((f) => /^frame-\d+\.png$/.test(f))
-    .sort();
-  if (frameFiles.length === 0) {
-    throw new Error('no frames were captured (is ffmpeg installed + did the capture run long enough?)');
-  }
-  // Align each frame to REAL wall-clock via its PNG mtime (when ffmpeg wrote it), NOT startMs + i/fps -- that
-  // removes ffmpeg's startup lag so every frame takes its true nearest CPU/RAM/disk sample. The mtime and the
-  // PowerShell sampler's UnixTimeMilliseconds share the one Windows clock, so they compare directly.
-  const frames = frameFiles.map((image, i) => {
-    const st = statSync(path.join(dir, image));
-    return { index: i, imageFile: image, imageBytes: st.size, ms: st.mtimeMs };
-  });
-  const firstFrameMs = frames[0].ms;
-  const resourceSamples = readResourceSamples(dir);
-  let meta = captureMetadataForPlatform('win32');
-  const metaFile = path.join(dir, 'capture-meta.json');
-  if (existsSync(metaFile)) {
-    const parsed = JSON.parse(readFileSync(metaFile, 'utf8')) as Partial<typeof meta>;
-    if ((parsed.workload === 'labview-launch' || parsed.workload === 'desktop-capture')
-      && ['WIN', 'LINUX'].includes(String(parsed.plane))
-      && ['ffmpeg-gdigrab', 'ffmpeg-x11grab', 'gnome-shell-screencast'].includes(String(parsed.source))) {
-      meta = parsed as typeof meta;
-    }
-  }
-  const record = builder.buildLaunchCapture({
-    frames,
-    resourceSamples,
-    startMs: firstFrameMs,
-    fps: meta.workload === 'desktop-capture' ? 1 / desktopCaptureInterval(meta.frameIntervalSeconds) : 12,
-    meta,
-  });
-  // #134: the GPU series (additive; a capture without gpu.json is assembled exactly as before) and the automatic
-  // GPU agent cues (memory rise = model load, utilization rise = compute) on the shared marker grab.
-  const gpu = readGpuSeries(dir);
-  attachGpuSeries(record, gpu);
-  if (gpu && gpu.header.available && extras.grab) {
-    const cues = gpuCueMarkers(record, gpuCues(gpu.samples, { platform: meta.plane, ...extras.gpuCue }), extras.grab);
-    // The builder emits no markers; the correlator's user-click markers are appended later.
-    if (cues.length > 0) record.markers = cues;
-  }
-  writeFileSync(path.join(dir, 'capture.json'), `${JSON.stringify(record, null, 2)}\n`);
-  return record;
 }
 
 async function openCorrelatorForCapture(

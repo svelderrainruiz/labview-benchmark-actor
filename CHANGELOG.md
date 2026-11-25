@@ -23,6 +23,11 @@ follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project
   the capture's `clips/` folder, with a receipt holding the markers' grab fields, frame range, frame rate,
   SHA-256, size and duration. The MCP server now publishes 15 tools (6 core plus 9 grid); the two new tools
   return metadata only and are off by default for the Ollama bridge (`--allow-tool`) (#134).
+- `node out/mcp/localModelLoop.js` runs the whole loop with a local Ollama model in one command, without
+  VS Code. It starts a desktop capture (or `--source test`) at 4 fps with the CPU/RAM and GPU samples,
+  streams a prompt to the model through the MCP bridge, marks prompt sent, first token and response done
+  next to the automatic GPU cues, exports a clip around them and prints one metadata-only JSON receipt. The
+  capture lands in the extension's captures folder, where **Open Frame Correlator** can open it (#134).
 
 ## [1.6.7] - 2026-11-23
 

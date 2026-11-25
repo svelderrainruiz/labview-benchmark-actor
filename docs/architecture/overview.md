@@ -182,7 +182,7 @@ multi-VM / Codespace topology.
   `resultHash`), making a static-analysis run a cross-plane-comparable benchmark
   (LBA-REQ-015).
 
-### 3.7 Agentic-infrastructure view — addresses LBA-REQ-012, LBA-REQ-013, LBA-REQ-018, LBA-REQ-019, LBA-REQ-101, LBA-REQ-102, LBA-REQ-105
+### 3.7 Agentic-infrastructure view — addresses LBA-REQ-012, LBA-REQ-013, LBA-REQ-018, LBA-REQ-019, LBA-REQ-101, LBA-REQ-102, LBA-REQ-105, LBA-REQ-106
 - The `lbabus` binary embeds version-pinned agent base instructions and exposes
   them via `lbabus agents` (print / --out / --check), so every session on a given
   version shares byte-identical, hardenable base instructions (LBA-REQ-012).
@@ -206,6 +206,9 @@ multi-VM / Codespace topology.
 - A capture also records nvidia-smi GPU samples at their own timestamps, agent cues placed
   through the same nearest-frame grab as a user click, and clips between two markers encoded
   inside the capture; MCP returns only markers and receipts, never pixels (LBA-REQ-105, ADR-0095).
+- `node out/mcp/localModelLoop.js` runs that capture, one streamed prompt to a local Ollama model
+  through the bridge, the loop and GPU cues and the clip in one command without an editor, and prints
+  one metadata-only receipt (LBA-REQ-106, ADR-0095).
 
 ### 3.8 Configuration-management & assurance view — addresses LBA-REQ-016, LBA-REQ-017, LBA-REQ-020, LBA-REQ-021, LBA-REQ-022, LBA-REQ-030, LBA-REQ-034, LBA-REQ-035, LBA-REQ-036, LBA-REQ-037, LBA-REQ-103, LBA-REQ-104
 - GitFlow branch governance (`main` protected + `develop` integration;
