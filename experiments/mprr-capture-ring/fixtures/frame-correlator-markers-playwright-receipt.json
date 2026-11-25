@@ -4,7 +4,7 @@
   "testItem": "T-011",
   "producedBy": "LINUX",
   "engine": "headless chromium (playwright)",
-  "producedAt": "2026-08-01T19:27:11.727Z",
+  "producedAt": "2026-11-25T10:51:23.158Z",
   "pass": true,
   "frames": 13,
   "markerToleranceMs": 200,
@@ -47,6 +47,21 @@
     {
       "name": "two markers posted to host",
       "pass": true
+    },
+    {
+      "name": "double-click drops exactly one marker",
+      "pass": true,
+      "detail": "count=3"
+    },
+    {
+      "name": "double-click posts exactly one marker to the host",
+      "pass": true,
+      "detail": "[\"m-449-3\"]"
+    },
+    {
+      "name": "a click after a double-click drops the next marker",
+      "pass": true,
+      "detail": "4 m-856-4"
     },
     {
       "name": "no page errors",

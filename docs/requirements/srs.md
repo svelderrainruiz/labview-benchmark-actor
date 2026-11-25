@@ -3210,7 +3210,7 @@ progressively.
     `gpuCueThresholdPct` (default 10%, "compute") each add one debounced cue; the measured
     utilization lag of the platform is recorded with the cue.
   - `export_capture_clip`, the Export Clip Between Markers command and the `captureClip` CLI encode the
-    frames between two markers (default the latest two) or two frame indices, with an optional crop
+    frames between two markers (default the latest two, counting exact twins once) or two frame indices, with an optional crop
     validated against the frame size, into `clips/clip-<from>-<to>.mp4` (H.264, yuv420p, even size)
     inside the capture, holding each frame for its real interval and capping the output at the real
     duration. The receipt lists both markers' instants, toleranceMs, deltaMs and admitted, the inclusive

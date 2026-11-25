@@ -127,10 +127,33 @@ export function writeCaptureRecord(capturePath: string, record: unknown): void {
   renameSync(staging, capturePath);
 }
 
-/** Append one marker to `capture.json`'s markers[] (any kind); returns the new marker count. */
+/**
+ * Exact twins (#138): two markers whose `kind`, `instantMs` and `frameIndex` are all identical (and whose
+ * `label`, if any, matches, so two differently labelled agent cues at one instant both stay). A double-click
+ * on one pixel produced such user-click pairs; the second carries no extra information.
+ */
+export function isTwinMarker(a: unknown, b: unknown): boolean {
+  if (!a || !b || typeof a !== 'object' || typeof b !== 'object') return false;
+  const x = a as Record<string, unknown>;
+  const y = b as Record<string, unknown>;
+  return (
+    x.kind === y.kind &&
+    typeof x.instantMs === 'number' &&
+    x.instantMs === y.instantMs &&
+    x.frameIndex !== undefined &&
+    x.frameIndex === y.frameIndex &&
+    x.label === y.label
+  );
+}
+
+/**
+ * Append one marker to `capture.json`'s markers[] (any kind); returns the marker count. An exact twin of a
+ * marker already stored (#138) is not appended; the file is left untouched and the unchanged count returned.
+ */
 export function appendCaptureMarker(capturePath: string, marker: unknown): number {
   const current = JSON.parse(readFileSync(capturePath, 'utf8')) as CaptureRecordLike;
   const markers = Array.isArray(current.markers) ? current.markers : [];
+  if (markers.some((existing) => isTwinMarker(existing, marker))) return markers.length;
   markers.push(marker);
   current.markers = markers;
   writeCaptureRecord(capturePath, current);

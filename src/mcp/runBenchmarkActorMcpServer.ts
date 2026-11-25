@@ -14,7 +14,7 @@ import { pathToFileURL } from 'node:url';
 import { promisify } from 'node:util';
 
 import { ClipRunner, clipFfmpegCommand, exportCaptureClip } from '../captureClip';
-import { appendCaptureMarker, buildAgentCueMarker, loadMarkerImageGrab, resolveCaptureDir } from '../captureMarkers';
+import { appendCaptureMarker, buildAgentCueMarker, isTwinMarker, loadMarkerImageGrab, resolveCaptureDir } from '../captureMarkers';
 import {
   AddCaptureMarkerArgs,
   BenchmarkActorMcpToolDeps,
@@ -171,7 +171,11 @@ export function createCaptureToolDeps(
         const capturePath = path.join(capture.dir, 'capture.json');
         const record = JSON.parse(readFileSync(capturePath, 'utf8')) as Parameters<typeof buildAgentCueMarker>[0];
         const marker = buildAgentCueMarker(record, args, await loadMarkerImageGrab(root));
+        const existing = Array.isArray(record.markers) ? (record.markers as unknown[]) : [];
         const count = appendCaptureMarker(capturePath, marker);
+        // An exact twin of a stored cue is not appended again (#138): report the stored one.
+        const twin = count > existing.length ? -1 : existing.findIndex((m) => isTwinMarker(m, marker));
+        if (twin >= 0) return jsonResult({ runId: capture.runId, markerIndex: twin, marker: existing[twin] });
         return jsonResult({ runId: capture.runId, markerIndex: count - 1, marker });
       } catch (error) {
         return toolError(error);

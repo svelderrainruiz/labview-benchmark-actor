@@ -3566,7 +3566,7 @@ check('frame-correlator-click-marker', () => {
   assert(r.schema === 'labview-benchmark-actor/frame-correlator-markers-receipt@v1' && r.requirement === 'LBA-REQ-011', 'committed marker receipt shape');
   assert(r.pass === true, 'the committed real-pointer marker proof must pass');
   const byName = Object.fromEntries((r.checks || []).map((c) => [c.name, c.pass]));
-  for (const name of ['click drops exactly one marker', 'click marker image admitted within tolerance', 'click posts a frame-marker to the host', 'drag scrubs the selected frame', 'drag drops no new marker', 'no page errors']) {
+  for (const name of ['click drops exactly one marker', 'click marker image admitted within tolerance', 'click posts a frame-marker to the host', 'drag scrubs the selected frame', 'drag drops no new marker', 'double-click drops exactly one marker', 'double-click posts exactly one marker to the host', 'no page errors']) {
     assert(byName[name] === true, `real-pointer proof: ${name}`);
   }
   return { selftest: 'frameCorrelatorMarkers 4/4', playwright: `${(r.checks || []).filter((c) => c.pass).length}/${(r.checks || []).length} real-pointer checks` };
