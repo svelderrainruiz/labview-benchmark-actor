@@ -1170,6 +1170,77 @@
               "signature": "6RtWAsGs5SzjD4UQ2XK09vowIh4/ZUejtc4pu8q2XRQMCMZhtdOlqvJEk6hFWNkxm5ToVRIP4Qs9SGVcoLQhBA=="
             }
           }
+        },
+        "1.6.7": {
+          "summary": "Extension 1.6.7 stable release: MCP tools for local Ollama models, signed reviewer infrastructure receipt required, canonical wiki publishing, lbabus 0.17.1 pinned release only, repo-standards-review v0.15.0",
+          "signoffs": {
+            "WIN": {
+              "agreed": true,
+              "reviewedCommit": "b6156c49188730ee596fd345861ce5a686856f8f",
+              "at": "2026-11-25T05:47:28.147Z",
+              "note": "Reviewer VM staged exact VSIX SHA-256 eabe35d3941bc363b324eea0580abc1b884c188bdabece0ea240eb2a978af622 and emitted correlated DONE stage-1.6.7-b6156c4-json."
+            },
+            "LINUX": {
+              "agreed": true,
+              "reviewedCommit": "b6156c49188730ee596fd345861ce5a686856f8f",
+              "at": "2026-11-25T05:47:28.147Z",
+              "note": "Cross-plane corroboration run 45400606218 and attestation ed85218510c9ce23a351eeb6ba0e4837f553e008f4f1993500a46ddc2d2399ca passed."
+            }
+          },
+          "visualReview": {
+            "verdict": {
+              "schema": "labview-benchmark-actor/reviewer-verdict@1",
+              "target": {
+                "component": "extension",
+                "version": "1.6.7",
+                "commit": "b6156c49188730ee596fd345861ce5a686856f8f",
+                "vsixSha256": "eabe35d3941bc363b324eea0580abc1b884c188bdabece0ea240eb2a978af622"
+              },
+              "verdict": "pass",
+              "reviewer": "reviewer@vi-tech.nl",
+              "station": "WINDOWS_VM",
+              "notes": "Run by the laptop agent, judged by the workstation agent, watched by the operator. PASS with notes (test plan section 4). On the staged 1.6.7 VSIX in the Windows 11 reviewer VM: TC-00 to TC-08, TC-10 and TC-11 PASS. TC-09 BLOCKED by its precondition, not by the extension: LabVIEW 2026 Q3 in the VM is not activated, so the activated start screen and the deliberate variation were not captured. The extension part of TC-09 ran: ffmpeg from the gyan.dev zip (SHA-256 checked) via ffmpegPath, Capture LabVIEW Launch and Stop recorded 2441 real frames at 12 fps, capture.json plane=WIN source=ffmpeg-gdigrab, correlator with CPU/RAM/disk samples. Full TC-09 with licensed LabVIEW: labview-benchmark-actor#131. TC-10: the VM model qwen3:4b (Ollama) lists the 13 MCP tools but did not call them; TC-11 used the default Copilot model, the tool ran with no validation error and the Benchmark Resource Profile panel rendered. Not blocking, filed as labview-benchmark-actor#130: AGENTS.md lbabus fallback names 0.16.0 while 0.17.1 is required, the MCP section names 4 of 13 tools, ffmpeg via winget is absent on LTSC; the Show Agent Instructions tab title has no version; the Host Capabilities dotnet line text. Deviations disclosed in 7153801574 accepted: the GitHub sign-in used the device-code flow, authorized by the operator on his own device; ollama serve was started in the VM terminal (outside the guide, no download), which affects only TC-10; VS Code closed with alt+f4.",
+              "evidence": [
+                {
+                  "kind": "cross-plane-run",
+                  "ref": "45400606218"
+                },
+                {
+                  "kind": "attestation-sha256",
+                  "ref": "ed85218510c9ce23a351eeb6ba0e4837f553e008f4f1993500a46ddc2d2399ca"
+                },
+                {
+                  "kind": "windows-stage",
+                  "ref": "stage-1.6.7-b6156c4-json"
+                },
+                {
+                  "kind": "reviewer-infrastructure-receipt-sha256",
+                  "ref": "afdd81d255407ee89a2b3f03a075fada0f2741155980c30cbfcf361692f78807"
+                }
+              ],
+              "renderedAt": "2026-11-25T05:35:01.601Z"
+            },
+            "signOff": {
+              "schema": "labview-benchmark-actor/acg-human-signoff-v1",
+              "subject": {
+                "verdictDigest": "ad468d6259e31fc0b46341565e5b44830b861dc7aa4f5128d614af6a071c6003",
+                "consensusVerdict": "pass",
+                "target": {
+                  "component": "extension",
+                  "version": "1.6.7",
+                  "commit": "b6156c49188730ee596fd345861ce5a686856f8f",
+                  "vsixSha256": "eabe35d3941bc363b324eea0580abc1b884c188bdabece0ea240eb2a978af622"
+                }
+              },
+              "reviewer": "reviewer@vi-tech.nl",
+              "decision": "approve",
+              "station": "WINDOWS_VM",
+              "algorithm": "ed25519",
+              "publicKeyPem": "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEAQH+ytuwWKaeyFfHLQQKdJzoJ8Z5lNG4h7GdjwSUFAZI=\n-----END PUBLIC KEY-----\n",
+              "signedAt": "2026-11-25T05:35:01.714Z",
+              "signature": "7CQw5g0VlG0Zhjb7KlZD+YnnQItZKOWnh6YWStcN/LIAL4qgj1l7iHuPTSzvyfOftcwemTqItAuppFs9402mDA=="
+            }
+          }
         }
       }
     }
