@@ -92,9 +92,12 @@ exports a clip around it. VS Code is not needed while it runs.
    Windows, `x11grab` on an Xorg session, or ffmpeg's lavfi `testsrc` with `--source test`. The CPU/RAM/disk
    sampler and the nvidia-smi GPU sampler run alongside.
 3. Waits `--lead-ms` (default 2000), adds the cue "prompt sent", streams `--prompt` (and `--image <png>` for a
-   vision model) to the model, and adds "first token" and "response done" from the stream. Tools are offered
-   as the bridge does: its read-only defaults plus each `--allow-tool <name>`, and only when the model
-   reports the `tools` capability.
+   vision model) to the model, and adds "first token" (the first streamed token of any kind: thinking,
+   content or a tool call), "answer started" (the first content or tool-call token) and "response done" from
+   the stream. Tools are offered as the bridge does: its read-only defaults plus each `--allow-tool <name>`,
+   and only when the model reports the `tools` capability. `--no-tools` offers none: the Ollama request then
+   carries no `tools` key and the receipt's `toolsOffered` is `[]`. `--no-tools` with `--allow-tool` is a
+   usage error (exit 2).
 4. Keeps recording `--tail-ms` (default 3000), stops, adds the automatic GPU cues (memory rise = model load,
    utilization through `--gpu-threshold-pct`, default 10% = compute, with the platform lag) and writes
    `capture.json` with all markers in time order.
@@ -102,7 +105,7 @@ exports a clip around it. VS Code is not needed while it runs.
    response done plus 1 s, and writes `clips/loop-<from>-<to>.json`, the receipt it prints.
 
 The receipt is metadata only: capture id and directory, model name, digest, size and capabilities, prompt
-and answer SHA-256 with at most 200 characters of the answer, first-token latency, each cue's instantMs,
+and answer SHA-256 with at most 200 characters of the answer, first-token and first-answer latency, each cue's instantMs,
 offset from prompt sent and imageGrab (deltaMs, admitted, toleranceMs), the GPU edges, the GPU series
 availability or reason, the frame count and the clip's SHA-256, size and duration. Frames and clips stay on
 the machine.
@@ -159,12 +162,15 @@ receipt. Progress goes to stderr; stdout holds only the receipt, so
 `--reference openwebui --endpoint <https url> --token-file <path> --reference-model <id>` adds a reference
 phase before the local phase in the same capture (#139). The same prompt is streamed through the Open WebUI
 chat-completions API (`<endpoint>/api/chat/completions`, OpenAI-compatible SSE) to the model id
-`--reference-model` (for example `fast`, `thinking` or `coding`). `--model` stays the local Ollama model, so
-the two may differ when a lower local model is documented.
+`--reference-model` (a base tag such as `gemma4:e4b`, `gemma4:26b` or `qwen3.6:35b`). `--model` stays the
+local Ollama model, so the two may differ when a lower local model is documented.
 
 1. Before the capture: the token file is read once, then `<endpoint>/api/models` must accept the token and
-   list the model id (otherwise exit 3, no capture).
-2. After `--lead-ms`: the cues "reference sent", "reference first token" and "reference done" are added on
+   list the model id (otherwise exit 3, no capture). If the entry is an Open WebUI alias (a workspace model
+   with `info.base_model_id`), one warning line on stderr names the base id and the `--reference-model` to
+   use; the exit code does not change.
+2. After `--lead-ms`: the cues "reference sent", "reference first token", "reference answer started" and
+   "reference done" are added on
    the capture's time axis. The GPU sampler keeps running: the local GPU should stay idle, which is the
    control.
 3. After another `--lead-ms`: the local phase runs as without `--reference` (with `--cold` if given).
@@ -173,9 +179,22 @@ Both sides use temperature 0, `--seed` (default 42) and `--max-tokens` (default 
 OpenAI `max_tokens`). `--seed` or `--max-tokens` alone also fixes the local decoding; without any of these
 flags, the Ollama request is unchanged. The clip starts 1 s before "reference sent".
 
+**For a like-for-like comparison** use the base tag as `--reference-model` (not an alias), add `--no-tools`,
+and give thinking models room with `--max-tokens 512` or more. An Open WebUI alias can carry built-in tools
+and default features that the server adds to the prompt (and that can switch on thinking), and the local
+side otherwise gets the bridge's tool schemas in its prompt; either way the prompt-token counts and the
+timings are not comparable.
+
 The receipt gets `decoding`, `reference` (model id, endpoint scheme and SHA-256 rather than the host, answer
-SHA-256 and a 200-character excerpt, usage) and one `comparison` block. For each side, `comparison` holds the
-first-token latency, total time, output count and tokens per second (from the first token to done). The
+SHA-256 and a 200-character excerpt, usage, and `alias`, `baseModelId`, `hasTools`, `hasDefaultFeatures` from
+the `/api/models` entry; booleans only, never tool or feature names) and one `comparison` block.
+`comparison.referenceModel` repeats those four fields. For each side, `comparison` holds `firstTokenMs` (to
+the first token of any kind, thinking or reasoning included), `firstAnswerMs` (to the first content or
+tool-call token), total time, output count, tokens per second (output count over first token to done; the
+output count includes thinking tokens) and `promptTokens` (reference: `usage.promptTokens`; local: Ollama
+`prompt_eval_count` of the final turn, whose prompt holds the whole conversation; with `--no-tools` there is
+one turn). The reference side also holds `reasoningChars`; the local side `thinkingChars` (Ollama
+`message.thinking`) and `toolsOffered`. The
 reference side also holds `gpuControl`: the local GPU utilization and VRAM during the reference window, and
 `idle` (below `--gpu-threshold-pct`, with less than `--gpu-memory-rise-mb` of memory rise). The local side
 also holds the VRAM peak. `gpuEdges` lists the GPU edges and whether each fell inside the reference window.
@@ -191,7 +210,8 @@ https; plain http is accepted only for `127.0.0.1` or `localhost` (tests). `--re
 
 ```powershell
 C:\nvm4w\nodejs\node.exe out\mcp\localModelLoop.js --model <local model> --cold `
-  --reference openwebui --endpoint https://owui.example.invalid --token-file C:\path\owui.key --reference-model fast
+  --reference openwebui --endpoint https://owui.example.invalid --token-file C:\path\owui.key `
+  --reference-model gemma4:e4b --no-tools --max-tokens 512
 ```
 
 ## Agent surface
