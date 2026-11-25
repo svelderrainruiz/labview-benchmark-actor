@@ -978,6 +978,9 @@ try {
       fakePng.writeUInt32BE(64, 16);
       fakePng.writeUInt32BE(48, 20);
       writeFileSync(join(directory, 'frame-00001.png'), fakePng);
+      // Inputs an earlier test left unconsumed on this host (on Windows the clone-port prompt returns early) are
+      // set aside so the Export Clip prompts read their own answers, then restored for the tests that follow.
+      const pendingInputs = inputQueue.splice(0);
       let clipErrors = errorMessages.length;
       inputQueue.push('');
       await exportClip.handler();
@@ -1005,6 +1008,7 @@ try {
         assert(clipReceipt.frameRange.count === 1 && clipReceipt.timing.realDurationMs === 60000 && clipReceipt.crop.width === 64, 'a desktop clip holds the frame for its real 60 s interval');
       } finally {
         execFileHandler = savedClipHandler;
+        inputQueue.push(...pendingInputs);
       }
     } finally {
       delete configStore.labviewPath;
