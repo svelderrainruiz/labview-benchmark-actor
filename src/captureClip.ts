@@ -17,7 +17,7 @@ import { createHash } from 'node:crypto';
 import { closeSync, existsSync, mkdirSync, openSync, readFileSync, readSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import * as path from 'node:path';
 
-import { captureIdOf, DEFAULT_MARKER_TOLERANCE_MS } from './captureMarkers';
+import { captureIdOf, DEFAULT_MARKER_TOLERANCE_MS, isTwinMarker } from './captureMarkers';
 
 export const CLIP_RECEIPT_SCHEMA = 'labview-benchmark-actor/capture-clip@v1';
 export const MISSING_FFMPEG_MESSAGE =
@@ -210,12 +210,17 @@ export function planClip(record: ClipCapture, dir: string, options: ClipOptions 
       start = pickMarker(markers, options.fromMarker, captureId);
       end = pickMarker(markers, options.toMarker, captureId);
     } else {
-      if (markers.length < 2) {
-        throw new ClipError(`capture ${captureId} has ${markers.length} marker(s); add two markers or select frames`);
+      // Exact twins (#138: one double-click stored twice) count once, so they never make a zero-length clip.
+      const distinct = markers.map((_, i) => i).filter((i) => !markers.slice(0, i).some((m) => isTwinMarker(m, markers[i])));
+      if (distinct.length < 2) {
+        const twins = markers.length - distinct.length;
+        throw new ClipError(
+          `capture ${captureId} has ${distinct.length} marker(s)${twins ? ` (plus ${twins} exact twin(s))` : ''}; add two markers or select frames`
+        );
       }
       selection = 'latest-markers';
-      start = pickMarker(markers, markers.length - 2, captureId);
-      end = pickMarker(markers, markers.length - 1, captureId);
+      start = pickMarker(markers, distinct[distinct.length - 2], captureId);
+      end = pickMarker(markers, distinct[distinct.length - 1], captureId);
     }
     let startReceipt = markerReceipt(start.marker, start.index, 'start');
     let endReceipt = markerReceipt(end.marker, end.index, 'end');

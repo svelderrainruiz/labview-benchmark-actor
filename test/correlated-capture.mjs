@@ -334,6 +334,19 @@ const grab = await markersMod.loadMarkerImageGrab(root);
   assert(markersMod.appendCaptureMarker(capturePath, { id: 'a' }) === 1 && markersMod.appendCaptureMarker(capturePath, { id: 'b' }) === 2, 'appendCaptureMarker creates markers[] and appends');
   const text = readFileSync(capturePath, 'utf8');
   assert(text.endsWith('}\n') && text.includes('\n  "markers": [') && JSON.parse(text).markers[1].id === 'b', 'capture.json keeps the 2-space format with a trailing newline');
+
+  // #138: the operator's twins (m-10188-1 / m-10188-2: same kind, instantMs and frameIndex) are stored once.
+  const twinA = { id: 'm-10188-1', instantMs: 10187.682409099365, frameIndex: 10, kind: 'user-click', imageGrab: { nearestFrameIndex: 10, deltaMs: 255.68, admitted: false, imageSrc: null } };
+  const twinB = { ...twinA, id: 'm-10188-2' };
+  assert(markersMod.isTwinMarker(twinA, twinB) && !markersMod.isTwinMarker(twinA, { ...twinB, frameIndex: 11 }) && !markersMod.isTwinMarker(twinA, { ...twinB, instantMs: 10187.7 }) && !markersMod.isTwinMarker(twinA, { ...twinB, kind: 'agent-cue' }), 'isTwinMarker compares kind, instantMs and frameIndex');
+  assert(!markersMod.isTwinMarker({ id: 'a' }, { id: 'b' }) && !markersMod.isTwinMarker(null, twinA) && !markersMod.isTwinMarker({ ...twinA, label: 'x' }, { ...twinB, label: 'y' }), 'markers without an instant, or with different labels, are never twins');
+  assert(markersMod.appendCaptureMarker(capturePath, twinA) === 3, 'a new user-click marker is appended');
+  const beforeTwin = readFileSync(capturePath, 'utf8');
+  assert(markersMod.appendCaptureMarker(capturePath, twinB) === 3, 'an exact twin is not appended; the unchanged count is returned');
+  assert(readFileSync(capturePath, 'utf8') === beforeTwin, 'capture.json is unchanged by a rejected twin');
+  assert(markersMod.appendCaptureMarker(capturePath, { ...twinB, id: 'm-10188-3', frameIndex: 11 }) === 4, 'a marker differing in frameIndex is still appended');
+  const stored = JSON.parse(readFileSync(capturePath, 'utf8')).markers[2];
+  assert(JSON.stringify(stored) === JSON.stringify(twinA), 'the stored user-click marker keeps its id, fields and imageGrab shape');
 }
 
 // ---- 8. capture directory resolution -------------------------------------------------------------------------
@@ -406,6 +419,18 @@ const click = (frameIndex, admitted = true, extra = {}) => ({ id: `m-${frameInde
   assert(latest.markers[0].frameSource === 'imageGrab.nearestFrameIndex' && latest.captureId === cap.uuid, 'an admitted marker uses imageGrab.nearestFrameIndex');
   assert(latest.crop.width === 64 && latest.crop.height === 48 && latest.crop.mode === 'full' && latest.crop.frameWidth === 65, 'odd frame dimensions are trimmed to even');
   assert(JSON.stringify(latest.durationsMs) === '[1000,1000,1000]' && latest.realDurationMs === 3000 && latest.outputFps === 1, 'slow desktop frames are held for their real interval; the last for 1/fps');
+
+  // #138: the operator's capture stored every click twice; the default clip skips the exact twins.
+  const twin = (frameIndex, seq, instantMs) => ({ id: `m-${Math.round(instantMs)}-${seq}`, kind: 'user-click', instantMs, frameIndex, imageGrab: { nearestFrameIndex: frameIndex, deltaMs: 255.68, admitted: false, imageSrc: null } });
+  const doubled = { ...cap.record, markers: [twin(1, 1, 1255.68), twin(1, 2, 1255.68), twin(3, 3, 3141.18), twin(3, 4, 3141.18)] };
+  const dedup = clip.planClip(doubled, cap.dir);
+  assert(dedup.selection === 'latest-markers' && dedup.from === 1 && dedup.to === 3, `the default clip skips exact twins (got ${dedup.from}-${dedup.to})`);
+  assert(dedup.markers[0].markerIndex === 0 && dedup.markers[0].id === 'm-1256-1' && dedup.markers[1].markerIndex === 2 && dedup.markers[1].id === 'm-3141-3', 'the first of each twin pair is used');
+  const doubledTail = { ...cap.record, markers: [click(0), click(2), twin(4, 3, 4020), twin(4, 4, 4020)] };
+  const tail = clip.planClip(doubledTail, cap.dir);
+  assert(tail.from === 2 && tail.to === 4 && tail.markers[1].markerIndex === 2, 'a twin pair at the end pairs with the previous distinct marker');
+  assert(clip.planClip(doubled, cap.dir, { fromMarker: 0, toMarker: 1 }).from === 1, 'explicit marker indices are honoured as given');
+  await rejects(() => clip.planClip({ ...cap.record, markers: [twin(1, 1, 1255.68), twin(1, 2, 1255.68)] }, cap.dir), /has 1 marker\(s\) \(plus 1 exact twin\(s\)\)/, 'a twin pair alone is one marker, not a clip');
 
   const byIndex = clip.planClip(cap.record, cap.dir, { fromMarker: 0, toMarker: 'late', crop: { x: 1, y: 2, w: 31, h: 20 } });
   assert(byIndex.selection === 'markers' && byIndex.from === 0 && byIndex.to === 3 && byIndex.markers[1].id === 'late', 'markers can be given by index or id');
@@ -640,6 +665,8 @@ const click = (frameIndex, admitted = true, extra = {}) => ({ id: `m-${frameInde
   const addedBody = JSON.parse(added.content[0].text);
   assert(!added.isError && addedBody.markerIndex === 2 && addedBody.marker.kind === 'agent-cue' && addedBody.marker.imageGrab.admitted === true && addedBody.marker.imageGrab.nearestFrameIndex === 1, 'add_capture_marker appends an agent cue with the shared grab');
   assert(JSON.parse(readFileSync(join(cap.dir, 'capture.json'), 'utf8')).markers.length === 3, 'the cue is persisted in capture.json');
+  const again = JSON.parse((await runner.createCaptureToolDeps(clipRoot).addCaptureMarker({ runId: cap.uuid, frameIndex: 1, label: 'agent saw the dialog' })).content[0].text);
+  assert(again.markerIndex === 2 && again.marker.id === addedBody.marker.id && JSON.parse(readFileSync(join(cap.dir, 'capture.json'), 'utf8')).markers.length === 3, 'an identical cue is not stored twice; the stored one is reported (#138)');
   const addFail = await tools.addCaptureMarker({ runId: randomUUID(), instantMs: 0, label: 'x' });
   assert(addFail.isError && /not found/.test(addFail.content[0].text), 'a cue for an unknown capture is a tool error');
 }
@@ -664,6 +691,35 @@ const click = (frameIndex, admitted = true, extra = {}) => ({ id: `m-${frameInde
   const plainHtml = buildFrameCorrelatorHtml({ title: 'old', fps: 12, selectedIndex: 0, frames: frames.map(({ gpus, ...f }) => f) }, 'gpu-nonce-000000000000000000000000', 'vscode-webview://render');
   const plainDoc = new JSDOM(plainHtml, { runScripts: 'dangerously', pretendToBeVisual: true }).window.document;
   assert(plainDoc.getElementById('fc-graph').querySelectorAll('polyline').length === 3 && !/GPU/.test(plainDoc.getElementById('fc-legend').textContent), 'a capture without GPU samples charts exactly as before');
+}
+
+// ---- 13. correlator: one marker per click, and a double-click is not a twin pair (#138) ---------------------------
+{
+  const px = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+M8AAAMBAQDJ/pLvAAAAAElFTkSuQmCC';
+  const frames = Array.from({ length: 55 }, (_, i) => ({ index: i, tMs: i * 1000 + 0.68, cpuPct: 10, ramMb: 100, diskPct: 1, imageSrc: px }));
+  const html = buildFrameCorrelatorHtml({ title: 'dup', fps: 1, selectedIndex: 0, frames }, 'dup-nonce-000000000000000000000000', 'vscode-webview://render');
+  const posted = [];
+  const dom = new JSDOM(html, {
+    runScripts: 'dangerously',
+    pretendToBeVisual: true,
+    beforeParse(window) {
+      window.acquireVsCodeApi = () => ({ postMessage: (m) => posted.push(m) });
+      window.SVGElement.prototype.getBoundingClientRect = () => ({ left: 0, top: 0, width: 1000, height: 300, right: 1000, bottom: 300, x: 0, y: 0 });
+    }
+  });
+  const { window } = dom;
+  const svg = window.document.getElementById('fc-graph');
+  const pointer = (type, clientX) => svg.dispatchEvent(new window.MouseEvent(type, { clientX, clientY: 100, bubbles: true, cancelable: true }));
+  const count = () => window.document.getElementById('fc-root').getAttribute('data-marker-count');
+  // the real Chromium double-click sequence (see frameCorrelatorMarkers.playwright.cjs): two presses, one pixel
+  for (const type of ['pointerdown', 'pointerup', 'click', 'pointerdown', 'pointerup', 'click', 'dblclick']) pointer(type, 185);
+  assert(count() === '1' && posted.length === 1 && posted[0].type === 'frame-marker', `a double-click drops and posts exactly one marker (got ${count()}, ${posted.length} posted)`);
+  const first = posted[0].marker;
+  assert(first.id === `m-${Math.round(first.instantMs)}-1` && first.kind === 'user-click' && first.frameIndex === 10 && JSON.stringify(Object.keys(first)) === '["id","instantMs","frameIndex","kind","imageGrab"]', 'the click marker keeps its id and fields');
+  assert(JSON.stringify(Object.keys(first.imageGrab)) === '["nearestFrameIndex","deltaMs","admitted","imageSrc"]', 'the click marker keeps its imageGrab shape');
+  for (const type of ['pointerdown', 'pointerup', 'pointerup', 'lostpointercapture']) pointer(type, 540);
+  assert(count() === '2' && posted.length === 2 && posted[1].marker.id === `m-${Math.round(posted[1].marker.instantMs)}-2`, 'a repeated pointerup drops at most one marker per pointerdown; ids stay consecutive');
+  window.close();
 }
 
 rmSync(work, { recursive: true, force: true });

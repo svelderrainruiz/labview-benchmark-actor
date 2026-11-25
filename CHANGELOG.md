@@ -29,6 +29,13 @@ follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project
   next to the automatic GPU cues, exports a clip around them and prints one metadata-only JSON receipt. The
   capture lands in the extension's captures folder, where **Open Frame Correlator** can open it (#134).
 
+### Fixed
+
+- A double-click in the frame correlator stored two identical user-click markers. It now drops one marker,
+  and `capture.json` never stores an exact twin (same kind, instant and frame). The default clip of
+  **Export Clip Between Markers**, `export_capture_clip` and `node out/captureClip.js` counts existing twins
+  once, so captures recorded with 1.6.7 still give the right clip (#138).
+
 ## [1.6.7] - 2026-11-23
 
 1.6.1 to 1.6.6 were not released separately; their changes ship in 1.6.7.

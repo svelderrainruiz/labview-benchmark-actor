@@ -5,7 +5,8 @@
  *   - a CLICK (pointer down+up without drag) drops exactly one marker, grabs the nearest frame image within the
  *     tolerance, and posts { type:'frame-marker', marker } to the host (stubbed acquireVsCodeApi);
  *   - a DRAG (down, move past the click slop, up) scrubs the selected frame and drops NO marker;
- *   - a second click drops a second marker.
+ *   - a second click drops a second marker;
+ *   - a DOUBLE-CLICK on one pixel drops exactly one marker (#138), and the next click still drops one.
  * Emits a receipt to fixtures/frame-correlator-markers-playwright-receipt.json (committed; a local gate replays it).
  *
  * Hosted CI stays browser-free -- this driver is NOT in package.json / npm test. Run with a cached Chromium:
@@ -89,6 +90,22 @@ async function main() {
   await page.waitForTimeout(40);
   check('second click drops a second marker', (await attr('data-marker-count')) === '2');
   check('two markers posted to host', (await msgs()).length === 2);
+
+  // DOUBLE-CLICK at 45% (#138): the real sequence down/up/down/up/dblclick on one pixel gave two markers with
+  // a bit-identical instantMs and consecutive ids (m-<t>-1, m-<t>-2). It must drop exactly one.
+  const c3 = at(0.45);
+  await page.mouse.dblclick(c3.x, c3.y);
+  await page.waitForTimeout(40);
+  check('double-click drops exactly one marker', (await attr('data-marker-count')) === '3', 'count=' + (await attr('data-marker-count')));
+  const m3 = await msgs();
+  check('double-click posts exactly one marker to the host', m3.length === 3, JSON.stringify(m3.slice(2).map((m) => m.marker && m.marker.id)));
+
+  // a later click on another spot still drops a marker, with the next id in sequence.
+  const c4 = at(0.85);
+  await page.mouse.click(c4.x, c4.y);
+  await page.waitForTimeout(40);
+  const m4 = await msgs();
+  check('a click after a double-click drops the next marker', m4.length === 4 && /-4$/.test(m4[3].marker.id), m4.length + ' ' + (m4[3] && m4[3].marker.id));
 
   check('no page errors', pageErrors.length === 0, pageErrors.join('; '));
 

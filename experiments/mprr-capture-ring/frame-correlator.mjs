@@ -246,13 +246,18 @@ const SCRIPT = `
   function dropMarkerAtClientX(clientX) {
     var instantMs = instantMsFromClientX(clientX);
     var grab = grabNearestImage(instantMs);
+    var frameIndex = grab.nearestFrameIndex == null ? sel : grab.nearestFrameIndex;
+    // #138: a second press on the same pixel (a double-click) would store an exact twin; show the existing one.
+    for (var k = 0; k < markers.length; k++) {
+      if (markers[k].kind === 'user-click' && markers[k].instantMs === instantMs && markers[k].frameIndex === frameIndex) { renderMarkReadout(markers[k]); return; }
+    }
     markerSeq += 1;
-    addMarker({ id: 'm-' + Math.round(instantMs) + '-' + markerSeq, instantMs: instantMs, frameIndex: grab.nearestFrameIndex == null ? sel : grab.nearestFrameIndex, kind: 'user-click', imageGrab: grab }, false);
+    addMarker({ id: 'm-' + Math.round(instantMs) + '-' + markerSeq, instantMs: instantMs, frameIndex: frameIndex, kind: 'user-click', imageGrab: grab }, false);
   }
 
-  var dragging = false, downX = 0, downY = 0, moved = 0;
+  var dragging = false, dropped = false, downX = 0, downY = 0, moved = 0;
   svg.addEventListener('pointerdown', function (e) {
-    dragging = true; downX = e.clientX; downY = e.clientY; moved = 0;
+    dragging = true; dropped = false; downX = e.clientX; downY = e.clientY; moved = 0;
     try { svg.setPointerCapture(e.pointerId); } catch (_) {}
     setSel(frameFromClientX(e.clientX)); e.preventDefault();
   });
@@ -266,7 +271,8 @@ const SCRIPT = `
     dragging = false;
     var upX = (e && e.clientX != null) ? e.clientX : downX;
     var upY = (e && e.clientY != null) ? e.clientY : downY;
-    if (classifyGesture(upX - downX, upY - downY, 4) === 'click' && moved <= 4) { dropMarkerAtClientX(upX); }
+    // at most one marker per pointerdown gesture, whatever ends it
+    if (!dropped && classifyGesture(upX - downX, upY - downY, 4) === 'click' && moved <= 4) { dropped = true; dropMarkerAtClientX(upX); }
   }
   svg.addEventListener('pointerup', endGesture);
   svg.addEventListener('pointercancel', function () { dragging = false; });
