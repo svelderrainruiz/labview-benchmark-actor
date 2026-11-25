@@ -252,9 +252,10 @@ const streamOf = (...parts) => [...parts.map((content) => `${JSON.stringify({ me
     const run = await bridge.runBridge(base, {});
     assert(run.failure && run.failure.stage === 'Ollama chat' && pattern.test(run.failure.message), `stream failure ${pattern}: ${JSON.stringify(run.failure)}`);
   }
-  ollama.chat.push({ status: 200, lines: [`${JSON.stringify({ message: { role: 'assistant', content: '', tool_calls: [{ function: { name: 'get_host_capabilities', arguments: {} } }] }, done: true })}\n`] });
+  // get_benchmark_series needs no lbabus, so the call succeeds on every CI host.
+  ollama.chat.push({ status: 200, lines: [`${JSON.stringify({ message: { role: 'assistant', content: '', tool_calls: [{ function: { name: 'get_benchmark_series', arguments: {} } }] }, done: true })}\n`] });
   ollama.chat.push({ status: 200, lines: streamOf('done') });
-  const tooled = await bridge.runBridge({ ...base, offerTools: true }, {});
+  const tooled = await bridge.runBridge({ ...base, offerTools: true, allow: new Set(['get_benchmark_series']) }, {});
   assert(tooled.finalText === 'done' && tooled.receipt.toolCalls.length === 1 && tooled.receipt.toolCalls[0].ok, 'a streamed tool call is executed and the next turn answers');
 }
 
