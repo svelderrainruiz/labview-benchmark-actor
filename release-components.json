@@ -17,6 +17,11 @@
   },
   "humanTasks": "1.0.7",
   "experimentGovernance": "1.0.2",
+  "reviewerInfrastructure": {
+    "schema": "reviewer-infrastructure@1",
+    "baseline": "v0.1.0",
+    "receiptSha256": "afdd81d255407ee89a2b3f03a075fada0f2741155980c30cbfcf361692f78807"
+  },
   "canonicalDistribution": "github-release",
   "marketplaceChannel": "stable",
   "governance": {
