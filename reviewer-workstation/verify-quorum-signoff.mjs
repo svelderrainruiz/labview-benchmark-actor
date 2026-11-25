@@ -67,7 +67,7 @@ function main() {
     process.exit(2);
   }
   const here = dirname(fileURLToPath(import.meta.url));
-  const allowlistPath = typeof opt.allowlist === 'string' ? opt.allowlist : join(here, '..', 'tools', 'collab-cli', 'reviewer-allowlist.json');
+  const allowlistPath = typeof opt.allowlist === 'string' ? opt.allowlist : join(here, '..', 'tools', 'release-governance', 'reviewer-allowlist.json');
   const attestationDoc = JSON.parse(readFileSync(opt.attestation, 'utf8'));
   const signOff = JSON.parse(readFileSync(opt.signoff, 'utf8'));
   const r = verifyQuorumSignOff({ attestationDoc, signOff, reviewerAllowlist: readAllowlist(allowlistPath) });

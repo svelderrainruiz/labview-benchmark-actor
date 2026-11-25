@@ -7,7 +7,7 @@
   Uses the labview-benchmark-actor golden box `actor/win11-labview2026` (Windows 11 + LabVIEW 2026 +
   VS Code + Node + git + LabVIEW fixtures). It adds ONLY the labview-benchmark-actor bits:
     1. the extension .vsix, from the gated `ext-v*` GitHub Release;
-    2. the `lbabus` CLI (self-contained win-x64) from the `collab-cli-v*` Release;
+    2. the `lbabus` CLI (self-contained win-x64) from the pinned svelderrainruiz/lbabus Release (SHA-256 checked);
     3. a scratch workspace so the reviewer can immediately run Write/Show/Check.
   Idempotent-ish and safe to re-run. WIN validates this on real Windows (WinRM).
 #>
@@ -106,7 +106,7 @@ Ensure-Tool 'git'  'Git.Git'                    'Git'        { Install-GitDirect
 Step "VS Code: $((code --version)[0]); gh: $((gh --version)[0]); node: $(node --version); git: $((git --version))"
 
 # Authenticate gh non-interactively. The labview-benchmark-actor repo is INTERNAL (private): the gated
-# ext-v*/collab-cli-v* Releases are NOT world-readable, so a headless guest cannot use gh unauthenticated
+# ext-v* Releases are NOT world-readable, so a headless guest cannot use gh unauthenticated
 # (`gh api`/`gh release download` abort with "run gh auth login"). The token is handed off as a FILE (the
 # Vagrant file provisioner does NOT echo contents; passing it via the shell provisioner `env:` would leak
 # it -- Vagrant echoes the full env-prefixed command when a step fails). Read the file, delete it
@@ -122,7 +122,7 @@ if (Test-Path $tokenFile) {
 if (-not $reviewerToken) { $reviewerToken = $env:REVIEWER_GH_TOKEN }
 if (-not $reviewerToken) { $reviewerToken = $env:GH_TOKEN }
 if (-not $reviewerToken) {
-  throw "No GitHub token in the guest. $repo is INTERNAL, so its gated ext-v*/collab-cli-v* Releases need auth. On the HOST, write a token to reviewer-workstation/.gh-token before provisioning (e.g. Set-Content reviewer-workstation/.gh-token (gh auth token)) then re-run: VAGRANT_CWD=reviewer-workstation vagrant provision. The token needs contents:read on $repo (SSO-authorized for SSO orgs)."
+  throw "No GitHub token in the guest. $repo is INTERNAL, so its gated ext-v* Releases need auth. On the HOST, write a token to reviewer-workstation/.gh-token before provisioning (e.g. Set-Content reviewer-workstation/.gh-token (gh auth token)) then re-run: VAGRANT_CWD=reviewer-workstation vagrant provision. The token needs contents:read on $repo (SSO-authorized for SSO orgs)."
 }
 $env:GH_TOKEN = $reviewerToken
 Step "GitHub token present; gh authenticates non-interactively for the private-release downloads."
@@ -264,23 +264,31 @@ Assert-VsixKeylessSignature -ExtTag $extResolved -Vsix $vsix.FullName -WorkDir $
 Step "Installing extension $($vsix.Name) into the interactive reviewer's profile"
 Install-ExtensionForInteractiveUser $vsix.FullName
 
-# 2) lbabus CLI (self-contained win-x64) from the collab-cli Release.
-$lbTag  = Resolve-Tag 'collab-cli-v' $lbabusTag
+# 2) lbabus CLI (self-contained win-x64) from the pinned svelderrainruiz/lbabus Release. The tag and the SHA-256 of
+#    the win-x64 binary come from release-components.json (lbabusRelease) via the Vagrantfile; fail closed on a mismatch.
+$lbabusSha = $env:REVIEWER_LBABUS_SHA256
+if ($lbabusTag -notmatch '^v\d+\.\d+\.\d+$' -or $lbabusSha -notmatch '^[0-9a-f]{64}$') {
+  throw "REVIEWER_LBABUS_TAG ('$lbabusTag') and REVIEWER_LBABUS_SHA256 must carry the lbabus pin from release-components.json."
+}
 $binDir = 'C:\lba-bin'
 New-Item -ItemType Directory -Force -Path $binDir | Out-Null
-Step "Downloading lbabus from $lbTag"
-gh release download $lbTag --repo $repo --pattern '*win-x64.exe' --dir $binDir --clobber
-$lbExe = Get-ChildItem $binDir -Filter '*win-x64.exe' | Select-Object -First 1
-if ($lbExe) {
-  Copy-Item $lbExe.FullName (Join-Path $binDir 'lbabus.exe') -Force
-  $machinePath = [Environment]::GetEnvironmentVariable('Path', 'Machine')
-  if ($machinePath -notlike "*$binDir*") {
-    [Environment]::SetEnvironmentVariable('Path', "$machinePath;$binDir", 'Machine')
-  }
-  Step "lbabus installed at $binDir\lbabus.exe (added to Machine PATH)"
-} else {
-  Step "WARN: no lbabus win-x64 asset in $lbTag; the bus + capabilities commands stay unavailable until installed."
+Step "Downloading lbabus $lbabusTag from svelderrainruiz/lbabus"
+$lbDownload = Join-Path $binDir 'lbabus.download'
+Remove-Item $lbDownload -Force -ErrorAction SilentlyContinue
+$lbAsset = "lbabus-$($lbabusTag.Substring(1))-win-x64.exe"
+gh release download $lbabusTag --repo svelderrainruiz/lbabus --pattern $lbAsset --output $lbDownload --clobber
+if ($LASTEXITCODE -ne 0) { throw "lbabus $lbabusTag download failed ($LASTEXITCODE)." }
+$lbActual = (Get-FileHash $lbDownload -Algorithm SHA256).Hash.ToLowerInvariant()
+if ($lbActual -ne $lbabusSha) {
+  Remove-Item $lbDownload -Force
+  throw "lbabus $lbAsset SHA-256 mismatch: pinned $lbabusSha, downloaded $lbActual."
 }
+Move-Item $lbDownload (Join-Path $binDir 'lbabus.exe') -Force
+$machinePath = [Environment]::GetEnvironmentVariable('Path', 'Machine')
+if ($machinePath -notlike "*$binDir*") {
+  [Environment]::SetEnvironmentVariable('Path', "$machinePath;$binDir", 'Machine')
+}
+Step "lbabus installed at $binDir\lbabus.exe (added to Machine PATH)"
 
 # 3) Scratch workspace so the reviewer can open a folder and run Write/Show/Check immediately.
 $ws = 'C:\lba-review'

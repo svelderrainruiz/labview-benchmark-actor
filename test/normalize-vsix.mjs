@@ -56,3 +56,7 @@ assert.strictEqual(a.readUInt32LE(firstCentral + 38), 0x81a40000, 'external attr
 assert.throws(() => normalizeZipTimestamps(Buffer.from('not a zip at all')), /End-of-Central-Directory/, 'non-zip fails closed');
 
 console.log('normalize-vsix: PASS -- same-content zips normalize byte-identical + idempotent + DOS-epoch + mode/version pinned (cross-plane) + fail-closed on non-zip');
+
+// The package must also not carry kit or tooling root files (issue #98). Run here so that `npm test` covers it
+// without adding a script to package.json, which the .vsix ships.
+await import('./package-files.mjs');

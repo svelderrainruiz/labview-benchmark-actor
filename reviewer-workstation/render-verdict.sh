@@ -38,7 +38,12 @@ done
 command -v VBoxManage >/dev/null || { echo "render-verdict: VBoxManage not on PATH" >&2; exit 3; }
 [[ -n "$version" ]] || { echo "render-verdict: --version is required" >&2; exit 2; }
 
-gc() { VBoxManage guestcontrol "$vm" --username "$user" --password "$pass" "$@"; }
+# Hand VBoxManage the password as a private file, never on its command line (visible to every local user via ps).
+pwfile="$(mktemp)"
+trap 'rm -f "$pwfile"' EXIT
+chmod 600 "$pwfile"
+printf '%s' "$pass" > "$pwfile"
+gc() { VBoxManage guestcontrol "$vm" --username "$user" --passwordfile "$pwfile" "$@"; }
 guest_handoff="C:\\Users\\${user}\\AppData\\Roaming\\Code\\User\\globalStorage\\svelderrainruiz.labview-benchmark-actor\\handoff"
 
 # Compute the sha256 of the staged candidate .vsix INSIDE the VM (PowerShell Get-FileHash -> 64-hex). Empty when

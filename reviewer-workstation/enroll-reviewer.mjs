@@ -2,7 +2,7 @@
 // enroll-reviewer.mjs -- mint an ENROLLED Ed25519 reviewer keypair for the visual-verdict signing
 // (LBA-REQ-057, ADR-0037). Writes the PRIVATE key to --key-out (0600, kept LOCAL to the reviewer station, never
 // committed) and prints the reviewer -> publicKeyPem allowlist entry (JSON) on stdout, to be added to the
-// committed reviewer allowlist (tools/collab-cli/reviewer-allowlist.json). Reuses the same Ed25519 enrollment as
+// committed reviewer allowlist (tools/release-governance/reviewer-allowlist.json). Reuses the same Ed25519 enrollment as
 // the machine witnesses (acg-provenance/attest.mjs), via the dependency-free reviewerVerdict.mjs.
 //
 // Usage: node reviewer-workstation/enroll-reviewer.mjs --reviewer <id> --key-out <priv.pem>
@@ -40,5 +40,5 @@ process.stdout.write(`${JSON.stringify({
   [reviewer]: { publicKeyPem, validFrom, validThrough, purposes },
 }, null, 2)}\n`);
 console.error(`enrolled "${reviewer}": private key -> ${keyOut} (keep it local; NEVER commit it).`);
-console.error('Add the public-key entry above to tools/collab-cli/reviewer-allowlist.json and set');
+console.error('Add the public-key entry above to tools/release-governance/reviewer-allowlist.json and set');
 console.error('labviewBenchmarkActor.reviewerId + labviewBenchmarkActor.reviewerKeyPath in the reviewer VM.');

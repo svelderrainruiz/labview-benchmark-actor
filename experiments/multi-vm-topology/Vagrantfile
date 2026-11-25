@@ -7,7 +7,7 @@
 # receipt, and README.md for the re-runnable procedure.
 #
 # Provider: vmware_desktop. Box: the self-contained golden box (vihs/labview-cleanroom-sc),
-# which carries its own pinned collab-cli source + a built lbabus (no host repo / SMB needed).
+# which carries its own pinned lbabus checkout + a built lbabus (no host repo / SMB needed).
 
 Vagrant.configure("2") do |config|
   box  = ENV.fetch("CLEANROOM_BOX", "vihs/labview-cleanroom-sc")

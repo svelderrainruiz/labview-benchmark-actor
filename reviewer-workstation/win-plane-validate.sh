@@ -26,7 +26,10 @@ TMPD="$(mktemp -d)"
 BUNDLE="$TMPD/rel.bundle"
 trap 'rm -rf "$TMPD"' EXIT
 
-GC=(VBoxManage guestcontrol "$VM" --username vagrant --password "$LBA_VM_PASS")
+# Hand VBoxManage the password as a private file (removed with $TMPD), never on its command line.
+PWFILE="$TMPD/vm-pass"
+(umask 077 && printf '%s' "$LBA_VM_PASS" > "$PWFILE")
+GC=(VBoxManage guestcontrol "$VM" --username vagrant --passwordfile "$PWFILE")
 PS='C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe'
 CMD='C:\Windows\System32\cmd.exe'
 

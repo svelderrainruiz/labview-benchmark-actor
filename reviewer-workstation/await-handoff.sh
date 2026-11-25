@@ -31,7 +31,12 @@ while [[ $# -gt 0 ]]; do
 done
 command -v VBoxManage >/dev/null || { echo "await-handoff: VBoxManage not on PATH" >&2; exit 3; }
 
-gc() { VBoxManage guestcontrol "$vm" --username "$user" --password "$pass" "$@"; }
+# Hand VBoxManage the password as a private file, never on its command line (visible to every local user via ps).
+pwfile="$(mktemp)"
+trap 'rm -f "$pwfile"' EXIT
+chmod 600 "$pwfile"
+printf '%s' "$pass" > "$pwfile"
+gc() { VBoxManage guestcontrol "$vm" --username "$user" --passwordfile "$pwfile" "$@"; }
 
 # Stage + run the guest poll (blocks until the beacon resolves or the timeout).
 gc run --exe 'C:\Windows\System32\cmd.exe' --wait-stdout -- cmd /c "if not exist C:\lba-review mkdir C:\lba-review" >/dev/null 2>&1 || true

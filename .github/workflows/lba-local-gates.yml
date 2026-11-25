@@ -67,3 +67,44 @@ jobs:
 
       - name: Run extension test suite
         run: npm test
+
+  # Canonical wiki test pages (VITechnologies/projectbuddy#318 M3). scripts/wikiEvidence.mjs runs the gate suite
+  # and the `npm test` steps once at this commit and writes a Jest-compatible report; observations.py turns it into
+  # rsr/test-evidence@1; scripts/check_wiki_canonical.py then builds the wiki twice from docs/ and requires
+  # identical output, no placeholder, and observations.py check passing. A test page is canonical only when a
+  # file its requirements' CodeRef names ran and passed here; every other page stays a stub. This is execution
+  # evidence at the commit, not a verification claim. Linux only: the evidence names one platform.
+  wiki-canonical-evidence:
+    name: Wiki Canonical Test Pages
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version-file: .nvmrc
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run the gates and tests, write the report
+        run: node scripts/wikiEvidence.mjs --report wiki-jest-report.json
+
+      - name: Write the execution evidence
+        run: python3 .repo-standards-review/observations.py evidence --format jest-json --report wiki-jest-report.json --platform linux-x64 --root . --output wiki-evidence.json
+
+      - name: Check the canonical test pages
+        run: python3 scripts/check_wiki_canonical.py
+
+      - name: Upload the evidence
+        if: always()
+        uses: actions/upload-artifact@v5
+        with:
+          name: wiki-canonical-evidence
+          path: |
+            wiki-evidence.json
+            wiki-jest-report.json
+          if-no-files-found: ignore
+          retention-days: 14

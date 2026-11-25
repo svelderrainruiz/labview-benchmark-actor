@@ -40,7 +40,12 @@ done
 command -v VBoxManage >/dev/null || { echo "request-step: VBoxManage not on PATH" >&2; exit 3; }
 command -v node >/dev/null || { echo "request-step: node not on PATH" >&2; exit 3; }
 
-gc() { VBoxManage guestcontrol "$vm" --username "$user" --password "$pass" "$@"; }
+# Hand VBoxManage the password as a private file, never on its command line (visible to every local user via ps).
+pwfile="$(mktemp)"
+trap 'rm -f "$pwfile"' EXIT
+chmod 600 "$pwfile"
+printf '%s' "$pass" > "$pwfile"
+gc() { VBoxManage guestcontrol "$vm" --username "$user" --passwordfile "$pwfile" "$@"; }
 
 # 1. Build the validated agent-request@1 beacon JSON locally (same pure builder the extension + gate use).
 tmp="$(mktemp -d)"

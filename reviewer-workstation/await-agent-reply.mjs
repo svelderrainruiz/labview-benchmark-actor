@@ -93,12 +93,16 @@ async function main() {
   if (a.help) { console.log(readHelp()); return 0; }
   if (!a.task) { console.error('await-agent-reply: --task <id> is required'); return 2; }
 
+  // Validate before lbabus starts: lbabus reads an invalid --timeout as 0 (no timeout) and would hold the port.
+  if (!/^[1-9]\d*$/.test(String(a.timeout))) { console.error('await-agent-reply: --timeout must be a positive whole number of seconds'); return 2; }
   const { cmd, pre, env } = resolveLbabus();
   const args = [...pre, ...buildListenArgs(a)];
   const startedAt = new Date().toISOString();
-  console.error(`[await-agent-reply] listening tcp=${a.tcp} awaiting type=${a.type} task=${a.task} timeout=${a.timeout}s`);
 
   const child = spawn(cmd, args, { env });
+  // Stopping this wrapper must stop lbabus too, or lbabus keeps the TCP port until its own timeout.
+  for (const signal of ['SIGTERM', 'SIGINT']) process.on(signal, () => child.kill(signal));
+  console.error(`[await-agent-reply] listening tcp=${a.tcp} awaiting type=${a.type} task=${a.task} timeout=${a.timeout}s`);
   const frames = [];
   let matched = null;
   let deadlineExpired = false;

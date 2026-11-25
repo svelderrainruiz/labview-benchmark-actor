@@ -34,6 +34,8 @@ coverage/**
 AGENTS.md
 .cruft.json
 .repo-standards-review.json
+.wiki-generator.json
+.wiki-canonical.json
 .repo-standards-review/**
 .c8rc.json
 coverage-thresholds.json

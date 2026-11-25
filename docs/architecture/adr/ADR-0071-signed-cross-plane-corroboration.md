@@ -20,7 +20,7 @@ crossPlane** quorum.
 
 That sign-off is signed with the reviewer's enrolled Ed25519 key, which is **local to the reviewer and never
 committed**. The agent must not synthesize it. The operator authorized the sign-off ("sign it") using the enrolled
-`reviewer@vi-tech.nl` key; the agent produced only the sign-off (public material) via a deterministic, offline
+maintainer-role key; the agent produced only the sign-off (public material) via a deterministic, offline
 helper — never handling nor committing the private key.
 
 ## Decision
@@ -34,7 +34,7 @@ helper — never handling nor committing the private key.
   be genuinely `crossPlane` (verdict pass AND spans both os-planes) and its consensus must name the candidate
   (version + sourceCommit). It reimplements no signing/gating and never synthesizes a signature.
 - **The committed receipt** (`signed-cross-plane-corroboration-receipt.json`) records the re-seal: extension `1.0.0`
-  @ `2a0352c`, the ADR-0070 crossPlane quorum, and the enrolled `reviewer@vi-tech.nl` sign-off over it — verified
+  @ `2a0352c`, the ADR-0070 crossPlane quorum, and the enrolled maintainer-role sign-off over it — verified
   against the committed allowlist. `signed-cross-plane-corroboration.selftest.mjs` (7/7, throwaway key) proves the
   machinery and that a single-plane / non-pass / un-enrolled / forged / unnamed / tampered receipt all fail closed
   (gate `acg-signed-cross-plane-corroboration`).

@@ -17,7 +17,7 @@ operator-gated final step. The operator authorized the collapse ("b").
 - **Collapse to one composite.** The genuine crossPlane composite REPLACES `composite-release-decision-receipt.json`
   (the defective single-plane 1.0.0 composite); the transitional `-crossplane-` receipt is removed. The old
   single-plane seal is preserved in git history — this is a normal tracked file edit, not a Marketplace re-publish.
-- **Enforce cross-plane on release.** `tools/collab-cli/verify-composite-release.mjs` now REQUIRES the composite's
+- **Enforce cross-plane on release.** `tools/release-governance/verify-composite-release.mjs` now REQUIRES the composite's
   machine quorum be `crossPlane` (spans both os-planes), so a single-plane composite (the shipped 1.0.0 defect) is
   rejected fail-closed. `crossplane-composite-reseal.selftest.mjs` proves the enforcement CLEARS the crossPlane
   composite and REJECTS a single-plane variant; the `composite-release-enforced` + `acg-crossplane-composite-reseal`

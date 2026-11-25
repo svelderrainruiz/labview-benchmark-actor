@@ -17,7 +17,7 @@
 //   node experiments/verify-local-gates.mjs [--json] [--out <path>]
 // Exit code 0 when every check passes, 1 otherwise.
 
-import { readFileSync, readdirSync, existsSync, writeFileSync, rmSync } from 'node:fs';
+import { readFileSync, readdirSync, existsSync, writeFileSync, rmSync, mkdtempSync, mkdirSync, cpSync, appendFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join, resolve } from 'node:path';
 import { tmpdir } from 'node:os';
@@ -30,6 +30,7 @@ import { summarizeViAnalyzerReport } from './vi-analyzer/viAnalyzerResult.mjs';
 import { validateViAnalyzerReport } from './vi-analyzer/validate-vi-analyzer-report.mjs';
 import { checkVsixLinks, REQUIRED_LINKS } from '../scripts/verify-vsix-links.mjs';
 import { validateLbabusProvisioningPin } from '../scripts/verify-ubuntu-golden-box.mjs';
+import { verifyPinContract } from '../scripts/lbabus-pin.mjs';
 import { parseAsciiReport, parseSummary } from './vi-analyzer/parse-vi-analyzer-ascii.mjs';
 import { verifyManifest as verifyExtensionAgentsManifest, agentsSha256, readManifest as readExtensionAgentsManifest, AGENTS_MD as EXTENSION_AGENTS_MD } from '../scripts/agentsManifest.mjs';
 import { normalizeZipTimestamps } from '../scripts/normalize-vsix.mjs';
@@ -59,7 +60,7 @@ import { buildFrameCorrelatorHtml } from './mprr-capture-ring/frame-correlator.m
 import { buildCaptureStatus, validateCaptureStatus } from './handoff-beacon/captureStatus.mjs';
 import { buildAgentRequest, buildOpDone, validateAgentRequest, validateOpDone, selectPendingRequest } from './handoff-beacon/handoffRequest.mjs';
 import { buildReviewerVerdict, signReviewerVerdict, verifyReviewerVerdict, gateVisualReview, buildVerdictBusPost, generateEnrolledKeypair as generateReviewerKeypair } from './handoff-beacon/reviewerVerdict.mjs';
-import { verifyVisualReview } from '../tools/collab-cli/verify-visual-review.mjs';
+import { verifyVisualReview } from '../tools/release-governance/verify-visual-review.mjs';
 import { crossPlaneTrendReceipt } from './mprr-capture-ring/cross-plane-trend.mjs';
 import { buildResourceUsageCorrelation } from './resource-usage-correlation/resourceUsageCorrelation.mjs';
 import { verifyDepManifest } from './labview-authoring/verify-dep-manifest.mjs';
@@ -297,20 +298,118 @@ check('information-for-users-26514', () => {
   return { standard: 'ISO/IEC/IEEE 26514:2022', selftest: 'verify-information-for-users 2/2 (committed conformant + fail-closed)' };
 });
 
-// 6e2. Repository wiki (LBA-REQ-103, ADR-0089): the wiki is an Obsidian vault GENERATED from docs/. The generator
-//      validates it fail-closed (resolved alias-free wikilinks, no relative links, images in the vault, every note
-//      reachable from Home, requirement notes linked to their tests and decisions, byte-identical rebuilds) and proves
-//      each detector with a negative control. The publish workflow must publish only from develop and must verify the
-//      published wiki against the generator.
+// 6e2. Repository wiki (LBA-REQ-103, ADR-0090): the wiki is GENERATED from docs/ by the shared repo-standards-review
+//      generator (.repo-standards-review/wiki_generate.py) under .wiki-generator.json. The generator validates the wiki
+//      (resolved wikilinks, indexed pages, page budget, configured requirement sections); this gate adds what CI must
+//      prove: a clean run with one page per requirement and test item, a byte-identical second run, the Obsidian vault
+//      settings and how-to, no aliased wikilink outside code, an --out guard that refuses the member root, its parent and an unrelated non-empty directory, three negative controls that fail closed, and a publish workflow that publishes only from
+//      develop and drift-checks a fresh clone of the published wiki.
 check('wiki-vault', () => {
-  const out = execFileSync(process.execPath, [join(pkgRoot, 'scripts', 'build-wiki.mjs')], { stdio: 'pipe' }).toString();
-  assert(/^wiki-vault: PASS/m.test(out), `build-wiki.mjs did not pass: ${out.trim()}`);
+  const generator = join(pkgRoot, '.repo-standards-review', 'wiki_generate.py');
+  const python = ['python3', 'python', 'py'].find((candidate) => {
+    try { execFileSync(candidate, ['--version'], { stdio: 'pipe' }); return true; } catch { return false; }
+  });
+  assert(python, 'wiki-vault needs Python 3 (python3, python or py) to run the shared wiki generator');
+  const run = (args, root = pkgRoot) => {
+    try {
+      return { code: 0, out: execFileSync(python, [generator, '--member-root', root, ...args], { stdio: 'pipe', maxBuffer: 1 << 26 }).toString() };
+    } catch (error) {
+      return { code: error.status, out: `${error.stdout || ''}${error.stderr || ''}` };
+    }
+  };
+  const base = run([]);
+  assert(base.code === 0, `wiki_generate.py did not pass: ${base.out.trim().slice(0, 600)}`);
+  const report = JSON.parse(base.out);
+  const requirements = (readFileSync(join(pkgRoot, 'docs', 'requirements', 'rtm.csv'), 'utf8').match(/^LBA-REQ-\d{3},/gm) || []).length;
+  const tests = (readFileSync(join(pkgRoot, 'docs', 'testing', 'test-plan.md'), 'utf8').match(/^\| T-\d{3} \|/gm) || []).length;
+  assert(report.problem_count === 0, 'the generated wiki has problems');
+  assert(requirements > 0 && report.requirement_pages === requirements, `${report.requirement_pages} requirement pages for ${requirements} RTM requirements`);
+  assert(tests > 0 && report.test_pages === tests, `${report.test_pages} test pages for ${tests} test-plan items`);
+  assert(report.rtm_requirements_without_page === 0, 'an RTM requirement has no page');
+  // An aliased wikilink [[a|b]] reads differently in Obsidian and in the GitHub wiki, so none may remain outside code.
+  const aliasedLinks = (vault) => {
+    const found = [];
+    for (const file of readdirSync(vault, { recursive: true })) {
+      const name = String(file).replace(/\\/g, '/');
+      if (!name.endsWith('.md') || name.startsWith('.git/')) continue;
+      const text = readFileSync(join(vault, name), 'utf8')
+        .replace(/^(`{3,}|~{3,})[^\n]*\n[\s\S]*?^\1[ \t]*$/gm, '')
+        .replace(/`[^`\n]*`/g, '');
+      for (const link of text.match(/\[\[[^\]\n]*\|[^\]\n]*\]\]/g) || []) found.push(`aliased wikilink ${link} in ${name}`);
+    }
+    return found;
+  };
+  const scratch = mkdtempSync(join(tmpdir(), 'lba-wiki-'));
+  try {
+    const first = join(scratch, 'first');
+    assert(run(['--out', first]).code === 0, 'wiki_generate.py --out failed');
+    assert(run(['--check', first]).code === 0, 'a second generator run differs from the first (the wiki is not deterministic)');
+    const rtmRows = [...readFileSync(join(pkgRoot, 'docs', 'requirements', 'rtm.csv'), 'utf8').matchAll(/^(LBA-REQ-\d{3}),"(?:[^"]|"")*",([^,]*),/gm)];
+    assert(rtmRows.length === requirements, 'could not read the TestID of every RTM requirement');
+    for (const [, id, testIds] of rtmRows) {
+      const page = readFileSync(join(first, 'requirements', `${id}.md`), 'utf8');
+      for (const testId of testIds.match(/T-\d{3}/g) || []) {
+        assert(page.includes(`[[${testId}]]`), `${id}'s page does not link its test ${testId}`);
+      }
+    }
+    assert(existsSync(join(first, '.obsidian', 'app.json')), 'the vault has no .obsidian/app.json');
+    assert(/Open folder as vault/.test(readFileSync(join(first, 'Home.md'), 'utf8')), 'Home lacks the open-in-Obsidian how-to');
+    const aliased = aliasedLinks(first);
+    // --out prunes every file the wiki does not hold, so it must refuse the member root, its parent and an unrelated
+    // non-empty directory. The controls run on a copy of the member, so a regression cannot prune the real repository.
+    const guardRoot = join(scratch, 'guard', 'member');
+    mkdirSync(guardRoot, { recursive: true });
+    cpSync(join(pkgRoot, 'docs'), join(guardRoot, 'docs'), { recursive: true });
+    cpSync(join(pkgRoot, '.wiki-generator.json'), join(guardRoot, '.wiki-generator.json'));
+    const unrelated = join(scratch, 'unrelated');
+    mkdirSync(unrelated);
+    writeFileSync(join(unrelated, 'keep.txt'), 'keep');
+    const listing = (dir) => readdirSync(dir, { recursive: true }).map((entry) => String(entry).replace(/\\/g, '/')).sort().join('\n');
+    assert(run(['--out', first], guardRoot).code === 0, '--out must accept a previous output');
+    for (const [label, target, reason] of [
+      ['the member root', guardRoot, /member root or one of its parents/],
+      ['the parent of the member root', dirname(guardRoot), /member root or one of its parents/],
+      ['an unrelated non-empty directory', unrelated, /not empty and is neither/],
+    ]) {
+      const before = listing(target);
+      const refused = run(['--out', target], guardRoot);
+      assert(refused.code === 2 && reason.test(refused.out), `--out must refuse ${label} (exit 2, ${reason}): exit ${refused.code} ${refused.out.trim().slice(0, 200)}`);
+      assert(listing(target) === before, `--out wrote to or pruned ${label} while refusing it`);
+    }
+    assert(aliased.length === 0, `${aliased.length} ${aliased[0]}`);
+    const aliasRoot = join(scratch, 'aliased-link');
+    mkdirSync(aliasRoot);
+    cpSync(join(pkgRoot, 'docs'), join(aliasRoot, 'docs'), { recursive: true });
+    cpSync(join(pkgRoot, '.wiki-generator.json'), join(aliasRoot, '.wiki-generator.json'));
+    appendFileSync(join(aliasRoot, 'docs', 'information-item-map.md'), '\n[[Home|alias]]\n');
+    assert(run(['--out', join(scratch, 'aliased-vault')], aliasRoot).code === 0, 'negative control aliased-link: the generator should accept the source');
+    assert(aliasedLinks(join(scratch, 'aliased-vault')).some((line) => /aliased wikilink \[\[Home\|alias\]\]/.test(line)), 'negative control aliased-link was not detected');
+    const control = (name, mutate, pattern) => {
+      const root = join(scratch, name);
+      mkdirSync(root);
+      cpSync(join(pkgRoot, 'docs'), join(root, 'docs'), { recursive: true });
+      cpSync(join(pkgRoot, '.wiki-generator.json'), join(root, '.wiki-generator.json'));
+      mutate(root);
+      const result = run([], root);
+      assert(result.code === 1 && pattern.test(result.out), `negative control ${name} did not fail closed (exit ${result.code})`);
+    };
+    control('unresolved-link', (root) => appendFileSync(join(root, 'docs', 'information-item-map.md'), '\n[[No-Such-Page]]\n'), /names no page/);
+    control('unconfigured-label', (root) => {
+      const srs = join(root, 'docs', 'requirements', 'srs.md');
+      writeFileSync(srs, readFileSync(srs, 'utf8').replace('- Status:', '- Unconfigured Label: x\n- Status:'));
+    }, /Unconfigured Label/);
+  } finally {
+    rmSync(scratch, { recursive: true, force: true });
+  }
   const workflow = readFileSync(join(pkgRoot, '.github', 'workflows', 'wiki-publish.yml'), 'utf8').replace(/\r\n/g, '\n');
   assert(/push:\n\s+branches:\n\s+- develop\n/.test(workflow), 'wiki-publish must publish on pushes to develop');
   assert(workflow.includes("github.ref == 'refs/heads/develop'"), 'wiki-publish must refuse to publish any other ref');
-  assert(workflow.includes('node scripts/build-wiki.mjs --out .wiki'), 'wiki-publish must write the generated vault');
-  assert(/node scripts\/build-wiki\.mjs --check "\$RUNNER_TEMP\/wiki-verify"/.test(workflow), 'wiki-publish must verify a fresh clone of the published wiki');
-  return { generator: 'scripts/build-wiki.mjs', summary: out.trim().replace(/^wiki-vault: PASS, /, '') };
+  assert(workflow.includes('python3 scripts/check_wiki_canonical.py --out .wiki'), 'wiki-publish must write the canonical wiki');
+  assert(workflow.includes('python3 scripts/check_wiki_canonical.py --check-dir "$RUNNER_TEMP/wiki-verify"'), 'wiki-publish must verify a fresh clone of the published wiki against the canonical build');
+  // Fail closed: the adapter and the canonical checks run before the wiki is checked out, so a failing gate publishes nothing.
+  const order = ['node scripts/wikiEvidence.mjs', 'observations.py evidence --format jest-json', 'python3 scripts/check_wiki_canonical.py\n', 'repository: ${{ github.repository }}.wiki'].map((needle) => workflow.indexOf(needle));
+  assert(order.every((i) => i >= 0) && order.every((i, n) => n === 0 || order[n - 1] < i), 'wiki-publish must run the evidence adapter and the canonical check before it checks out the wiki');
+  return { generator: '.repo-standards-review/wiki_generate.py', summary: `${report.requirement_pages} requirement pages, ${report.test_pages} test pages, ${report.adr_pages} ADR pages, ${report.pages} pages; deterministic; alias-free wikilinks; --out guard; 3 negative controls` };
 });
 
 // 6f. Test & assurance report is generated + current (ISO/IEC/IEEE 29119-3 test report + ISO 10007 status
@@ -708,9 +807,8 @@ check('cleanroom-provisioner-scripts-pure-ascii', () => {
 });
 
 // Typed mesh actors must send only to listener-capable peers and wait only for emitter-capable peers.
-// The worker selftest ships with the vendored lbabus mirror (ADR-0088); this repository owns the mesh
-// Vagrantfile, so its typed-peer wiring is asserted here rather than in the vendored script.
-// Bash is available in Linux CI and local WSL; Windows runners may not expose it as an executable.
+// The worker selftest (mesh-actor-typed-peers.selftest.sh) runs in lbabus's own CI (`selftests` job); this
+// repository owns the mesh Vagrantfile, so its typed-peer wiring is asserted here.
 check('mesh-typed-peer-routing', () => {
   const vagrantfile = readFileSync(join(pkgRoot, 'cleanroom', 'ubuntu-labview', 'mesh', 'Vagrantfile'), 'utf8');
   const wiring = [
@@ -720,13 +818,7 @@ check('mesh-typed-peer-routing', () => {
     'normalized_mesh_node_type(x)',
   ];
   for (const marker of wiring) assert(vagrantfile.includes(marker), `mesh Vagrantfile lost typed-peer wiring: ${marker}`);
-  try {
-    execFileSync('bash', ['tools/collab-cli/ci/mesh-actor-typed-peers.selftest.sh'], { cwd: pkgRoot, stdio: 'pipe' });
-  } catch (error) {
-    if (error.code === 'ENOENT') return { skipped: 'bash is unavailable on this host', vagrantfileWiring: `${wiring.length}/${wiring.length}` };
-    throw error;
-  }
-  return { selftest: 'mesh-actor-typed-peers 3/3', vagrantfileWiring: `${wiring.length}/${wiring.length}`, proves: 'source targets listeners; listeners await emitters; empty typed lists remain empty; the mesh Vagrantfile wires typed listener/emitter lists' };
+  return { vagrantfileWiring: `${wiring.length}/${wiring.length}`, proves: 'the mesh Vagrantfile wires typed listener/emitter lists (the worker selftest runs in lbabus CI)' };
 });
 
 // The Ubuntu clean room builds lbabus from source on first boot. Its pin must be the lbabus release this
@@ -1319,7 +1411,7 @@ check('release-lanes-keyless-attested', () => {
   assert(/using:\s*composite/.test(action), 'the keyless-attest action must be a composite action');
   assert(/sigstore\/cosign-installer/.test(action), 'the keyless-attest action must install cosign');
   assert(/cosign sign-blob/.test(action), 'the keyless-attest action must keyless-sign the artifacts with cosign');
-  for (const wf of ['extension-release.yml', 'collab-cli-release.yml']) {
+  for (const wf of ['extension-release.yml']) {
     const text = readFileSync(join(pkgRoot, '.github', 'workflows', wf), 'utf8').replace(/\r\n/g, '\n');
     assert(/id-token:\s*write/.test(text), `${wf} must grant the OIDC id-token for keyless signing`);
     assert(/uses:\s*\.\/\.github\/actions\/keyless-attest/.test(text), `${wf} must invoke the keyless-attest action before creating the release`);
@@ -1330,7 +1422,7 @@ check('release-lanes-keyless-attested', () => {
   const extWf = readFileSync(join(pkgRoot, '.github', 'workflows', 'extension-release.yml'), 'utf8').replace(/\r\n/g, '\n');
   assert(/workflow_dispatch:/.test(extWf), 'extension-release.yml must expose workflow_dispatch (the org-ruleset-safe live release path)');
   assert(/uses:\s*actions\/upload-artifact/.test(extWf), 'extension-release.yml must upload the keyless-signed .vsix as a run artifact so the maintainer can cut the immutable release');
-  return { lanes: ['extension-release', 'collab-cli-release'], attested: true };
+  return { lanes: ['extension-release'], attested: true };
 });
 
 // LBA-REQ-025 / ADR-0016: the reviewer-workstation must cosign-VERIFY the .vsix's keyless signature (a Fulcio
@@ -1400,12 +1492,12 @@ check('ollama-comparison-core-receipt-green', () => {
 // 17. The documentation package carries the repo-standards-review stamp and the requirement IDs are
 //     contiguous with no renumbering after the standalone-repo move (LBA-REQ-008, T-008). Static/CM.
 check('docs-stamp-and-no-id-renumbering', () => {
-  // (a) Stamp: README + cm-plan name repo-standards-review v0.4.2 (commit 5a3aa9da).
+  // (a) Stamp: README + cm-plan name repo-standards-review v0.15.0 (commit 3d4a10f1).
   for (const rel of ['README.md', join('docs', 'cm', 'cm-plan.md')]) {
     const text = readFileSync(join(pkgRoot, rel), 'utf8');
     assert(/repo-standards-review/.test(text), `${rel} must name repo-standards-review`);
-    assert(/v0\.4\.2/.test(text), `${rel} must name the v0.4.2 baseline`);
-    assert(/5a3aa9da/.test(text), `${rel} must cite the 5a3aa9da commit`);
+    assert(/v0\.15\.0/.test(text), `${rel} must name the v0.15.0 baseline`);
+    assert(/3d4a10f1/.test(text), `${rel} must cite the 3d4a10f1 commit`);
   }
   // (b) The docs/ lane layout the standards runner expects.
   for (const lane of ['architecture', 'cm', 'requirements', 'testing']) {
@@ -1420,31 +1512,6 @@ check('docs-stamp-and-no-id-renumbering', () => {
     assert(ids[i] === i + 1, `requirement ids must be contiguous 1..N; expected ${i + 1}, got ${ids[i]}`);
   }
   return { ids: ids.length, lanes: ['architecture', 'cm', 'requirements', 'testing'] };
-});
-
-// 17b. The collab-cli CLI embeds the CANONICAL requirements (SRS + RTM) BY REFERENCE, so `lbabus docs
-//      show srs|rtm` surfaces the exact requirements THIS build carries and they stay aligned with the
-//      build. Static wiring guard (dep-free, no dotnet): the embed cannot silently regress; the embed
-//      round-trip itself is the ci-docs / verify-linux gate.
-check('collab-cli-embeds-canonical-requirements', () => {
-  const csproj = readFileSync(join(pkgRoot, 'tools', 'collab-cli', 'LbaBus.csproj'), 'utf8');
-  for (const [inc, logical] of [
-    ['../../docs/requirements/srs.md', 'docs.requirements.srs.md'],
-    ['../../docs/requirements/rtm.csv', 'docs.requirements.rtm.csv'],
-  ]) {
-    assert(csproj.includes(`Include="${inc}"`), `csproj must embed ${inc} by reference`);
-    assert(csproj.includes(`<LogicalName>${logical}</LogicalName>`), `csproj must pin the ${logical} manifest name`);
-  }
-  // The canonical sources the CLI embeds must exist on disk.
-  for (const rel of ['srs.md', 'rtm.csv']) {
-    assert(existsSync(join(pkgRoot, 'docs', 'requirements', rel)), `docs/requirements/${rel} must exist`);
-  }
-  // The docs command registry must key both requirement docs so `docs show srs|rtm` resolves.
-  const docs = readFileSync(join(pkgRoot, 'tools', 'collab-cli', 'Docs.cs'), 'utf8');
-  for (const id of ['"srs"', '"rtm"', '"guide"']) {
-    assert(docs.includes(id), `Docs.cs registry must define the ${id} doc`);
-  }
-  return { embedded: ['srs', 'rtm'], surfacedBy: 'lbabus docs show <id>' };
 });
 
 // 17c. GitFlow branch governance (LBA-REQ-016) is documented so the authoritative repo-standards-review CM
@@ -1629,15 +1696,10 @@ check('human-task-shortcuts', () => {
       && rawCollector.includes('Guest candidate receipt does not bind'),
     'raw reviewer evidence does not retain and verify the candidate receipt',
   );
-  const dependencies = readFileSync(join(pkgRoot, 'tools', 'collab-cli', 'Dependencies.cs'), 'utf8');
-  for (const productSource of [
-    join('tools', 'collab-cli', 'AgentGuards.cs'),
-    join('tools', 'collab-cli', 'Agents.cs'),
-    join('tools', 'collab-cli', 'GitHubGraphQL.cs'),
-  ]) {
-    assert(readFileSync(join(pkgRoot, productSource), 'utf8').includes('Preflight.ResolveCommand'), `${productSource} bypasses the stable dependency resolver`);
-  }
-  assert(dependencies.includes('internal static string ResolveCommand'), 'stable dependency resolver is not class-level reusable code');
+  assert(
+    rawCollector.includes('$GuestPassword = $env:LBA_VM_PASS') && rawCollector.includes('there is no built-in default'),
+    'raw reviewer collector must take the guest password from LBA_VM_PASS and fail closed when empty',
+  );
   const collector = readFileSync(join(pkgRoot, 'reviewer-workstation', 'collect-review-raw.ps1'), 'utf8');
   for (const proof of ['reviewTarget', 'candidate', 'commands', 'taskDefinitions', 'agents', 'capabilities', 'reviewerSettings', 'screenshotpng']) {
     assert(collector.includes(proof), `raw review collector lacks ${proof} evidence`);
@@ -1661,7 +1723,6 @@ check('release-component-versioning', () => {
   const pkg = readJson('package.json');
   const lock = readJson('package-lock.json');
   const agentsManifest = readJson(join('extension-agents', 'agents.manifest.json'));
-  const lbabus = readFileSync(join(pkgRoot, 'tools', 'collab-cli', 'LbaBus.csproj'), 'utf8');
   const tasks = readFileSync(join(pkgRoot, 'src', 'humanTasks.ts'), 'utf8');
   const hook = readFileSync(join(pkgRoot, '.githooks', 'pre-commit'), 'utf8');
   const workflow = readFileSync(join(pkgRoot, '.github', 'workflows', 'extension-release.yml'), 'utf8').replace(/\r\n/g, '\n');
@@ -1676,12 +1737,11 @@ check('release-component-versioning', () => {
   assert(versions.schema === 'labview-benchmark-actor/release-components@1', 'release component schema mismatch');
   assert(pkg.version === versions.extension && lock.version === versions.extension && lock.packages[''].version === versions.extension, 'extension package versions drifted');
   assert(agentsManifest.version === versions.agents, 'AGENTS version drifted');
-  assert(lbabus.includes(`<Version>${versions.lbabus}</Version>`), 'lbabus version drifted');
   assert(tasks.includes(`HUMAN_TASKS_VERSION = '${versions.humanTasks}'`), 'human task version drifted');
   assert(versions.canonicalDistribution === 'github-release' && versions.marketplaceChannel === 'stable', 'distribution policy drifted');
   assert(/^[0-9a-f]{40}$/.test(versions.governance.standardsReviewCommit), 'standards-review commit is not pinned');
   assert(/^sha256:[0-9a-f]{64}$/.test(versions.governance.workbenchDigest), 'governance workbench digest is not pinned');
-  assert(versions.governance.standardsReviewVersion === '0.4.2', 'standards-review version is not pinned');
+  assert(versions.governance.standardsReviewVersion === '0.15.0', 'standards-review version is not pinned');
   // The RSR consumer kit (ADR-0087) pins the same release that certifies this repository.
   const kitPin = readJson('.repo-standards-review.json');
   assert(
@@ -1695,7 +1755,7 @@ check('release-component-versioning', () => {
   assert(riskBaseline.source.standardsReviewCommit === versions.governance.standardsReviewCommit, 'release-risk source commit drifted');
   assert(riskBaseline.source.workbenchDigest === versions.governance.workbenchDigest, 'release-risk image digest drifted');
   assert(riskCore.includes("const GATES = ['coverage', 'cm', 'req', 'arch', 'doc', 'dod']"), 'release-risk evaluator lacks all scorecard gates');
-  assert(agents.includes('repo-standards-review 0.4.2') && agents.includes('12/28 (42.9%)') && agents.includes('Prioritize DoD blockers'), 'generated AGENTS lacks forward risk awareness');
+  assert(agents.includes('repo-standards-review 0.15.0') && agents.includes('12/28 (42.9%)') && agents.includes('Prioritize DoD blockers'), 'generated AGENTS lacks forward risk awareness');
   assert(hook.includes('release-components.mjs --precommit'), 'precommit release-component gate missing');
   assert(
     workflow.includes('inputs.publish_marketplace')
@@ -1719,26 +1779,27 @@ check('release-component-versioning', () => {
   return { extension: versions.extension, agents: versions.agents, lbabus: versions.lbabus, humanTasks: versions.humanTasks };
 });
 
-check('lbabus-vendored-mirror', () => {
-  // ADR-0088: tools/collab-cli is lbabus's tagged release tree, byte for byte, plus this repository's
-  // release-governance files. Compared through the index, so a checkout's line endings cannot matter.
-  const pin = readJson(join('tools', 'lbabus-vendor.json'));
-  const versions = readJson('release-components.json');
-  assert(pin.schema === 'labview-benchmark-actor/lbabus-vendor@1' && pin.repository === 'https://github.com/svelderrainruiz/lbabus', 'the lbabus vendor pin must name the lbabus repository');
-  assert(pin.tag === `v${versions.lbabus}` && /^[0-9a-f]{40}$/.test(pin.commit), 'the vendored lbabus tag must match the lbabus version in release-components.json');
-  const governance = new Set(['release-agreement.json', 'reviewer-allowlist.json', 'record-release-agreement.mjs', 'record-release-agreement.selftest.mjs',
-    'verify-composite-release.mjs', 'verify-release-agreement.mjs', 'verify-visual-review.mjs'].map((f) => `tools/collab-cli/${f}`));
-  const index = new Map(execFileSync('git', ['ls-files', '-s', '--', 'tools/collab-cli'], { cwd: pkgRoot, encoding: 'utf8' })
-    .split('\n').filter(Boolean).map((line) => { const [meta, path] = line.split('\t'); const [mode, blob] = meta.split(' '); return [path, { mode, blob }]; }));
-  const pinned = Object.entries(pin.files);
-  assert(pinned.length > 0, 'the lbabus vendor pin lists no files');
-  for (const [path, want] of pinned) {
-    const have = index.get(path);
-    assert(have && have.blob === want.blob && have.mode === want.mode, `${path} differs from lbabus ${pin.tag}`);
-  }
-  const extra = [...index.keys()].filter((path) => !pin.files[path] && !governance.has(path));
-  assert(extra.length === 0, `tools/collab-cli has files that are not in lbabus ${pin.tag}: ${extra.join(', ')}`);
-  return { tag: pin.tag, commit: pin.commit.slice(0, 9), vendored: pinned.length, governance: governance.size };
+// ADR-0088 as amended by #57 slice 3: lbabus is consumed only as the release pinned in release-components.json. The
+// checks that used to read the in-tree copy run in lbabus's own CI (ci/source-guards.sh and the harness cases).
+// This gate binds the pin to the extension's AGENTS contract and to every default that repeats it, and fails when
+// an in-tree copy comes back. scripts/fetch-lbabus.mjs checks the digests and the commit when a consumer fetches.
+check('lbabus-pin-matches-agents-contract', () => {
+  const components = readJson('release-components.json');
+  const manifest = readJson('cleanroom/ubuntu-labview/cleanroom-manifest.json');
+  const provisioner = readFileSync(join(pkgRoot, 'cleanroom', 'ubuntu-labview', 'provision-lbabus-fromsource.sh'), 'utf8');
+  const bootstrap = readFileSync(join(pkgRoot, 'cleanroom', 'bootstrap.ps1'), 'utf8');
+  const first = (text, pattern, what) => { const m = text.match(pattern); assert(m, `cannot read ${what}`); return m[1]; };
+  const consumers = [
+    { name: 'cleanroom-manifest.json', tag: manifest.lbabus.source_ref, commit: manifest.lbabus.source_commit },
+    { name: 'provision-lbabus-fromsource.sh', tag: first(provisioner, /REF="\$\{LBABUS_REF:-([^}]+)\}"/, 'the provisioner tag default'), commit: first(provisioner, /EXPECT_COMMIT="\$\{LBABUS_EXPECT_COMMIT:-([^}]+)\}"/, 'the provisioner commit default') },
+    { name: 'cleanroom/bootstrap.ps1', tag: first(bootstrap, /\$LbabusTag\s*=\s*'([^']+)'/, 'the bootstrap tag default'), commit: first(bootstrap, /\$LbabusCommit\s*=\s*'([^']+)'/, 'the bootstrap commit default') },
+  ];
+  const inTreeCopyPaths = ['tools/collab-cli', 'tools/lbabus-vendor.json'].filter((path) => existsSync(join(pkgRoot, path)));
+  const agentsText = readFileSync(join(pkgRoot, 'extension-agents', 'AGENTS.md'), 'utf8');
+  const result = verifyPinContract({ components, agentsText, consumers, inTreeCopyPaths });
+  assert(result.ok, `lbabus pin: ${result.reasons.join('; ')}`);
+  execFileSync(process.execPath, [join(pkgRoot, 'test', 'lbabus-pin.mjs')], { stdio: 'pipe' });
+  return { tag: components.lbabusRelease.tag, commit: components.lbabusRelease.commit.slice(0, 9), consumers: consumers.map((c) => c.name), inTreeCopy: 'absent', controls: 'wrong digest, wrong commit, wrong tag object, wrong AGENTS version fail closed' };
 });
 
 check('no-vihs-prefix', () => {
@@ -1785,7 +1846,7 @@ check('standards-release-risk-baseline', () => {
   const scoreBaseline = readJson('standards-score-baseline.json');
   const gateNames = ['coverage', 'cm', 'req', 'arch', 'doc', 'dod'];
   assert(baseline.schema === 'labview-benchmark-actor/release-risk-baseline@1', 'release-risk schema mismatch');
-  assert(baseline.source.workbenchVersion === '0.4.2' && baseline.source.scoreSchema === '1.3.0', 'workbench score identity drifted');
+  assert(baseline.source.workbenchVersion === '0.15.0' && baseline.source.scoreSchema === '1.3.0', 'workbench score identity drifted');
   assert(scoreBaseline.source.workbenchVersion === baseline.source.workbenchVersion, 'retained score workbench version drifted');
   assert(scoreBaseline.source.standardsReviewCommit === baseline.source.standardsReviewCommit, 'retained score source commit drifted');
   assert(scoreBaseline.source.workbenchDigest === baseline.source.workbenchDigest, 'retained score image digest drifted');
@@ -1808,7 +1869,7 @@ check('standards-release-risk-baseline', () => {
   assert(runner.includes('verifyGovernedRisk(risk, governance.releaseRisk)'), 'runtime risk does not match the governed system tuple');
   assert(runner.includes("if (risk.status !== 'READY')"), 'Release Candidate Check does not fail closed on blocked risk');
   const agents = readFileSync(join(pkgRoot, 'extension-agents', 'AGENTS.md'), 'utf8');
-  for (const signal of ['repo-standards-review 0.4.2', '12/28 (42.9%)', 'Missing Proof cells are `-`', 'Do not publish', 'expected artifact']) {
+  for (const signal of ['repo-standards-review 0.15.0', '12/28 (42.9%)', 'Missing Proof cells are `-`', 'Do not publish', 'expected artifact']) {
     assert(agents.includes(signal), `generated AGENTS lacks release-risk signal '${signal}'`);
   }
   for (const gate of gateNames) {
@@ -1833,7 +1894,7 @@ check('experiment-lifecycle-local-kpi', () => {
   assert(result.kpi.total === 62 && result.kpi.governed === 62 && result.kpi.ungoverned === 0, 'experiment governance KPI is not 62/62');
   assert(result.kpi.forbiddenProductionReferences === 0, 'prohibited experiments reach production surfaces');
   assert(result.kpi.prototypes === 1 && result.kpi.superseded === 2, 'prototype/superseded lifecycle baseline drifted');
-  assert(readJson(join('experiments', 'governance-overrides.json')).version === '1.0.1', 'experiment-governance/KPI version drifted');
+  assert(readJson(join('experiments', 'governance-overrides.json')).version === '1.0.2', 'experiment-governance/KPI version drifted');
   const pkg = readJson('package.json');
   assert(pkg.scripts?.['ci:local:quick'] === 'node scripts/local-continuous-kpi.mjs --quick', 'quick local KPI command missing');
   assert(pkg.scripts?.['ci:local'] === 'node scripts/local-continuous-kpi.mjs', 'full local KPI command missing');
@@ -3210,7 +3271,7 @@ check('handoff-verdict', () => {
   const { privateKeyPem, publicKeyPem } = generateReviewerKeypair();
   const reviewer = 'reviewer@example';
   const allow = { [reviewer]: publicKeyPem };
-  const committedReviewerAllowlist = readJson('tools/collab-cli/reviewer-allowlist.json');
+  const committedReviewerAllowlist = readJson('tools/release-governance/reviewer-allowlist.json');
   const productionKeys = Object.entries(committedReviewerAllowlist)
     .filter(([identity]) => identity !== '_comment')
     .flatMap(([, keys]) => Array.isArray(keys) ? keys : [keys]);
@@ -3229,7 +3290,7 @@ check('handoff-verdict', () => {
   const decision = gateVisualReview({ verdict, signOffs: [signed], reviewerAllowlist: allow, minReviewers: 1 });
   assert(decision.publish === true, 'a pass verdict + an enrolled approval publishes the visual review');
   assert(gateVisualReview({ verdict: { ...verdict, notes: 'tampered' }, signOffs: [signed], reviewerAllowlist: allow }).publish === false, 'a tampered verdict fails closed');
-  // the release-agreement visual-review verifier (tools/collab-cli/verify-visual-review.mjs) reuses the gate over
+  // the release-agreement visual-review verifier (tools/release-governance/verify-visual-review.mjs) reuses the gate over
   // a { verdict, signOff } record -- so the extension-signed verdict + a plane agreement gate the release together.
   assert(verifyVisualReview({ record: { verdict, signOff: signed }, reviewerAllowlist: allow, minReviewers: 1 }).publish === true, 'verify-visual-review publishes a signed pass record');
   assert(verifyVisualReview({ record: { verdict, signOffs: [] }, reviewerAllowlist: allow }).publish === false, 'verify-visual-review fails closed without a sign-off');
@@ -3254,6 +3315,52 @@ check('reviewer-version-contract', () => {
   return { source: 'release-components.json', scope: 'Windows/Ubuntu reviewer staging + continuation readiness' };
 });
 
+// #75: the reviewer VM password never reaches VBoxManage on its command line, where every local user can read it
+// (ps, /proc/<pid>/cmdline); scripts hand it over as a private --passwordfile instead. Scans every repository-owned
+// script that drives guestcontrol (the vendored lbabus copy in tools/ is out of scope) and proves the detector
+// with a negative control.
+check('vm-password-not-on-command-line', () => {
+  const flag = ['--pass', 'word'].join(''); // assembled so this gate's own source is not a finding
+  // A value follows the flag: `--flag "$x"`, `--flag $X`, `--flag=x`, or a Node/PowerShell array `'--flag', x`.
+  const valueAfterFlag = new RegExp(`${flag}(?!file)(?:\\s+|=|['"]\\s*,\\s*)["'$A-Za-z_]`);
+  const findings = (text) => text.split(/\r?\n/).map((line, i) => [i + 1, line]).filter(([, line]) => valueAfterFlag.test(line));
+  const control = [
+    `gc() { VBoxManage guestcontrol "$vm" --username "$user" ${flag} "$pass" "$@"; }`,
+    `& VBoxManage guestcontrol $VmName --username $GuestUser ${flag} $GuestPassword run`,
+    `'guestcontrol', vm, '--username', user, '${flag}', pass,`,
+  ].join('\n');
+  assert(findings(control).length === 3, 'the password detector must flag the shell, PowerShell, and Node forms');
+  assert(findings(`VBoxManage guestcontrol vm --username u ${flag}file "$pwfile" run`).length === 0, 'the detector must allow --passwordfile');
+  assert(findings(`assert.ok(!args.includes('${flag}') && args.includes('${flag}file'));`).length === 0, 'the detector must allow a negative assertion about the flag');
+  const roots = ['reviewer-workstation', 'scripts', 'cleanroom', 'experiments', '.github'];
+  const scriptFile = /(\.(sh|ps1|psm1|mjs|cjs|js|yml|yaml)|Vagrantfile)$/;
+  const walk = (dir) => readdirSync(join(pkgRoot, dir), { withFileTypes: true }).flatMap((e) => {
+    const rel = `${dir}/${e.name}`;
+    if (e.isDirectory()) return ['node_modules', '.git', 'bin', 'obj'].includes(e.name) ? [] : walk(rel);
+    return scriptFile.test(e.name) ? [rel] : [];
+  });
+  const scanned = roots.filter((r) => existsSync(join(pkgRoot, r))).flatMap(walk);
+  const offenders = [];
+  for (const rel of scanned) {
+    const text = readFileSync(join(pkgRoot, rel), 'utf8');
+    if (!text.includes('guestcontrol')) continue;
+    for (const [line] of findings(text)) offenders.push(`${rel}:${line}`);
+  }
+  assert(offenders.length === 0, `VM password passed on a VBoxManage command line (use --passwordfile): ${offenders.join(', ')}`);
+  return { scanned: scanned.length, guestcontrolScripts: scanned.filter((rel) => readFileSync(join(pkgRoot, rel), 'utf8').includes('guestcontrol')).length };
+});
+
+// LBA-REQ-069 (#73): release phase 7 in one command. The driver stages the exact candidate on the WIN reviewer VM,
+// proves the VM holds those bytes, confirms the install, configures the per-version visual key, records the
+// correlated DONE frame, and binds the review target to the attestation evidence. The offline selftest drives it
+// against a fake VBoxManage: guest runs carry no argv0 and no password on a command line, and every broken
+// precondition fails closed before any evidence is written.
+check('release-stage-win', () => {
+  const out = execFileSync(process.execPath, [join(here, '..', 'reviewer-workstation', 'release-stage-win.selftest.mjs')], { stdio: 'pipe' }).toString();
+  assert(/release-stage-win selftest: 4\/4 passed/.test(out), `release-stage-win selftest did not pass: ${out.trim().slice(-300)}`);
+  return { selftest: 'release-stage-win 4/4 (builders, ordered happy path, 9 fail-closed cases, dry run)' };
+});
+
 // LBA-REQ-059 / ADR-0039: the host<->VM-agent CLOSED LOOP over lbabus net TCP. A pure parser self-test (no
 // network/VM), the committed live+loopback receipt, and the semantic verdict types on the net envelope (option A):
 // the host awaits the VM agent's correlated reply over TCP and the reviewer verdict announces as a first-class
@@ -3266,10 +3373,8 @@ check('closed-loop-readback', () => {
   assert(r.loopbackProof.ok === true && r.loopbackProof.matchingTaskClosesLoop === true && r.loopbackProof.wrongTaskFailsClosed === true && r.loopbackProof.semanticVerdictTypeOverNet === true, 'loopback proof: loop closes, wrong task fails closed, semantic verdict type rides net');
   assert(Array.isArray(r.liveDrives) && r.liveDrives.length === 3 && r.liveDrives.every((d) => d.frame.senderId === 'WIN'), 'three live drives from the reviewer VM (senderId WIN)');
   assert(r.liveDrives.map((d) => d.frame.type).join(',') === 'DONE,DONE,NOTE', 'live drives: closed loop, release-review, verdict announcement');
-  // option A (ADR-0039): the net envelope type set carries the semantic verdict statuses so a verdict rides net directly.
-  const netSrc = readFileSync(join(here, '..', 'tools', 'collab-cli', 'Net.cs'), 'utf8');
-  const typesLine = netSrc.split('\n').find((l) => l.includes('"CLAIM"') && l.includes('"HELLO"')) || '';
-  for (const t of ['RESOLVED', 'REFINE', 'BLOCKED']) { assert(typesLine.includes(`"${t}"`), `net Types set includes ${t}`); }
+  // option A (ADR-0039): the semantic verdict statuses ride net directly; lbabus's harness case
+  // net-verdict-types-roundtrip-over-tcp asserts the envelope types (moved from a Net.cs source check, #57).
   return { selftest: 'await-agent-reply 9/9 + timeout 3/3', loopback: r.loopbackProof.ok, liveDrives: r.liveDrives.length, netVerdictTypes: 'RESOLVED/REFINE/BLOCKED' };
 });
 
@@ -3335,7 +3440,7 @@ check('assemble-composite', () => {
 // that the enforcement CLI clears the committed candidate + fails closed for a version with no decision, AND that
 // extension-release.yml runs the CLI in the publish-gating agreement job (release needs: [build, agreement]).
 check('composite-release-enforced', () => {
-  const cli = join(here, '..', 'tools', 'collab-cli', 'verify-composite-release.mjs');
+  const cli = join(here, '..', 'tools', 'release-governance', 'verify-composite-release.mjs');
   // The committed receipt's candidate.version is the SINGLE SOURCE OF TRUTH (#416): assert the receipt is
   // PROVEN for ITS OWN version, so a release version bump touches only the receipt, never this gate file.
   const receiptVersion = JSON.parse(readFileSync(join(here, '..', 'reviewer-workstation', 'composite-release-decision-receipt.json'), 'utf8')).candidate.version;
@@ -3359,9 +3464,7 @@ check('net-coordination-log', () => {
   const r = JSON.parse(readFileSync(join(here, 'net-coordination', 'net-coordination-log-receipt.json'), 'utf8'));
   assert(r.schema === 'labview-benchmark-actor/net-coordination-log-proof@1' && r.requirement === 'LBA-REQ-060', 'committed net-coordination receipt shape');
   assert(r.cases.postToLogToPollRoundTrip === true && r.cases.typeFilterNote === true && r.cases.typeFilterResolved === true && r.cases.pollWithoutLogGraceful === true && r.ok === true, 'post->log->poll round-trip + type filter + poll-without-log graceful no-op');
-  const netSrc = readFileSync(join(here, '..', 'tools', 'collab-cli', 'Net.cs'), 'utf8');
-  assert(/"poll"\s*=>\s*CmdPoll/.test(netSrc), 'net dispatch routes poll -> CmdPoll');
-  assert(netSrc.includes('private static int CmdPoll(') && netSrc.includes('a.Get("log")'), 'CmdPoll reads the local --log receive-log');
+  // The poll dispatch and the --log read side are asserted by lbabus's own CI (net-poll-* cases, source-guards.sh).
   return { receipt: r.ok, model: 'live-only net (no GitHub Discussion)', cases: Object.keys(r.cases).length };
 });
 
@@ -3432,33 +3535,16 @@ check('release-no-discussion-announce', () => {
 // loopback). Source-asserts the CLI graceful branches + the net default (the runtime net poll graceful is also
 // covered by the net-coordination-log receipt; npm test covers the extension/MCP default flip).
 check('net-default-graceful', () => {
-  const net = readFileSync(join(here, '..', 'tools', 'collab-cli', 'Net.cs'), 'utf8');
-  assert(net.includes('skip-if-no-peer') && /no peer configured/.test(net), 'net send --skip-if-no-peer degrades gracefully (exit 0)');
-  assert(/no receive-log configured/.test(net) && net.includes('ADR-0045'), 'net poll with no receive-log degrades gracefully (exit 0)');
+  // The CLI's graceful branches are lbabus harness cases (net-send-skip-if-no-peer-exits-0-with-hint,
+  // net-poll-without-log-configured-exits-0-with-hint); this gate keeps the extension side.
   const ext = readFileSync(join(here, '..', 'src', 'extension.ts'), 'utf8');
   assert(ext.includes('--skip-if-no-peer') && /'net', 'send'/.test(ext), 'the extension routes the send side via --skip-if-no-peer (graceful no-op) when no peer is configured');
   return { gracefulPoll: true, gracefulSend: true };
 });
 
-// LBA-REQ-067 / ADR-0047: off-Discussions step 8 (final) -- the GitHub-Discussion transport is removed from the
-// lbabus CLI itself. Program.cs no longer dispatches init/post/poll/wait/delta; GitHubGraphQL is a REST-only
-// client (releases for selfcheck + issue comments for defect); the live-only net TCP bus is the sole coordination
-// transport. Source-asserts the removal; the CLI build + smoke test cover the runtime.
-check('cli-no-discussion-transport', () => {
-  const prog = readFileSync(join(here, '..', 'tools', 'collab-cli', 'Program.cs'), 'utf8');
-  for (const cmd of ['"init"', '"post"', '"poll"', '"wait"', '"delta"']) {
-    assert(!prog.includes(`${cmd} =>`), `Program.cs no longer dispatches ${cmd} (Discussion transport removed)`);
-  }
-  assert(!/\bCmdPost\b|\bCmdPoll\b|\bCmdWait\b|\bCmdInit\b|\bCmdDelta\b/.test(prog), 'the Discussion command methods are removed from Program.cs');
-  assert(prog.includes('"net" => NetCommands.Run'), 'the live-only net coordination transport is intact');
-  assert(prog.includes('"defect" => CmdDefect') && prog.includes('CmdSelfCheck'), 'the GitHub-API keepers (defect + selfcheck) remain');
-  const gh = readFileSync(join(here, '..', 'tools', 'collab-cli', 'GitHubGraphQL.cs'), 'utf8');
-  assert(!/FindDiscussion|CreateDiscussion|EnsureDiscussion/.test(gh) && !gh.includes('addDiscussionComment') && !gh.includes('DiscussionRef'), 'GitHubGraphQL has no Discussion GraphQL surface');
-  assert(gh.includes('ListReleaseTags') && gh.includes('AddIssueComment'), 'GitHubGraphQL keeps the REST bits for selfcheck (releases) + defect (issue comment)');
-  const cfg = readFileSync(join(here, '..', 'tools', 'collab-cli', 'Config.cs'), 'utf8');
-  assert(!cfg.includes('Category') && !cfg.includes('Title') && !cfg.includes('AddressesMe'), 'Config drops the discussion-only fields (Category/Title/AddressesMe)');
-  return { removed: ['init', 'post', 'poll', 'wait', 'delta'], graphql: 'REST-only', transport: 'net' };
-});
+// LBA-REQ-067 / ADR-0047: the GitHub-Discussion transport is removed from the lbabus CLI. The checks (Program.cs
+// dispatch, REST-only GitHubGraphQL, Config fields) run in lbabus's CI: the cli-help-lists-no-discussion-subcommands
+// case and ci/source-guards.sh (#57 slice 3).
 
 // LBA-REQ-011 (extended): the frame-correlator CLICK-TO-MARKER wiring. Browser-free self-test (the built document
 // embeds the click-to-marker runtime + the authoritative classifyPointerGesture / resolveMarkerImageGrab spec the
@@ -3973,8 +4059,8 @@ check('acg-crossplane-composite-reseal', () => {
 // clobber, and fails closed unless BOTH release gates pass. Guarded by its selftest so a release entry is never
 // hand-edited JSON again.
 check('record-release-agreement-selftested', () => {
-  execFileSync(process.execPath, [join(here, '..', 'tools', 'collab-cli', 'record-release-agreement.selftest.mjs')], { stdio: 'pipe' });
-  return { helper: 'tools/collab-cli/record-release-agreement.mjs', proof: 'records + minimal-diff + no-clobber + empty-seed (both gates pass)' };
+  execFileSync(process.execPath, [join(here, '..', 'tools', 'release-governance', 'record-release-agreement.selftest.mjs')], { stdio: 'pipe' });
+  return { helper: 'tools/release-governance/record-release-agreement.mjs', proof: 'records + minimal-diff + no-clobber + empty-seed (both gates pass)' };
 });
 
 const passed = checks.filter((c) => c.pass).length;

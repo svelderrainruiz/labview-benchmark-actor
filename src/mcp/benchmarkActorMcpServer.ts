@@ -80,9 +80,10 @@ export class McpArgumentError extends Error {}
  * The authoritative tool registry. `tools/list` publishes exactly this set, and `tools/call` rejects any
  * name not in it before a handler runs.
  */
-export const BENCHMARK_ACTOR_MCP_TOOLS: readonly BenchmarkActorMcpTool[] = [
+const coreRegistry: readonly (BenchmarkActorMcpTool & { ollamaDefault?: true })[] = [
   {
     name: 'get_host_capabilities',
+    ollamaDefault: true,
     description:
       "Report what the current host can actually run for LabVIEW benchmarking (LabVIEW runtime + bitness, " +
       "Docker engine, etc.) via the lbabus capabilities probe. Run this before proposing benchmark work.",
@@ -90,6 +91,7 @@ export const BENCHMARK_ACTOR_MCP_TOOLS: readonly BenchmarkActorMcpTool[] = [
   },
   {
     name: 'get_benchmark_series',
+    ollamaDefault: true,
     description:
       "Return the deterministic mprr ring-buffer benchmark metric series the extension's viewer renders, as " +
       "ordered {t,v} points plus a stable content hash (seriesHash). Reproduce this series; do not re-derive it.",
@@ -97,6 +99,7 @@ export const BENCHMARK_ACTOR_MCP_TOOLS: readonly BenchmarkActorMcpTool[] = [
   },
   {
     name: 'poll_coordination_bus',
+    ollamaDefault: true,
     description:
       'Read the latest cross-plane (WIN <-> LINUX) coordination-bus messages from the live-only lbabus net bus ' +
       '(net poll of the local receive-log). The bus is the authoritative "what is next" channel.',
@@ -126,6 +129,12 @@ export const BENCHMARK_ACTOR_MCP_TOOLS: readonly BenchmarkActorMcpTool[] = [
     }
   }
 ] as const;
+
+// Permission is local to the bridge, not a change to the server's tools/list protocol.
+export const BENCHMARK_ACTOR_MCP_TOOLS: readonly BenchmarkActorMcpTool[] =
+  coreRegistry.map(({ ollamaDefault, ...tool }) => tool);
+export const OLLAMA_DEFAULT_TOOLS: ReadonlySet<string> =
+  new Set(coreRegistry.filter(tool => tool.ollamaDefault).map(tool => tool.name));
 
 const KNOWN_TOOL_NAMES: ReadonlySet<string> = new Set(BENCHMARK_ACTOR_MCP_TOOLS.map((t) => t.name));
 

@@ -18,11 +18,8 @@ Vagrant.configure("2") do |config|
   config.vm.communicator = "winrm"           # Windows LabVIEW guest
   config.winrm.timeout = 1800
 
-  # Sync the collab-cli source so the bootstrap can BUILD it in the clean room.
-  # VirtualBox (Linux host) uses a Guest-Additions synced folder — no host SMB server needed
-  # (the plane-specific counterpart to the default Vagrantfile's `type: "smb"`). The shared
-  # bootstrap.ps1 already probes both C:\vagrant-src and C:\vagrant for the source.
-  config.vm.synced_folder "..", "C:\\vagrant-src", type: "virtualbox"
+  # No source share: the shared bootstrap.ps1 clones the PINNED lbabus release (tag + commit checked) and builds it.
+  config.vm.synced_folder ".", "/vagrant", disabled: true
 
   config.vm.provider "virtualbox" do |vb|
     vb.gui    = false

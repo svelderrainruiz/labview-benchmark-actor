@@ -10,7 +10,7 @@
   actors.
 - **Claim:** the bounded information-product set in the
   [Conformance Boundary](./conformance-boundary.md).
-- **Baseline:** `repo-standards-review` v0.4.2.
+- **Baseline:** `repo-standards-review` v0.15.0.
 
 ## Audiences and tasks
 
@@ -27,6 +27,7 @@ task profiles. That model drives which items exist and what each contains.
 | User guide | [`user-guide.md`](./user-guide.md) | In-depth workflow |
 | Command reference | [`command-reference.md`](./command-reference.md) | Every command |
 | Glossary | [`glossary.md`](./glossary.md) | Domain terms |
+| Fork and wiki guide | [`fork-and-wiki-guide.md`](./fork-and-wiki-guide.md) | Fork bootstrap and wiki publishing |
 | FAQ | [`faq.md`](./faq.md) | Recurring answers |
 | Audience + task model | [`audience-and-task-model.md`](./audience-and-task-model.md) | Who + what tasks |
 | Delivery profile | [`delivery-profile.md`](./delivery-profile.md) | How information is delivered |

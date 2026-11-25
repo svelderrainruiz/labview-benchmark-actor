@@ -1,0 +1,6 @@
+{
+  "evidence": ["wiki-evidence.json"],
+  "artifactSection": "CodeRef",
+  "testFiles": ["\\.selftest\\.mjs$", "^test/[^/]+\\.mjs$"],
+  "notRunReason": "no gate of experiments/verify-local-gates.mjs and no step of npm test ran it in this evidence"
+}

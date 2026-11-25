@@ -1,6 +1,6 @@
 # labview-benchmark-actor — User Guide
 
-> Standards baseline: `repo-standards-review` v0.4.2. User information follows
+> Standards baseline: `repo-standards-review` v0.15.0. User information follows
 > ISO/IEC/IEEE 26514:2022 (task-oriented, minimal, with clear entry routes).
 >
 > **Planning note:** this describes the *intended* user experience. It is a

@@ -34,7 +34,6 @@ const base = {
   packageLock: { version: extensionVersion, packages: { '': { version: extensionVersion } } },
   agentsManifest: { version: releaseComponents.agents },
   agentsText: `exactly \`${releaseComponents.lbabus}\` for this extension build. Else install with \`dotnet tool install --global LabViewBenchmarkActor.CollabBus --version ${releaseComponents.lbabus} --add-source <folder>\`.\nbundle v${releaseComponents.humanTasks}`,
-  lbabusProject: `<Version>${releaseComponents.lbabus}</Version>`,
   humanTasksSource: `HUMAN_TASKS_VERSION = '${releaseComponents.humanTasks}'`,
   humanTaskRunner: `HUMAN_TASKS_VERSION = '${releaseComponents.humanTasks}'`,
   changelog: `## [${extensionVersion}]`,
@@ -48,6 +47,20 @@ const base = {
 };
 
 assert.equal(verifyReleaseComponents(base).ok, true);
+// The lbabus release is pinned by tag, tag object, commit and SHA-256 digests; any gap fails closed.
+for (const lbabusRelease of [
+  { ...releaseComponents.lbabusRelease, tag: 'v0.0.1' },
+  { ...releaseComponents.lbabusRelease, commit: 'abc' },
+  { ...releaseComponents.lbabusRelease, repository: 'https://github.com/example/lbabus' },
+  { ...releaseComponents.lbabusRelease, assets: {} },
+  { ...releaseComponents.lbabusRelease, assets: Object.fromEntries(Object.entries(releaseComponents.lbabusRelease.assets).filter(([name]) => name !== 'SHA256SUMS')) },
+  { ...releaseComponents.lbabusRelease, assets: Object.fromEntries(Object.entries(releaseComponents.lbabusRelease.assets).filter(([name]) => !name.endsWith('win-x64.exe'))) },
+  { ...releaseComponents.lbabusRelease, assets: { ...releaseComponents.lbabusRelease.assets, extra: 'a'.repeat(64) } },
+  { ...releaseComponents.lbabusRelease, assets: { ...releaseComponents.lbabusRelease.assets, 'lbabus-x': 'nothex' } },
+  undefined,
+]) {
+  assert.equal(verifyReleaseComponents({ ...base, components: { ...base.components, lbabusRelease } }).ok, false);
+}
 // The AGENTS install fallback must install the same lbabus version the preflight pins.
 assert.equal(verifyReleaseComponents({
   ...base,
@@ -131,7 +144,7 @@ assert.equal(verifyStagedReleaseMetadata({
 assert.equal(verifyStagedReleaseMetadata({
   staged: [
     'reviewer-workstation/composite-release-decision-receipt.json',
-    'tools/collab-cli/release-agreement.json',
+    'tools/release-governance/release-agreement.json',
   ],
   unstaged: [],
   previous: base.components,
@@ -139,17 +152,16 @@ assert.equal(verifyStagedReleaseMetadata({
 }).ok, true);
 // Enrolling a release's reviewer keys is release data, not an lbabus change.
 assert.equal(verifyStagedReleaseMetadata({
-  staged: ['tools/collab-cli/reviewer-allowlist.json'],
+  staged: ['tools/release-governance/reviewer-allowlist.json'],
   unstaged: [],
   previous: base.components,
   current: base.components,
 }).ok, true);
-assert.equal(verifyStagedReleaseMetadata({
-  staged: ['tools/collab-cli/Program.cs'],
-  unstaged: [],
-  previous: base.components,
-  current: base.components,
-}).ok, false);
+// A new lbabus pin is an lbabus component change: its version must move with it.
+const repinned = { ...base.components, lbabusRelease: { ...base.components.lbabusRelease, tag: 'v0.0.9', commit: 'f'.repeat(40) } };
+const repinWithoutBump = verifyStagedReleaseMetadata({ staged: [], unstaged: [], previous: base.components, current: repinned });
+assert.equal(repinWithoutBump.ok, false);
+assert.ok(repinWithoutBump.reasons.includes('lbabus component changed without an lbabus version bump'));
 assert.equal(verifyStagedReleaseMetadata({
   staged: ['extension-tasks/release-risk.mjs'],
   unstaged: [],

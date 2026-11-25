@@ -44,11 +44,14 @@ jobs:
         run: npm test
       - name: Produce the plane witness
         shell: bash
+        env:
+          MATRIX_OS: ${{ matrix.os }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
         run: |
           mkdir -p witness
-          plane="ACTIONS-${{ matrix.os }}"
-          node experiments/acg-quorum/produce-witness.mjs --plane "$plane" --verdict pass --commit "${{ github.event.pull_request.head.sha || github.sha }}" > "witness/${{ matrix.os }}.bundle.json"
-          echo "--- ${{ matrix.os }} witness ---"; cat "witness/${{ matrix.os }}.bundle.json"
+          plane="ACTIONS-${MATRIX_OS}"
+          node experiments/acg-quorum/produce-witness.mjs --plane "$plane" --verdict pass --commit "$HEAD_SHA" > "witness/${MATRIX_OS}.bundle.json"
+          echo "--- ${MATRIX_OS} witness ---"; cat "witness/${MATRIX_OS}.bundle.json"
       - uses: actions/upload-artifact@v4
         with:
           name: witness-${{ matrix.os }}

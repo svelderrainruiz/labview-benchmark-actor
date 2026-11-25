@@ -1,8 +1,15 @@
-# Clean-room bootstrap - installs the pinned collab-cli toolchain and BUILDS lbabus in the VM.
+# Clean-room bootstrap - installs the pinned collab-cli toolchain and BUILDS the PINNED lbabus release in the VM.
 #
 # Runs as a Vagrant shell provisioner (privileged) inside the licensed-LabVIEW clean room. Idempotent:
 # tool installs skip when the binary is already present, and `dotnet tool update` is a no-op when current.
-# "Build it on bootstrap" per project direction - the CLI is compiled from the synced source, not downloaded.
+# "Build it on bootstrap" per project direction - the CLI is compiled from the pinned lbabus source (the release tag
+# of svelderrainruiz/lbabus, commit-checked), not downloaded as a binary. The pin repeats release-components.json
+# `lbabusRelease`; the `lbabus-pin-matches-agents-contract` gate fails when the two drift.
+param(
+    [string]$LbabusRepo   = 'https://github.com/svelderrainruiz/lbabus',
+    [string]$LbabusTag    = 'v0.17.1',
+    [string]$LbabusCommit = '8d00f968dacb27c601d311b563ffd0a6b5d38e03'
+)
 
 $ErrorActionPreference = 'Stop'
 
@@ -60,13 +67,19 @@ Install-ToolArchive 'glab'    'https://gitlab.com/api/v4/projects/gitlab-org%2Fc
 # Make the .NET global-tools dir (where lbabus installs below) visible on PATH.
 Add-MachinePath "$env:USERPROFILE\.dotnet\tools"
 
-# Locate the collab-cli source. Prefer a box-baked copy (self-contained: no host repo / SMB / creds),
-# then fall back to the SMB synced folder for a dev host that syncs its working tree.
-$src = @('C:\cleanroom-src\tools\collab-cli', 'C:\vagrant-src\tools\collab-cli', 'C:\vagrant\tools\collab-cli') |
-    Where-Object { Test-Path $_ } | Select-Object -First 1
-if (-not $src) { throw '[cleanroom] collab-cli source not found (bake it into C:\cleanroom-src or sync it).' }
+# Obtain the pinned lbabus source. A box-baked checkout (C:\cleanroom-src\lbabus, self-contained: no network) is
+# reused only when it is the pinned commit; otherwise the pinned tag is cloned. Either way HEAD must be the pin.
+$checkout = 'C:\cleanroom-src\lbabus'
+if (-not (Test-Path (Join-Path $checkout '.git'))) {
+    New-Item -ItemType Directory -Force -Path (Split-Path $checkout) | Out-Null
+    git clone --quiet --depth 1 --branch $LbabusTag $LbabusRepo $checkout
+    if ($LASTEXITCODE -ne 0) { throw "[cleanroom] cloning lbabus $LbabusTag failed ($LASTEXITCODE)." }
+}
+$head = (git -C $checkout rev-parse HEAD).Trim()
+if ($head -ne $LbabusCommit) { throw "[cleanroom] lbabus at $checkout is commit $head, not the pinned $LbabusCommit ($LbabusTag)." }
+$src = Join-Path $checkout 'tools\collab-cli'
 
-Write-Host "[cleanroom] building collab-cli from $src ..."
+Write-Host "[cleanroom] building lbabus $LbabusTag ($LbabusCommit) from $src ..."
 Push-Location $src
 try {
     dotnet build -c Release

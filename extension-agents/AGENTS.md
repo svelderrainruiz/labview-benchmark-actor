@@ -16,7 +16,7 @@ Treat this as an executable agent preflight, not optional human setup prose. Run
 | Tool | Required/validated version | Agent action |
 | --- | --- | --- |
 | VS Code | `>=1.101.0` | Required for the extension and contributed MCP server. |
-| `lbabus` | **exactly `0.16.0` for this extension build** | Run `lbabus version`. Windows reviewer staging installs this version at `C:\lba-tools\lbabus\lbabus.exe`; Ubuntu reviewers use `/usr/local/bin/lbabus`. Extension commands, MCP, and human tasks require the exact binary. Else download `LabViewBenchmarkActor.CollabBus.0.16.0.nupkg` from the [lbabus v0.16.0 release](https://github.com/svelderrainruiz/lbabus/releases/tag/v0.16.0) into a folder and install with `dotnet tool install --global LabViewBenchmarkActor.CollabBus --version 0.16.0 --add-source <folder>`. |
+| `lbabus` | **exactly `0.17.1` for this extension build** | Run `lbabus version`. Windows reviewer staging installs this version at `C:\lba-tools\lbabus\lbabus.exe`; Ubuntu reviewers use `/usr/local/bin/lbabus`. Extension commands, MCP, and human tasks require the exact binary. Else download `LabViewBenchmarkActor.CollabBus.0.16.0.nupkg` from the [lbabus v0.16.0 release](https://github.com/svelderrainruiz/lbabus/releases/tag/v0.16.0) into a folder and install with `dotnet tool install --global LabViewBenchmarkActor.CollabBus --version 0.17.1 --add-source <folder>`. |
 | Node.js | **exactly `24.19.0` for source-checkout repository/release work** | Match the repository `.nvmrc`; packaging is Node-version-bound. Evidence-only reviewer workspaces use VS Code's bundled runtime and do not require a separate Node installation. |
 | `ffmpeg` | distribution package on Ubuntu; Gyan/WinGet or configured path on Windows | Required by **Capture LabVIEW Launch**. Ubuntu uses native `x11grab` on the active graphical seat; Windows uses `gdigrab`. |
 | .NET runtime | `>=8.0` | Required to execute the framework-dependent `lbabus` payload. |
@@ -49,9 +49,9 @@ Governance requires the standards PDFs at `C:\design\standards` (or `STANDARDS_R
 
 ## Standards scorecard and forward risk baseline
 
-This build uses **repo-standards-review 0.4.2** at commit
-`5a3aa9da4b64bd5cc24cd2c6a21253947bca7575`, workbench digest
-`sha256:913bba59240fc9981b0fa45decc92a4e9881041b29969030e85b050c46b3cfe5`, score schema 1.3.0,
+This build uses **repo-standards-review 0.15.0** at commit
+`3d4a10f1e974ad5a3cb09840c452159465154f6d`, workbench digest
+`sha256:f3193f850d290feeb5cb99d8ded9e9eb1c3edd7f336f726b6308ef60e690c278`, score schema 1.3.0,
 profile `release-gate`, depth `deep`.
 
 The raw static baseline is REQ/ARCH/TEST/CM/DOC **5/5** (25/25) and coverage/CM/REQ/ARCH/DOC/DoD

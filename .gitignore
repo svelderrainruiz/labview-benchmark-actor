@@ -57,3 +57,7 @@ coverage/coverage-final.json
 # .NET "runfile discovery" tooling cache the C# extension writes into the workspace root (codespace/cleanroom noise)
 /dotnet/
 .lba/
+
+# Wiki canonical test-page evidence (scripts/wikiEvidence.mjs)
+wiki-jest-report.json
+wiki-evidence.json

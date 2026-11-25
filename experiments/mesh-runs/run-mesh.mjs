@@ -2,7 +2,7 @@
 // per-run logs, so runs are individually identifiable and comparable ACROSS runs (for agent inference).
 //
 // Why: the VM mesh path is environment-flaky (NAT, tools, boot timing); the Linux-container mesh
-// (tools/collab-cli/ci/Dockerfile.linux --target mesh, the SAME mesh-actor.sh workload) forms in seconds and
+// (the pinned lbabus release's tools/collab-cli/ci/Dockerfile.linux --target mesh, the SAME mesh-actor.sh workload) forms in seconds and
 // is deterministic. ci/mesh-linux.sh is a one-shot PASS/FAIL gate that self-cleans (logs discarded). This
 // harness KEEPS the evidence: each run gets a reproducible runId prefix mesh-<commit>[-<role>]-r<NNN> on every
 // actor name (role, when set, is the `Actor:` trailer of the building commit — the same one lbabus agents

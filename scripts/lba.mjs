@@ -27,7 +27,7 @@
 //   next-ids                     print the next free requirement id and ADR id
 //   init                         plan (or --run) the one-command First Win golden-VM onboarding (LBA-REQ-033)
 //   mesh-run                     agent-drive one mesh run: ingest a live dispatch + returned receipts, then cross-plane corroborate + compare
-//   release-preflight <X.Y.Z>    release doctor: node major + version + CHANGELOG + the 3 publish agreement gates
+//   release-preflight <X.Y.Z>    release doctor: node major + version + CHANGELOG + the publish agreement gates
 //   release <X.Y.Z>             resumable status driver: per-phase completion + the exact next actionable step (#409)
 //   release <X.Y.Z> --dry-run    print the full governed-release phase plan (ordering + deps + the 2 signings) + preflight
 //   release-verify-published <X.Y.Z>  confirm the VS Code Marketplace listing shows the version live after publish (#412)
@@ -40,9 +40,11 @@
 //   provision-windows-actor     install one native PowerShell 5 actor from an elevated Windows guest console
 //   selftest                     self-check this tool (run by the `agent-tooling-selftest` gate)
 
-import { mkdirSync, readFileSync, writeFileSync, existsSync, readdirSync, rmSync } from 'node:fs';
-import { execFileSync } from 'node:child_process';
-import { createPrivateKey, createPublicKey, generateKeyPairSync } from 'node:crypto';
+import { closeSync, mkdirSync, mkdtempSync, openSync, readFileSync, writeFileSync, existsSync, readdirSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { execFileSync, spawnSync } from 'node:child_process';
+import { createHash, createPrivateKey, createPublicKey, generateKeyPairSync } from 'node:crypto';
+import { gunzipSync, gzipSync } from 'node:zlib';
 import { fileURLToPath } from 'node:url';
 import { dirname, join, resolve } from 'node:path';
 import { capacityWeightedPartition } from '../experiments/parallel/parallelWorkload.mjs';
@@ -54,9 +56,11 @@ import { stagedOk } from '../reviewer-workstation/release-with-review-drive.mjs'
 import { buildReleaseStage } from '../reviewer-workstation/record-release-stage.mjs';
 import { enrolledReviewerPublicKeys } from '../experiments/handoff-beacon/reviewerVerdict.mjs';
 import { validateLbabusProvisioningPin } from './verify-ubuntu-golden-box.mjs';
+import { reviewedVsixSha256 } from './verify-published-vsix.mjs';
+import { canonicalRepo, ghRepoArgs } from './canonical-repo.mjs';
 import { decideAutonomousN3 } from '../experiments/mesh-fulfillment/autonomousN3Controller.mjs';
 
-export const ITERATION = 32; // bump when you refine this tool (see the banner above)
+export const ITERATION = 37; // bump when you refine this tool (see the banner above)
 
 const here = dirname(fileURLToPath(import.meta.url));
 export const repoRoot = resolve(here, '..');
@@ -174,7 +178,7 @@ export function governCheck(id) {
 // .vsix is byte-reproducible ONLY WITHIN a node major -- a node-22 build has a different sha256 than a node-24
 // build, so a review/candidate captured on node 22 fails the reviewed==shipped gate (verify-published-vsix).
 // These pure, deterministic checks catch that (+ version/CHANGELOG drift) BEFORE a publish; the `release-preflight`
-// command layers the 3 live publish agreement gates on top.
+// command layers the live publish agreement gates on top.
 export function releasePreflightStatic({ version, nodeVersion, pkgVersion, changelog, nvmrc, compositeVersion }) {
   const major = Number(String(nodeVersion).replace(/^v/, '').split('.')[0]);
   const escaped = String(version).replace(/\./g, '\\.');
@@ -208,19 +212,20 @@ export function releasePreflightStatic({ version, nodeVersion, pkgVersion, chang
 // preflight so the operator sees the whole sequence and the two irreducible Ed25519 signings up front.
 export function releasePlan(version) {
   const v = String(version);
+  const repo = (() => { try { return canonicalRepo(); } catch { return '<owner/repo>'; } })();
   const phases = [
     { id: 1, key: 'cut-branch', kind: 'auto', exec: 'auto', dependsOn: [], title: `cut release/${v} from develop`, command: `git checkout -b release/${v} develop` },
     { id: 2, key: 'bump', kind: 'auto', exec: 'auto', dependsOn: [1], title: 'bump package.json + stamp CHANGELOG', command: `npm version ${v} --no-git-tag-version  +  stamp CHANGELOG.md [${v}]` },
     { id: 3, key: 'build-vsix', kind: 'auto', exec: 'auto', dependsOn: [2], title: 'build the node-24 candidate .vsix + capture its sha256', command: 'npm run package  +  sha256sum labview-benchmark-actor.vsix' },
-    { id: 4, key: 'dispatch-corroboration', kind: 'auto', exec: 'ci', dependsOn: [3], title: 'dispatch acg-cross-plane-corroboration.yml at the candidate commit', command: 'gh workflow run acg-cross-plane-corroboration.yml --ref <candidate-commit>' },
+    { id: 4, key: 'dispatch-corroboration', kind: 'auto', exec: 'ci', dependsOn: [3], title: 'dispatch acg-cross-plane-corroboration.yml at the candidate commit', command: `gh workflow run acg-cross-plane-corroboration.yml --repo ${repo} --ref <candidate-commit>` },
     { id: 5, key: 'build-attestation', kind: 'auto', exec: 'auto', dependsOn: [4], title: 'build the machine attestation from the run witnesses', command: 'node experiments/acg-quorum/cross-plane-attestation.mjs  (from the corroboration run artifacts)' },
     { id: 6, key: 'quorum-signoff', kind: 'operator', exec: 'operator', signing: true, dependsOn: [5], title: 'Ed25519 quorum sign-off over the attestation (enrolled key)', command: 'lba signing-status  ->  reviewer-workstation/render-quorum.sh all --version ' + v + ' (#415)' },
-    { id: 7, key: 'stage-benchmark', kind: 'operator', exec: 'operator', dependsOn: [3], title: 'stage + live-benchmark the candidate on the WIN VM (net DONE frame)', command: 'reviewer-workstation/render-verdict.sh set-target --version ' + v + ' … (#411)  ->  save the WIN DONE frame as ~/lba-vm-share/staged-frame-WIN-' + v + '.json' },
+    { id: 7, key: 'stage-benchmark', kind: 'operator', exec: 'operator', dependsOn: [3], title: 'stage the candidate on the WIN VM (net DONE frame) and set the evidence-bound review target', command: 'lba release-stage-win ' + v + ' --vm <reviewer-vm> --commit <candidate> --vsix <candidate.vsix> --attestation ~/lba-vm-share/attestation-' + v + '.json (#73)  ->  ~/lba-vm-share/staged-frame-WIN-' + v + '.json' },
     { id: 8, key: 'visual-verdict', kind: 'operator', exec: 'operator', signing: true, dependsOn: [7], title: 'signed reviewer visual verdict of the built candidate (Ed25519)', command: 'run "Render Reviewer Verdict" in the VM  ->  render-verdict.sh collect' },
     { id: 9, key: 'assemble-composite', kind: 'auto', exec: 'auto', dependsOn: [3, 5, 6, 7, 8], title: 'assemble the composite-release-decision receipt (binds all pieces to one candidate)', command: 'node reviewer-workstation/assemble-composite.mjs --component extension --version ' + v + ' … --out reviewer-workstation/composite-release-decision-receipt.json (#410)' },
-    { id: 10, key: 'record-agreement', kind: 'auto', exec: 'auto', dependsOn: [9], title: 'record WIN+LINUX agreed + visualReview in release-agreement.json', command: 'node tools/collab-cli/record-release-agreement.mjs … (#419)' },
-    { id: 11, key: 'merge-main', kind: 'auto', exec: 'irreversible', dependsOn: [10], title: `merge release/${v} -> main (--no-ff)`, command: `gh pr merge <n> --merge  (release/${v} -> main, --no-ff)` },
-    { id: 12, key: 'cut-gh-release', kind: 'operator', exec: 'irreversible', dependsOn: [11], title: 'tag + workflow_dispatch extension-release.yml + cut the immutable GitHub Release', command: `gh workflow run extension-release.yml  ->  lba release-cut-github ${v} --run <id> --create (#412)` },
+    { id: 10, key: 'record-agreement', kind: 'auto', exec: 'auto', dependsOn: [9], title: 'record WIN+LINUX agreed + visualReview in release-agreement.json', command: 'node tools/release-governance/record-release-agreement.mjs … (#419)' },
+    { id: 11, key: 'merge-main', kind: 'auto', exec: 'irreversible', dependsOn: [10], title: `merge release/${v} -> main (--no-ff)`, command: `gh pr merge <n> --repo ${repo} --merge  (release/${v} -> main, --no-ff)` },
+    { id: 12, key: 'cut-gh-release', kind: 'operator', exec: 'irreversible', dependsOn: [11], title: 'tag + workflow_dispatch extension-release.yml + cut the immutable GitHub Release', command: `gh workflow run extension-release.yml --repo ${repo}  ->  lba release-cut-github ${v} --run <id> --create (#412)` },
     { id: 13, key: 'publish-backmerge', kind: 'operator', exec: 'irreversible', dependsOn: [12], title: 'publish to the stable Marketplace channel + back-merge to develop (--no-ff), then confirm the Marketplace', command: `vsce publish --packagePath <canonical-release.vsix>  ->  git merge --no-ff release/${v} into develop (#417)  ->  lba release-verify-published ${v} (#412)` },
   ];
   return { version: v, phases };
@@ -334,22 +339,37 @@ export function marketplaceVerificationPath(share, version) {
   return join(share, `marketplace-verification-${String(version)}.json`);
 }
 
-export function buildMarketplaceVerificationReceipt({ extension, version, result, verifiedAt = new Date().toISOString() } = {}) {
+export function buildMarketplaceVerificationReceipt({ extension, version, result, artifact, verifiedAt = new Date().toISOString() } = {}) {
   return {
     schema: MARKETPLACE_VERIFICATION_SCHEMA,
     extension: String(extension),
     version: String(version),
     verifiedAt,
     observed: { latest: result?.latest ?? null, versions: Array.isArray(result?.versions) ? result.versions.map(String) : [] },
-    verdict: { published: result?.ok === true && result?.live === true },
+    artifact: {
+      reviewedSha256: artifact?.reviewedSha256 ?? null,
+      marketplaceSha256: artifact?.marketplaceSha256 ?? null,
+      githubReleaseSha256: artifact?.githubReleaseSha256 ?? null,
+    },
+    verdict: {
+      published: result?.ok === true && result?.live === true,
+      reviewedMatchesShipped: artifact?.ok === true,
+    },
   };
 }
 
+// A version counts as published only when the listing showed it live AND the VSIX the Marketplace serves is the
+// reviewed artifact (#71); a receipt without that identity proof does not count.
 export function isMarketplaceVerificationReceipt(receipt, { extension, version } = {}) {
+  const sha = (value) => /^[0-9a-f]{64}$/.test(String(value ?? ''));
   return receipt?.schema === MARKETPLACE_VERIFICATION_SCHEMA
     && receipt.extension === String(extension)
     && receipt.version === String(version)
     && receipt.verdict?.published === true
+    && receipt.verdict?.reviewedMatchesShipped === true
+    && sha(receipt.artifact?.reviewedSha256)
+    && receipt.artifact.marketplaceSha256 === receipt.artifact.reviewedSha256
+    && receipt.artifact.githubReleaseSha256 === receipt.artifact.reviewedSha256
     && Array.isArray(receipt.observed?.versions)
     && receipt.observed.versions.map(String).includes(String(version));
 }
@@ -362,7 +382,7 @@ export function liveReleaseProbes(version, { env = process.env } = {}) {
   const tryGit = (args) => { try { execFileSync('git', args, { stdio: 'pipe' }); return true; } catch { return false; } };
   const pkg = (() => { try { return JSON.parse(read('package.json')); } catch { return {}; } })();
   const composite = (() => { try { return JSON.parse(read('reviewer-workstation/composite-release-decision-receipt.json')); } catch { return null; } })();
-  const agreement = (() => { try { return read('tools/collab-cli/release-agreement.json'); } catch { return null; } })();
+  const agreement = (() => { try { return read('tools/release-governance/release-agreement.json'); } catch { return null; } })();
   const shareHas = (name) => !!share && existsSync(join(share, name));
   const compositeSealed = !!composite && composite.candidate?.version === v && composite.verdict?.compositeReleaseProven === true;
   const stagedFrame = (() => { if (!share) return null; try { return JSON.parse(readFileSync(join(share, `staged-frame-WIN-${v}.json`), 'utf8')); } catch { return null; } })();
@@ -388,7 +408,7 @@ export function liveReleaseProbes(version, { env = process.env } = {}) {
     compositeSealed,
     agreementRecorded: !!agreement && agreement.includes(v),
     mergedToMain,
-    ghReleaseCut: (() => { try { execFileSync('gh', ['release', 'view', `ext-v${v}`], { stdio: 'pipe' }); return true; } catch { return false; } })(),
+    ghReleaseCut: (() => { try { execFileSync('gh', ghRepoArgs(['release', 'view', `ext-v${v}`], canonicalRepo(pkg)), { stdio: 'pipe' }); return true; } catch { return false; } })(),
     published: isMarketplaceVerificationReceipt(marketplaceReceipt, { extension: extensionId, version: v }),
     backMergedToDevelop,
     publishedAndBackMerged: isMarketplaceVerificationReceipt(marketplaceReceipt, { extension: extensionId, version: v }) && backMergedToDevelop,
@@ -442,6 +462,43 @@ export function assertListingLinks(queryResult, { version, repositoryUrl, bugsUr
   return { ok: reasons.length === 0, links, reason: reasons.join('; ') };
 }
 
+// ---- release-verify-published (#71): the VSIX the Marketplace serves must be the reviewed artifact -------------
+// The listing can be live with the right links and still serve a different file. The reviewed hash is the signed
+// visual-verdict target in release-agreement.json (reviewedVsixSha256, the same rule verify-published-vsix.mjs
+// applies before publishing); the Marketplace package and the immutable GitHub Release asset must both equal it.
+export function marketplaceVsixUrl({ publisher, name, version } = {}) {
+  return `https://marketplace.visualstudio.com/_apis/public/gallery/publishers/${encodeURIComponent(publisher)}/vsextensions/${encodeURIComponent(name)}/${encodeURIComponent(version)}/vspackage`;
+}
+
+export function githubReleaseVsixUrl({ repositoryUrl, name, version } = {}) {
+  const repo = String(repositoryUrl ?? '').trim().replace(/^git\+/, '').replace(/\.git$/i, '').replace(/\/+$/, '');
+  if (!/^https:\/\/github\.com\/[^/]+\/[^/]+$/.test(repo)) throw new Error(`not a GitHub repository URL: ${repositoryUrl}`);
+  return `${repo}/releases/download/ext-v${version}/${name}-${version}.vsix`;
+}
+
+// The gallery may serve the package gzip-compressed without saying so; a VSIX is a ZIP archive ("PK").
+export function vsixBytesFromDownload(bytes) {
+  let buffer = Buffer.from(bytes);
+  if (buffer[0] === 0x1f && buffer[1] === 0x8b) buffer = gunzipSync(buffer);
+  if (!(buffer[0] === 0x50 && buffer[1] === 0x4b)) throw new Error('the download is not a VSIX (ZIP) archive');
+  return buffer;
+}
+
+export function assertShippedArtifact({ agreement, component = 'extension', version, marketplaceSha256, githubReleaseSha256 } = {}) {
+  const reasons = [];
+  let reviewed = null;
+  try { reviewed = reviewedVsixSha256(agreement, component, version); } catch (e) { reasons.push(e.message); }
+  if (reviewed && marketplaceSha256 !== reviewed) reasons.push(`the Marketplace VSIX ${marketplaceSha256} is not the reviewed artifact ${reviewed}`);
+  if (reviewed && githubReleaseSha256 !== reviewed) reasons.push(`the GitHub Release VSIX ${githubReleaseSha256} is not the reviewed artifact ${reviewed}`);
+  return { ok: reasons.length === 0, reviewedSha256: reviewed, marketplaceSha256, githubReleaseSha256, reason: reasons.join('; ') };
+}
+
+export async function downloadVsixSha256(url, { fetchImpl = globalThis.fetch } = {}) {
+  const res = await fetchImpl(url, { redirect: 'follow' });
+  if (!res.ok) throw new Error(`download failed: HTTP ${res.status} for ${url}`);
+  return createHash('sha256').update(vsixBytesFromDownload(new Uint8Array(await res.arrayBuffer()))).digest('hex');
+}
+
 // Live leg: POST the VS Code Marketplace gallery extensionquery for one extension. `fetchImpl` is injectable so the
 // pure path stays testable; defaults to the global fetch (Node 18+).
 export async function queryMarketplaceExtension({ publisher, name, fetchImpl = globalThis.fetch } = {}) {
@@ -484,7 +541,7 @@ export const STATIONS = { VM: 'WINDOWS_VM', HOST: 'HOST', UNKNOWN: 'UNKNOWN' };
 // The enrolled reviewer allowlist (reviewer id -> Ed25519 SPKI public-key PEM). Only PUBLIC material.
 export function readReviewerAllowlist() {
   try {
-    const raw = JSON.parse(read('tools/collab-cli/reviewer-allowlist.json') || '{}');
+    const raw = JSON.parse(read('tools/release-governance/reviewer-allowlist.json') || '{}');
     const out = {};
     const validKey = (key) => typeof key === 'string'
       ? key.trim() !== ''
@@ -511,12 +568,12 @@ export function signingCommands({ station, reviewerId, reviewerKeyPath, version,
   const id = reviewerId || '<reviewer-id>';
   const keyPath = purpose === 'visual' ? '<enrolled-quorum-key.pem>' : reviewerKeyPath || '<enrolled-quorum-key.pem>';
   // The visual verdict is ALWAYS rendered + signed in the VM (the extension reads reviewerKeyPath there).
-  const visual = `LBA_VM_PASS=… reviewer-workstation/render-verdict.sh set-target --version ${ver} --commit <sha> --vsix-sha256 <sha256>  →  run "Render Reviewer Verdict" in the VM  →  reviewer-workstation/render-verdict.sh collect --version ${ver} --out ~/lba-vm-share/visual-verdict-${ver}.json`;
+  const visual = `Use the evidence-bound target from lba release-stage-win ${ver}  →  run "Render Reviewer Verdict" in the VM  →  reviewer-workstation/render-verdict.sh collect --version ${ver} --out ~/lba-vm-share/visual-verdict-${ver}.json`;
   let quorum;
   if (station === STATIONS.VM) {
     // Key lives in the VM -> sign IN the VM. Invoke via `cmd /c` from the repo clone so guestcontrol does not
     // eat node's argv[0] as the main module (the MODULE_NOT_FOUND gotcha to be wrapped by render-quorum.sh, #415).
-    quorum = `VBoxManage guestcontrol actor --username vagrant --password "$LBA_VM_PASS" run --exe 'C:\\Windows\\System32\\cmd.exe' --wait-stdout --wait-stderr -- cmd /c "cd /d C:\\lba-validate\\repo && node reviewer-workstation\\sign-release-quorum.mjs --key ${keyPath} --reviewer ${id} --station WINDOWS_VM --quorum <attestation-${ver}.json> --out <quorum-signoff-${ver}.json>"`;
+    quorum = `VBoxManage guestcontrol actor --username vagrant --passwordfile <(printf %s "$LBA_VM_PASS") run --exe 'C:\\Windows\\System32\\cmd.exe' --wait-stdout --wait-stderr -- cmd /c "cd /d C:\\lba-validate\\repo && node reviewer-workstation\\sign-release-quorum.mjs --key ${keyPath} --reviewer ${id} --station WINDOWS_VM --quorum <attestation-${ver}.json> --out <quorum-signoff-${ver}.json>"`;
   } else {
     // Key lives on this host -> sign on the host directly.
     quorum = `node reviewer-workstation/sign-release-quorum.mjs --key ${keyPath} --reviewer ${id} --station LINUX_CODESPACE --quorum ~/lba-vm-share/attestation-${ver}.json --out ~/lba-vm-share/quorum-signoff-${ver}.json`;
@@ -565,11 +622,27 @@ export function signingStatus({ reviewerId, reviewerKeyPath, keyExists, station,
 // Impure discovery: find the enrolled key + its station. Best-effort + fail-soft (never throws): host env first
 // (LBA_REVIEWER_ID + LBA_REVIEWER_KEY for a host-resident key), then the reviewer VM's VS Code settings.json via
 // `VBoxManage guestcontrol` when LBA_VM_PASS is set + the VM is reachable. Reads only the key PATH, never the key.
+// Runs a command with stdout captured through a file: VBoxManage guestcontrol cannot write guest output into Node's
+// socket pipes ("Error getting stdout handle: VERR_NOT_IMPLEMENTED"), which would leave stdout empty.
+function runCapturingStdout(file, args) {
+  const dir = mkdtempSync(join(tmpdir(), 'lba-run-'));
+  const outPath = join(dir, 'stdout');
+  const out = openSync(outPath, 'w');
+  try {
+    const r = spawnSync(file, args, { stdio: ['ignore', out, 'ignore'] });
+    if (r.status !== 0) throw new Error(`${file} exited ${r.status ?? r.error?.message}`);
+    return readFileSync(outPath, 'utf8');
+  } finally {
+    closeSync(out);
+    rmSync(dir, { recursive: true, force: true });
+  }
+}
+
 export function discoverSigningStation({ env = process.env, run } = {}) {
   const vm = env.LBA_VM_NAME || 'actor';
   const user = env.LBA_VM_USER || 'vagrant';
   const pass = env.LBA_VM_PASS;
-  const exec = run || ((file, args) => execFileSync(file, args, { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }));
+  const exec = run || runCapturingStdout;
   // 1) explicit host config: an enrolled key that lives on THIS host.
   const hostId = String(env.LBA_REVIEWER_ID || '').trim();
   const hostKey = String(env.LBA_REVIEWER_KEY || '').trim();
@@ -588,10 +661,14 @@ export function discoverSigningStation({ env = process.env, run } = {}) {
   }
   // 2) the reviewer VM: read its VS Code settings.json for reviewerId + reviewerKeyPath, then probe the key.
   if (pass) {
+    // VBoxManage gets the password as a private file, never on its command line (visible to every local user).
+    const secretDir = mkdtempSync(join(tmpdir(), 'lba-vm-'));
+    const passwordFile = join(secretDir, 'vm-pass');
+    writeFileSync(passwordFile, pass, { mode: 0o600 });
     try {
       const settings = `C:\\Users\\${user}\\AppData\\Roaming\\Code\\User\\settings.json`;
       const ps = (inner) => exec('VBoxManage', [
-        'guestcontrol', vm, '--username', user, '--password', pass,
+        'guestcontrol', vm, '--username', user, '--passwordfile', passwordFile,
         'run', '--exe', 'C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe',
         '--wait-stdout', '--wait-stderr', '--',
         '-NoLogo', '-NoProfile', '-NonInteractive', '-Command', inner,
@@ -622,7 +699,9 @@ export function discoverSigningStation({ env = process.env, run } = {}) {
         }
       }
       return { reviewerId, reviewerKeyPath: reviewerKeyPath || null, keyExists, presentedPublicKey, station: STATIONS.VM, source: `reviewer VM "${vm}" VS Code settings.json` };
-    } catch { /* VM not reachable / VBoxManage absent -> fall through to UNKNOWN */ }
+    } catch { /* VM not reachable / VBoxManage absent -> fall through to UNKNOWN */ } finally {
+      rmSync(secretDir, { recursive: true, force: true });
+    }
   }
   return { reviewerId: '', reviewerKeyPath: null, keyExists: null, station: STATIONS.UNKNOWN, source: 'none (set LBA_VM_PASS for the VM, or LBA_REVIEWER_ID + LBA_REVIEWER_KEY for a host key)' };
 }
@@ -668,7 +747,7 @@ export const COMMANDS = {
     run: () => { console.log(`next requirement: ${nextRequirementId()}`); console.log(`next ADR:         ${nextAdrId()}`); },
   },
   'release-preflight': {
-    desc: 'release doctor: node major + version + CHANGELOG + the 3 publish agreement gates for a target version',
+    desc: 'release doctor: node major + version + CHANGELOG + the publish agreement gates for a target version',
     run: (args) => {
       const version = args[0];
       if (!/^\d+\.\d+\.\d+/.test(version || '')) { console.error('usage: lba release-preflight X.Y.Z'); process.exit(2); }
@@ -681,13 +760,17 @@ export const COMMANDS = {
         compositeVersion: (() => { try { return JSON.parse(read('reviewer-workstation/composite-release-decision-receipt.json')).candidate.version; } catch { return undefined; } })(),
       });
       const gates = [
-        ['release-agreement WIN+LINUX agreed', 'tools/collab-cli/verify-release-agreement.mjs'],
-        ['signed reviewer visual verdict', 'tools/collab-cli/verify-visual-review.mjs'],
-        ['composite release decision', 'tools/collab-cli/verify-composite-release.mjs'],
+        ['release-agreement WIN+LINUX agreed', 'tools/release-governance/verify-release-agreement.mjs'],
+        ['signed reviewer visual verdict', 'tools/release-governance/verify-visual-review.mjs'],
+        ['composite release decision', 'tools/release-governance/verify-composite-release.mjs'],
+        ['reviewer infrastructure record', 'scripts/verify-reviewer-infrastructure.mjs'],
       ].map(([label, rel]) => {
-        let ok = false;
-        try { execFileSync(process.execPath, [join(repoRoot, rel), '--component', 'extension', version], { stdio: 'pipe' }); ok = true; } catch { ok = false; }
-        return { label, ok, note: ok ? '' : 'not yet satisfied' };
+        try {
+          execFileSync(process.execPath, [join(repoRoot, rel), '--component', 'extension', version], { stdio: 'pipe' });
+          return { label, ok: true };
+        } catch (error) {
+          return { label, ok: false, note: error.stderr?.toString().trim() || error.message };
+        }
       });
       const all = [...statics, ...gates];
       for (const c of all) console.log(`  ${c.ok ? '\u2713' : '\u2717'} ${c.label}${c.note ? '  (' + c.note + ')' : ''}`);
@@ -740,7 +823,7 @@ export const COMMANDS = {
     },
   },
   'release-verify-published': {
-    desc: 'confirm the VS Code Marketplace listing shows X.Y.Z live after publish and record resumable local evidence (#412)',
+    desc: 'confirm X.Y.Z is live on the VS Code Marketplace with canonical links and ships the reviewed VSIX, then record resumable local evidence (#412, #56, #71)',
     run: async (args) => {
       const version = args.find((a) => !a.startsWith('--'));
       if (!/^\d+\.\d+\.\d+/.test(version || '')) { console.error('usage: lba release-verify-published X.Y.Z [--extension <publisher.name>]'); process.exit(2); }
@@ -764,6 +847,18 @@ export const COMMANDS = {
           return;
         }
         console.log(`\u2713 listing Issues link: ${linkCheck.links.Support}`);
+        const artifact = assertShippedArtifact({
+          agreement: JSON.parse(read('tools/release-governance/release-agreement.json')),
+          version,
+          marketplaceSha256: await downloadVsixSha256(marketplaceVsixUrl({ publisher, name, version })),
+          githubReleaseSha256: await downloadVsixSha256(githubReleaseVsixUrl({ repositoryUrl, name: pkg.name, version })),
+        });
+        if (!artifact.ok) {
+          console.error(`\u2717 ${extId} ${version} is live, but it does not ship the reviewed artifact: ${artifact.reason}`);
+          process.exitCode = 1;
+          return;
+        }
+        console.log(`\u2713 Marketplace and GitHub Release VSIX are the reviewed artifact: ${artifact.reviewedSha256}`);
         const share = process.env.LBA_VM_SHARE || (process.env.HOME ? join(process.env.HOME, 'lba-vm-share') : '');
         if (!share) {
           console.error('\u2717 Marketplace verification succeeded but no local share is configured; set HOME or LBA_VM_SHARE to persist resumable evidence');
@@ -771,13 +866,25 @@ export const COMMANDS = {
           return;
         }
         const receiptPath = marketplaceVerificationPath(share, version);
-        const receipt = buildMarketplaceVerificationReceipt({ extension: extId, version, result: r });
+        const receipt = buildMarketplaceVerificationReceipt({ extension: extId, version, result: r, artifact });
         mkdirSync(share, { recursive: true });
         writeFileSync(receiptPath, `${JSON.stringify(receipt, null, 2)}\n`);
         console.log(`\u2713 ${extId} ${version} is LIVE on the Marketplace (latest ${r.latest}; recent: ${r.versions.slice(0, 5).join(', ')})`);
         console.log(`  recorded resumable Marketplace verification: ${receiptPath}`);
       } catch (e) {
         console.error(`\u2717 Marketplace query error: ${e.message}`);
+        process.exitCode = 1;
+      }
+    },
+  },
+  'release-stage-win': {
+    desc: 'release phase 7: stage the candidate on the WIN reviewer VM, record staged-frame-WIN-X.Y.Z.json, and set the evidence-bound review target (#73)',
+    run: async (args) => {
+      try {
+        const { main } = await import('../reviewer-workstation/release-stage-win.mjs');
+        await main(args);
+      } catch (error) {
+        console.error(`\u2717 release-stage-win: ${error.message}`);
         process.exitCode = 1;
       }
     },
@@ -792,7 +899,13 @@ export const COMMANDS = {
       if (!dir) {
         if (runIdx < 0) { console.error('provide --dir <artifactdir> or --run <run-id>'); process.exit(2); }
         dir = execFileSync('mktemp', ['-d']).toString().trim();
-        execFileSync('gh', ['run', 'download', String(args[runIdx + 1]), '--dir', dir], { stdio: 'inherit' });
+        try {
+          execFileSync('gh', ghRepoArgs(['run', 'download', String(args[runIdx + 1]), '--dir', dir]), { stdio: 'inherit' });
+        } catch (error) {
+          console.error(`\u2717 could not download the artifacts of run ${args[runIdx + 1]} from ${canonicalRepo()}: ${String(error.message).split('\n')[0]}`);
+          rmSync(dir, { recursive: true, force: true });
+          process.exit(1);
+        }
       }
       const files = readdirSync(dir, { recursive: true }).map((f) => join(dir, String(f)));
       const r = verifyReleaseAssets(files, { version });
@@ -801,10 +914,10 @@ export const COMMANDS = {
       const quoted = assets.map((a) => `'${a}'`).join(' ');
       if (!args.includes('--create')) {
         console.log(`\u2713 artifact verified for ${r.tag} (vsix ${String(r.vsix)}). DRY-RUN -- re-run with --create (needs your authorized bypass token) to cut it:`);
-        console.log(`  gh release create ${r.tag} ${quoted} --target main --title '${r.tag}' --notes 'Immutable release ${version}.'`);
+        console.log(`  gh release create ${r.tag} ${quoted} --target main --title '${r.tag}' --notes 'Immutable release ${version}.' --repo ${canonicalRepo()}`);
         return;
       }
-      execFileSync('gh', ['release', 'create', r.tag, ...assets, '--target', 'main', '--title', r.tag, '--notes', `Immutable release ${version}.`], { stdio: 'inherit' });
+      execFileSync('gh', ghRepoArgs(['release', 'create', r.tag, ...assets, '--target', 'main', '--title', r.tag, '--notes', `Immutable release ${version}.`]), { stdio: 'inherit' });
       console.log(`\u2713 cut ${r.tag} with ${assets.length} asset(s).`);
     },
   },
@@ -825,7 +938,7 @@ export const COMMANDS = {
       console.log(`  keyExists     : ${s.keyExists === null ? '(unknown)' : s.keyExists}`);
       console.log(`  station       : ${s.station}  (${disc.source})`);
       console.log(`  purpose       : ${s.purpose}`);
-      console.log(`  enrolled      : ${s.enrolled ? 'yes' : 'no'}${s.keyMatch !== 'unknown' ? ` (public-key ${s.keyMatch})` : ''}  [tools/collab-cli/reviewer-allowlist.json]`);
+      console.log(`  enrolled      : ${s.enrolled ? 'yes' : 'no'}${s.keyMatch !== 'unknown' ? ` (public-key ${s.keyMatch})` : ''}  [tools/release-governance/reviewer-allowlist.json]`);
       console.log(`\n  quorum sign-off (machine consensus) — run on ${s.station === STATIONS.VM ? 'the reviewer VM' : s.station === STATIONS.HOST ? 'this host' : 'the station where the key lives'}:\n    ${s.commands.quorum}`);
       console.log(`\n  visual verdict (human PASS) — always rendered + signed in the reviewer VM:\n    ${s.commands.visual}`);
       if (s.ok) { console.log(`\n\u2713 signing ready: ${s.reviewerId} enrolled, key present at ${s.reviewerKeyPath} on ${s.station}`); return; }
@@ -1096,6 +1209,21 @@ const SELFTEST = [
     const publishedOnly = releaseStatus({ version: '1.2.0', probes: { branchExists: true, versionBumped: true, vsixBuilt: true, attestationReady: true, quorumSigned: true, staged: true, visualSigned: true, compositeSealed: true, agreementRecorded: true, mergedToMain: true, ghReleaseCut: true, published: true, publishedAndBackMerged: false } });
     return backMerged && publishedOnly.next?.key === 'publish-backmerge';
   }],
+  ['gh calls name the canonical repository, never the one gh infers from git remotes (#59)', () => {
+    const canonical = canonicalRepo();
+    const fromGitUrl = canonicalRepo({ repository: { url: 'git+https://github.com/owner/name.git' } });
+    let rejected = false;
+    try { canonicalRepo({ repository: { url: 'https://gitlab.com/owner/name' } }); } catch { rejected = true; }
+    const plan = releasePlan('1.2.0');
+    const ghCommands = plan.phases.map((p) => p.command).filter((c) => /\bgh (workflow|pr|release|run) /.test(c));
+    // Every gh process this tool or the composite assembler starts goes through ghRepoArgs.
+    const unscoped = ['scripts/lba.mjs', 'reviewer-workstation/assemble-composite.mjs']
+      .flatMap((file) => [...read(file).matchAll(/(?:execFileSync|spawnSync|spawn)\('gh',(?!\s*ghRepoArgs\()/g)].map(() => file));
+    return canonical === 'svelderrainruiz/labview-benchmark-actor' && fromGitUrl === 'owner/name' && rejected
+      && ghRepoArgs(['run', 'download', '42'], 'o/r').join(' ') === 'run download 42 --repo o/r'
+      && ghCommands.length >= 3 && ghCommands.every((c) => c.includes(`--repo ${canonical}`))
+      && unscoped.length === 0;
+  }],
   ['release-verify-published (#412) confirms a version present in the Marketplace query result', () => {
     const q = { results: [{ extensions: [{ publisher: { publisherName: 'pub' }, extensionName: 'ext', versions: [{ version: '1.2.0' }, { version: '1.1.1' }] }] }] };
     const r = assertPublished(q, { publisher: 'pub', name: 'ext', version: '1.2.0' });
@@ -1103,10 +1231,35 @@ const SELFTEST = [
   }],
   ['release-verify-published records only a matching successful Marketplace observation as resumable evidence', () => {
     const result = { ok: true, live: true, latest: '1.2.0', versions: ['1.2.0', '1.1.1'] };
-    const receipt = buildMarketplaceVerificationReceipt({ extension: 'pub.ext', version: '1.2.0', result, verifiedAt: '2026-08-06T00:00:00.000Z' });
+    const sha = 'a'.repeat(64);
+    const artifact = { ok: true, reviewedSha256: sha, marketplaceSha256: sha, githubReleaseSha256: sha };
+    const receipt = buildMarketplaceVerificationReceipt({ extension: 'pub.ext', version: '1.2.0', result, artifact, verifiedAt: '2026-08-06T00:00:00.000Z' });
     const wrongVersion = { ...receipt, version: '1.2.1' };
+    const noProof = buildMarketplaceVerificationReceipt({ extension: 'pub.ext', version: '1.2.0', result, verifiedAt: '2026-08-06T00:00:00.000Z' });
+    const otherFile = { ...receipt, artifact: { ...receipt.artifact, marketplaceSha256: 'b'.repeat(64) } };
     return isMarketplaceVerificationReceipt(receipt, { extension: 'pub.ext', version: '1.2.0' })
-      && !isMarketplaceVerificationReceipt(wrongVersion, { extension: 'pub.ext', version: '1.2.0' });
+      && !isMarketplaceVerificationReceipt(wrongVersion, { extension: 'pub.ext', version: '1.2.0' })
+      && !isMarketplaceVerificationReceipt(noProof, { extension: 'pub.ext', version: '1.2.0' })
+      && !isMarketplaceVerificationReceipt(otherFile, { extension: 'pub.ext', version: '1.2.0' });
+  }],
+  ['release-verify-published (#71) requires the Marketplace and GitHub Release VSIX to be the reviewed artifact', () => {
+    const reviewed = 'c'.repeat(64);
+    const agreement = { components: { extension: { releases: { '1.2.0': { visualReview: { verdict: { target: { vsixSha256: reviewed } } } } } } } };
+    const check = (marketplaceSha256, githubReleaseSha256, version = '1.2.0') => assertShippedArtifact({ agreement, version, marketplaceSha256, githubReleaseSha256 });
+    return check(reviewed, reviewed).ok === true
+      && check('d'.repeat(64), reviewed).ok === false
+      && check(reviewed, 'd'.repeat(64)).ok === false
+      && check(reviewed, reviewed, '1.2.1').ok === false;
+  }],
+  ['release-verify-published (#71) reads a plain or gzip-wrapped VSIX download and rejects anything else', () => {
+    const zip = Buffer.from([0x50, 0x4b, 0x03, 0x04, 0x01, 0x02]);
+    const plain = vsixBytesFromDownload(zip);
+    const wrapped = vsixBytesFromDownload(gzipSync(zip));
+    let rejected = false;
+    try { vsixBytesFromDownload(Buffer.from('<html>not found</html>')); } catch { rejected = true; }
+    return plain.equals(zip) && wrapped.equals(zip) && rejected
+      && marketplaceVsixUrl({ publisher: 'pub', name: 'ext', version: '1.2.0' }).endsWith('/publishers/pub/vsextensions/ext/1.2.0/vspackage')
+      && githubReleaseVsixUrl({ repositoryUrl: 'https://github.com/owner/ext.git', name: 'ext', version: '1.2.0' }) === 'https://github.com/owner/ext/releases/download/ext-v1.2.0/ext-1.2.0.vsix';
   }],
   ['release-verify-published (#412) fails closed on absent version / publisher mismatch / no extension', () => {
     const q = { results: [{ extensions: [{ publisher: { publisherName: 'pub' }, extensionName: 'ext', versions: [{ version: '1.1.1' }] }] }] };

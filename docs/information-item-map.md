@@ -1,6 +1,6 @@
 # Information Item Map
 
-> Standards baseline: `repo-standards-review` v0.4.2. Information items follow
+> Standards baseline: `repo-standards-review` v0.15.0. Information items follow
 > ISO/IEC/IEEE 15289.
 
 ## Scope
@@ -20,7 +20,7 @@
 | Autonomous Actor Protocol Decision | `docs/architecture/adr/ADR-0081-signed-autonomous-actor-protocol.md` | Maintainers | actor authorization, task transport, candidate binding, replay, or outcome-signing change | `LBA-REQ-098` and `T-098` re-run the signed request/response fail-closed contract |
 | Autonomous Actor Service Decision | `docs/architecture/adr/ADR-0082-persistent-lbabus-autonomous-actor-service.md` | Maintainers | actor daemon, durable delivery state, workload adapter, CAS bounds, or local key configuration change | `LBA-REQ-099` and `T-099` re-run the persistent service and `lbabus` daemon contract |
 | Test Plan | `docs/testing/test-plan.md` | QA/maintainers | validation approach or coverage change | each `LBA-REQ` maps to at least one test item |
-| Repository Wiki (Obsidian vault) | generated from `docs/` by `scripts/build-wiki.mjs` into `labview-benchmark-actor.wiki.git` | Maintainers | any `docs/` change on `develop` | `wiki-vault` gate passes and the `wiki-publish` drift check finds the published wiki current |
+| Repository Wiki (Obsidian vault) | generated from `docs/` by the shared generator `.repo-standards-review/wiki_generate.py` (configured by `.wiki-generator.json`) into `labview-benchmark-actor.wiki.git` | Maintainers | any `docs/` change on `develop` | `wiki-vault` gate passes and the `wiki-publish` drift check finds the published wiki current |
 | Configuration Management Plan | `docs/cm/cm-plan.md` | Maintainers | baseline, branch, release, or move-procedure change | CM plan names the governing standards release and move procedure |
 | User Guide | `docs/information-for-users/user-guide.md` | Maintainers | install route or benchmark-UI change | guide covers install, run, the time-cursor review workflow, multi-VM coordination, MCP tools, release corroboration, and the agent→human handoff request (mark done / skip) workflow |
 | Ubuntu Installation Reference | `docs/information-for-users/ubuntu-24.04-labview-2026-installation.md` | Maintainers | Ubuntu/LabVIEW package, provisioning, activation, or benchmark procedure change | measured package versions, monotonic timing, safe screenshots, activation proof, and Mass Compile metrics remain tied to the validated Ubuntu 24.04 VirtualBox evidence |

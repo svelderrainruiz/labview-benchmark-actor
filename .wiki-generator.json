@@ -1,0 +1,54 @@
+{
+  "schema": "rsr/wiki-generator-config@1",
+  "repoUrl": "https://github.com/svelderrainruiz/labview-benchmark-actor",
+  "branch": "develop",
+  "wikiTitle": "labview-benchmark-actor Wiki",
+  "description": "The spec-driven documentation of [labview-benchmark-actor](https://github.com/svelderrainruiz/labview-benchmark-actor), a VS Code extension for benchmarking LabVIEW across Codespaces, golden VMs, and a coordination mesh.\n\nThis wiki is an Obsidian vault. Clone `https://github.com/svelderrainruiz/labview-benchmark-actor.wiki.git` and open the folder in Obsidian (\"Open folder as vault\") for the graph, backlink, and outline views. Links are plain `[[Page]]` wikilinks, which Obsidian and the GitHub wiki both understand.",
+  "obsidian": true,
+  "docs": "docs",
+  "srs": { "path": "requirements/srs.md", "style": "blocks" },
+  "rtm": { "path": "requirements/rtm.csv", "idColumn": "ReqID", "columns": ["Status"] },
+  "architecture": { "overview": "architecture/overview.md", "adrDir": "architecture/adr", "adrIndex": "architecture/adr/README.md" },
+  "testPlan": { "path": "testing/test-plan.md", "idColumn": "ID" },
+  "names": {
+    "information-for-users/plan.md": "Information-For-Users-Plan",
+    "proposals/cli-embedded-requirements.md": "Proposal-CLI-Embedded-Requirements",
+    "proposals/ephemeral-mesh.md": "Proposal-Ephemeral-Mesh",
+    "proposals/labview-authoring-and-lvkit-selftest.md": "Proposal-LabVIEW-Authoring-And-LVKit-Selftest",
+    "proposals/mesh-node-types.md": "Proposal-Mesh-Node-Types"
+  },
+  "words": { "labview": "LabVIEW", "lvkit": "LVKit", "mcp": "MCP" },
+  "assetDirs": ["images"],
+  "sections": [
+    ["information-for-users", "Information for users"],
+    ["architecture", "Architecture"],
+    ["release", "Release"],
+    ["cm", "Process and assurance"],
+    ["dod", "Process and assurance"],
+    ["compliance", "Process and assurance"],
+    ["testing", "Testing"],
+    ["benchmarks", "Benchmarks"],
+    ["proposals", "Proposals"]
+  ],
+  "scopes": {
+    "software": {
+      "directory": "requirements",
+      "idPrefix": "LBA-REQ",
+      "sections": [
+        { "name": "Status", "from": "block:Status" },
+        { "name": "Area", "from": "block:Area" },
+        { "name": "Statement", "from": "block:Statement" },
+        { "name": "Rationale", "from": "block:Rationale" },
+        { "name": "Acceptance Criteria", "from": "block:Acceptance Criteria" },
+        { "name": "Verification", "from": "block:Verification" },
+        { "name": "Historical statement (no longer implemented)", "from": "block:Historical statement (no longer implemented)" },
+        { "name": "Supersession", "from": "block:Supersession" },
+        { "name": "Change Guidance", "from": "block:Change Guidance" },
+        { "name": "TestID", "from": "rtm:TestID" },
+        { "name": "CodeRef", "from": "rtm:CodeRef" },
+        { "name": "RTM Status", "from": "rtm:Status" }
+      ]
+    },
+    "test": { "directory": "tests", "idPrefix": "T" }
+  }
+}

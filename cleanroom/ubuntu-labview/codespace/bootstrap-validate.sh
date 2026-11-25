@@ -14,7 +14,7 @@ set -euo pipefail
 
 HERE="$(cd "$(dirname "$(readlink -f "$0")")" && pwd)"
 REPO="$(cd "$HERE/../../.." && pwd)"
-SRC="$REPO/tools/collab-cli"
+SRC=""   # set below from the pinned lbabus checkout
 GATE_SUITE="$REPO/cleanroom/ubuntu-labview/lba/gate-suite.sh"
 LBA_DIR="${LBA_DIR:-$HOME/.lba}"
 DEST="$LBA_DIR/lbabus"
@@ -40,7 +40,9 @@ resolve_source_commit() {
   printf '%s\n' "${commit,,}"
 }
 
-[ -f "$SRC/LbaBus.csproj" ] || { echo "[abort] no $SRC/LbaBus.csproj -- run from a full checkout" >&2; exit 2; }
+command -v node >/dev/null 2>&1 || { echo "[abort] no node on PATH (needed to check out the pinned lbabus)" >&2; exit 2; }
+SRC="$(node "$REPO/scripts/fetch-lbabus.mjs" source)/tools/collab-cli" || { echo "[abort] cannot check out the pinned lbabus release" >&2; exit 2; }
+[ -f "$SRC/LbaBus.csproj" ] || { echo "[abort] no $SRC/LbaBus.csproj in the pinned lbabus checkout" >&2; exit 2; }
 [ -f "$GATE_SUITE" ] || { echo "[abort] missing shared gate-suite $GATE_SUITE" >&2; exit 2; }
 command -v dotnet >/dev/null 2>&1 || { echo "[abort] no dotnet SDK on PATH" >&2; exit 2; }
 mkdir -p "$LBA_DIR"

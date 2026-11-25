@@ -18,20 +18,20 @@
 | LBA-REQ-009 | VM cleanroom image storage via the mprr ring buffer | Proven | §3.3 Actor / run-result | ADR-0009, ADR-0086 | T-009 | 5 |
 | LBA-REQ-010 | Own-run review, host concentration, and the ollama comparison layer | Proven | §3.6 Analysis | ADR-0006, ADR-0008 | T-010 | 16 |
 | LBA-REQ-011 | CPU/RAM/disk usage correlation with a pre/post-trigger window | Proven | §3.6 Analysis | — | T-011 | 30 |
-| LBA-REQ-012 | Version-pinned agent base instructions | Proven | §3.7 Agentic-infrastructure | — | T-012 | 5 |
-| LBA-REQ-013 | Prioritized, addressable coordination messages | Superseded | §3.7 Agentic-infrastructure | ADR-0048, ADR-0088 | T-013 | 2 |
+| LBA-REQ-012 | Version-pinned agent base instructions | Proven | §3.7 Agentic-infrastructure | — | T-012 | 1 |
+| LBA-REQ-013 | Prioritized, addressable coordination messages | Superseded | §3.7 Agentic-infrastructure | ADR-0048, ADR-0088 | T-013 | 1 |
 | LBA-REQ-014 | Cross-plane benchmark comparison | Proven | §3.6 Analysis | — | T-014 | 17 |
 | LBA-REQ-015 | VI Analyzer as a cross-plane benchmark | Proven | §3.6 Analysis | — | T-015 | 17 |
 | LBA-REQ-016 | GitFlow branch governance | Proven | §3.8 Configuration-management & assurance | ADR-0010 | T-016 | 5 |
 | LBA-REQ-017 | LabVIEW authoring-lane dependency manifest | Proven | §3.8 Configuration-management & assurance | — | T-017 | 3 |
 | LBA-REQ-018 | Provider-delegated cleanroom AI uplift | Proven | §3.7 Agentic-infrastructure | ADR-0011 | T-018 | 17 |
-| LBA-REQ-019 | MCP server agent tool surface | Proven | §3.7 Agentic-infrastructure | ADR-0012 | T-019 | 7 |
-| LBA-REQ-020 | Bidirectional release sign-off | Proven | §3.8 Configuration-management & assurance | — | T-020 | 6 |
+| LBA-REQ-019 | MCP server agent tool surface | Proven | §3.7 Agentic-infrastructure | ADR-0012, ADR-0092 | T-019 | 10 |
+| LBA-REQ-020 | Bidirectional release sign-off | Proven | §3.8 Configuration-management & assurance | — | T-020 | 5 |
 | LBA-REQ-021 | Test-to-requirement correspondence gate | Proven | §3.8 Configuration-management & assurance | ADR-0013 | T-021 | 3 |
 | LBA-REQ-022 | Generated traceability matrix | Proven | §3.8 Configuration-management & assurance | ADR-0013 | T-022 | 3 |
 | LBA-REQ-023 | Actor Corroboration Grid (multi-witness release corroboration) | Proven | §3.9 Corroboration-grid | ADR-0014 | T-023 | 6 |
 | LBA-REQ-024 | Corroboration quorum + graded confidence | Proven | §3.9 Corroboration-grid | ADR-0015 | T-024 | 10 |
-| LBA-REQ-025 | Corroboration provenance + attestation | Proven | §3.9 Corroboration-grid | ADR-0016 | T-025 | 14 |
+| LBA-REQ-025 | Corroboration provenance + attestation | Proven | §3.9 Corroboration-grid | ADR-0016 | T-025 | 13 |
 | LBA-REQ-026 | Witness independence | Proven | §3.9 Corroboration-grid | ADR-0017, ADR-0068 | T-026 | 7 |
 | LBA-REQ-027 | Reviewer station + human sign-off | Proven | §3.9 Corroboration-grid | ADR-0018 | T-027 | 8 |
 | LBA-REQ-028 | Mesh verdict beacon | Proven | §3.9 Corroboration-grid | ADR-0019 | T-028 | 6 |
@@ -63,21 +63,21 @@
 | LBA-REQ-054 | Benchmark Observatory (suite-wide coverage + determinism map) | Proven | §3.2 Deployment | ADR-0034 | T-054 | 4 |
 | LBA-REQ-055 | Handoff Beacon -- capture-status (human-in-the-loop signal) | Proven | §3.2 Deployment | ADR-0035 | T-055 | 9 |
 | LBA-REQ-056 | Handoff Beacon -- agent->human request (human-step barrier) | Proven | §3.2 Deployment | ADR-0036 | T-056 | 7 |
-| LBA-REQ-057 | Handoff Beacon -- reviewer visual verdict (signed human PASS/FAIL) | Proven | §3.2 Deployment | ADR-0037 | T-057 | 14 |
+| LBA-REQ-057 | Handoff Beacon -- reviewer visual verdict (signed human PASS/FAIL) | Proven | §3.2 Deployment | ADR-0037, ADR-0093 | T-057 | 14 |
 | LBA-REQ-058 | Handoff Beacon -- reviewer verdict bus announcement | Proven | §3.2 Deployment | ADR-0038 | T-058 | 6 |
-| LBA-REQ-059 | Host<->VM-agent closed loop over the lbabus net TCP bus | Proven | §3.2 Deployment | ADR-0039 | T-059 | 8 |
-| LBA-REQ-060 | Live-only net coordination -- the receive-log + net poll read side | Proven | §3.2 Deployment | ADR-0040 | T-060 | 4 |
+| LBA-REQ-059 | Host<->VM-agent closed loop over the lbabus net TCP bus | Proven | §3.2 Deployment | ADR-0039 | T-059 | 7 |
+| LBA-REQ-060 | Live-only net coordination -- the receive-log + net poll read side | Proven | §3.2 Deployment | ADR-0040 | T-060 | 3 |
 | LBA-REQ-061 | Bus transport selection in the extension -- Discussion default, net opt-in | Proven | §3.2 Deployment | ADR-0041 | T-061 | 4 |
 | LBA-REQ-062 | MCP coordination tools transport selection -- Discussion default, net opt-in | Proven | §3.2 Deployment | ADR-0042 | T-062 | 4 |
 | LBA-REQ-063 | post-verdict.mjs transport selection -- Discussion default, net opt-in | Proven | §3.2 Deployment | ADR-0043 | T-063 | 2 |
 | LBA-REQ-064 | Drop the release-CI GitHub-Discussion verdict announce | Proven | §3.2 Deployment | ADR-0044 | T-064 | 3 |
-| LBA-REQ-065 | Flip the coordination default to net + graceful no-op when unconfigured | Proven | §3.2 Deployment | ADR-0045 | T-065 | 7 |
+| LBA-REQ-065 | Flip the coordination default to net + graceful no-op when unconfigured | Proven | §3.2 Deployment | ADR-0045 | T-065 | 6 |
 | LBA-REQ-066 | Collapse the coordination product surface to net-only | Proven | §3.2 Deployment | ADR-0046 | T-066 | 8 |
-| LBA-REQ-067 | Remove the GitHub-Discussion transport from the lbabus CLI | Proven | §3.2 Deployment | ADR-0047 | T-067 | 5 |
+| LBA-REQ-067 | Remove the GitHub-Discussion transport from the lbabus CLI | Proven | §3.2 Deployment | ADR-0047 | T-067 | 1 |
 | LBA-REQ-068 | Net-only live VM-agent drive (govern the released-CLI closed loop as a committed receipt) | Proven | §3.2 Deployment | ADR-0049 | T-068 | 6 |
-| LBA-REQ-069 | Release-with-review drive (bind the net-staged candidate to the signed + announced verdict) | Proven | §3.2 Deployment | ADR-0050 | T-069 | 5 |
+| LBA-REQ-069 | Release-with-review drive (bind the net-staged candidate to the signed + announced verdict) | Proven | §3.2 Deployment | ADR-0050 | T-069 | 7 |
 | LBA-REQ-070 | Composite release decision (bind the machine corroboration gate to the human visual gate over one net-staged candidate) | Proven | §3.2 Deployment | ADR-0051 | T-070 | 8 |
-| LBA-REQ-071 | Enforce the composite release decision in the extension release workflow | Proven | §3.2 Deployment | ADR-0052, ADR-0073 | T-071 | 4 |
+| LBA-REQ-071 | Enforce the composite release decision in the extension release workflow | Proven | §3.2 Deployment | ADR-0052, ADR-0073, ADR-0093 | T-071 | 6 |
 | LBA-REQ-072 | Cross-plane launch-benchmark parity (identity is the spec, not the series) | Proven | §3.2 Deployment | ADR-0053 | T-072 | 6 |
 | LBA-REQ-073 | Mesh-run cross-plane fulfillment (the North Star loop) | Proven | §3.2 Deployment | ADR-0054 | T-073 | 5 |
 | LBA-REQ-074 | GitHub-native mesh-run dispatch transport (repository_dispatch) | Proven | §3.2 Deployment | ADR-0055 | T-074 | 6 |
@@ -92,7 +92,7 @@
 | LBA-REQ-083 | The mesh carries a second benchmark family (VI Analyzer) | Proven | §3.2 Deployment | ADR-0064 | T-083 | 6 |
 | LBA-REQ-084 | The stress-discounted cross-plane comparison (discount a result captured on a stressed actor) | Proven | §3.2 Deployment | ADR-0065 | T-084 | 6 |
 | LBA-REQ-085 | The byte-reproducible extension package (the reviewed .vsix equals the shipped .vsix) | Proven | §3.1 Packaging / boundary | ADR-0066 | T-085 | 7 |
-| LBA-REQ-086 | The cross-plane byte-reproducible extension package (a Windows build equals a Linux build) | Proven | §3.1 Packaging / boundary | ADR-0067 | T-086 | 6 |
+| LBA-REQ-086 | The cross-plane byte-reproducible extension package (a Windows build equals a Linux build) | Proven | §3.1 Packaging / boundary | ADR-0067 | T-086 | 7 |
 | LBA-REQ-087 | Genuine cross-plane corroboration (a windows-latest + ubuntu-latest witness prove two planes agree) | Proven | §3.9 Corroboration-grid | ADR-0069 | T-087 | 5 |
 | LBA-REQ-088 | Durable genuine cross-plane corroboration attestation (capture the live two-plane proof as a committed receipt) | Proven | §3.9 Corroboration-grid | ADR-0070 | T-088 | 5 |
 | LBA-REQ-089 | Signed cross-plane corroboration (the enrolled human sign-off over the genuine crossPlane quorum) | Proven | §3.9 Corroboration-grid | ADR-0071 | T-089 | 9 |
@@ -101,14 +101,15 @@
 | LBA-REQ-092 | Run-bound cross-plane corroborate + compare (the ingested collection) | Proven | §3.2 Deployment | ADR-0075 | T-092 | 6 |
 | LBA-REQ-093 | The Node-version-pinned reproducible package (reviewed Node equals shipped Node) | Proven | §3.1 Packaging / boundary | ADR-0076 | T-093 | 7 |
 | LBA-REQ-094 | Extension-contributed compound human tasks | Proven | — | ADR-0077 | T-094 | 7 |
-| LBA-REQ-095 | System-level SemVer, task chronology, and canonical distribution | Proven | — | ADR-0078 | T-095 | 24 |
+| LBA-REQ-095 | System-level SemVer, task chronology, and canonical distribution | Proven | — | ADR-0078 | T-095 | 26 |
 | LBA-REQ-096 | Standards scorecard release-risk overlay | Proven | — | ADR-0079, ADR-0087 | T-096 | 9 |
 | LBA-REQ-097 | Experiment lifecycle and local continuous KPI | Proven | — | ADR-0080 | T-097 | 16 |
-| LBA-REQ-098 | Signed autonomous actor protocol | Proven | — | ADR-0081 | T-098 | 6 |
-| LBA-REQ-099 | Persistent lbabus autonomous actor service | Proven | — | ADR-0082 | T-099 | 14 |
+| LBA-REQ-098 | Signed autonomous actor protocol | Proven | — | ADR-0081 | T-098 | 5 |
+| LBA-REQ-099 | Persistent lbabus autonomous actor service | Proven | — | ADR-0082 | T-099 | 13 |
 | LBA-REQ-100 | Fail-closed autonomous N>=3 controller decision | Proven | — | ADR-0083 | T-100 | 6 |
 | LBA-REQ-101 | Read-only active-capture MCP resources | Planned | §3.7 Agentic-infrastructure | ADR-0084 | T-101 | 8 |
 | LBA-REQ-102 | Standalone Windows desktop capture | Planned | §3.7 Agentic-infrastructure | ADR-0085 | T-102 | 7 |
-| LBA-REQ-103 | Obsidian-ready wiki generated from docs | Proven | §3.8 Configuration-management & assurance | ADR-0089 | T-103 | 4 |
+| LBA-REQ-103 | Obsidian-ready wiki generated from docs | Proven | §3.8 Configuration-management & assurance | ADR-0089, ADR-0090 | T-103 | 5 |
+| LBA-REQ-104 | Fork wiki submissions are verified as data | Proven | §3.8 Configuration-management & assurance | ADR-0091 | T-104 | 6 |
 
-_Generated for 103 requirements._
+_Generated for 104 requirements._

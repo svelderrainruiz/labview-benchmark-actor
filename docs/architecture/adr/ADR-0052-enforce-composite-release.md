@@ -17,7 +17,7 @@ governed decision existed but was not ENFORCED at the point of release.
 
 ## Decision
 
-- Add `tools/collab-cli/verify-composite-release.mjs` — a fail-closed release-time enforcement CLI that, for a
+- Add `tools/release-governance/verify-composite-release.mjs` — a fail-closed release-time enforcement CLI that, for a
   `<component, version>`, requires the committed composite receipt to NAME that candidate AND be a proven
   composite decision. It REUSES the gated `validateReceipt` from the composite-release-decision verifier; no
   gating logic is reimplemented. Exit 0 = cleared to publish; 1 = fail-closed; 2 = usage.

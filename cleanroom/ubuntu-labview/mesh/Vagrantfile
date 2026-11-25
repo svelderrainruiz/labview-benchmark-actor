@@ -53,9 +53,11 @@ mesh_emitters = ACTORS.count { |actor| %w[source both].include?(normalized_mesh_
 mesh_listeners = ACTORS.count { |actor| %w[sink both].include?(normalized_mesh_node_type(actor)) }
 raise "mesh topology needs at least one emitter and one listener" if mesh_emitters.zero? || mesh_listeners.zero?
 
-# The per-actor mesh workload is SHARED with Docker-CI (tools/collab-cli/ci/mesh-actor.sh). Read + normalize it
+# The per-actor mesh workload is SHARED with Docker-CI (tools/collab-cli/ci/mesh-actor.sh in the PINNED lbabus release;
+# scripts/fetch-lbabus.mjs checks out the pinned tag and fails unless the commit matches). Read + normalize it
 # to LF here (a Windows host checkout may be CRLF) and deliver it base64 so no line ending survives to the guest.
-MESH_ACTOR_SRC = File.expand_path("../../../tools/collab-cli/ci/mesh-actor.sh", __dir__)
+MESH_ACTOR_SRC = ENV["MESH_ACTOR_SRC"] ||
+  File.join(`node #{File.expand_path("../../../scripts/fetch-lbabus.mjs", __dir__)} source`.strip, "tools", "collab-cli", "ci", "mesh-actor.sh")
 raise "missing #{MESH_ACTOR_SRC}" unless File.exist?(MESH_ACTOR_SRC)
 MESH_ACTOR_B64 = Base64.strict_encode64(File.read(MESH_ACTOR_SRC).gsub(/\r\n?/, "\n"))
 

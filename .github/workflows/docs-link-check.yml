@@ -29,5 +29,5 @@ jobs:
             --verbose
             --no-progress
             --include-fragments
-            docs/**/*.md
+            docs
             **/*.md

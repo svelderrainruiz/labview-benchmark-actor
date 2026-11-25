@@ -31,6 +31,11 @@
 2. Bump changed component versions and the extension in `release-components.json`, synchronize
    package/component sources, and stamp `## [X.Y.Z]` in `CHANGELOG.md`. The repository precommit
    hook requires these release metadata files to be staged in their final state.
+   **From 1.6.7:** the release operator checks the full reviewer infrastructure receipt against the
+   selected baseline in private, before signing. Hash the exact retained receipt bytes with SHA-256.
+   Put only the [three-field record](reviewer-infrastructure.schema.json) in `release-components.json`
+   before building: `schema` is `reviewer-infrastructure@1`, `baseline` is the baseline version (e.g.
+   `v0.1.0`), and `receiptSha256` is the 64-character lowercase hex digest. Keep the receipt private.
 3. On the pinned node, build the normalized artifact: `npm run package`, from a clean
    `git worktree` of the candidate commit so no ignored local file is packaged (#55). Capture
    the candidate `commit` and the packaged `vsixSha256`. Packaging fails closed unless every
@@ -61,8 +66,29 @@ as `~/lba-vm-share/staged-frame-WIN-X.Y.Z.json`; this is the independent, versio
 completion evidence for release phase 7 (neither a quorum sign-off nor a visual verdict
 can substitute for it).
 
-Capture and normalize that frame instead of hand-authoring JSON. After the WIN reviewer agent reports its
-stage task, await its correlated `DONE` frame and then build the composite-ready artifact:
+Stage, capture, and bind in one command (#73). With the reviewer VM running and the per-version reviewer keys
+enrolled:
+
+```
+npm run lba -- release-stage-win X.Y.Z --vm <reviewer-vm> --commit <candidate-commit> \
+   --vsix <candidate.vsix> --attestation ~/lba-vm-share/attestation-X.Y.Z.json
+```
+
+It copies the candidate into the VM and fails unless the VM holds the exact bytes. It then installs the extension
+and confirms the listed `id@version`, and points the reviewer key setting at the `X.Y.Z` visual key. Next, it listens
+for the correlated `DONE` while the in-VM sender reports the staged identity, and writes
+`~/lba-vm-share/staged-frame-WIN-X.Y.Z.json`. Finally, it runs `render-verdict.sh set-target` with the evidence taken
+from the attestation (`cross-plane-run`, `attestation-sha256`) plus the `windows-stage` task. The VM password comes from
+`LBA_VM_PASS` or `~/.config/lba/vm-pass` and reaches VBoxManage only as a private `--passwordfile`. `--dry-run`
+prints the plan, and the command refuses to overwrite an existing staged frame without `--force`.
+
+When the infrastructure record is present, the stage command adds its digest to those evidence entries.
+If setting the target manually, preserve the stage evidence and add exactly one
+`--evidence "reviewer-infrastructure-receipt-sha256:<receiptSha256>"` to the same `set-target` command.
+Before signing, the reviewer confirms the target carries the digest of the privately checked receipt.
+
+The steps it composes, for diagnosis: after the WIN reviewer agent reports its stage task, await its correlated
+`DONE` frame and then build the composite-ready artifact:
 
 ```
 node reviewer-workstation/await-agent-reply.mjs \
@@ -113,8 +139,8 @@ key material). Then:
    VM-resident enrolled key (the key never leaves the VM; it wraps the guestcontrol `cmd /c`
    node-invocation gotcha), collects the signed `quorum-signoff-X.Y.Z.json` to `~/lba-vm-share/`,
    and verifies it (`verify-quorum-signoff.mjs`: enrolled key + passing cross-plane quorum, fail-closed).
-3. Verify both locally before sealing: `tools/collab-cli/verify-visual-review.mjs` and
-   the composite verifier `tools/collab-cli/verify-composite-release.mjs`.
+3. Verify both locally before sealing: `tools/release-governance/verify-visual-review.mjs` and
+   the composite verifier `tools/release-governance/verify-composite-release.mjs`.
 
 ## 5. Seal — receipt + agreement
 
@@ -138,7 +164,7 @@ key material). Then:
 2. **Record the agreement.** Instead of hand-editing JSON, run the recorder (issue #419):
 
    ```
-   node tools/collab-cli/record-release-agreement.mjs \
+   node tools/release-governance/record-release-agreement.mjs \
      --component extension --version X.Y.Z --commit <sha> \
      --linux-note "..." --win-note "..." \
      --visual-verdict ~/lba-vm-share/visual-verdict-X.Y.Z.json
@@ -146,22 +172,27 @@ key material). Then:
 
    It inserts the `components.extension.releases.<version>` entry (both planes
    `agreed:true` + the embedded signed `visualReview`) as a minimal structured edit into
-   `tools/collab-cli/release-agreement.json`, refuses to clobber an existing version, and
-   fails closed unless `tools/collab-cli/verify-release-agreement.mjs` +
-   `tools/collab-cli/verify-visual-review.mjs` both pass for that version.
+   `tools/release-governance/release-agreement.json`, refuses to clobber an existing version, and
+   fails closed unless `tools/release-governance/verify-release-agreement.mjs` +
+   `tools/release-governance/verify-visual-review.mjs` both pass for that version.
    These two generated sealing receipts are release evidence, not product-component source;
    the precommit version classifier therefore permits their post-signing update without
    forcing a new extension or `lbabus` identity.
 3. **Preflight.** `npm run lba -- release-preflight X.Y.Z` must be all green: it asserts
    the local node equals `.nvmrc`, `package.json` + `CHANGELOG.md` are at `X.Y.Z`, the
-   composite receipt `candidate.version == X.Y.Z`, and the three live publish gates clear
-   (`scripts/lba.mjs`).
+   composite receipt `candidate.version == X.Y.Z`, and the live publish gates clear. Both preflight and
+   the workflow's `agreement` job run `scripts/verify-reviewer-infrastructure.mjs` against the sealed
+   candidate. A pass proves the signed verdict commits to the public digest, not that the infrastructure
+   matches the receipt. Published releases are not re-checked.
+   The visual key must have `validFrom` and `validThrough` both equal to `X.Y.Z` and the `visual`
+   purpose. Ranges are insufficient for this gate. Supply stable versions without leading zeros;
+   pre-release versions and duplicate JSON member names are rejected.
 
 ## 6. Reconcile + merge to main
 
 1. Merge `origin/main` into the release branch to absorb any divergence (issue #417),
    resolving the sealing files (`reviewer-workstation/composite-release-decision-receipt.json`,
-   `tools/collab-cli/release-agreement.json`) with `--ours`; verify no main-unique commit
+   `tools/release-governance/release-agreement.json`) with `--ours`; verify no main-unique commit
    is lost.
 2. Open the PR to `main` and merge with `--no-ff` (never squash a release), so
    `main` ↔ `develop` never diverge (`docs/cm/cm-plan.md`).
@@ -175,7 +206,7 @@ key material). Then:
 
 1. Dispatch `.github/workflows/extension-release.yml` (`workflow_dispatch`,
    `-f version=X.Y.Z -f publish_marketplace=false`, `--ref main`). The `agreement` job runs
-   `tools/collab-cli/verify-composite-release.mjs --component extension X.Y.Z` and blocks
+   `tools/release-governance/verify-composite-release.mjs --component extension X.Y.Z` and blocks
    the publish unless the committed composite decision proves both gates for the tagged
    candidate. This first dispatch stages signed assets and does not publish to Marketplace.
 2. Confirm reviewed == shipped: `scripts/verify-published-vsix.mjs` asserts the CI-built
@@ -200,8 +231,10 @@ key material). Then:
    release tip is an ancestor of both, so the planes stay in sync.
 3. Re-check the Marketplace listing (the gallery API lags a few minutes) with
    `npm run lba -- release-verify-published X.Y.Z`. It also requires every listing link,
-   Issues (`Links.Support`) included, to name the canonical repository (#56). A successful query records
-   `~/lba-vm-share/marketplace-verification-X.Y.Z.json`, allowing the resumable driver to
+   Issues (`Links.Support`) included, to name the canonical repository (#56), and it downloads the VSIX the
+   Marketplace serves and the `ext-vX.Y.Z` GitHub Release asset and requires both to equal the reviewed artifact
+   (the signed visual-verdict target in `release-agreement.json`, #71). A successful query records
+   `~/lba-vm-share/marketplace-verification-X.Y.Z.json` with the three hashes, allowing the resumable driver to
    recognize phase 13 only after the required release-tip back-merge to `develop` is also
    proven. Record the closeout in the regenerated `docs/testing/test-report.md` counts.
 
@@ -215,6 +248,6 @@ key material). Then:
 | Signed visual verdict | `~/lba-vm-share/visual-verdict-X.Y.Z.json` (host) |
 | Marketplace verification | `~/lba-vm-share/marketplace-verification-X.Y.Z.json` (host) |
 | Composite receipt (committed) | `reviewer-workstation/composite-release-decision-receipt.json` |
-| Release agreement (committed) | `tools/collab-cli/release-agreement.json` |
+| Release agreement (committed) | `tools/release-governance/release-agreement.json` |
 | Marketplace publish credential | none stored: Trusted Publishing policy on the `svelderrainruiz` publisher for `extension-release.yml` + environment `marketplace` |
 | `ext-v*` tag push | an authorized bypass token (protected tag) |

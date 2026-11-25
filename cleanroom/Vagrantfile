@@ -3,7 +3,7 @@
 # Provider: VMware (vmware_desktop) — NOT VirtualBox (per project direction). The base box carries
 # the operator's LICENSED LabVIEW; there is no public LabVIEW box by design. Package one from an
 # existing VMware VM (e.g. C:\VM\labview-cleanroom) — see README.md. This Vagrantfile then bootstraps the pinned
-# collab-cli toolchain (incl. the .NET SDK) ON TOP and BUILDS lbabus in the clean room.
+# collab-cli toolchain (incl. the .NET SDK) ON TOP and BUILDS the pinned lbabus release in the clean room.
 
 Vagrant.configure("2") do |config|
   # Base box: a Windows image with licensed LabVIEW already installed (operator-provided).
@@ -14,15 +14,9 @@ Vagrant.configure("2") do |config|
   config.vm.communicator = "winrm"           # Windows LabVIEW guest
   config.winrm.timeout = 1800
 
-  # Sync the collab-cli source into the guest so the bootstrap can BUILD it in the clean room.
-  # Skippable for unattended smoke boots (avoids the host SMB credential prompt) via
-  # CLEANROOM_NO_SYNC=1 — the source share is only needed by the bootstrap provisioner.
-  if ENV["CLEANROOM_NO_SYNC"].to_s.empty?
-    config.vm.synced_folder "..", "C:\\vagrant-src", type: "smb",
-      mount_options: ["mfsymlinks", "dir_mode=0775", "file_mode=0664"]
-  else
-    config.vm.synced_folder ".", "/vagrant", disabled: true
-  end
+  # No source share: the bootstrap clones the PINNED lbabus release (svelderrainruiz/lbabus, tag + commit checked)
+  # into the guest and BUILDS it there. CLEANROOM_NO_SYNC is kept as a no-op so existing unattended invocations work.
+  config.vm.synced_folder ".", "/vagrant", disabled: true
 
   config.vm.provider "vmware_desktop" do |v|
     v.gui = true

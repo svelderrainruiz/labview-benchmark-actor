@@ -15,6 +15,7 @@ git-hooks/** text=auto eol=lf
 # same bytes on every platform.
 .repo-standards-review.json text eol=lf
 .cruft.json text eol=lf
+.wiki-generator.json text eol=lf
 *.py text=auto eol=lf
 cleanroom/ubuntu-labview/*.ps1 text=auto eol=lf
 experiments/multi-vm-topology/**/*.ps1 text=auto eol=lf
@@ -32,7 +33,11 @@ experiments/ollama-bus/*.sh text eol=lf
 cleanroom/ubuntu-labview/*.sh text eol=lf
 cleanroom/ubuntu-labview/**/*.sh text eol=lf
 experiments/activation/*.sh text eol=lf
-tools/collab-cli/ci/*.sh text eol=lf
+
+# The wiki generator's configuration is read by the generator and gates on every plane; it keeps LF so a Windows
+# checkout hashes the same as a Linux one (issue #98: it once shipped in the .vsix as CRLF and broke the cross-plane
+# reproduction).
+.wiki-generator.json text eol=lf
 
 # Extension-embedded AGENTS.md (issue #98): the manifest pins the file by sha256 over its canonical body, so
 # it must stay LF on every plane (a Windows CRLF checkout would otherwise hash differently than the manifest).
@@ -69,6 +74,7 @@ experiments/windows-docker-container/decisions/*.json text eol=lf
 cleanroom/ubuntu-labview/*.sh text eol=lf
 
 # Shared CI mesh workers execute under Bash in Linux containers and guests.
-tools/collab-cli/ci/*.sh text eol=lf
 # The vendored mprr shared contract is verified by SHA-256 (ADR-0086): keep it byte-exact on every plane.
 experiments/mprr-ring/contract/mprr-shared-contract.v1.json -text
+# Cross-plane parity: this file is packaged into the .vsix, so it must be byte-identical on every plane (#108).
+.wiki-canonical.json text eol=lf

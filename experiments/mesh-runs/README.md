@@ -3,8 +3,8 @@
 Reliable, **repeatable** lbabus mesh runs on Linux containers, with a **unique per-run prefix** and **stored
 per-run logs**, so runs are individually identifiable and comparable **across runs and commits** (for agent
 inference). This is the container-native complement to the VM mesh (`cleanroom/ubuntu-labview/mesh/`) — it
-runs the **same** [`mesh-actor.sh`](../../tools/collab-cli/ci/mesh-actor.sh) workload from the
-`lbabus-linux-verify:mesh` image (`tools/collab-cli/ci/Dockerfile.linux --target mesh`), forms in seconds,
+runs the **same** [`mesh-actor.sh`](https://github.com/svelderrainruiz/lbabus/blob/v0.17.1/tools/collab-cli/ci/mesh-actor.sh) workload from the
+`lbabus-linux-verify:mesh` image (the pinned lbabus release's `tools/collab-cli/ci/Dockerfile.linux --target mesh`), forms in seconds,
 and is free of the VM/NAT/boot flakiness.
 
 ## Run id = `<commit>-r<NNN>`
@@ -41,4 +41,4 @@ node experiments/mesh-runs/compare-mesh-runs.mjs       # compare every stored ru
 `meshFormMs` (per actor: `mesh start` → `MESH OK`, from the log timestamps) is the container-mesh benchmark
 metric — it is the mesh-formation leg, the reliable analog of the boot-benchmark's `meshFormMs` span.
 
-Prereq: build the image once — `docker build -f tools/collab-cli/ci/Dockerfile.linux --target mesh -t lbabus-linux-verify:mesh .`.
+Prereq: build the image once — `L=$(node scripts/fetch-lbabus.mjs source) && docker build -f "$L/tools/collab-cli/ci/Dockerfile.linux" --target mesh -t lbabus-linux-verify:mesh "$L"` (the pinned lbabus checkout is the build context).

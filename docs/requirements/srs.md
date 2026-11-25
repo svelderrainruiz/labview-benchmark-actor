@@ -1,6 +1,6 @@
 # labview-benchmark-actor — Software Requirements Specification
 
-> Standards baseline: `repo-standards-review` v0.4.2. Requirements follow
+> Standards baseline: `repo-standards-review` v0.15.0. Requirements follow
 > ISO/IEC/IEEE 29148 §5 (requirement quality: verifiable, unambiguous,
 > traceable). Requirement IDs are `LBA-REQ-NNN`; acceptance criteria are cited
 > by position as `LBA-REQ-NNN.M`.
@@ -47,7 +47,7 @@ progressively.
 | LBA-REQ-017 | The system shall record every LabVIEW authoring-lane dependency as a version-pinned entry in a governed dependency manifest. | The authoring lane (`labview_assistant` + its DQMH dependency + the `.vipb` VI-Package build) must build reproducibly on the Windows clean room, which requires every dependency pinned to a concrete, verifiable version rather than a floating reference. | `experiments/labview-authoring/dep-manifest.json` records each authoring dependency with a `pinStatus` of `resolved` (a concrete git SHA, pip version, or vipc) or `tbd-*`, and the verifier rejects a bad schema, a malformed SHA, an unknown plane, a missing python bitness, a bad `pinStatus`, or a `resolved` entry with an empty version. | Run `node experiments/labview-authoring/verify-dep-manifest.mjs` and `verify-dep-manifest.selftest.mjs`; both gated in `verify-local-gates`. |
 | LBA-REQ-018 | The system shall delegate a validated uplift task to a capability-matched cleanroom AI provider over the coordination bus. | Uplift and documentation-drafting work runs where the licensed tooling and capability differentiation live (cleanroom actors running Ollama / Copilot CLI / Codex), so the host observes each cleanroom's gated outcome over the existing `lbabus` transport rather than hosting providers centrally. | `delegateUplift` validates an `lba-uplift-task@v1` spec, drives the provider through a provider-agnostic adapter seam, applies a deterministic acceptance gate (pass and fail), and writes an `lba-uplift-delegation-receipt@v1` announced as an ADR-0003 `DONE` frame; the registry routes a `CLAIM` only to a live capability-matched worker; the worker pool bounds concurrency; each uplift domain (coverage-lift, evidence, risky-test, VIPM credential + routing) gates fail-closed — all proven offline via the mock adapter. | Run the provider-delegation verify suite (`verify-provider-delegation`, `verify-registry`, `verify-claim-tasking`, `verify-worker-pool`, `verify-quality-gate`, `verify-vipm-routing`, `verify-vipm-gate`, `verify-coverage-lift`, `verify-evidence`, `verify-risky-test`); gated in `verify-local-gates`. |
 | LBA-REQ-019 | The system shall expose the benchmark actor's tools to a coding agent through a Model Context Protocol server. | Coding agents consume tooling through MCP, and the actor already holds value an agent wants (host capabilities, the deterministic mprr benchmark series, and the `lbabus` coordination bus), so a standard MCP surface lets an agent discover and call them directly rather than through bespoke VS Code commands. | The compiled JSON-RPC 2.0 handler answers `initialize` / `tools/list` / `tools/call` over newline-delimited stdio, publishes exactly four tools (`get_host_capabilities`, `get_benchmark_series`, `poll_coordination_bus`, `post_coordination_note`), returns `-32601` / `-32602` for an unknown method / tool, and degrades a missing `lbabus` to a soft `isError` rather than a transport crash; the definition provider registers under the same id the manifest contributes; and `docs/mcp-tools.md` matches the published registry. | Run `npm test` (compiles, then runs `test/mcp-server.mjs` -- pure-core, activation, and stdio legs -- and `scripts/mcpToolDoc.mjs --check docs/mcp-tools.md`). |
-| LBA-REQ-020 | The system shall block a component release from publishing until both the WIN and LINUX planes have recorded an agreed sign-off for that exact component version. | A shared release (the `collab-cli` bus binary or the VS Code extension `.vsix`) is co-owned by both planes, so letting either plane publish unilaterally would ship an unreviewed change; each component's release workflow therefore fails closed until both planes commit an explicit `agreed:true` sign-off for the exact version. | `verify-release-agreement.mjs` reads `tools/collab-cli/release-agreement.json` (`release-agreement@v2`) and exits 0 only when every required plane (WIN, LINUX) records `agreed:true` for the `<component, version>`, exits 1 fail-closed on a missing / withheld / unparseable sign-off, and exits 2 on a usage error; both `extension-release.yml` and `collab-cli-release.yml` run it before their publish job. | Run `node tools/collab-cli/verify-release-agreement.mjs <version>` (and `--component extension <version>`); each release workflow gates its publish job on the gate's exit 0. |
+| LBA-REQ-020 | The system shall block a component release from publishing until both the WIN and LINUX planes have recorded an agreed sign-off for that exact component version. | A shared release (the `collab-cli` bus binary or the VS Code extension `.vsix`) is co-owned by both planes, so letting either plane publish unilaterally would ship an unreviewed change; each component's release workflow therefore fails closed until both planes commit an explicit `agreed:true` sign-off for the exact version. | `verify-release-agreement.mjs` reads `tools/release-governance/release-agreement.json` (`release-agreement@v2`) and exits 0 only when every required plane (WIN, LINUX) records `agreed:true` for the `<component, version>`, exits 1 fail-closed on a missing / withheld / unparseable sign-off, and exits 2 on a usage error; `extension-release.yml` runs it before its publish job. | Run `node tools/release-governance/verify-release-agreement.mjs <version>` (and `--component extension <version>`); each release workflow gates its publish job on the gate's exit 0. |
 | LBA-REQ-021 | The system shall reject any governed test file that does not correspond to at least one requirement in the traceability register. | A test that maps to no requirement is either an untraceable capability or dead weight; enforcing the test-to-requirement correspondence as a fail-closed gate keeps the 29119 test suite tied to the 29148 requirements and seeds the ISO/IEC/IEEE 42010 correspondence graph (ADR-0013) that later rules extend. | `verify-correspondences.mjs` enumerates the governed test set (`test/*.mjs`, `experiments/**/verify-*.mjs`, `*.selftest.mjs`, `*.playwright.{mjs,cjs}`, `playwright/*.mjs`, `tools/**/verify-*`) from the working tree and exits 1 listing any file absent from every RTM CodeRef (rule TR-1); it also enforces the ADR-to-requirement (AD-1) and requirement-to-view (VW-1) correspondence rules fail-closed after the ADR-0013 register reconciliation. | Run `node experiments/reqs-coverage/verify-correspondences.mjs`; gated in `verify-local-gates`. |
 | LBA-REQ-022 | The system shall generate the requirement traceability matrix from the governed requirement, test, and decision sources. | Hand-maintaining the requirement-to-view-to-decision-to-test cross-references invites drift, so deriving one matrix from the canonical SRS, RTM, architecture description, and ADR register keeps the traceability view honest and current by construction (ADR-0013 correspondence graph, Stage 3). | `generate-traceability.mjs` reads the requirement ids and titles from `docs/requirements/srs.md`, the status / TestID / CodeRef count from `docs/requirements/rtm.csv`, the addressing architecture view from `docs/architecture/overview.md`, and the decisions from the ADR index, then writes `docs/requirements/traceability-matrix.md`; `--check` exits non-zero when the committed matrix is stale. | Run `node experiments/reqs-coverage/generate-traceability.mjs --check`; gated by `traceability-matrix-current` in `verify-local-gates`. |
 | LBA-REQ-023 | The system shall gate each governed component release on an on-demand corroboration quorum in which a majority of independent witnesses across distinct environments agree on the release's deterministic anchors. | A single cleanroom is an unwitnessed single point of trust; requiring a majority of independent, distinct-environment witnesses to agree on the deterministic anchors raises release confidence and makes a drifted or forged witness detectable as a quorum divergence rather than a silent pass. | The Actor Corroboration Grid (ADR-0014) collects a signed receipt bundle from at least two of three heterogeneous witnesses (Codespace-Linux, VirtualBox-Linux, Windows) and passes only when a majority agree on the OS-independent anchors (viewer `seriesHash`, `lbabus` version + `sourceCommit`, gate-suite `verdict`); a sub-majority blocks the release and opens a divergence issue. | The Actor Corroboration Grid end-to-end gate (`experiments/acg-grid/grid.mjs`) composes every sub-engine -- independence + quorum + attestation + mesh + human sign-off -- into one release decision (self-test 6/6, gated by `acg-grid-e2e`); the real {codespace, host} grid corroborates through every machine stage, held only at the human sign-off (`acg-grid-run-live`). |
@@ -116,8 +116,8 @@ progressively.
 | LBA-REQ-086 | The system shall package the `.vsix` byte-identically on the windows and linux planes -- pinning its OS-dependent zip metadata (entry timestamp, mode, version-made-by) and forcing LF on its packaged content -- so a fail-closed gate proves a windows build and a linux build of the same commit have the same sha256. | A plane is the OS the extension runs in (windows, linux); the human reviews on the windows plane and CI publishes on the linux plane, and a genuine corroboration needs a windows- AND a linux-plane witness to agree on ONE artifact. But `vsce`/`yazl` writes OS-dependent metadata (mtime from the clock, mode from `fs.stat`, a version-made-by host byte) and `tsc`/checkout can emit CRLF, so a Windows build and a Linux build of the same commit had different sha256 -- the reviewed artifact was never the shipped one, and two planes could not corroborate one identical artifact. | `scripts/normalize-vsix.mjs` pins every entry's timestamp (1980-01-01) + external attributes (regular file 0644) + version-made-by (Unix); `.gitattributes` forces LF on the packaged files (scoped past the Windows-captured fixtures) + `tsconfig.json` sets `newLine: lf`, so the packaged bytes depend only on the committed content, not the plane. | `.github/workflows/vsix-cross-plane-repro.yml` builds `npm run package` on ubuntu-latest AND windows-latest and asserts the two sha256 are identical (fail-closed); the offline gate `vsix-cross-plane-repro-workflow-wired` guards the workflow + prerequisites; `test/normalize-vsix.mjs` covers the mode/version pinning. |
 | LBA-REQ-087 | The system shall produce a genuine witness on the windows plane and the linux plane and prove, in CI, that they cross-plane corroborate over the deterministic anchors, so a fail-closed gate blocks any claim of two-plane corroboration unless both planes actually agree. | ADR-0068 found the ACG's live corroboration single-plane (linux-only) -- genuine cross-plane was PENDING a windows-plane witness, and none was committed. But `windows-latest` CI is a genuine windows plane (the extension runs + the gate passes there), so a real windows witness can be produced automatically; the viewer `seriesHash` is deterministic DATA (identical on every plane), so a linux + windows witness carry the same OS-independent anchors. | `experiments/acg-quorum/produce-witness.mjs` emits an acg-witness-bundle-v1 from the current plane (os, version, sourceCommit, gate verdict, and the seriesHash projected from the committed mprr fixture by the shipped viewer code); pngSha256 is an optional Linux-only anchor. `.github/workflows/acg-cross-plane-corroboration.yml` runs it on a multi-substrate matrix -- ubuntu-22.04 + ubuntu-24.04 (linux plane) and windows-2022 + windows-2025 (windows plane), each after `npm test` -- and `corroborate-planes.mjs` corroborates ALL substrates (crossPlane), proving the anchor is substrate-independent. | `node experiments/acg-quorum/produce-witness.selftest.mjs` (a linux+windows pair corroborates; a single-plane, divergent, or non-pass pair fails closed) gated by `acg-cross-plane-corroboration`; the workflow drift gate `acg-cross-plane-corroboration-workflow-wired`; the live dual-OS corroborate job. |
 | LBA-REQ-088 | The system shall capture the genuine cross-plane corroboration -- a real linux-plane witness and a real windows-plane witness produced in CI (LBA-REQ-087) -- as a committed, tamper-evident attestation that re-derives its os-plane quorum offline, so a fail-closed gate blocks any durable claim of two-plane corroboration unless both planes genuinely agree and a single-plane witness set (the 1.0.0 defect) fails closed. | ADR-0069 proves genuine cross-plane corroboration LIVE, but that proof is ephemeral (only inside a workflow run) -- nothing committed consumed a genuine windows-plane witness, so the ACG's committed evidence still had only the honest single-plane negative (ADR-0068) and the shipped 1.0.0 quorum (a LINUX witness + a VMware-Ubuntu witness -- both the linux plane) stayed a flagged defect. The ADR-0069 workflow (push: develop) produced a real os:linux + os:windows witness at one develop commit -- capturable durably. | `experiments/acg-quorum/cross-plane-attestation.mjs` (schema cross-plane-corroboration-attestation@1) embeds the two GENUINE CI witnesses + their run provenance, re-derives the os-plane quorum (compare-witnesses.mjs), and is corroborated only when it PASSES + spans both os-planes (crossPlane); a canonical digest makes it tamper-evident. The committed receipt captures ubuntu-latest + windows-latest at 2a0352c (run 30923501292). The HUMAN sign-off is deliberately not synthesized (the reviewer's local key). | `node experiments/acg-quorum/cross-plane-attestation.selftest.mjs` (the committed attestation validates; a single-plane set -- the 1.0.0 defect -- + a non-pass + a tampered witness/verdict/digest all fail closed) gated by `acg-cross-plane-attestation`. |
-| LBA-REQ-089 | The system shall bind an enrolled human sign-off to the genuine cross-plane quorum -- the reviewer signs the crossPlane quorum digest with their local Ed25519 key -- so a fail-closed gate blocks any signed corroboration unless the quorum is genuinely cross-plane, passes, names the candidate, and carries a verified enrolled approval. | LBA-REQ-088 captured a genuine crossPlane machine quorum, but a quorum alone is not the machine corroboration GATE: ADR-0018 (gateReleasePublish) is the quorum PLUS a recorded enrolled human sign-off over that exact quorum. The shipped 1.0.0 had a sign-off but over the SINGLE-PLANE quorum; an honest re-seal needs the enrolled reviewer to sign over the genuine crossPlane quorum. The sign-off is signed with the reviewer's local Ed25519 key (never committed); the agent must not synthesize it. | `reviewer-workstation/sign-release-quorum.mjs` is a deterministic, offline signing helper (the reviewer signs the committed quorum's bundleDigest locally; the private key never leaves the reviewer). `experiments/acg-quorum/signed-cross-plane-corroboration.mjs` (schema signed-cross-plane-corroboration@1) REUSES gateReleasePublish + requires crossPlane + the consensus names the candidate; the committed receipt records extension 1.0.0 @ 2a0352c + the enrolled reviewer@vi-tech.nl sign-off, verified against the committed allowlist. | `node experiments/acg-quorum/signed-cross-plane-corroboration.selftest.mjs` (7/7: a signed crossPlane quorum validates; a single-plane, non-pass, un-enrolled, forged, unnamed, or tampered receipt fails closed) + the committed-receipt check, gated by `acg-signed-cross-plane-corroboration`. |
-| LBA-REQ-090 | The system shall re-seal the 1.0.0 composite release decision over the genuine cross-plane quorum -- binding the crossPlane machine corroboration (LBA-REQ-089) to a signed human visual PASS of the byte-reproducible candidate over one net-staged candidate -- so a fail-closed gate blocks the composite unless its machine quorum is genuinely cross-plane, both gates carry verified enrolled sign-offs, and all bind to one candidate. | LBA-REQ-089 re-sealed the MACHINE corroboration, but the shipped 1.0.0 COMPOSITE decision (ADR-0051, the capstone binding the machine gate to the human visual gate over one net-staged candidate) still stood on the single-plane quorum. The extension runtime (src/out/media) is byte-identical from the originally-reviewed 1.0.0 (1054b07) through the quorum commit (2a0352c), so the reviewer's original genuine review re-binds to the byte-reproducible, cross-plane candidate. | `reviewer-workstation/sign-visual-verdict.mjs` (deterministic offline visual-verdict signer). The genuine composite `reviewer-workstation/composite-release-decision-receipt.json` (collapsed to the crossPlane re-seal, ADR-0073) is assembled via the REUSED composite verifier from the crossPlane quorum (LBA-REQ-088) + the enrolled machine sign-off (LBA-REQ-089) + a signed WINDOWS_VM visual PASS (vsix 2ec7bd31 @ 2a0352c) + the genuine WIN staging -- all 5 bindings hold, quorum crossPlane, both gates signed by reviewer@vi-tech.nl. verify-composite-release now REQUIRES crossPlane. | `node reviewer-workstation/crossplane-composite-reseal.selftest.mjs` (the committed crossPlane composite validates as proven + its quorum is crossPlane; verify-composite-release clears it + rejects a single-plane variant) gated by `acg-crossplane-composite-reseal`. |
+| LBA-REQ-089 | The system shall bind an enrolled human sign-off to the genuine cross-plane quorum -- the reviewer signs the crossPlane quorum digest with their local Ed25519 key -- so a fail-closed gate blocks any signed corroboration unless the quorum is genuinely cross-plane, passes, names the candidate, and carries a verified enrolled approval. | LBA-REQ-088 captured a genuine crossPlane machine quorum, but a quorum alone is not the machine corroboration GATE: ADR-0018 (gateReleasePublish) is the quorum PLUS a recorded enrolled human sign-off over that exact quorum. The shipped 1.0.0 had a sign-off but over the SINGLE-PLANE quorum; an honest re-seal needs the enrolled reviewer to sign over the genuine crossPlane quorum. The sign-off is signed with the reviewer's local Ed25519 key (never committed); the agent must not synthesize it. | `reviewer-workstation/sign-release-quorum.mjs` is a deterministic, offline signing helper (the reviewer signs the committed quorum's bundleDigest locally; the private key never leaves the reviewer). `experiments/acg-quorum/signed-cross-plane-corroboration.mjs` (schema signed-cross-plane-corroboration@1) REUSES gateReleasePublish + requires crossPlane + the consensus names the candidate; the committed receipt records extension 1.0.0 @ 2a0352c + the enrolled maintainer-role sign-off, verified against the committed allowlist. | `node experiments/acg-quorum/signed-cross-plane-corroboration.selftest.mjs` (7/7: a signed crossPlane quorum validates; a single-plane, non-pass, un-enrolled, forged, unnamed, or tampered receipt fails closed) + the committed-receipt check, gated by `acg-signed-cross-plane-corroboration`. |
+| LBA-REQ-090 | The system shall re-seal the 1.0.0 composite release decision over the genuine cross-plane quorum -- binding the crossPlane machine corroboration (LBA-REQ-089) to a signed human visual PASS of the byte-reproducible candidate over one net-staged candidate -- so a fail-closed gate blocks the composite unless its machine quorum is genuinely cross-plane, both gates carry verified enrolled sign-offs, and all bind to one candidate. | LBA-REQ-089 re-sealed the MACHINE corroboration, but the shipped 1.0.0 COMPOSITE decision (ADR-0051, the capstone binding the machine gate to the human visual gate over one net-staged candidate) still stood on the single-plane quorum. The extension runtime (src/out/media) is byte-identical from the originally-reviewed 1.0.0 (1054b07) through the quorum commit (2a0352c), so the reviewer's original genuine review re-binds to the byte-reproducible, cross-plane candidate. | `reviewer-workstation/sign-visual-verdict.mjs` (deterministic offline visual-verdict signer). The genuine composite `reviewer-workstation/composite-release-decision-receipt.json` (collapsed to the crossPlane re-seal, ADR-0073) is assembled via the REUSED composite verifier from the crossPlane quorum (LBA-REQ-088) + the enrolled machine sign-off (LBA-REQ-089) + a signed WINDOWS_VM visual PASS (vsix 2ec7bd31 @ 2a0352c) + the genuine WIN staging -- all 5 bindings hold, quorum crossPlane, both gates signed by the enrolled sign-off identity (maintainer role). verify-composite-release now REQUIRES crossPlane. | `node reviewer-workstation/crossplane-composite-reseal.selftest.mjs` (the committed crossPlane composite validates as proven + its quorum is crossPlane; verify-composite-release clears it + rejects a single-plane variant) gated by `acg-crossplane-composite-reseal`. |
 | LBA-REQ-091 | The system shall ingest a live mesh-run dispatch and the actors' returned plane-tagged receipts into a run-bound actor-tasking + receipt-collection bound to the dispatchId -- so a fail-closed gate blocks fulfillment unless every collected receipt provably ran the dispatched benchmark on a tasked plane. | The fan-out (LBA-REQ-076) validates COMMITTED tasking + collection fixtures, but a LIVE run must bind the actual dispatch (the workflow `client_payload`) + the actors' returned receipt artifacts into that contract; nothing governed that ingestion step, so an agent-driven live run could feed the fulfillment gate a receipt set assembled outside the real dispatch. | `meshIngest.mjs` reads a validated live dispatch (`requestOk` + identity self-consistency, LBA-REQ-074) + a folder of `returned-receipt@1` files and REUSES the LBA-REQ-076 fan-out (`deriveTasking` + `buildCollection` + `validateTasking` + `validateCollection`) to produce a run-bound tasking + collection bound to the `dispatchId`; fails closed on an uncovered plane, a declared/receipt plane mismatch, a receipt identity mismatch, an unbound task, a duplicate actor, a malformed dispatch, or a malformed returned receipt. | `node experiments/mesh-fulfillment/meshIngest.selftest.mjs` (8/8); gated by `mesh-run-ingest`. |
 | LBA-REQ-092 | The system shall corroborate a run-bound receipt collection across its planes and compare the planes' benchmark metrics -- so a fail-closed gate blocks a cross-plane result unless the collected receipts span >= 2 distinct OS-planes, every plane's benchmark PASSED, and each re-derives the dispatched benchmark identity. | LBA-REQ-091 binds a live dispatch + returned receipts into a run-bound collection, but nothing consumed it to a single cross-plane verdict + comparison; "corroborated + compared" (the campaign milestone) was ungoverned over the ingested receipts. | `meshCorroborate.mjs` (`corroborateRun`) corroborates the collected plane receipts cross-plane (>= 2 planes, all PASS, each re-deriving `dispatchIdentity{metric,workload,n}` = the collection identity) + REUSES benchmark-store `compareRuns` (LBA-REQ-010) for the WIN-vs-LINUX delta, emitting a run-bound `mesh-cross-plane-report@1`; fails closed on a single-plane collection, a non-PASS plane, an identity mismatch, a malformed collection, a non-trend receipt, or a plane mismatch. | `node experiments/mesh-fulfillment/meshCorroborate.selftest.mjs` (8/8) + the committed two-plane collection corroborates; gated by `mesh-cross-plane-corroborate`. |
 | LBA-REQ-093 | The system shall pin the exact Node.js version that packages the `.vsix` in a repo-root `.nvmrc` sourced by every release-path workflow, so a fail-closed gate proves the reviewed build and the CI publish build use the identical Node version and cannot drift across a Node minor. | LBA-REQ-085/086 make the `.vsix` byte-reproducible within a Node major, but the packaged bytes are reproducible only within an EXACT Node version -- a Node minor can perturb them -- and every release-path workflow pinned `node-version: '24'`, which floats to the latest 24.x in the runner cache, so a future minor could silently drift CI's sha from the reviewed sha and re-break the reviewed==shipped gate at publish, the most expensive place to find it. | A repo-root `.nvmrc` pins the exact version (`24.19.0`); `extension-release.yml`, `vsix-cross-plane-repro.yml`, and `acg-cross-plane-corroboration.yml` source it via `node-version-file: .nvmrc` (no floating literal); `lba release-preflight` asserts the local Node equals `.nvmrc`. | The gate `release-path-node-pinned` proves `.nvmrc` pins an exact version and every release-path workflow sources it (pinning no floating literal), and the `scripts/lba.mjs` selftest proves the exact-version preflight (an equal Node clears, a later 24.x fails). |
@@ -131,7 +131,8 @@ progressively.
 | LBA-REQ-101 | The system shall expose the lifecycle and ordered evidence of a local active LabVIEW capture through a pathless, read-only MCP resource contract. | ProjectBuddy #250 needs timely frame/event reads while LBA capture remains active, but the separate stdio MCP server cannot access the extension process's in-memory `activeCapture` and host-specific storage paths are not a stable consumer interface. | `active-capture-session@1` assigns an opaque UUID and lifecycle (`capturing`, `finalizing`, `stopped`, `failed`) to each run. `resources/list` exposes only bounded metadata/session URIs; `resources/read` returns a session/batch or an explicitly requested frame resource. Batches preserve frame/sample sequence and capture timestamps, mark gaps/partial writes, enforce a per-frame size bound, and never expose absolute paths or frame bytes by default. Reads never mutate capture. | `test/active-capture-mcp.mjs` exercises fake Global Storage roots and spawned stdio MCP for pathless discovery, lifecycle, ordered batch cursors, explicit frame resources, and fail-closed malformed/partial/path-traversal cases; gated in `npm test`. |
 
 | LBA-REQ-102 | The system shall record an explicitly requested Windows desktop workload at a bounded operator-selected cadence without locating or launching LabVIEW. | A standalone synthetic UI live proof must not depend on NI activation or inherit an unreviewable 12-fps inference queue. | A separate Capture Desktop command records `desktop-capture` with an integer interval of 1 through 120 seconds (default 60), emits the existing pathless lifecycle/resources, and uses the existing stop/finalization path; Capture LabVIEW Launch retains its 12-fps behavior. | Host-free activation, argument, cadence, and lifecycle fixtures in `npm test`; Windows desktop execution remains a separate live-proof gate. |
-| LBA-REQ-103 | The system shall publish the repository wiki as an Obsidian vault generated from `docs/`, in which every requirement note links its tests and decisions. | The operator could not open the wiki in Obsidian (1.5.2 Marketplace rejection, #64), and hand-maintained pages drift from the governed sources, so the wiki is derived from `docs/`. | `node scripts/build-wiki.mjs` passes: every wikilink resolves, no aliased wikilink or relative Markdown link remains, every image is in the vault, every note is reachable from Home, every `LBA-REQ` note links its RTM tests and ADR-index decisions, two builds are byte-identical, and eight negative controls fail closed; after publishing, `--check` finds no drift in a fresh wiki clone. | Run `node scripts/build-wiki.mjs`; gated by `wiki-vault` in `verify-local-gates`; the `wiki-publish` workflow verifies the published wiki with `--check`. |
+| LBA-REQ-103 | The system shall publish the repository wiki as an Obsidian vault generated from `docs/` by the shared repo-standards-review generator, in which every requirement page links its test. | The operator could not open the wiki in Obsidian (1.5.2 Marketplace rejection, #64), and hand-maintained pages drift from the governed sources, so the wiki is derived from `docs/`; the ecosystem wiki standard and its registry export need the one shared generator. | `.repo-standards-review/wiki_generate.py` under `.wiki-generator.json` passes with no problem and writes one page per RTM requirement and per test-plan item, every requirement page lists its `TestID`, two runs are byte-identical, `.obsidian/app.json` and the open-in-Obsidian how-to are present, no aliased wikilink remains outside code in the generated wiki, `--out` refuses the member root, its parent and an unrelated non-empty directory, and three negative controls fail closed; after publishing, `--check` finds no drift in a fresh wiki clone. | The `wiki-vault` gate in `verify-local-gates` (T-103); the `wiki-publish` workflow verifies the published wiki with `--check`. |
+| LBA-REQ-104 | The system shall verify a fork's wiki-submission issue against upstream's own test definitions, treating fork content strictly as data, and label it attested or not-attested, with a partner allow-list, held outside the repository, that rejects everything while unset or empty. | Only evidence that upstream re-verified without running fork code may be called attested (#112). | `scripts/wiki_submission.py` rejects an unlisted submitter first, then oversize, malformed, tampered, traversing or unknown-test submissions, and accepts a matching one, in offline fixtures; an unset or garbage allow-list rejects all, and a canary login never appears in any output or in the tree. | `node test/wiki-submission.mjs` (T-104). |
 
 ---
 
@@ -289,7 +290,7 @@ progressively.
   `labview-benchmark-actor` repository without losing traceability.
 - Acceptance Criteria:
   - The package overview and CM plan both name `repo-standards-review`
-    **v0.4.2** (commit `5a3aa9da`).
+    **v0.15.0** (commit `3d4a10f1`).
   - The `docs/` lane layout matches the standards runner's expected structure
     (requirements, architecture, testing, cm, information-for-users, plus the
     information-item map).
@@ -642,6 +643,9 @@ progressively.
     dependency-free stdio entry (`runBenchmarkActorMcpServer.ts`).
   - The bundled tool-doc check keeps `docs/mcp-tools.md` in sync with the
     published registry.
+  - A local Ollama client can discover and call those tools without the editor.
+    Only the three read-only core tools are enabled by default. A fake chat endpoint
+    exercises the real stdio server and the self-test receipt (`test/ollama-mcp-bridge.mjs`, ADR-0092).
   - Gated: `test/mcp-server.mjs` (pure-core, activation, and stdio legs) and
     `scripts/mcpToolDoc.mjs --check` run under `npm test`, all deterministic and
     host-free (no real VS Code, no display, no live `lbabus`).
@@ -663,7 +667,7 @@ progressively.
   each component's release workflow fails closed until both planes commit an
   explicit `agreed:true` sign-off for the exact version.
 - Acceptance Criteria:
-  - `verify-release-agreement.mjs` reads `tools/collab-cli/release-agreement.json`
+  - `verify-release-agreement.mjs` reads `tools/release-governance/release-agreement.json`
     (`release-agreement@v2`) and exits 0 only when every required plane (WIN and
     LINUX) records `agreed:true` for the `<component, version>` being published.
   - The gate fails closed: it exits 1 on a missing, withheld (`agreed:false`), or
@@ -672,10 +676,10 @@ progressively.
   - `<version>` accepts the bare SemVer or the tagged form (`collab-cli-vX.Y.Z` /
     `ext-vX.Y.Z`); the default component is `collab-cli` and `--component <name>`
     selects another (e.g. `extension`).
-  - Gated in CI: both `.github/workflows/extension-release.yml` and
-    `.github/workflows/collab-cli-release.yml` run the gate before their publish
-    job, so neither plane can unilaterally ship a shared release.
-- Change Guidance: Keep the gate fail-closed and keep both release workflows
+  - Gated in CI: `.github/workflows/extension-release.yml` runs the gate before its
+    publish job, so neither plane can unilaterally ship the extension. lbabus is
+    released from its own repository (ADR-0088), so its former lane is retired.
+- Change Guidance: Keep the gate fail-closed and keep the release workflow
   calling it before publish. New required planes extend `requiredPlanes`. Authored
   under the `repo-standards-review` singular-requirement directive (one `shall`).
 
@@ -1829,7 +1833,7 @@ progressively.
     `gateReleasePublish` so the machine corroboration and the human's PASS are independently required.
   - The extension's Render Reviewer Verdict command signs the verdict in the VM (enrolled reviewer
     key) into `handoff/verdicts/`; `reviewer-workstation/render-verdict.sh` sets the target + collects
-    it; `tools/collab-cli/verify-visual-review.mjs` gates a release's `visualReview` block against the
+    it; `tools/release-governance/verify-visual-review.mjs` gates a release's `visualReview` block against the
     committed `reviewer-allowlist.json`; CI keyless-cosign counter-signs the verdict bundle.
 - Change Guidance: `experiments/handoff-beacon/reviewerVerdict.mjs` and
   `reviewer-workstation/stage-ubuntu-vsix.mjs` plus their self-tests are gated by
@@ -2231,7 +2235,7 @@ progressively.
   (`verify-release-agreement.mjs`) + the human visual verdict (`verify-visual-review.mjs`) in its `agreement`
   job, with `release` `needs: [build, agreement]`; the composite decision was not yet in that publish-gating chain.
 - Acceptance Criteria:
-  - `tools/collab-cli/verify-composite-release.mjs --component <name> <version>` REUSES the gated composite
+  - `tools/release-governance/verify-composite-release.mjs --component <name> <version>` REUSES the gated composite
     `validateReceipt` and requires the committed composite receipt to NAME the tagged candidate AND be a proven
     composite decision; it exits 0 (cleared to publish) or 1 (fail-closed) -- e.g. a version with no matching
     proven decision is blocked.
@@ -2241,7 +2245,7 @@ progressively.
   - The gate `composite-release-enforced` proves both DETERMINISTICALLY (no network): the CLI clears the
     committed ext 0.5.0 candidate + fails closed for a version with no decision, and the workflow wires the CLI in
     the publish-gating agreement job.
-- Change Guidance: the enforcement CLI is `tools/collab-cli/verify-composite-release.mjs` (REUSES
+- Change Guidance: the enforcement CLI is `tools/release-governance/verify-composite-release.mjs` (REUSES
   `reviewer-workstation/composite-release-decision.mjs`); the workflow step is in
   `.github/workflows/extension-release.yml`; gate `composite-release-enforced` in `verify-local-gates`. A future
   release adds its own committed composite receipt before it can publish. Authored under the singular-requirement
@@ -2808,7 +2812,7 @@ progressively.
     REUSES gateReleasePublish (ADR-0018) and additionally requires the quorum be crossPlane (pass + both os-planes)
     and its consensus name the candidate; it never synthesizes a signature.
   - The committed `signed-cross-plane-corroboration-receipt.json` records extension `1.0.0` @ `2a0352c`, the
-    LBA-REQ-088 crossPlane quorum, and the enrolled `reviewer@vi-tech.nl` sign-off over it, verified against the
+    LBA-REQ-088 crossPlane quorum, and the enrolled maintainer-role sign-off over it, verified against the
     committed allowlist.
   - `signed-cross-plane-corroboration.selftest.mjs` (7/7, throwaway key) proves a signed crossPlane quorum validates
     while a single-plane, non-pass, un-enrolled, forged, unnamed, or tampered receipt all fail closed (gate
@@ -2841,7 +2845,7 @@ progressively.
   - `reviewer-workstation/composite-release-decision-receipt.json` (collapsed to the crossPlane re-seal, ADR-0073)
     is assembled via the REUSED composite verifier from the MACHINE gate (crossPlane quorum + enrolled machine
     sign-off), the HUMAN gate (a signed WINDOWS_VM visual PASS of vsix `2ec7bd31` @ `2a0352c`), and the genuine WIN
-    net-staged frame -- all five bindings hold, the quorum is crossPlane, both gates signed by enrolled reviewer@vi-tech.nl.
+    net-staged frame -- all five bindings hold, the quorum is crossPlane, both gates signed by the enrolled sign-off identity (maintainer role).
   - `crossplane-composite-reseal.selftest.mjs` proves the committed crossPlane composite validates as a proven
     composite decision AND its quorum is crossPlane, while the shipped single-plane composite is the defect it
     corrects (gate `acg-crossplane-composite-reseal`).
@@ -2993,7 +2997,7 @@ progressively.
 - Statement: The generated agent contract shall preserve the exact standards-workbench score and conservatively
   overlay every `-` Missing Proof cell with evidence-counted candidate risk and artifact-dependent forward actions,
   so a static PASS cannot be mistaken for release readiness.
-- Rationale: The pinned repo-standards-review workbench (v0.4.2; re-certified under ADR-0087) correctly reports static repository maturity as 25/25
+- Rationale: The pinned repo-standards-review workbench (v0.15.0; re-certified under ADR-0087) correctly reports static repository maturity as 25/25
   with six PASS gates, but it does not model the exact candidate's human, hosted, cross-plane, canonical-release, and
   Marketplace-closeout proofs.
 - Acceptance Criteria:
@@ -3126,29 +3130,62 @@ progressively.
 ### LBA-REQ-103: Obsidian-ready wiki generated from docs
 
 - Status: Proven
-- Area: Information for users / configuration management (ISO/IEC/IEEE 26514 delivery; ADR-0089)
+- Area: Information for users / configuration management (ISO/IEC/IEEE 26514 delivery; ADR-0090)
 - Statement: The system shall publish the repository wiki as an Obsidian vault generated
-  from `docs/`, in which every requirement note links its tests and decisions.
+  from `docs/` by the shared repo-standards-review generator, in which every requirement
+  page links its test.
 - Rationale: The operator could not open the wiki in Obsidian (#64). Deriving the wiki
-  from `docs/`, the governed source, keeps it current by construction.
+  from `docs/`, the governed source, keeps it current by construction, and the one shared
+  generator gives the wiki the ecosystem standard's governed pages for the registry export.
 - Acceptance Criteria:
-  - `scripts/build-wiki.mjs` builds the vault from `docs/` only: `Home`, the
-    specification notes, one note per requirement (`requirements/LBA-REQ-NNN`), test
-    item (`tests/T-NNN`), and ADR (`architecture/ADR-NNNN`), every other `docs/` page,
-    the documentation images, and the `.obsidian/` settings.
-  - Links are alias-free `[[Page]]` wikilinks that Obsidian and the GitHub wiki read
-    the same way; links to other repository files and explicit `owner/repo#N` issue
+  - `.repo-standards-review/wiki_generate.py`, vendored byte for byte from
+    repo-standards-review and configured by `.wiki-generator.json`, builds the wiki from
+    `docs/` only: `Home`, the specification pages, one page per requirement
+    (`requirements/LBA-REQ-NNN`), test-plan item (`tests/T-NNN`) and ADR
+    (`architecture/ADR-NNNN`), every other `docs/` page, the documentation images, the
+    `.obsidian/app.json` vault setting, and `.wiki-profile.json`.
+  - Every requirement page lists its RTM `TestID` as a wikilink to its test page. `Home`
+    explains how to open the wiki as an Obsidian vault.
+  - Links are alias-free `[[Page]]` wikilinks that Obsidian and the GitHub wiki read the
+    same way; the `wiki-vault` gate fails on an aliased `[[a|b]]` wikilink in the generated
+    wiki outside code. Links to other repository files and explicit `owner/repo#N` issue
     references become GitHub URLs. A bare `#N` stays text.
-  - `--out` writes only into an empty directory, a wiki clone, or a vault the generator
-    wrote, never into the repository or one of its parents.
-  - Validation fails closed on an unresolved or aliased wikilink, a relative Markdown
-    link, an image missing from the vault, a note unreachable from `Home`, a requirement
-    note missing a test or decision link, or two builds that differ. Negative controls
-    prove the detectors.
+  - The generator fails closed on a wikilink that names no page, a page that is not
+    indexed, a page over the size budget, and a requirement label outside the configured
+    sections; a second run is byte-identical to the first.
+  - `--out` writes only into an absent or empty directory, a previous output or a git
+    clone, and refuses (exit 2, nothing written) the member root, its parents and an
+    unrelated non-empty directory.
   - The `wiki-publish` workflow publishes every `develop` change to `docs/` and verifies
-    the published wiki with `--check`.
-- Verification: `node scripts/build-wiki.mjs` (the `wiki-vault` gate) and the
-  `wiki-publish` drift check.
+    the published wiki with `--check` against a fresh clone.
+  - A relative link to a missing file, a missing image and a missing anchor in `docs/` are
+    caught at the source by the Docs Link Check workflow (lychee with `--include-fragments`)
+    on every pull request. Every wiki page must be indexed (the generator fails on one that
+    is not); reachability by links is not checked.
+  - Known reductions from the previous generator (ADR-0090): the vault plugin list
+    (`core-plugins.json`) and graph colour groups (`graph.json`) are not written; a
+    requirement page does not list its architecture view or decisions.
+- Verification: The `wiki-vault` gate (`node experiments/verify-local-gates.mjs`, T-103)
+  and the `wiki-publish` drift check.
+
+### LBA-REQ-104: Fork wiki submissions are verified as data
+
+- Status: Proven
+- Area: Information for users / security (ADR-0091)
+- Statement: The system shall verify a fork's wiki-submission issue against upstream's
+  own test definitions, treating fork content strictly as data, and label it
+  attested or not-attested, with a partner allow-list, held outside the repository, that rejects everything while unset or empty.
+- Rationale: Forks publish their own wikis; only evidence that upstream re-verified
+  without running fork code may be called attested (#112).
+- Acceptance Criteria:
+  - `scripts/wiki_submission.py` first authorizes the fork owner (listed in the allow-list
+    held in an Actions secret) and the author (the owner or a public org member), with one
+    undifferentiated failure outcome, then parses the body strictly, fetches evidence bytes at the
+    pinned fork commit, enforces size caps, recomputes sha256 and checks test ids against
+    upstream's test files.
+  - The ingest workflow's verify job is read-only; its report job only labels and posts a
+    fixed comment.
+- Verification: `node test/wiki-submission.mjs` (T-104).
 
 ## Traceability (requirement → architecture view / test)
 

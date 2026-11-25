@@ -95,11 +95,9 @@ cleanroom-bootstrap-is-winget-free
 cleanroom-gate-suite-shared-in-sync
 cleanroom-lbabus-pin-matches-release
 cleanroom-provisioner-scripts-pure-ascii
-cli-no-discussion-transport
 closed-loop-readback
 codespace-witness-bootstrap-valid
 codespace-witness-prebuild-workflow-wired
-collab-cli-embeds-canonical-requirements
 colon-corroboration-plane2-scoring
 composite-release-decision
 composite-release-enforced
@@ -137,7 +135,7 @@ human-task-shortcuts
 image-derived-timing-colon-ocr-fidelity
 in-guest-sampler-v2
 information-for-users-26514
-lbabus-vendored-mirror
+lbabus-pin-matches-agents-contract
 live-v2-capture-real
 lunit-test-benchmark
 mass-compile-benchmark
@@ -207,6 +205,7 @@ release-no-discussion-announce
 release-path-node-pinned
 release-procedure-references-resolve
 release-risk-post-release-closeout
+release-stage-win
 release-with-review-drive
 reproducible-vsix-normalizer
 reqs-coverage-ledger
@@ -238,6 +237,7 @@ viewer-webview-surface-wired
 vipm-functional-package-install
 vm-bridge-human-assisted-secret-safety
 vm-live-status-idle-analysis
+vm-password-not-on-command-line
 vsix-cross-plane-repro-workflow-wired
 vsix-marketplace-links
 wiki-vault
@@ -275,20 +275,31 @@ ratchet up only (`npm run coverage:bump`); they are never lowered by hand.
 The Mocha extension activation + view-render suites run in the `extension tests` CI jobs on
 `ubuntu-latest` and `windows-latest`.
 
+### 2.5 Lanes not executed
+
+For #57 slice 3 (consume lbabus only as the pinned release), these lanes have NOT been executed; no result is claimed for them. Executed: P0 (hosted gates), P1 (hosted codespace witness).
+
+| Lane | What | Status | Needs |
+| --- | --- | --- | --- |
+| P2 | VirtualBox host and guest (golden box, from-source provisioning at the pin) | NOT executed | operator-run local session |
+| P3 | Windows native on the operator's peer machine (pinned win-x64 binary) | NOT executed | operator approval of the peer step kind and of the exact script sha256 |
+| P4 | Docker-Windows clean room (Dockerfile.windows clones the pinned tag) | NOT executed | Windows container host and the licensed LabVIEW feed |
+| P5 | Windows VM guest (cleanroom/Vagrantfile bootstrap at the pin) | NOT executed | operator workstation and a rebuilt box |
+
 ## 3. Configuration status accounting (ISO 10007 / ISO/IEC/IEEE 12207)
 
 The controlled state of the repository's configuration items, derived from the registers:
 
 | Configuration item class | Count | Register |
 | --- | --- | --- |
-| Requirements (total) | 103 | docs/requirements/srs.md, rtm.csv |
+| Requirements (total) | 104 | docs/requirements/srs.md, rtm.csv |
 | — Status: Planned | 2 | rtm.csv |
-| — Status: Proven | 100 | rtm.csv |
+| — Status: Proven | 101 | rtm.csv |
 | — Status: Superseded | 1 | rtm.csv |
-| Architecture decisions (ADRs) | 89 | docs/architecture/adr/README.md |
+| Architecture decisions (ADRs) | 93 | docs/architecture/adr/README.md |
 | Governed gates | 220 | experiments/verify-local-gates.mjs |
 | Correspondence rules | 7 | experiments/reqs-coverage/verify-correspondences.mjs |
-| Governed test items | 103 | docs/testing/test-plan.md |
+| Governed test items | 104 | docs/testing/test-plan.md |
 
 Baselines are cut on the `main` branch via SemVer tags (GitFlow); each release is keyless-signed and
 corroborated across planes before publication (see `docs/cm/cm-plan.md` and the release procedure).
@@ -305,4 +316,4 @@ the same correspondence graph (ADR-0013).
 `node experiments/reqs-coverage/generate-test-report.mjs` rewrites this file; `--check` (the
 `test-report-current` gate) fails closed on drift, so the report can never silently lag the apparatus.
 
-_Generated from 220 gates, 7 correspondence rules, 103 requirements, 89 ADRs, 103 test items._
+_Generated from 220 gates, 7 correspondence rules, 104 requirements, 93 ADRs, 104 test items._

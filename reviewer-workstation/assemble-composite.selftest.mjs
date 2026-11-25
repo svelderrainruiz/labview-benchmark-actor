@@ -47,7 +47,7 @@ ok('assembles a valid composite receipt from correctly-bound pieces', () => {
 
 // 2. The CLI default must read the committed reviewer enrollment, not a nonexistent docs path.
 ok('uses the committed reviewer allowlist by default', () => {
-  assert.equal(DEFAULT_REVIEWER_ALLOWLIST_PATH, join(here, '..', 'tools', 'collab-cli', 'reviewer-allowlist.json'));
+  assert.equal(DEFAULT_REVIEWER_ALLOWLIST_PATH, join(here, '..', 'tools', 'release-governance', 'reviewer-allowlist.json'));
   assert.doesNotThrow(() => JSON.parse(readFileSync(DEFAULT_REVIEWER_ALLOWLIST_PATH, 'utf8')));
 });
 

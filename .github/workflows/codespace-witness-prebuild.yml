@@ -23,7 +23,8 @@ on:
       - '.devcontainer/cleanroom-witness/**'
       - 'cleanroom/ubuntu-labview/codespace/**'
       - 'cleanroom/ubuntu-labview/lba/gate-suite.sh'
-      - 'tools/collab-cli/**'
+      - 'scripts/fetch-lbabus.mjs'
+      - 'release-components.json'
       - '.github/workflows/codespace-witness-prebuild.yml'
   push:
     branches: [develop, main]
@@ -31,7 +32,8 @@ on:
       - '.devcontainer/cleanroom-witness/**'
       - 'cleanroom/ubuntu-labview/codespace/**'
       - 'cleanroom/ubuntu-labview/lba/gate-suite.sh'
-      - 'tools/collab-cli/**'
+      - 'scripts/fetch-lbabus.mjs'
+      - 'release-components.json'
       - '.github/workflows/codespace-witness-prebuild.yml'
 
 # One run per ref; a newer push supersedes an in-flight build.

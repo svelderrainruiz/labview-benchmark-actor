@@ -12,7 +12,7 @@
 | **Command Palette** | Every contributed command | member, maintainer | Titles prefixed **LabVIEW Benchmark Actor:**. |
 | **Marketplace listing (README)** | Orientation + capabilities | first-time member, engineering leader | Marketplace-safe links only (repo-relative links 404 there and are gate-blocked). |
 | **Repository docs (`docs/`)** | This information-for-users set + governed route docs | all | Repo-relative Markdown; a lychee link-check runs in CI. |
-| **Wiki (Obsidian vault)** | The whole `docs/` set as small linked notes: one note per requirement, test item, and decision | all, including Obsidian users | Generated from `docs/` by `scripts/build-wiki.mjs` and published from `develop` ([ADR-0089](../architecture/adr/ADR-0089-generate-the-wiki-as-an-obsidian-vault.md)); clone `labview-benchmark-actor.wiki.git` and open it as a vault. Never edited directly. |
+| **Wiki (Obsidian vault)** | The whole `docs/` set as small linked notes: one note per requirement, test item, and decision | all, including Obsidian users | Generated from `docs/` by the shared generator `.repo-standards-review/wiki_generate.py` and published from `develop` ([ADR-0090](../architecture/adr/ADR-0090-generate-the-wiki-with-the-shared-generator.md)); clone `labview-benchmark-actor.wiki.git` and open it as a vault. Never edited directly. |
 | **MCP server + language-model tools** | The actor's tools + panel-open tool | autonomous AI agent | The primary surface for agent operation; see [`AGENTS.md`](../../extension-agents/AGENTS.md). |
 | **Embedded `AGENTS.md`** | Agent operating instructions, integrity-checked | agent, maintainer | Materialized / verified via the agent-instruction commands. |
 

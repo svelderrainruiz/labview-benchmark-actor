@@ -56,7 +56,7 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
   const version = flag('--version', positionals[0]);
   const vsixPath = flag('--vsix', positionals[1] || 'labview-benchmark-actor.vsix');
   const component = flag('--component', 'extension');
-  const agreementPath = flag('--agreement', 'tools/collab-cli/release-agreement.json');
+  const agreementPath = flag('--agreement', 'tools/release-governance/release-agreement.json');
   if (!version) {
     console.error('usage: node scripts/verify-published-vsix.mjs <version> [vsix-path] [--component extension] [--agreement <path>]');
     process.exit(2);

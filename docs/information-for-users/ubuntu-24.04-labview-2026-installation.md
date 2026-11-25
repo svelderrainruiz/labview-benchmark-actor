@@ -106,7 +106,7 @@ Run:
 
 ```bash
 sudo env PRIMARY_USER=actor PROVISION_REBOOT=0 \
-  bash /home/actor/lba-provision/provision-guest.sh
+  bash <guest-home>/lba-provision/provision-guest.sh
 ```
 
 The measured provisioner run:
@@ -240,8 +240,8 @@ LabVIEWCLI \
   -LabVIEWPath /usr/local/natinst/LabVIEW-2026-64/labview \
   -PortNumber 3363 \
   -OperationName MassCompile \
-  -DirectoryToCompile /home/actor/labview-icon-editor/resource \
-  -MassCompileLogFile /home/actor/lba-provision/mass-compile.log \
+  -DirectoryToCompile <guest-home>/labview-icon-editor/resource \
+  -MassCompileLogFile <guest-home>/lba-provision/mass-compile.log \
   -AppendToMassCompileLog FALSE
 ```
 
@@ -310,7 +310,7 @@ and a PASS bootstrap receipt. The receipt records OpenSSH server package `1:9.6p
 were not attempted.
 
 Evidence was retained outside Git under
-`C:\Users\sveld\.copilot\session-state\af313f92-0145-44da-8d0a-cac86b86eae7\files\lba-ubuntu-base-proof-20260809T125300Z`:
+`<user-profile>\.copilot\session-state\af313f92-0145-44da-8d0a-cac86b86eae7\files\lba-ubuntu-base-proof-20260809T125300Z`:
 
 - `base-bootstrap-receipt.json` SHA-256 `9cae56975a2d54b794844042445a1c4208ff7213718ac6ea62cd09169a41881c`;
 - `live-proof-receipt.json` SHA-256 `4a438d16d4c1d0a00fc64cb4394d3e301f097b376689a115ef2d61352a8985b9`;
@@ -354,7 +354,7 @@ uncertainty for this replay; the earlier first proof remains the canonical five-
 
 The SSH proof returned uid `1000`, hostname `actor`, Git, active SSH, active guest utilities, and the PASS receipt.
 LabVIEW provisioning and activation were not attempted. Evidence is outside Git under
-`C:\Users\sveld\.copilot\session-state\af313f92-0145-44da-8d0a-cac86b86eae7\files\lba-ubuntu-base-replay-20260809T140500Z`:
+`<user-profile>\.copilot\session-state\af313f92-0145-44da-8d0a-cac86b86eae7\files\lba-ubuntu-base-replay-20260809T140500Z`:
 
 - `replay-receipt.json` SHA-256 `45ae1535e0913a1db611e19b1d31228e9ed624f967004d203d24b7dada3ec7d7`;
 - `base-bootstrap-receipt.json` SHA-256 `e0290c9f119eb156d78012ee0965a70258078eb40aa8d13b33f8c91778365257`;

@@ -29,7 +29,7 @@ vm_key="${LBA_VM_KEY:-C:\\lba-review\\reviewer-vitech.pem}"
 vm_stage='C:\lba-review'
 version=""; attestation=""; out=""; signoff=""
 here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-allowlist="${here}/../tools/collab-cli/reviewer-allowlist.json"
+allowlist="${here}/../tools/release-governance/reviewer-allowlist.json"
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -55,8 +55,13 @@ if [[ "$sub" != "verify" ]]; then
   command -v VBoxManage >/dev/null || { echo "render-quorum: VBoxManage not on PATH" >&2; exit 3; }
   : "${LBA_VM_PASS:?set LBA_VM_PASS to the reviewer VM password (a local throwaway cred; never commit it)}"
   pass="$LBA_VM_PASS"
+  # Hand VBoxManage the password as a private file, never on its command line (visible to every local user via ps).
+  pwfile="$(mktemp)"
+  trap 'rm -f "$pwfile"' EXIT
+  chmod 600 "$pwfile"
+  printf '%s' "$pass" > "$pwfile"
 fi
-gc() { VBoxManage guestcontrol "$vm" --username "$user" --password "$pass" "$@"; }
+gc() { VBoxManage guestcontrol "$vm" --username "$user" --passwordfile "$pwfile" "$@"; }
 vm_att="${vm_stage}\\attestation-${version}.json"
 vm_signoff="${vm_stage}\\quorum-signoff-${version}.json"
 

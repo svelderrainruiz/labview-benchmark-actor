@@ -9,9 +9,9 @@
       "boundary": "depends only on vscode + Node built-ins"
     },
     {
-      "surface": "tools/collab-cli",
-      "role": "agentic cross-plane coordination bus (lbabus): CLAIM/ACK/HANDOFF/DONE, resource leases, local TCP/UDP transport, version-pinned AGENTS.md/DOCS.md",
-      "boundary": "standalone .NET 8 tool; no vi-history-suite reference"
+      "surface": "scripts/fetch-lbabus.mjs",
+      "role": "consumes the agentic cross-plane coordination bus (lbabus) only as the pinned svelderrainruiz/lbabus release (release-components.json lbabusRelease): digest- and commit-checked binary or source",
+      "boundary": "dependency-free ESM; lbabus itself is a standalone .NET 8 tool in its own repository"
     },
     {
       "surface": "experiments",

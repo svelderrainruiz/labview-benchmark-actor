@@ -171,8 +171,12 @@ export function verifyReviewerVerdict(verdict, signOff, { reviewerAllowlist = {}
   else if (normalizedKeys.length === 0) reasons.push(`reviewer "${signOff.reviewer}" has no visual key enrolled for version "${verdict?.target?.version ?? ''}"`);
   else if (!normalizedKeys.includes(normPem(signOff.publicKeyPem))) reasons.push(`presented key does not match a visual key enrolled for "${signOff.reviewer}" at version "${verdict?.target?.version ?? ''}"`);
   try {
-    const ok = crypto.verify(null, signMessage(signOff.reviewer, signOff.decision, signOff.station, actualDigest), crypto.createPublicKey(signOff.publicKeyPem), Buffer.from(signOff.signature || '', 'base64'));
-    if (!ok) reasons.push('sign-off signature does not verify');
+    const publicKey = crypto.createPublicKey(signOff.publicKeyPem);
+    if (publicKey.asymmetricKeyType !== 'ed25519') reasons.push('sign-off public key must be ed25519');
+    else {
+      const ok = crypto.verify(null, signMessage(signOff.reviewer, signOff.decision, signOff.station, actualDigest), publicKey, Buffer.from(signOff.signature || '', 'base64'));
+      if (!ok) reasons.push('sign-off signature does not verify');
+    }
   } catch (e) {
     reasons.push('signature verification error: ' + e.message);
   }
