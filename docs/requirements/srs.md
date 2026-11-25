@@ -3262,6 +3262,17 @@ progressively.
     header. It never appears in argv, output, logs, the receipt or `capture.json`. The endpoint must be https
     (plain http only for 127.0.0.1 or localhost). Exit 7 is a failed reference run and 8 a reference
     timeout. Without these flags the loop is unchanged.
+  - Like-for-like reference (#143): the reference preflight records `alias` (the `/api/models` entry has a
+    non-empty `info.base_model_id`), `baseModelId`, `hasTools` and `hasDefaultFeatures` (booleans only, never
+    tool or feature names) in the receipt and `comparison.referenceModel`; an alias prints one stderr warning
+    naming the base id and `--reference-model <base>`, without changing the exit code. `--no-tools` sends the
+    local model no `tools` key and records `toolsOffered: []`; with `--allow-tool` it is a usage error (exit
+    2); without it the Ollama request is byte-for-byte unchanged. Both sides of `comparison` hold
+    `promptTokens` (reference `usage.promptTokens`; local `prompt_eval_count` of the final turn),
+    `firstTokenMs` (first token of any kind, thinking or reasoning included), `firstAnswerMs` (first content or
+    tool-call token) and tokens/s over first token to done; the local side holds `thinkingChars`, the
+    reference side `reasoningChars`. The cue "first token" means the first token of any kind; "answer started"
+    and "reference answer started" mark the first answer token.
 - Verification: `node test/local-model-loop.mjs` and `node test/local-model-loop-reference.mjs` (T-106,
   including a sentinel token grepped in every output and artifact of a full loop against a fake SSE server); a real loop with a local Ollama, nvidia-smi and
   ffmpeg on a LINUX workstation is recorded on the pull request. The Windows laptop run is to be proven.

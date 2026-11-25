@@ -34,9 +34,18 @@ follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project
   (default 42) and `--max-tokens` (default 256) on both sides. The receipt adds one reference-vs-local
   comparison block. The API token is read once from an owner-only file, sent only as a bearer header and never
   written to output, logs or receipts. New exit codes: 7 (reference failed) and 8 (reference timed out) (#139).
+- Like-for-like reference runs in `localModelLoop` (#143): the receipt records whether `--reference-model` is
+  an Open WebUI alias (`alias`, `baseModelId`, `hasTools`, `hasDefaultFeatures`; booleans only) and an alias
+  prints one warning naming the base tag to use. `--no-tools` offers the local model no tools (no `tools` key,
+  `toolsOffered: []`; it cannot be combined with `--allow-tool`). The comparison block adds `promptTokens`
+  on both sides, `firstAnswerMs`, local `thinkingChars` and reference `reasoningChars`.
 
 ### Fixed
 
+- `localModelLoop` local timing with thinking models (#143): "first token" is now the first streamed token of
+  any kind (Ollama `message.thinking` included), a new "answer started" cue marks the first content or tool
+  call, and tokens/s is output tokens over first token to done on both sides. Before, the local rate was
+  computed over the answer only while `eval_count` included the thinking tokens, which overstated it.
 - A double-click in the frame correlator stored two identical user-click markers. It now drops one marker,
   and `capture.json` never stores an exact twin (same kind, instant and frame). The default clip of
   **Export Clip Between Markers**, `export_capture_clip` and `node out/captureClip.js` counts existing twins

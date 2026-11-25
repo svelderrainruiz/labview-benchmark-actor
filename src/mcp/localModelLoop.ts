@@ -8,8 +8,8 @@
  *   2. starts the frame capture (gdigrab on Windows, x11grab on Xorg, or `--source test`: ffmpeg lavfi testsrc),
  *      the CPU/RAM/disk sampler and the GPU sampler, with the extension's own arguments and scripts;
  *   3. after `--lead-ms`, sends the prompt to a local Ollama model THROUGH the bridge (ollamaMcpBridge: the same
- *      MCP discovery and `--allow-tool` allow-list), streamed, and records "prompt sent", "first token" and
- *      "response done";
+ *      MCP discovery and `--allow-tool` allow-list, or no tools with `--no-tools`), streamed, and records "prompt
+ *      sent", "first token" (any kind, thinking included), "answer started" and "response done";
  *   4. keeps capturing `--tail-ms`, stops, assembles capture.json with the automatic GPU cues (memory rise = model
  *      load, utilization through the threshold = compute, with the platform's measured lag) and the three agent cues;
  *   5. exports a clip from min(prompt sent, first GPU cue) - 1 s to response done + 1 s into `<capture>/clips/`;
@@ -20,6 +20,8 @@
  * streamed through an Open WebUI chat-completions API (cues "reference sent", "reference first token", "reference
  * done" on the same axis) while the laptop GPU sampler keeps running as the idle control; both sides use temperature
  * 0, `--seed` and `--max-tokens`, and the receipt gets one `comparison` block. The token stays in openWebUiReference.
+ * Like-for-like (#143): the receipt says whether the reference id is an Open WebUI alias (with tools / default
+ * features the server adds to the prompt), and `--no-tools` sends the local model no tools at all.
  *
  * Every process runs through spawn/execFile with an argument array, never a shell string.
  */
@@ -48,7 +50,7 @@ import { OLLAMA_DEFAULT_TOOLS } from './benchmarkActorMcpServer';
 import { api, BridgeConfig, BridgeHooks, BridgeRun, ChatStreamStats, isObject, runBridge } from './ollamaMcpBridge';
 import {
   DEFAULT_REFERENCE_TIMEOUT_MS, nodeTokenFileOps, parseReferenceEndpoint, readTokenFile, redact, ReferenceConfig, ReferenceError,
-  ReferenceModelInfo, referencePreflight, ReferenceResult, REFERENCE_KINDS, ReferenceKind, runReferenceChat, TokenFileOps
+  REFERENCE_MODEL_ID, ReferenceModelInfo, referencePreflight, ReferenceResult, REFERENCE_KINDS, ReferenceKind, runReferenceChat, TokenFileOps
 } from './openWebUiReference';
 
 export const LOOP_RECEIPT_SCHEMA = 'labview-benchmark-actor/local-model-loop@v1';
@@ -66,8 +68,11 @@ export const LOOP_DEFAULTS = {
 } as const;
 export const MAX_LOOP_WAIT_MS = 600_000;
 export const RESPONSE_EXCERPT_CHARS = 200;
-export const LOOP_CUE_LABELS = { promptSent: 'prompt sent', firstToken: 'first token', responseDone: 'response done' } as const;
-export const REFERENCE_CUE_LABELS = { sent: 'reference sent', firstToken: 'reference first token', done: 'reference done' } as const;
+/** #143: "first token" = the first token of any kind (thinking included); "answer started" = the first content/tool call. */
+export const LOOP_CUE_LABELS = { promptSent: 'prompt sent', firstToken: 'first token', answerStarted: 'answer started', responseDone: 'response done' } as const;
+export const REFERENCE_CUE_LABELS = {
+  sent: 'reference sent', firstToken: 'reference first token', answerStarted: 'reference answer started', done: 'reference done'
+} as const;
 export const LOOP_COMPARISON_SCHEMA = 'labview-benchmark-actor/local-model-loop-comparison@v1';
 
 /**
@@ -78,7 +83,7 @@ export const LOOP_EXIT = { usage: 2, prerequisite: 3, capture: 4, model: 5, clip
 
 export const LOOP_USAGE =
   'usage: node out/mcp/localModelLoop.js [--source desktop|test] [--fps <n>] [--lead-ms <ms>] [--tail-ms <ms>] ' +
-  '[--model <name>] [--ollama <url>] [--prompt <text>] [--image <png>] [--allow-tool <name>]... [--max-turns <n>] ' +
+  '[--model <name>] [--ollama <url>] [--prompt <text>] [--image <png>] [--allow-tool <name>]... | [--no-tools] [--max-turns <n>] ' +
   '[--cold] [--captures-dir <dir>] [--ffmpeg <path>] [--nvidia-smi <path>] [--gpu-threshold-pct <n>] [--gpu-memory-rise-mb <n>] ' +
   '[--max-tokens <n>] [--seed <n>] [--reference openwebui --endpoint <https url> --token-file <path> --reference-model <id> ' +
   '[--reference-timeout-ms <ms>]]';
@@ -100,6 +105,8 @@ export interface LoopConfig {
   prompt: string;
   image?: string;
   allowTools: string[];
+  /** #143: offer the local model no tools (the /api/chat body has no `tools` key). */
+  noTools: boolean;
   maxTurns: number;
   cold: boolean;
   capturesDir: string;
@@ -155,7 +162,7 @@ export function parseLoopArgs(
       options: {
         source: { type: 'string' }, fps: { type: 'string' }, 'lead-ms': { type: 'string' }, 'tail-ms': { type: 'string' },
         model: { type: 'string' }, ollama: { type: 'string' }, prompt: { type: 'string' }, image: { type: 'string' },
-        'allow-tool': { type: 'string', multiple: true }, 'max-turns': { type: 'string' }, cold: { type: 'boolean' },
+        'allow-tool': { type: 'string', multiple: true }, 'no-tools': { type: 'boolean' }, 'max-turns': { type: 'string' }, cold: { type: 'boolean' },
         'captures-dir': { type: 'string' }, ffmpeg: { type: 'string' }, 'nvidia-smi': { type: 'string' },
         'gpu-threshold-pct': { type: 'string' }, 'gpu-memory-rise-mb': { type: 'string' },
         'max-tokens': { type: 'string' }, seed: { type: 'string' }, reference: { type: 'string' }, endpoint: { type: 'string' },
@@ -192,6 +199,8 @@ export function parseLoopArgs(
   }
   const allowTools = (values['allow-tool'] as string[] | undefined) ?? [];
   if (allowTools.some((name) => !/^[A-Za-z0-9_.-]{1,64}$/.test(name))) throw new LoopError('--allow-tool needs a tool name', LOOP_EXIT.usage);
+  const noTools = values['no-tools'] === true;
+  if (noTools && allowTools.length > 0) throw new LoopError('--no-tools and --allow-tool exclude each other', LOOP_EXIT.usage);
   const capturesDir = text('captures-dir') ?? defaultCapturesDir(platform, env, home);
   if (!capturesDir.trim()) throw new LoopError('--captures-dir must not be empty', LOOP_EXIT.usage);
   const seed = intOption('seed', text('seed'), LOOP_DEFAULTS.seed, 0, 2_147_483_647);
@@ -207,6 +216,7 @@ export function parseLoopArgs(
     prompt,
     ...(image !== undefined ? { image } : {}),
     allowTools,
+    noTools,
     maxTurns: intOption('max-turns', text('max-turns'), LOOP_DEFAULTS.maxTurns, 1, 32),
     cold: values.cold === true,
     capturesDir,
@@ -234,7 +244,7 @@ function parseReferenceArgs(text: (name: string) => string | undefined, platform
     if (text(name) === undefined) throw new LoopError(`--reference ${kind} needs --${name}`, LOOP_EXIT.usage);
   }
   const model = (text('reference-model') as string).trim();
-  if (!/^[A-Za-z0-9_.:/@+-]{1,128}$/.test(model)) throw new LoopError('--reference-model needs a model id (e.g. fast)', LOOP_EXIT.usage);
+  if (!REFERENCE_MODEL_ID.test(model)) throw new LoopError('--reference-model needs a model id (e.g. gemma4:e4b)', LOOP_EXIT.usage);
   let endpoint: URL;
   try {
     endpoint = parseReferenceEndpoint(text('endpoint') as string);
@@ -331,7 +341,10 @@ export async function ollamaPreflight(endpoint: URL, model: string): Promise<Oll
 
 export interface LoopInstants {
   promptSentMs?: number;
+  /** The first streamed token of any kind (thinking/reasoning, content or tool call). */
   firstTokenMs?: number;
+  /** #143: the first content or tool-call token. */
+  firstAnswerMs?: number;
   responseDoneMs?: number;
 }
 
@@ -387,20 +400,22 @@ function epochCueMarkers(
   return out;
 }
 
-/** The three loop cues as agent-cue markers on the frame axis, in time order (missing instants are skipped). */
+/** The loop cues as agent-cue markers on the frame axis, in time order (missing instants are skipped). */
 export function loopCueMarkers(record: LaunchCaptureRecord, instants: LoopInstants, grab: MarkerImageGrabFn, createdAt?: string): Array<Record<string, unknown>> {
   return epochCueMarkers(record, [
     [instants.promptSentMs, LOOP_CUE_LABELS.promptSent],
     [instants.firstTokenMs, LOOP_CUE_LABELS.firstToken],
+    [instants.firstAnswerMs, LOOP_CUE_LABELS.answerStarted],
     [instants.responseDoneMs, LOOP_CUE_LABELS.responseDone]
   ], 'local-model-loop', grab, createdAt);
 }
 
-/** #139: the three reference cues (source kind `openwebui-reference`), same axis and image grab as the loop cues. */
+/** #139: the reference cues (source kind `openwebui-reference`), same axis and image grab as the loop cues. */
 export function referenceCueMarkers(record: LaunchCaptureRecord, instants: LoopInstants, grab: MarkerImageGrabFn, createdAt?: string): Array<Record<string, unknown>> {
   return epochCueMarkers(record, [
     [instants.promptSentMs, REFERENCE_CUE_LABELS.sent],
     [instants.firstTokenMs, REFERENCE_CUE_LABELS.firstToken],
+    [instants.firstAnswerMs, REFERENCE_CUE_LABELS.answerStarted],
     [instants.responseDoneMs, REFERENCE_CUE_LABELS.done]
   ], 'openwebui-reference', grab, createdAt);
 }
@@ -445,21 +460,25 @@ function round2(value: number): number {
 }
 
 export interface PhaseSide {
+  /** Prompt sent to the first token of any kind (thinking/reasoning included). */
   firstTokenMs: number | null;
+  /** #143: prompt sent to the first content (or tool-call) token. */
+  firstAnswerMs: number | null;
   totalMs: number | null;
   outputTokens: number | null;
   /** `tokens` (usage / Ollama eval_count) or `chunks` (non-empty stream deltas, when no token count was reported). */
   outputUnit: 'tokens' | 'chunks';
-  /** outputTokens per second of generation (first token to done). */
+  /** outputTokens per second of generation (first token of any kind to done; thinking tokens count as output). */
   tokensPerSecond: number | null;
 }
 
 /** One side of the comparison from its instants and its output count. */
 export function phaseSide(instants: LoopInstants, outputTokens: number | null, outputUnit: 'tokens' | 'chunks'): PhaseSide {
-  const { promptSentMs: sent, firstTokenMs: first, responseDoneMs: done } = instants;
+  const { promptSentMs: sent, firstTokenMs: first, firstAnswerMs: answer, responseDoneMs: done } = instants;
   const genMs = first !== undefined && done !== undefined ? done - first : null;
   return {
     firstTokenMs: sent !== undefined && first !== undefined ? first - sent : null,
+    firstAnswerMs: sent !== undefined && answer !== undefined ? answer - sent : null,
     totalMs: sent !== undefined && done !== undefined ? done - sent : null,
     outputTokens,
     outputUnit,
@@ -629,6 +648,16 @@ function referenceLoopError(error: unknown, reference: ReferenceConfig): LoopErr
   return new LoopError(redact(error.message, reference.token()), code);
 }
 
+/**
+ * #143: one stderr line when the reference id is an Open WebUI alias (the server adds the alias's tools and
+ * default features to the prompt). Names only the two model ids, never the entry's tools or features.
+ */
+export function referenceAliasWarning(info: Pick<ReferenceModelInfo, 'id' | 'alias' | 'baseModelId'> | undefined): string | null {
+  if (!info?.alias) return null;
+  const base = info.baseModelId ?? '<base model id>';
+  return `warning: reference model ${info.id} is an Open WebUI alias of ${base}; use --reference-model ${base} for a like-for-like comparison`;
+}
+
 /** Run the loop; returns the receipt (also written next to the clip). Throws LoopError with the exit code. */
 export async function runLocalModelLoop(config: LoopConfig, deps: LoopDeps = defaultLoopDeps, log: (line: string) => void = () => undefined): Promise<Record<string, unknown>> {
   // 1. Prerequisites first: nothing is created when ffmpeg, the display, Ollama or the model is missing.
@@ -651,6 +680,8 @@ export async function runLocalModelLoop(config: LoopConfig, deps: LoopDeps = def
     } catch (error) {
       throw referenceLoopError(error, config.reference);
     }
+    const warning = referenceAliasWarning(referenceInfo);
+    if (warning) log(warning);
   }
   if (config.cold) {
     // keep_alive 0 unloads the model, so the capture sees the model load (the memory-rise GPU cue).
@@ -700,6 +731,7 @@ export async function runLocalModelLoop(config: LoopConfig, deps: LoopDeps = def
           {
             onSent: () => { referenceInstants.promptSentMs = deps.now(); },
             onFirstToken: () => { referenceInstants.firstTokenMs = referenceInstants.firstTokenMs ?? deps.now(); },
+            onFirstAnswer: () => { referenceInstants.firstAnswerMs = referenceInstants.firstAnswerMs ?? deps.now(); },
             onDone: () => { referenceInstants.responseDoneMs = deps.now(); }
           }
         );
@@ -709,10 +741,11 @@ export async function runLocalModelLoop(config: LoopConfig, deps: LoopDeps = def
       if (!referenceFailure) await deps.sleep(config.leadMs);
     }
     if (!referenceFailure) {
-      const offerTools = model.capabilities === null || model.capabilities.includes('tools');
+      const offerTools = !config.noTools && (model.capabilities === null || model.capabilities.includes('tools'));
       bridgeRun = await deps.bridge(
         {
           model: config.model, endpoint: config.endpoint, prompt: config.prompt, maxTurns: config.maxTurns, stream: true, offerTools,
+          ...(config.noTools ? { omitTools: true } : {}),
           allow: new Set([...OLLAMA_DEFAULT_TOOLS, ...config.allowTools]),
           ...(imageBytes ? { images: [imageBytes.toString('base64')] } : {}),
           ...(config.fixedDecoding ? { options: { temperature: 0, seed: config.seed, num_predict: config.maxTokens } } : {})
@@ -724,6 +757,9 @@ export async function runLocalModelLoop(config: LoopConfig, deps: LoopDeps = def
           },
           onFirstToken: () => {
             instants.firstTokenMs = instants.firstTokenMs ?? deps.now();
+          },
+          onFirstAnswer: () => {
+            instants.firstAnswerMs = instants.firstAnswerMs ?? deps.now();
           },
           onDone: () => {
             instants.responseDoneMs = deps.now();
@@ -800,6 +836,7 @@ export async function runLocalModelLoop(config: LoopConfig, deps: LoopDeps = def
     timing: {
       promptSentInstantMs: promptInstant,
       firstTokenLatencyMs: instants.firstTokenMs !== undefined && instants.promptSentMs !== undefined ? instants.firstTokenMs - instants.promptSentMs : null,
+      firstAnswerLatencyMs: instants.firstAnswerMs !== undefined && instants.promptSentMs !== undefined ? instants.firstAnswerMs - instants.promptSentMs : null,
       responseMs: instants.responseDoneMs !== undefined && instants.promptSentMs !== undefined ? instants.responseDoneMs - instants.promptSentMs : null,
       leadMs: config.leadMs,
       tailMs: config.tailMs
@@ -832,7 +869,15 @@ export async function runLocalModelLoop(config: LoopConfig, deps: LoopDeps = def
     const refTokens = referenceResult?.usage.completionTokens ?? null;
     const evalCounts = localStats.map((s) => s.evalCount);
     const localTokens = localStats.length > 0 && evalCounts.every((c) => c !== null) ? (evalCounts as number[]).reduce((a, b) => a + b, 0) : null;
-    const localChunks = localStats.reduce((a, s) => a + s.contentChunks, 0);
+    const localChunks = localStats.reduce((a, s) => a + s.streamChunks, 0);
+    // The final turn's prompt_eval_count: its prompt holds the whole conversation (with --no-tools there is one turn).
+    const localPromptTokens = localStats.length > 0 ? localStats[localStats.length - 1].promptEvalCount : null;
+    const traits = {
+      alias: referenceInfo?.alias ?? null,
+      baseModelId: referenceInfo?.baseModelId ?? null,
+      hasTools: referenceInfo?.hasTools ?? null,
+      hasDefaultFeatures: referenceInfo?.hasDefaultFeatures ?? null
+    };
     const refInstant = refSent === undefined ? null : refSent - startMs;
     const refDoneInstant = refDone === undefined ? null : refDone - startMs;
     receipt.reference = {
@@ -841,6 +886,7 @@ export async function runLocalModelLoop(config: LoopConfig, deps: LoopDeps = def
       endpointSha256: sha256(reference.endpoint.href),
       model: referenceInfo?.id ?? reference.model,
       modelsListed: referenceInfo?.listed ?? null,
+      ...traits,
       response: { sha256: sha256(refText), chars: refText.length, excerpt: responseExcerpt(redact(refText, token)), reasoningChars: referenceResult?.reasoningChars ?? 0 },
       finishReason: referenceResult?.finishReason ?? null,
       sawDone: referenceResult?.sawDone ?? false,
@@ -852,13 +898,19 @@ export async function runLocalModelLoop(config: LoopConfig, deps: LoopDeps = def
     receipt.comparison = {
       schema: LOOP_COMPARISON_SCHEMA,
       models: { reference: reference.model, local: config.model },
+      referenceModel: traits,
       decoding: { temperature: 0, seed: config.seed, maxTokens: config.maxTokens },
       reference: {
         ...phaseSide(referenceInstants, refTokens ?? (referenceResult ? referenceResult.chunks : null), refTokens !== null ? 'tokens' : 'chunks'),
+        promptTokens: referenceResult?.usage.promptTokens ?? null,
+        reasoningChars: referenceResult?.reasoningChars ?? 0,
         gpuControl: control
       },
       local: {
         ...phaseSide(instants, localTokens ?? (localStats.length > 0 ? localChunks : null), localTokens !== null ? 'tokens' : 'chunks'),
+        promptTokens: localPromptTokens,
+        thinkingChars: localStats.reduce((a, s) => a + s.thinkingChars, 0),
+        toolsOffered: bridgeRun?.toolsOffered ?? [],
         vramPeakMb: localWindow?.memoryUsedMb.max ?? null,
         maxUtilizationPct: localWindow?.maxUtilizationPct ?? null,
         toolCalls: bridgeRun?.receipt.toolCalls.length ?? 0

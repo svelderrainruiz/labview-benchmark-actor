@@ -27,6 +27,8 @@ export interface BridgeConfig {
   images?: string[];
   /** false withholds every tool (a model without the tools capability). */
   offerTools?: boolean;
+  /** #143 (`--no-tools`): no tool is offered and the /api/chat body carries no `tools` key at all. */
+  omitTools?: boolean;
   /** #139: Ollama decoding options sent with every /api/chat turn (e.g. temperature, seed, num_predict). */
   options?: Record<string, number>;
 }
@@ -140,18 +142,30 @@ function chatMessage(body: unknown): Message {
 /** What one streamed turn produced: non-empty content chunks and Ollama's own counts from the done chunk. */
 export interface ChatStreamStats {
   contentChunks: number;
+  /** #143: non-empty thinking, content or tool-call deltas; fallback output count if Ollama omits eval_count. */
+  streamChunks: number;
   evalCount: number | null;
   evalDurationNs: number | null;
+  /** #143: Ollama's prompt_eval_count of this turn (the prompt tokens it evaluated). */
+  promptEvalCount: number | null;
+  /** #143: characters of `message.thinking` streamed in this turn (a thinking model). */
+  thinkingChars: number;
 }
 
 export interface ChatTiming {
+  /** #143: the first streamed token of any kind (thinking, content or a tool call). */
   onFirstToken?(turn: number): void;
+  /** #143: the first content or tool-call token (the answer starts; thinking excluded). */
+  onFirstAnswer?(turn: number): void;
   onDone?(turn: number): void;
   /** #139: called once per streamed turn, right after onDone. */
   onStats?(turn: number, stats: ChatStreamStats): void;
 }
 
-/** One streamed /api/chat turn: NDJSON chunks folded into one message; first content or tool call = first token. */
+/**
+ * One streamed /api/chat turn: NDJSON chunks folded into one message. First token = the first thinking, content or
+ * tool-call chunk; first answer = the first content or tool-call chunk (#143).
+ */
 async function streamChat(endpoint: URL, body: object, turn: number, timing: ChatTiming): Promise<Message> {
   const response = await fetch(new URL('/api/chat', endpoint), {
     redirect: 'manual', signal: AbortSignal.timeout(300_000), method: 'POST',
@@ -164,8 +178,11 @@ async function streamChat(endpoint: URL, body: object, turn: number, timing: Cha
   let content = '';
   const toolCalls: unknown[] = [];
   let first = true;
+  let firstAnswer = true;
   let done = false;
   let contentChunks = 0;
+  let streamChunks = 0;
+  let thinkingChars = 0;
   const take = (line: string): void => {
     if (!line.trim() || done) return;
     let chunk: unknown;
@@ -173,19 +190,27 @@ async function streamChat(endpoint: URL, body: object, turn: number, timing: Cha
     if (!isObject(chunk) || chunk.error !== undefined) throw new OllamaAnswered('stream error');
     const message = isObject(chunk.message) ? chunk.message : {};
     const text = typeof message.content === 'string' ? message.content : '';
+    const thinking = typeof message.thinking === 'string' ? message.thinking : '';
     const calls = Array.isArray(message.tool_calls) ? message.tool_calls as unknown[] : [];
     content += text;
+    thinkingChars += thinking.length;
     if (text.length > 0) contentChunks += 1;
     toolCalls.push(...calls);
-    if (first && (text.length > 0 || calls.length > 0)) {
+    const answer = text.length > 0 || calls.length > 0;
+    if (answer || thinking.length > 0) streamChunks += 1;
+    if (first && (answer || thinking.length > 0)) {
       first = false;
       timing.onFirstToken?.(turn);
+    }
+    if (firstAnswer && answer) {
+      firstAnswer = false;
+      timing.onFirstAnswer?.(turn);
     }
     if (chunk.done === true) {
       done = true;
       timing.onDone?.(turn);
       const count = (value: unknown): number | null => (typeof value === 'number' && Number.isFinite(value) && value >= 0 ? value : null);
-      timing.onStats?.(turn, { contentChunks, evalCount: count(chunk.eval_count), evalDurationNs: count(chunk.eval_duration) });
+      timing.onStats?.(turn, { contentChunks, streamChunks, evalCount: count(chunk.eval_count), evalDurationNs: count(chunk.eval_duration), promptEvalCount: count(chunk.prompt_eval_count), thinkingChars });
     }
   };
   const decoder = new TextDecoder();
@@ -251,7 +276,7 @@ export async function runBridge(config: BridgeConfig, hooks: BridgeHooks = {}): 
   try {
     const listed = await server.list();
     receipt.toolsListed = listed.map(tool => tool.name);
-    const tools = listed.filter(tool => config.offerTools !== false && config.allow.has(tool.name)).map(({ name, description, inputSchema }) =>
+    const tools = listed.filter(tool => config.offerTools !== false && !config.omitTools && config.allow.has(tool.name)).map(({ name, description, inputSchema }) =>
       ({ type: 'function', function: { name, description, parameters: inputSchema } }));
     const allowed = new Set(tools.map(tool => tool.function.name));
     toolsOffered = [...allowed];
@@ -265,9 +290,10 @@ export async function runBridge(config: BridgeConfig, hooks: BridgeHooks = {}): 
       stage = 'Ollama chat';
       hooks.onChatRequest?.(turn);
       const decoding = config.options ? { options: config.options } : {};
+      const offered = config.omitTools ? {} : { tools };
       const message = config.stream
-        ? await streamChat(config.endpoint, { model: config.model, stream: true, messages, tools, ...decoding }, turn, hooks)
-        : chatMessage(await api(config.endpoint, '/api/chat', { model: config.model, stream: false, messages, tools, ...decoding }));
+        ? await streamChat(config.endpoint, { model: config.model, stream: true, messages, ...offered, ...decoding }, turn, hooks)
+        : chatMessage(await api(config.endpoint, '/api/chat', { model: config.model, stream: false, messages, ...offered, ...decoding }));
       if (!message.tool_calls?.length) {
         finalText = message.content;
         break;

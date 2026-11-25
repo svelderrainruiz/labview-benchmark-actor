@@ -17,6 +17,7 @@ const require = createRequire(import.meta.url);
 const loop = require(join(root, 'out', 'mcp', 'localModelLoop.js'));
 const ref = require(join(root, 'out', 'mcp', 'openWebUiReference.js'));
 const bridge = require(join(root, 'out', 'mcp', 'ollamaMcpBridge.js'));
+const mcpServer = require(join(root, 'out', 'mcp', 'benchmarkActorMcpServer.js'));
 
 let checks = 0;
 function assert(cond, msg) {
@@ -236,6 +237,10 @@ const kindIs = (kind) => (error) => {
   assert(noUsage.usage.completionTokens === null && noUsage.chunks === 2, 'without usage the chunks are counted');
   owui.chat.push({ status: 200, lines: [delta('', { reasoning_content: 'think' }), delta('x'), sse({ choices: [{ delta: {}, finish_reason: 'length' }], usage: { eval_count: 9 } })] });
   const thinking = await ref.runReferenceChat(refConfig(), request);
+  owui.chat.push({ status: 200, lines: [delta('', { reasoning_content: 'hmm' }), delta('y'), 'data: [DONE]\n\n'] });
+  const refOrder = [];
+  await ref.runReferenceChat(refConfig(), request, { onFirstToken: () => refOrder.push('first'), onFirstAnswer: () => refOrder.push('answer') });
+  assert(refOrder.join() === 'first,answer', `reference: reasoning is the first token, content the first answer (${refOrder})`);
   assert(thinking.reasoningChars === 5 && thinking.text === 'x' && thinking.chunks === 2 && thinking.usage.completionTokens === 9 && !thinking.sawDone && thinking.finishReason === 'length', 'reasoning deltas count as output; a finish_reason without [DONE] ends the stream; eval_count usage');
 
   const failures = [
@@ -262,15 +267,16 @@ const kindIs = (kind) => (error) => {
 
 // ---- 4. fake Ollama (the REAL bridge runs: decoding options on /api/chat, eval_count stats) ----------------------
 const gpu = { hot: false };
-const ollama = { chat: [], requests: [] };
+// #143: `capabilities` is what /api/show reports; a chat part is content text or { thinking } (a thinking model).
+const ollama = { chat: [], requests: [], capabilities: ['completion', 'vision'], omitCounts: false };
 const ollamaServer = createServer(async (req, res) => {
   let text = '';
   for await (const chunk of req) text += chunk;
-  ollama.requests.push({ url: req.url, body: text ? JSON.parse(text) : null });
+  ollama.requests.push({ url: req.url, raw: text, body: text ? JSON.parse(text) : null });
   const fixed = {
     '/api/version': '{"version":"0.40.18"}',
     '/api/tags': JSON.stringify({ models: [{ name: 'qwen2.5vl:3b', model: 'qwen2.5vl:3b', digest: 'd1g3st', size: 3200627168 }] }),
-    '/api/show': '{"capabilities":["completion","vision"]}',
+    '/api/show': JSON.stringify({ capabilities: ollama.capabilities }),
     '/api/generate': '{"done":true}'
   }[req.url];
   if (fixed) {
@@ -282,11 +288,14 @@ const ollamaServer = createServer(async (req, res) => {
     const parts = ollama.chat.shift() ?? ['Local', ' answer'];
     res.writeHead(200, { 'Content-Type': 'application/x-ndjson' });
     await sleep(250);
-    for (const content of parts) {
-      res.write(`${JSON.stringify({ message: { role: 'assistant', content }, done: false })}\n`);
+    for (const part of parts) {
+      const message = typeof part === 'string' ? { role: 'assistant', content: part } : { role: 'assistant', content: '', ...part };
+      res.write(`${JSON.stringify({ message, done: false })}\n`);
       await sleep(100);
     }
-    res.write(`${JSON.stringify({ message: { role: 'assistant', content: '' }, done: true, eval_count: 30, eval_duration: 900000000 })}\n`);
+    const done = { message: { role: 'assistant', content: '' }, done: true };
+    if (!ollama.omitCounts) Object.assign(done, { eval_count: 30, eval_duration: 900000000, prompt_eval_count: 25 });
+    res.write(`${JSON.stringify(done)}\n`);
     return res.end();
   }
   res.writeHead(404);
@@ -302,10 +311,34 @@ const ollamaUrl = `http://127.0.0.1:${ollamaServer.address().port}/`;
   const run = await bridge.runBridge({ ...base, options: { temperature: 0, seed: 42, num_predict: 256 } }, { onStats: (turn, s) => stats.push([turn, s]) });
   const body = ollama.requests.find((r) => r.url === '/api/chat').body;
   assert(!run.failure && body.options.temperature === 0 && body.options.seed === 42 && body.options.num_predict === 256, 'the bridge sends the decoding options');
-  assert(stats.length === 1 && stats[0][0] === 0 && stats[0][1].evalCount === 30 && stats[0][1].evalDurationNs === 900000000 && stats[0][1].contentChunks === 2, `the done chunk's counts reach onStats: ${JSON.stringify(stats)}`);
+  assert(stats.length === 1 && stats[0][0] === 0 && stats[0][1].evalCount === 30 && stats[0][1].evalDurationNs === 900000000 && stats[0][1].contentChunks === 2 && stats[0][1].streamChunks === 2 && stats[0][1].promptEvalCount === 25 && stats[0][1].thinkingChars === 0, `the done chunk's counts reach onStats: ${JSON.stringify(stats)}`);
   ollama.requests.length = 0;
   await bridge.runBridge(base, {});
   assert(!('options' in ollama.requests.find((r) => r.url === '/api/chat').body), 'without options the /api/chat body is unchanged');
+
+  // #143: omitTools drops the `tools` key; omitTools false/absent leaves the body byte-for-byte as before.
+  const chatRaw = async (config) => {
+    ollama.requests.length = 0;
+    const run = await bridge.runBridge(config, {});
+    return { run, raw: ollama.requests.find((r) => r.url === '/api/chat').raw };
+  };
+  const tooled = { ...base, offerTools: true, allow: new Set([[...mcpServer.OLLAMA_DEFAULT_TOOLS][0]]) };
+  const plain = await chatRaw(tooled);
+  const explicitFalse = await chatRaw({ ...tooled, omitTools: false });
+  assert(plain.raw === explicitFalse.raw && JSON.parse(plain.raw).tools.length === 1, 'omitTools false: the /api/chat body is byte-for-byte unchanged (tools key kept)');
+  const omitted = await chatRaw({ ...tooled, omitTools: true });
+  assert(!('tools' in JSON.parse(omitted.raw)) && omitted.run.toolsOffered.length === 0, 'omitTools: no tools key, nothing offered');
+
+  // #143: thinking chunks before content: first token = the first thinking chunk, first answer = the first content.
+  const order = [];
+  const thinkStats = [];
+  ollama.chat.push([{ thinking: 'Let me think' }, { thinking: ' more' }, 'Ans', 'wer']);
+  const thought = await bridge.runBridge(base, {
+    onFirstToken: () => order.push('first'), onFirstAnswer: () => order.push('answer'), onDone: () => order.push('done'),
+    onStats: (_t, st) => thinkStats.push(st)
+  });
+  assert(thought.finalText === 'Answer' && order.join() === 'first,answer,done', `thinking before content: ${order}`);
+  assert(thinkStats[0].thinkingChars === 17 && thinkStats[0].contentChunks === 2 && thinkStats[0].streamChunks === 4, `thinking characters and all stream deltas are counted: ${JSON.stringify(thinkStats)}`);
 }
 
 // ---- 5. the whole loop (fake ffmpeg / nvidia-smi, real bridge, fake Ollama + Open WebUI) ------------------------
@@ -473,6 +506,89 @@ const readJson = (file) => JSON.parse(readFileSync(file, 'utf8'));
   r = io();
   argv = ['--source', 'test', '--ollama', ollamaUrl, '--captures-dir', caps, '--reference', 'openwebui', '--endpoint', owuiUrl, '--token-file', join(work, 'empty.key'), '--reference-model', 'fast'];
   assert(await loop.runLocalModelLoopCli(argv, r.io, fakeDeps().deps) === LOOP_EXIT.usage && r.o.err[0] === 'local-model-loop: --token-file is empty' && r.o.err[1] === loop.LOOP_USAGE, 'an empty token file is a usage error');
+}
+
+// ---- 6. #143 like-for-like: alias detection, --no-tools, prompt tokens, any-kind first token -------------------
+{
+  // Flags: --no-tools parses; with --allow-tool it is a usage error (exit 2).
+  assert(loop.parseLoopArgs(['--no-tools'], {}, 'linux', '/h').noTools === true && loop.parseLoopArgs([], {}, 'linux', '/h').noTools === false, '--no-tools parses (default off)');
+  throws(() => loop.parseLoopArgs(['--no-tools', '--allow-tool', 'x'], {}, 'linux', '/h'), /--no-tools and --allow-tool exclude each other/, '--no-tools + --allow-tool', LOOP_EXIT.usage);
+  const r = io();
+  assert(await loop.runLocalModelLoopCli(['--no-tools', '--allow-tool', 'x', '--source', 'test', '--captures-dir', caps], r.io, fakeDeps().deps) === LOOP_EXIT.usage && r.o.err[1] === loop.LOOP_USAGE && loop.LOOP_USAGE.includes('[--no-tools]'), 'the CLI exits 2 for --no-tools + --allow-tool');
+
+  // Traits of /api/models entries: only booleans and the base id.
+  const T = ref.referenceModelTraits;
+  const aliasEntry = { id: 'fast', info: { base_model_id: 'gemma4:e4b', meta: { toolIds: ['tool-one'], builtinTools: { 'builtin-one': true }, defaultFeatureIds: ['feature-one'] } } };
+  assert(JSON.stringify(T(aliasEntry)) === '{"alias":true,"baseModelId":"gemma4:e4b","hasTools":true,"hasDefaultFeatures":true}', `alias traits: ${JSON.stringify(T(aliasEntry))}`);
+  assert(JSON.stringify(T({ id: 'gemma4:e4b' })) === '{"alias":false,"baseModelId":null,"hasTools":false,"hasDefaultFeatures":false}', 'a base entry');
+  assert(JSON.stringify(T({ id: 'b', info: { base_model_id: '', meta: { toolIds: [], builtinTools: { a: false }, defaultFeatureIds: [] } } })) === '{"alias":false,"baseModelId":null,"hasTools":false,"hasDefaultFeatures":false}', 'empty values are not an alias, tools or features');
+  assert(T({ id: 'odd', info: { base_model_id: 'has space; rm' } }).alias === true && T({ id: 'odd', info: { base_model_id: 'has space; rm' } }).baseModelId === null, 'an odd base id is an alias without an echoed id');
+  assert(T({ id: 'x', info: { meta: { builtinTools: { a: true } } } }).hasTools === true, 'a true builtinTools value counts as tools');
+
+  owui.models = { status: 200, body: JSON.stringify({ data: [aliasEntry, { id: 'gemma4:e4b', info: null }, { id: 'gemma4:26b' }] }) };
+  ollama.capabilities = ['completion', 'tools'];
+  const leakWords = ['tool-one', 'builtin-one', 'feature-one'];
+  const runLoop = async (refModel, extra) => {
+    gpu.hot = false;
+    owui.onChat = () => { gpu.hot = false; };
+    ollama.requests.length = 0;
+    const o = io();
+    const argv = ['--source', 'test', '--lead-ms', '100', '--tail-ms', '100', '--ollama', ollamaUrl, '--captures-dir', caps,
+      '--reference', 'openwebui', '--endpoint', owuiUrl, '--token-file', tokenFile, '--reference-model', refModel, ...extra];
+    const code = await loop.runLocalModelLoopCli(argv, o.io, fakeDeps().deps);
+    assert(code === 0, `${refModel} ${extra.join(' ')}: exit 0 (${o.o.err.join(' | ')})`);
+    assertNoSentinel(`#143 ${refModel}`, o.o, argv);
+    const receipt = JSON.parse(o.o.out.join('\n'));
+    const all = `${o.o.out.join('\n')}\n${o.o.err.join('\n')}\n${filesUnder(receipt.captureDir).map((f) => readFileSync(f, 'latin1')).join('\n')}`;
+    assert(leakWords.every((w) => !all.includes(w)), `${refModel}: no tool or feature name of the entry in any output or artifact`);
+    return { receipt, err: o.o.err, chat: ollama.requests.filter((q) => q.url === '/api/chat') };
+  };
+
+  // Alias: one warning line naming the base id and the flag; traits recorded; tools offered as before.
+  owui.chat.push({ status: 200, lines: sseStream(['Red, ', 'yellow, ', 'blue.'], { usage: { prompt_tokens: 276, completion_tokens: 6 } }) });
+  const alias = await runLoop('fast', []);
+  const warnings = alias.err.filter((l) => /^warning:/.test(l));
+  assert(warnings.length === 1 && warnings[0] === 'warning: reference model fast is an Open WebUI alias of gemma4:e4b; use --reference-model gemma4:e4b for a like-for-like comparison', `one alias warning: ${warnings}`);
+  const traitsAlias = { alias: true, baseModelId: 'gemma4:e4b', hasTools: true, hasDefaultFeatures: true };
+  assert(Object.entries(traitsAlias).every(([k, v]) => alias.receipt.reference[k] === v && alias.receipt.comparison.referenceModel[k] === v), `alias traits in the receipt: ${JSON.stringify(alias.receipt.comparison.referenceModel)}`);
+  assert(alias.chat.length === 1 && Array.isArray(alias.chat[0].body.tools) && alias.chat[0].body.tools.length === mcpServer.OLLAMA_DEFAULT_TOOLS.size, 'without --no-tools the default tools are offered');
+  assert(alias.receipt.model.toolsOffered.length === mcpServer.OLLAMA_DEFAULT_TOOLS.size && alias.receipt.comparison.local.toolsOffered.length === mcpServer.OLLAMA_DEFAULT_TOOLS.size, 'toolsOffered lists them');
+  assert(alias.receipt.comparison.reference.promptTokens === 276 && alias.receipt.comparison.local.promptTokens === 25, 'prompt tokens on both sides show the mismatch');
+
+  // Without --no-tools the /api/chat body is byte-for-byte the same with and without an unrelated flag.
+  owui.chat.push({ status: 200, lines: sseStream(['x']) });
+  const unrelated = await runLoop('fast', ['--gpu-threshold-pct', '20', '--fps', '5']);
+  assert(unrelated.chat[0].raw === alias.chat[0].raw && Object.keys(alias.chat[0].body).join() === 'model,stream,messages,tools,options', 'the /api/chat body is byte-for-byte unchanged by unrelated flags');
+
+  // Base tag + --no-tools: no warning, no tools key, toolsOffered [], equal prompt tokens.
+  owui.chat.push({ status: 200, lines: sseStream(['Red, ', 'yellow, ', 'blue.'], { usage: { prompt_tokens: 25, completion_tokens: 6 } }) });
+  const parity = await runLoop('gemma4:e4b', ['--no-tools']);
+  assert(!parity.err.some((l) => /^warning:/.test(l)), 'no warning for a base entry');
+  assert(parity.receipt.reference.alias === false && parity.receipt.reference.baseModelId === null && parity.receipt.comparison.referenceModel.hasTools === false && parity.receipt.comparison.referenceModel.hasDefaultFeatures === false, 'base traits in the receipt');
+  assert(parity.chat.length === 1 && !('tools' in parity.chat[0].body) && !parity.chat[0].raw.includes('"tools"'), '--no-tools: the Ollama request has no tools key');
+  assert(Array.isArray(parity.receipt.model.toolsOffered) && parity.receipt.model.toolsOffered.length === 0 && parity.receipt.comparison.local.toolsOffered.length === 0, '--no-tools: toolsOffered is []');
+  assert(parity.receipt.comparison.reference.promptTokens === 25 && parity.receipt.comparison.local.promptTokens === 25, 'equal prompt tokens');
+
+  // Gap 3: thinking before content on both sides. first token = any kind, first answer = content, rate over first token -> done.
+  ollama.omitCounts = true;
+  ollama.chat.push([{ thinking: 'Let me think' }, { thinking: ' more' }, { thinking: ' still' }, 'Ans', 'wer']);
+  owui.chat.push({ status: 200, gapMs: 60, lines: [delta('', { reasoning_content: 'mull' }), delta('', { reasoning_content: 'ing' }), delta('Red'), sse({ choices: [], usage: { prompt_tokens: 25, completion_tokens: 20 } }), 'data: [DONE]\n\n'] });
+  const think = await runLoop('gemma4:e4b', ['--no-tools']);
+  const cl = think.receipt.comparison.local;
+  const cr = think.receipt.comparison.reference;
+  assert(cl.firstTokenMs !== null && cl.firstAnswerMs - cl.firstTokenMs >= 250 && cl.thinkingChars === 23, `local: thinking is the first token, the answer starts later: ${JSON.stringify(cl)}`);
+  assert(cl.outputUnit === 'chunks' && cl.outputTokens === 5 && cl.tokensPerSecond === Math.round((5 / ((cl.totalMs - cl.firstTokenMs) / 1000)) * 100) / 100, 'without eval_count, local fallback counts thinking and content stream chunks');
+  assert(cr.firstAnswerMs - cr.firstTokenMs >= 100 && cr.reasoningChars === 7 && cr.tokensPerSecond === Math.round((20 / ((cr.totalMs - cr.firstTokenMs) / 1000)) * 100) / 100, `reference: reasoning first, same rate rule: ${JSON.stringify(cr)}`);
+  assert(think.receipt.timing.firstAnswerLatencyMs === cl.firstAnswerMs && think.receipt.timing.firstTokenLatencyMs === cl.firstTokenMs, 'timing block has both latencies');
+  const labels = think.receipt.cues.map((c) => c.label);
+  const order = ['reference sent', 'reference first token', 'reference answer started', 'reference done', 'prompt sent', 'first token', 'answer started', 'response done'];
+  assert(order.every((l) => labels.includes(l)) && order.every((l, i) => i === 0 || labels.indexOf(order[i - 1]) < labels.indexOf(l)), `eight cues in order: ${labels}`);
+  console.log(`  sample comparison block (#143, --no-tools, thinking model):\n${JSON.stringify(think.receipt.comparison, null, 2).split('\n').map((l) => `    ${l}`).join('\n')}`);
+
+  ollama.omitCounts = false;
+  owui.onChat = null;
+  ollama.capabilities = ['completion', 'vision'];
+  owui.models = { status: 200, body: JSON.stringify({ data: [{ id: 'fast' }] }) };
 }
 
 // Without --reference nothing changes: no options on /api/chat, no decoding/reference/comparison in the receipt.

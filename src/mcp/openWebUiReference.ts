@@ -112,9 +112,41 @@ export interface ReferenceModelInfo {
   id: string;
   /** Number of models the endpoint lists. */
   listed: number;
+  /** #143: the entry is an Open WebUI workspace model (alias) on top of `baseModelId`. */
+  alias: boolean;
+  /** `info.base_model_id` when it is a plain model id; null otherwise (also for an alias whose base id looks odd). */
+  baseModelId: string | null;
+  /** The entry lists tools (`info.meta.toolIds`, or a `true` in `info.meta.builtinTools`); never their names. */
+  hasTools: boolean;
+  /** The entry lists default features (`info.meta.defaultFeatureIds`); never their names. */
+  hasDefaultFeatures: boolean;
 }
 
-/** GET <endpoint>/api/models: the token is accepted and the model id is served. Failures are prerequisite errors. */
+/** A model id as accepted by --reference-model; anything else from the server is not echoed. */
+export const REFERENCE_MODEL_ID = /^[A-Za-z0-9_.:/@+-]{1,128}$/;
+
+/**
+ * #143: what the /api/models entry says about the model beyond its id: alias (a non-empty `info.base_model_id`),
+ * tools and default features. Only booleans and the base id leave this function; no tool or feature name.
+ */
+export function referenceModelTraits(entry: Record<string, unknown>): Pick<ReferenceModelInfo, 'alias' | 'baseModelId' | 'hasTools' | 'hasDefaultFeatures'> {
+  const info = isObject(entry.info) ? entry.info : {};
+  const meta = isObject(info.meta) ? info.meta : {};
+  const base = typeof info.base_model_id === 'string' ? info.base_model_id.trim() : '';
+  const nonEmptyList = (value: unknown): boolean => Array.isArray(value) && value.length > 0;
+  const builtin = isObject(meta.builtinTools) && Object.values(meta.builtinTools).some((v) => v === true);
+  return {
+    alias: base.length > 0,
+    baseModelId: base && REFERENCE_MODEL_ID.test(base) ? base : null,
+    hasTools: nonEmptyList(meta.toolIds) || builtin,
+    hasDefaultFeatures: nonEmptyList(meta.defaultFeatureIds)
+  };
+}
+
+/**
+ * GET <endpoint>/api/models: the token is accepted and the model id is served, plus the entry's alias / tools /
+ * default-feature traits (#143). Failures are prerequisite errors.
+ */
 export async function referencePreflight(config: ReferenceConfig): Promise<ReferenceModelInfo> {
   let response: Response;
   try {
@@ -136,10 +168,11 @@ export async function referencePreflight(config: ReferenceConfig): Promise<Refer
   }
   const list = isObject(body) && Array.isArray(body.data) ? body.data.filter(isObject) : null;
   if (!list) throw new ReferenceError('reference preflight (/api/models) did not answer like Open WebUI', 'prerequisite');
-  if (!list.some((m) => m.id === config.model)) {
+  const entry = list.find((m) => m.id === config.model);
+  if (!entry) {
     throw new ReferenceError(`reference model ${config.model} is not served by the reference endpoint (${list.length} models listed)`, 'prerequisite');
   }
-  return { id: config.model, listed: list.length };
+  return { id: config.model, listed: list.length, ...referenceModelTraits(entry) };
 }
 
 export interface ReferenceRequest {
@@ -153,7 +186,10 @@ export interface ReferenceRequest {
 
 export interface ReferenceTiming {
   onSent?(): void;
+  /** #143: the first streamed token of any kind (reasoning or content). */
   onFirstToken?(): void;
+  /** #143: the first content (or tool-call) token: the answer starts. */
+  onFirstAnswer?(): void;
   onDone?(): void;
 }
 
@@ -206,6 +242,7 @@ export async function runReferenceChat(config: ReferenceConfig, request: Referen
   }
   const result: ReferenceResult = { text: '', reasoningChars: 0, chunks: 0, usage: { completionTokens: null, promptTokens: null }, finishReason: null, sawDone: false };
   let first = true;
+  let firstAnswer = true;
   const take = (rawLine: string): void => {
     const line = rawLine.replace(/\r$/, '');
     if (result.sawDone || !line.startsWith('data:')) return;
@@ -242,6 +279,10 @@ export async function runReferenceChat(config: ReferenceConfig, request: Referen
         first = false;
         timing.onFirstToken?.();
       }
+    }
+    if (firstAnswer && (text.length > 0 || (Array.isArray(delta.tool_calls) && delta.tool_calls.length > 0))) {
+      firstAnswer = false;
+      timing.onFirstAnswer?.();
     }
     if (typeof choice.finish_reason === 'string') result.finishReason = choice.finish_reason;
   };
