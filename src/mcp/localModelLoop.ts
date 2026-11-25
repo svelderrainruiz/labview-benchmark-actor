@@ -16,6 +16,11 @@
  *   6. prints ONE JSON receipt (metadata, hashes, at most a 200-character response excerpt; never pixels) and
  *      writes it next to the clip.
  *
+ * Reference mode (#139 slice 2, `--reference openwebui`): between the lead and the local prompt, the same prompt is
+ * streamed through an Open WebUI chat-completions API (cues "reference sent", "reference first token", "reference
+ * done" on the same axis) while the laptop GPU sampler keeps running as the idle control; both sides use temperature
+ * 0, `--seed` and `--max-tokens`, and the receipt gets one `comparison` block. The token stays in openWebUiReference.
+ *
  * Every process runs through spawn/execFile with an argument array, never a shell string.
  */
 import { ChildProcess, execFile, spawn } from 'node:child_process';
@@ -37,10 +42,14 @@ import {
 import { ActiveCaptureState, buildActiveCaptureSession, newCaptureRunId, writeActiveCaptureSession } from '../captureSession';
 import {
   DEFAULT_GPU_CUE_MEMORY_RISE_MB, DEFAULT_GPU_CUE_UTIL_THRESHOLD_PCT, GpuSeriesHeader, NvidiaSmiRunner, nvidiaSmiRunner,
-  startGpuSampler
+  readGpuSeries, startGpuSampler
 } from '../gpuSamples';
 import { OLLAMA_DEFAULT_TOOLS } from './benchmarkActorMcpServer';
-import { api, BridgeConfig, BridgeHooks, BridgeRun, isObject, runBridge } from './ollamaMcpBridge';
+import { api, BridgeConfig, BridgeHooks, BridgeRun, ChatStreamStats, isObject, runBridge } from './ollamaMcpBridge';
+import {
+  DEFAULT_REFERENCE_TIMEOUT_MS, nodeTokenFileOps, parseReferenceEndpoint, readTokenFile, redact, ReferenceConfig, ReferenceError,
+  ReferenceModelInfo, referencePreflight, ReferenceResult, REFERENCE_KINDS, ReferenceKind, runReferenceChat, TokenFileOps
+} from './openWebUiReference';
 
 export const LOOP_RECEIPT_SCHEMA = 'labview-benchmark-actor/local-model-loop@v1';
 export const LOOP_DEFAULTS = {
@@ -51,19 +60,28 @@ export const LOOP_DEFAULTS = {
   leadMs: 2000,
   tailMs: 3000,
   clipPadMs: 1000,
-  maxTurns: 4
+  maxTurns: 4,
+  maxTokens: 256,
+  seed: 42
 } as const;
 export const MAX_LOOP_WAIT_MS = 600_000;
 export const RESPONSE_EXCERPT_CHARS = 200;
 export const LOOP_CUE_LABELS = { promptSent: 'prompt sent', firstToken: 'first token', responseDone: 'response done' } as const;
+export const REFERENCE_CUE_LABELS = { sent: 'reference sent', firstToken: 'reference first token', done: 'reference done' } as const;
+export const LOOP_COMPARISON_SCHEMA = 'labview-benchmark-actor/local-model-loop-comparison@v1';
 
-/** Exit codes: 2 usage, 3 a prerequisite is missing, 4 the capture failed, 5 the model run failed, 6 the clip failed. */
-export const LOOP_EXIT = { usage: 2, prerequisite: 3, capture: 4, model: 5, clip: 6 } as const;
+/**
+ * Exit codes: 2 usage (also a bad --token-file), 3 a prerequisite is missing (also the reference preflight), 4 the
+ * capture failed, 5 the model run failed, 6 the clip failed, 7 the reference run failed, 8 the reference timed out.
+ */
+export const LOOP_EXIT = { usage: 2, prerequisite: 3, capture: 4, model: 5, clip: 6, reference: 7, referenceTimeout: 8 } as const;
 
 export const LOOP_USAGE =
   'usage: node out/mcp/localModelLoop.js [--source desktop|test] [--fps <n>] [--lead-ms <ms>] [--tail-ms <ms>] ' +
   '[--model <name>] [--ollama <url>] [--prompt <text>] [--image <png>] [--allow-tool <name>]... [--max-turns <n>] ' +
-  '[--cold] [--captures-dir <dir>] [--ffmpeg <path>] [--nvidia-smi <path>] [--gpu-threshold-pct <n>] [--gpu-memory-rise-mb <n>]';
+  '[--cold] [--captures-dir <dir>] [--ffmpeg <path>] [--nvidia-smi <path>] [--gpu-threshold-pct <n>] [--gpu-memory-rise-mb <n>] ' +
+  '[--max-tokens <n>] [--seed <n>] [--reference openwebui --endpoint <https url> --token-file <path> --reference-model <id> ' +
+  '[--reference-timeout-ms <ms>]]';
 
 /** A loop failure with its exit code; the message is for the operator (no model text, no pixels). */
 export class LoopError extends Error {
@@ -89,6 +107,18 @@ export interface LoopConfig {
   nvidiaSmi: string;
   gpuThresholdPct: number;
   gpuMemoryRiseMb: number;
+  /** #139: fixed decoding (temperature 0, seed, max tokens); applied when `fixedDecoding` is true. */
+  seed: number;
+  maxTokens: number;
+  /** True in reference mode or when --seed / --max-tokens is given; otherwise Ollama's defaults, as before #139. */
+  fixedDecoding: boolean;
+  /** #139 reference mode; the token lives only inside `reference.token()`. */
+  reference?: ReferenceConfig;
+}
+
+function referenceUsage(error: unknown): never {
+  if (error instanceof ReferenceError) throw new LoopError(error.message, LOOP_EXIT.usage);
+  throw error;
 }
 
 function intOption(name: string, raw: string | undefined, fallback: number, min: number, max: number): number {
@@ -113,7 +143,8 @@ export function parseLoopArgs(
   argv: readonly string[],
   env: NodeJS.ProcessEnv = process.env,
   platform: NodeJS.Platform = process.platform,
-  home: string = homedir()
+  home: string = homedir(),
+  tokenOps: TokenFileOps = nodeTokenFileOps
 ): LoopConfig {
   let values: Record<string, string | boolean | string[] | undefined>;
   try {
@@ -126,7 +157,9 @@ export function parseLoopArgs(
         model: { type: 'string' }, ollama: { type: 'string' }, prompt: { type: 'string' }, image: { type: 'string' },
         'allow-tool': { type: 'string', multiple: true }, 'max-turns': { type: 'string' }, cold: { type: 'boolean' },
         'captures-dir': { type: 'string' }, ffmpeg: { type: 'string' }, 'nvidia-smi': { type: 'string' },
-        'gpu-threshold-pct': { type: 'string' }, 'gpu-memory-rise-mb': { type: 'string' }
+        'gpu-threshold-pct': { type: 'string' }, 'gpu-memory-rise-mb': { type: 'string' },
+        'max-tokens': { type: 'string' }, seed: { type: 'string' }, reference: { type: 'string' }, endpoint: { type: 'string' },
+        'token-file': { type: 'string' }, 'reference-model': { type: 'string' }, 'reference-timeout-ms': { type: 'string' }
       }
     }));
   } catch (error) {
@@ -161,6 +194,9 @@ export function parseLoopArgs(
   if (allowTools.some((name) => !/^[A-Za-z0-9_.-]{1,64}$/.test(name))) throw new LoopError('--allow-tool needs a tool name', LOOP_EXIT.usage);
   const capturesDir = text('captures-dir') ?? defaultCapturesDir(platform, env, home);
   if (!capturesDir.trim()) throw new LoopError('--captures-dir must not be empty', LOOP_EXIT.usage);
+  const seed = intOption('seed', text('seed'), LOOP_DEFAULTS.seed, 0, 2_147_483_647);
+  const maxTokens = intOption('max-tokens', text('max-tokens'), LOOP_DEFAULTS.maxTokens, 1, 131_072);
+  const reference = parseReferenceArgs(text, platform, tokenOps);
   return {
     source,
     fps,
@@ -177,8 +213,42 @@ export function parseLoopArgs(
     ...(text('ffmpeg') !== undefined ? { ffmpeg: text('ffmpeg') } : {}),
     nvidiaSmi: text('nvidia-smi') ?? 'nvidia-smi',
     gpuThresholdPct: numberOption('gpu-threshold-pct', text('gpu-threshold-pct'), DEFAULT_GPU_CUE_UTIL_THRESHOLD_PCT, 100),
-    gpuMemoryRiseMb: numberOption('gpu-memory-rise-mb', text('gpu-memory-rise-mb'), DEFAULT_GPU_CUE_MEMORY_RISE_MB, 1_000_000)
+    gpuMemoryRiseMb: numberOption('gpu-memory-rise-mb', text('gpu-memory-rise-mb'), DEFAULT_GPU_CUE_MEMORY_RISE_MB, 1_000_000),
+    seed,
+    maxTokens,
+    fixedDecoding: reference !== undefined || text('seed') !== undefined || text('max-tokens') !== undefined,
+    ...(reference ? { reference } : {})
   };
+}
+
+/** The reference flags: all four together, or none. The token file is read last, once, after every other check. */
+function parseReferenceArgs(text: (name: string) => string | undefined, platform: NodeJS.Platform, tokenOps: TokenFileOps): ReferenceConfig | undefined {
+  const kind = text('reference');
+  const dependent = ['endpoint', 'token-file', 'reference-model', 'reference-timeout-ms'].filter((name) => text(name) !== undefined);
+  if (kind === undefined) {
+    if (dependent.length > 0) throw new LoopError(`--${dependent[0]} needs --reference openwebui`, LOOP_EXIT.usage);
+    return undefined;
+  }
+  if (!(REFERENCE_KINDS as readonly string[]).includes(kind)) throw new LoopError(`--reference must be ${REFERENCE_KINDS.join(' or ')}`, LOOP_EXIT.usage);
+  for (const name of ['endpoint', 'token-file', 'reference-model']) {
+    if (text(name) === undefined) throw new LoopError(`--reference ${kind} needs --${name}`, LOOP_EXIT.usage);
+  }
+  const model = (text('reference-model') as string).trim();
+  if (!/^[A-Za-z0-9_.:/@+-]{1,128}$/.test(model)) throw new LoopError('--reference-model needs a model id (e.g. fast)', LOOP_EXIT.usage);
+  let endpoint: URL;
+  try {
+    endpoint = parseReferenceEndpoint(text('endpoint') as string);
+  } catch (error) {
+    referenceUsage(error);
+  }
+  const timeoutMs = intOption('reference-timeout-ms', text('reference-timeout-ms'), DEFAULT_REFERENCE_TIMEOUT_MS, 100, 3_600_000);
+  let token: () => string;
+  try {
+    token = readTokenFile(text('token-file') as string, platform, tokenOps);
+  } catch (error) {
+    referenceUsage(error);
+  }
+  return { kind: kind as ReferenceKind, endpoint, model, timeoutMs, token };
 }
 
 export interface CaptureSourcePlan {
@@ -266,7 +336,7 @@ export interface LoopInstants {
 }
 
 export interface LoopClipWindow {
-  anchor: 'prompt sent' | 'gpu cue';
+  anchor: 'prompt sent' | 'gpu cue' | 'reference sent';
   startInstantMs: number;
   endInstantMs: number;
   fromFrame: number;
@@ -276,19 +346,22 @@ export interface LoopClipWindow {
 /**
  * The clip window on the frame axis: from the earliest of (prompt sent, first GPU cue) minus `padMs` to response
  * done plus `padMs`, widened to whole frames (the last frame at or before the start, the first at or after the end)
- * and clamped to the capture.
+ * and clamped to the capture. In reference mode (#139) the window starts at the earliest of reference sent, prompt
+ * sent and the first GPU cue, so the clip shows the idle control too.
  */
 export function planLoopClip(
   frames: ReadonlyArray<{ tMs?: unknown }>,
   promptSentInstantMs: number,
   responseDoneInstantMs: number,
   gpuCueInstantsMs: readonly number[],
-  padMs: number = LOOP_DEFAULTS.clipPadMs
+  padMs: number = LOOP_DEFAULTS.clipPadMs,
+  referenceSentInstantMs?: number
 ): LoopClipWindow {
   if (frames.length === 0) throw new LoopError('the capture has no frames to clip', LOOP_EXIT.clip);
   const firstGpu = gpuCueInstantsMs.length > 0 ? Math.min(...gpuCueInstantsMs) : Infinity;
-  const anchor = firstGpu < promptSentInstantMs ? 'gpu cue' : 'prompt sent';
-  const startInstantMs = Math.min(promptSentInstantMs, firstGpu) - padMs;
+  const reference = referenceSentInstantMs ?? Infinity;
+  const anchor = reference < Math.min(promptSentInstantMs, firstGpu) ? 'reference sent' : firstGpu < promptSentInstantMs ? 'gpu cue' : 'prompt sent';
+  const startInstantMs = Math.min(promptSentInstantMs, firstGpu, reference) - padMs;
   const endInstantMs = responseDoneInstantMs + padMs;
   const times = frames.map((f) => Number(f.tMs));
   let fromFrame = 0;
@@ -300,23 +373,98 @@ export function planLoopClip(
   return { anchor, startInstantMs, endInstantMs, fromFrame, toFrame: Math.max(fromFrame, toFrame) };
 }
 
-/** The three loop cues as agent-cue markers on the frame axis, in time order (missing instants are skipped). */
-export function loopCueMarkers(record: LaunchCaptureRecord, instants: LoopInstants, grab: MarkerImageGrabFn, createdAt?: string): Array<Record<string, unknown>> {
+function epochCueMarkers(
+  record: LaunchCaptureRecord, steps: ReadonlyArray<[number | undefined, string]>, kind: string, grab: MarkerImageGrabFn, createdAt?: string
+): Array<Record<string, unknown>> {
   const startMs = Number(record.startMs);
   const out: Array<Record<string, unknown>> = [];
-  const steps: Array<[keyof LoopInstants, string]> = [
-    ['promptSentMs', LOOP_CUE_LABELS.promptSent],
-    ['firstTokenMs', LOOP_CUE_LABELS.firstToken],
-    ['responseDoneMs', LOOP_CUE_LABELS.responseDone]
-  ];
-  for (const [key, label] of steps) {
-    const at = instants[key];
+  for (const [at, label] of steps) {
     if (at === undefined) continue;
     const view = { ...record, markers: [...(Array.isArray(record.markers) ? record.markers : []), ...out] };
     const marker = buildAgentCueMarker(view, { instantMs: at - startMs, label, ...(createdAt ? { createdAt } : {}) }, grab);
-    out.push({ ...marker, source: { kind: 'local-model-loop', epochMs: at } });
+    out.push({ ...marker, source: { kind, epochMs: at } });
   }
   return out;
+}
+
+/** The three loop cues as agent-cue markers on the frame axis, in time order (missing instants are skipped). */
+export function loopCueMarkers(record: LaunchCaptureRecord, instants: LoopInstants, grab: MarkerImageGrabFn, createdAt?: string): Array<Record<string, unknown>> {
+  return epochCueMarkers(record, [
+    [instants.promptSentMs, LOOP_CUE_LABELS.promptSent],
+    [instants.firstTokenMs, LOOP_CUE_LABELS.firstToken],
+    [instants.responseDoneMs, LOOP_CUE_LABELS.responseDone]
+  ], 'local-model-loop', grab, createdAt);
+}
+
+/** #139: the three reference cues (source kind `openwebui-reference`), same axis and image grab as the loop cues. */
+export function referenceCueMarkers(record: LaunchCaptureRecord, instants: LoopInstants, grab: MarkerImageGrabFn, createdAt?: string): Array<Record<string, unknown>> {
+  return epochCueMarkers(record, [
+    [instants.promptSentMs, REFERENCE_CUE_LABELS.sent],
+    [instants.firstTokenMs, REFERENCE_CUE_LABELS.firstToken],
+    [instants.responseDoneMs, REFERENCE_CUE_LABELS.done]
+  ], 'openwebui-reference', grab, createdAt);
+}
+
+export interface GpuWindowStats {
+  fromEpochMs: number;
+  toEpochMs: number;
+  sampleCount: number;
+  maxUtilizationPct: number | null;
+  meanUtilizationPct: number | null;
+  memoryUsedMb: { min: number | null; max: number | null };
+  /** Utilization stayed under the threshold and memory rose less than the rise (null without samples). */
+  idle: boolean | null;
+}
+
+/** GPU utilization and memory over an epoch-ms window, all GPUs together (the #139 idle control and the VRAM peak). */
+export function gpuWindowStats(
+  samples: ReadonlyArray<{ ms: number; gpus: ReadonlyArray<{ utilizationPct: number | null; memoryUsedMb: number | null }> }>,
+  fromEpochMs: number, toEpochMs: number, thresholdPct: number, memoryRiseMb: number
+): GpuWindowStats {
+  const inside = samples.filter((s) => s.ms >= fromEpochMs && s.ms <= toEpochMs);
+  const utils = inside.flatMap((s) => s.gpus.map((g) => g.utilizationPct)).filter((v): v is number => typeof v === 'number' && Number.isFinite(v));
+  const mems = inside.flatMap((s) => s.gpus.map((g) => g.memoryUsedMb)).filter((v): v is number => typeof v === 'number' && Number.isFinite(v));
+  const max = (v: number[]): number | null => (v.length ? Math.max(...v) : null);
+  const min = (v: number[]): number | null => (v.length ? Math.min(...v) : null);
+  const memMin = min(mems);
+  const memMax = max(mems);
+  const utilMax = max(utils);
+  return {
+    fromEpochMs,
+    toEpochMs,
+    sampleCount: inside.length,
+    maxUtilizationPct: utilMax,
+    meanUtilizationPct: utils.length ? round2(utils.reduce((a, b) => a + b, 0) / utils.length) : null,
+    memoryUsedMb: { min: memMin, max: memMax },
+    idle: inside.length === 0 ? null : (utilMax ?? 0) < thresholdPct && (memMax ?? 0) - (memMin ?? 0) < memoryRiseMb
+  };
+}
+
+function round2(value: number): number {
+  return Math.round(value * 100) / 100;
+}
+
+export interface PhaseSide {
+  firstTokenMs: number | null;
+  totalMs: number | null;
+  outputTokens: number | null;
+  /** `tokens` (usage / Ollama eval_count) or `chunks` (non-empty stream deltas, when no token count was reported). */
+  outputUnit: 'tokens' | 'chunks';
+  /** outputTokens per second of generation (first token to done). */
+  tokensPerSecond: number | null;
+}
+
+/** One side of the comparison from its instants and its output count. */
+export function phaseSide(instants: LoopInstants, outputTokens: number | null, outputUnit: 'tokens' | 'chunks'): PhaseSide {
+  const { promptSentMs: sent, firstTokenMs: first, responseDoneMs: done } = instants;
+  const genMs = first !== undefined && done !== undefined ? done - first : null;
+  return {
+    firstTokenMs: sent !== undefined && first !== undefined ? first - sent : null,
+    totalMs: sent !== undefined && done !== undefined ? done - sent : null,
+    outputTokens,
+    outputUnit,
+    tokensPerSecond: outputTokens !== null && genMs !== null && genMs > 0 ? round2(outputTokens / (genMs / 1000)) : null
+  };
 }
 
 /** All markers of the capture in time order (stable: GPU cues before loop cues at the same instant). */
@@ -474,6 +622,13 @@ async function loadMedia<T>(root: string, file: string): Promise<T> {
   return (await dynamicImport(pathToFileURL(path.join(root, 'media', file)).href)) as unknown as T;
 }
 
+/** A reference failure as a LoopError; the message is fixed text, redacted once more for safety. */
+function referenceLoopError(error: unknown, reference: ReferenceConfig): LoopError {
+  if (!(error instanceof ReferenceError)) return new LoopError(redact(`reference failed: ${(error as Error)?.message ?? 'error'}`, reference.token()), LOOP_EXIT.reference);
+  const code = { usage: LOOP_EXIT.usage, prerequisite: LOOP_EXIT.prerequisite, run: LOOP_EXIT.reference, timeout: LOOP_EXIT.referenceTimeout }[error.kind];
+  return new LoopError(redact(error.message, reference.token()), code);
+}
+
 /** Run the loop; returns the receipt (also written next to the clip). Throws LoopError with the exit code. */
 export async function runLocalModelLoop(config: LoopConfig, deps: LoopDeps = defaultLoopDeps, log: (line: string) => void = () => undefined): Promise<Record<string, unknown>> {
   // 1. Prerequisites first: nothing is created when ffmpeg, the display, Ollama or the model is missing.
@@ -489,6 +644,14 @@ export async function runLocalModelLoop(config: LoopConfig, deps: LoopDeps = def
   }
   const model = await ollamaPreflight(config.endpoint, config.model);
   const imageBytes = config.image ? readFileSync(config.image) : undefined;
+  let referenceInfo: ReferenceModelInfo | undefined;
+  if (config.reference) {
+    try {
+      referenceInfo = await referencePreflight(config.reference);
+    } catch (error) {
+      throw referenceLoopError(error, config.reference);
+    }
+  }
   if (config.cold) {
     // keep_alive 0 unloads the model, so the capture sees the model load (the memory-rise GPU cue).
     try {
@@ -518,33 +681,60 @@ export async function runLocalModelLoop(config: LoopConfig, deps: LoopDeps = def
   const sampler = deps.startResourceSampler(deps.platform, path.join(dir, 'resources.jsonl'));
   const gpuSampler = startGpuSampler({ dir, run: deps.gpuRunner(config.nvidiaSmi) });
 
-  // 3. Lead, prompt through the bridge, tail.
+  // 3. Lead, [reference phase (#139), settle,] prompt through the bridge, tail.
   const instants: LoopInstants = {};
+  const referenceInstants: LoopInstants = {};
+  let referenceResult: ReferenceResult | undefined;
+  let referenceFailure: LoopError | undefined;
+  const localStats: ChatStreamStats[] = [];
   let bridgeRun: BridgeRun | undefined;
   let gpuHeader: GpuSeriesHeader;
   try {
     await deps.sleep(config.leadMs);
-    const offerTools = model.capabilities === null || model.capabilities.includes('tools');
-    bridgeRun = await deps.bridge(
-      {
-        model: config.model, endpoint: config.endpoint, prompt: config.prompt, maxTurns: config.maxTurns, stream: true, offerTools,
-        allow: new Set([...OLLAMA_DEFAULT_TOOLS, ...config.allowTools]),
-        ...(imageBytes ? { images: [imageBytes.toString('base64')] } : {})
-      },
-      {
-        serverEnv: { ...deps.env, LBA_CAPTURE_ROOT: config.capturesDir, LBA_FFMPEG_PATH: ffmpeg },
-        onChatRequest: (turn) => {
-          if (turn === 0) instants.promptSentMs = deps.now();
-        },
-        onFirstToken: () => {
-          instants.firstTokenMs = instants.firstTokenMs ?? deps.now();
-        },
-        onDone: () => {
-          instants.responseDoneMs = deps.now();
-        }
+    if (config.reference) {
+      log(`reference: ${config.reference.kind} model ${config.reference.model} (the local GPU should stay idle)`);
+      try {
+        referenceResult = await runReferenceChat(
+          config.reference,
+          { prompt: config.prompt, ...(imageBytes ? { image: imageBytes } : {}), temperature: 0, seed: config.seed, maxTokens: config.maxTokens },
+          {
+            onSent: () => { referenceInstants.promptSentMs = deps.now(); },
+            onFirstToken: () => { referenceInstants.firstTokenMs = referenceInstants.firstTokenMs ?? deps.now(); },
+            onDone: () => { referenceInstants.responseDoneMs = deps.now(); }
+          }
+        );
+      } catch (error) {
+        referenceFailure = referenceLoopError(error, config.reference);
       }
-    );
-    if (!bridgeRun.failure) await deps.sleep(config.tailMs);
+      if (!referenceFailure) await deps.sleep(config.leadMs);
+    }
+    if (!referenceFailure) {
+      const offerTools = model.capabilities === null || model.capabilities.includes('tools');
+      bridgeRun = await deps.bridge(
+        {
+          model: config.model, endpoint: config.endpoint, prompt: config.prompt, maxTurns: config.maxTurns, stream: true, offerTools,
+          allow: new Set([...OLLAMA_DEFAULT_TOOLS, ...config.allowTools]),
+          ...(imageBytes ? { images: [imageBytes.toString('base64')] } : {}),
+          ...(config.fixedDecoding ? { options: { temperature: 0, seed: config.seed, num_predict: config.maxTokens } } : {})
+        },
+        {
+          serverEnv: { ...deps.env, LBA_CAPTURE_ROOT: config.capturesDir, LBA_FFMPEG_PATH: ffmpeg },
+          onChatRequest: (turn) => {
+            if (turn === 0) instants.promptSentMs = deps.now();
+          },
+          onFirstToken: () => {
+            instants.firstTokenMs = instants.firstTokenMs ?? deps.now();
+          },
+          onDone: () => {
+            instants.responseDoneMs = deps.now();
+          },
+          onStats: (_turn, stats) => {
+            localStats.push(stats);
+          }
+        }
+      );
+      if (!bridgeRun.failure) await deps.sleep(config.tailMs);
+    }
   } finally {
     // 4. Stop everything, whatever happened above.
     sampler.stop();
@@ -558,14 +748,18 @@ export async function runLocalModelLoop(config: LoopConfig, deps: LoopDeps = def
     const builder = await loadMedia<CaptureBuilder>(deps.root, 'launch-capture.mjs');
     const grab = await loadMarkerImageGrab(deps.root);
     record = assembleCaptureFromDir(dir, builder, { grab, gpuCue: { utilThresholdPct: config.gpuThresholdPct, memoryRiseMb: config.gpuMemoryRiseMb } });
-    const loopMarkers = loopCueMarkers(record, instants, grab, stoppedAt);
-    record.markers = orderMarkers([...(Array.isArray(record.markers) ? record.markers as Array<Record<string, unknown>> : []), ...loopMarkers]);
+    const existing = Array.isArray(record.markers) ? record.markers as Array<Record<string, unknown>> : [];
+    const refMarkers = config.reference ? referenceCueMarkers(record, referenceInstants, grab, stoppedAt) : [];
+    const loopMarkers = loopCueMarkers({ ...record, markers: [...existing, ...refMarkers] }, instants, grab, stoppedAt);
+    record.markers = orderMarkers([...existing, ...refMarkers, ...loopMarkers]);
     writeCaptureRecord(path.join(dir, 'capture.json'), record);
   } catch (error) {
     const detail = recorder.lastError();
     const message = `the capture yielded no usable frames (${(error as Error).message})${detail ? `; ffmpeg: ${detail}` : ''}`;
     setState('failed', stoppedAt);
     writeStatus(status.buildFailedStatus({ runDir: dir, startedAt, stoppedAt, error: message }));
+    // A reference failure is the root cause: its exit code wins over the (short) capture's.
+    if (referenceFailure) throw new LoopError(`${referenceFailure.message}; ${message}`, referenceFailure.exitCode);
     throw new LoopError(message, LOOP_EXIT.capture);
   }
   writeStatus(status.buildCaptureStatus(record, readResourceSamples(dir), { runDir: dir, startedAt, stoppedAt }));
@@ -623,18 +817,80 @@ export async function runLocalModelLoop(config: LoopConfig, deps: LoopDeps = def
     },
     clip: null
   };
+  if (config.fixedDecoding) receipt.decoding = { temperature: 0, seed: config.seed, maxTokens: config.maxTokens };
+  if (config.reference) {
+    const reference = config.reference;
+    const token = reference.token();
+    const samples = readGpuSeries(dir)?.samples ?? [];
+    const refText = referenceResult?.text ?? '';
+    const refSent = referenceInstants.promptSentMs;
+    const refDone = referenceInstants.responseDoneMs;
+    const control = refSent !== undefined && refDone !== undefined
+      ? gpuWindowStats(samples, refSent, refDone, config.gpuThresholdPct, config.gpuMemoryRiseMb) : null;
+    const localWindow = instants.promptSentMs !== undefined && instants.responseDoneMs !== undefined
+      ? gpuWindowStats(samples, instants.promptSentMs, instants.responseDoneMs, config.gpuThresholdPct, config.gpuMemoryRiseMb) : null;
+    const refTokens = referenceResult?.usage.completionTokens ?? null;
+    const evalCounts = localStats.map((s) => s.evalCount);
+    const localTokens = localStats.length > 0 && evalCounts.every((c) => c !== null) ? (evalCounts as number[]).reduce((a, b) => a + b, 0) : null;
+    const localChunks = localStats.reduce((a, s) => a + s.contentChunks, 0);
+    const refInstant = refSent === undefined ? null : refSent - startMs;
+    const refDoneInstant = refDone === undefined ? null : refDone - startMs;
+    receipt.reference = {
+      kind: reference.kind,
+      endpointScheme: reference.endpoint.protocol.replace(':', ''),
+      endpointSha256: sha256(reference.endpoint.href),
+      model: referenceInfo?.id ?? reference.model,
+      modelsListed: referenceInfo?.listed ?? null,
+      response: { sha256: sha256(refText), chars: refText.length, excerpt: responseExcerpt(redact(refText, token)), reasoningChars: referenceResult?.reasoningChars ?? 0 },
+      finishReason: referenceResult?.finishReason ?? null,
+      sawDone: referenceResult?.sawDone ?? false,
+      usage: referenceResult?.usage ?? null,
+      chunks: referenceResult?.chunks ?? 0,
+      sentInstantMs: refInstant,
+      doneInstantMs: refDoneInstant
+    };
+    receipt.comparison = {
+      schema: LOOP_COMPARISON_SCHEMA,
+      models: { reference: reference.model, local: config.model },
+      decoding: { temperature: 0, seed: config.seed, maxTokens: config.maxTokens },
+      reference: {
+        ...phaseSide(referenceInstants, refTokens ?? (referenceResult ? referenceResult.chunks : null), refTokens !== null ? 'tokens' : 'chunks'),
+        gpuControl: control
+      },
+      local: {
+        ...phaseSide(instants, localTokens ?? (localStats.length > 0 ? localChunks : null), localTokens !== null ? 'tokens' : 'chunks'),
+        vramPeakMb: localWindow?.memoryUsedMb.max ?? null,
+        maxUtilizationPct: localWindow?.maxUtilizationPct ?? null,
+        toolCalls: bridgeRun?.receipt.toolCalls.length ?? 0
+      },
+      gpuEdges: gpuEdges.map((e) => ({
+        label: e.label,
+        edge: e.edge ?? null,
+        offsetFromPromptMs: e.offsetFromPromptMs,
+        duringReference: refInstant !== null && refDoneInstant !== null && e.instantMs >= refInstant && e.instantMs <= refDoneInstant
+      }))
+    };
+  }
   const writeReceipt = (file: string): Record<string, unknown> => {
     receipt.receiptFile = file;
     writeFileSync(path.join(dir, file), `${JSON.stringify(receipt, null, 2)}\n`);
     return receipt;
   };
+  if (referenceFailure) {
+    receipt.error = referenceFailure.message;
+    writeReceipt('loop-receipt.json');
+    throw Object.assign(referenceFailure, { receipt });
+  }
   if (bridgeRun?.failure || instants.promptSentMs === undefined || instants.responseDoneMs === undefined) {
     const failure = bridgeRun?.failure ?? { stage: 'Ollama chat', message: 'no complete response.' };
     receipt.error = `${failure.stage} failed: ${failure.message}`;
     writeReceipt('loop-receipt.json');
     throw Object.assign(new LoopError(String(receipt.error), LOOP_EXIT.model), { receipt });
   }
-  const window = planLoopClip(record.frames, promptInstant as number, instants.responseDoneMs - startMs, gpuEdges.map((e) => e.instantMs));
+  const window = planLoopClip(
+    record.frames, promptInstant as number, instants.responseDoneMs - startMs, gpuEdges.map((e) => e.instantMs), LOOP_DEFAULTS.clipPadMs,
+    referenceInstants.promptSentMs === undefined ? undefined : referenceInstants.promptSentMs - startMs
+  );
   let clipReceipt: Record<string, unknown>;
   try {
     clipReceipt = await exportCaptureClip(dir, { fromFrame: window.fromFrame, toFrame: window.toFrame }, { ffmpeg, run: deps.clipRun });

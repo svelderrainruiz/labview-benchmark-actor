@@ -28,6 +28,12 @@ follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project
   streams a prompt to the model through the MCP bridge, marks prompt sent, first token and response done
   next to the automatic GPU cues, exports a clip around them and prints one metadata-only JSON receipt. The
   capture lands in the extension's captures folder, where **Open Frame Correlator** can open it (#134).
+- `localModelLoop` has a reference mode: `--reference openwebui --endpoint <https url> --token-file <path>
+  --reference-model <id>` first streams the same prompt to an Open WebUI model, in the same capture, while
+  the GPU sampler records the idle local GPU. Then the local model runs, with temperature 0, `--seed`
+  (default 42) and `--max-tokens` (default 256) on both sides. The receipt adds one reference-vs-local
+  comparison block. The API token is read once from an owner-only file, sent only as a bearer header and never
+  written to output, logs or receipts. New exit codes: 7 (reference failed) and 8 (reference timed out) (#139).
 
 ### Fixed
 

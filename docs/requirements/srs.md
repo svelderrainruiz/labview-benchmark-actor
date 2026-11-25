@@ -3251,7 +3251,19 @@ progressively.
   - Unreachable Ollama, a missing model, missing ffmpeg or a refused desktop are reported before a capture
     starts (exit 3); a capture without frames is marked failed (exit 4); a failed chat (exit 5) or clip
     (exit 6) still writes the receipt; missing nvidia-smi marks the GPU unavailable and the loop completes.
-- Verification: `node test/local-model-loop.mjs` (T-106); a real loop with a local Ollama, nvidia-smi and
+  - Reference mode (#139 slice 2): `--reference openwebui --endpoint <https url> --token-file <path>
+    --reference-model <id>` first streams the same prompt through the Open WebUI chat-completions API
+    (OpenAI-compatible SSE), with the cues "reference sent", "reference first token" and "reference done" on
+    the same axis while the GPU sampler runs as the idle control, then runs the local phase. Both sides use
+    temperature 0, `--seed` (default 42) and `--max-tokens` (default 256). The receipt adds one `comparison`
+    block: first-token latency, total time, output count (tokens, or labelled chunks) and tokens/s per side,
+    the GPU utilization and VRAM during the reference window, the local VRAM peak and the GPU edges. The
+    token is read once from an owner-only, non-empty file and sent only as the `Authorization: Bearer`
+    header. It never appears in argv, output, logs, the receipt or `capture.json`. The endpoint must be https
+    (plain http only for 127.0.0.1 or localhost). Exit 7 is a failed reference run and 8 a reference
+    timeout. Without these flags the loop is unchanged.
+- Verification: `node test/local-model-loop.mjs` and `node test/local-model-loop-reference.mjs` (T-106,
+  including a sentinel token grepped in every output and artifact of a full loop against a fake SSE server); a real loop with a local Ollama, nvidia-smi and
   ffmpeg on a LINUX workstation is recorded on the pull request. The Windows laptop run is to be proven.
 
 ## Traceability (requirement → architecture view / test)
