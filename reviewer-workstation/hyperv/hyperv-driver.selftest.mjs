@@ -487,6 +487,27 @@ test('H24', 'the release-components extension must equal the candidate version e
   }
 });
 
+test('H29', 'successful host commands may write stderr, while non-zero exits still fail', () => {
+  const quote = (value) => `'${value.replaceAll("'", "''")}'`;
+  const modulePath = quote(join(here, 'LbaHyperV.psm1'));
+  const nodePath = quote(process.execPath);
+  const okScript = quote('process.stderr.write("benign stderr\\n")');
+  const failScript = quote('process.stderr.write("failure stderr\\n"); process.exitCode = 7');
+  const script = `Import-Module ${modulePath} -Force
+Start-LbaPlan
+$ErrorActionPreference = 'Stop'
+$out = Invoke-LbaHost -File ${nodePath} -Arguments @('-e', ${okScript})
+if (($out -join "\`n") -notmatch 'benign stderr') { throw 'successful stderr was not retained' }
+try { [void](Invoke-LbaHost -File ${nodePath} -Arguments @('-e', ${failScript})) } catch {
+  if ($_.Exception.Message -match 'LBA_HOST: .*exited 7:.*failure stderr') { 'non-zero check passed'; exit 0 }
+  throw
+}
+throw 'non-zero host exit was accepted'`;
+  const r = spawnSync('pwsh', ['-NoProfile', '-NonInteractive', '-Command', script], { encoding: 'utf8' });
+  assert.equal(r.status, 0, r.stdout + r.stderr);
+  assert.match(r.stdout, /non-zero check passed/);
+}, { needsPwsh: true });
+
 let passed = 0;
 let skipped = 0;
 try {

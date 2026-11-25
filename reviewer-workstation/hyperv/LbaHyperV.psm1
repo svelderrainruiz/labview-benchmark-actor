@@ -246,8 +246,13 @@ function Invoke-LbaHost {
   [CmdletBinding()] param([Parameter(Mandatory)][string]$File, [string[]]$Arguments = @(), [switch]$Pure, [ValidateSet('HOST', 'GATE')][string]$FailAs = 'HOST')
   Add-LbaStep 'host-run' $File ($Arguments -join ' ')
   if ($script:DryRun -and -not $Pure) { return @() }
-  $out = @(& $File @Arguments 2>&1 | ForEach-Object { "$_" })
-  if ($LASTEXITCODE -ne 0) { throw "LBA_${FailAs}: $File exited ${LASTEXITCODE}: $(($out | Select-Object -Last 3) -join ' | ')" }
+  $previousPreference = $ErrorActionPreference
+  try {
+    $ErrorActionPreference = 'Continue'
+    $out = @(& $File @Arguments 2>&1 | ForEach-Object { "$_" })
+    $exitCode = $LASTEXITCODE
+  } finally { $ErrorActionPreference = $previousPreference }
+  if ($exitCode -ne 0) { throw "LBA_${FailAs}: $File exited ${exitCode}: $(($out | Select-Object -Last 3) -join ' | ')" }
   return $out
 }
 
