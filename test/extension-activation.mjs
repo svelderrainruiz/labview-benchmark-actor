@@ -981,7 +981,7 @@ try {
       let clipErrors = errorMessages.length;
       inputQueue.push('');
       await exportClip.handler();
-      assert(errorMessages.slice(clipErrors).some((message) => /has 0 marker\(s\)/.test(message)), 'Export Clip defaults to the latest two markers and explains when there are none');
+      assert(errorMessages.slice(clipErrors).some((message) => /has 0 marker\(s\)/.test(message)), `Export Clip defaults to the latest two markers and explains when there are none (got ${JSON.stringify(errorMessages.slice(clipErrors))})`);
       clipErrors = errorMessages.length;
       await exportClip.handler();
       assert(errorMessages.length === clipErrors, 'cancelling the Export Clip option box does nothing');
