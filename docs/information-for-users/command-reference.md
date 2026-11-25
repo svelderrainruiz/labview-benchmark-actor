@@ -118,6 +118,8 @@ loop still completes and the receipt marks the GPU unavailable with the reason.
 | 4 | The capture yielded no frames; the run is marked failed in `capture-status.json` and `active-capture-session.json`. |
 | 5 | The model failed or gave no complete answer; the capture is kept and `loop-receipt.json` is written. |
 | 6 | The clip failed; the capture is kept and `loop-receipt.json` is written. |
+| 7 | Reference mode: the reference run failed (HTTP error, invalid or incomplete stream, endpoint unreachable during the run); the capture is kept and `loop-receipt.json` is written. The local phase is skipped. |
+| 8 | Reference mode: the reference timed out (`--reference-timeout-ms`); as for 7. |
 
 Default captures folder (the installed extension's `globalStorage`, so **Open Benchmark Frame Correlator**
 can open the run):
@@ -151,6 +153,46 @@ The run is written to
 `active-capture-session.json`, `capture-meta.json`, and in `clips\` the MP4, its clip receipt and the loop
 receipt. Progress goes to stderr; stdout holds only the receipt, so
 `... | Out-File -Encoding utf8 loop-receipt.json` keeps it.
+
+### Reference mode (Open WebUI)
+
+`--reference openwebui --endpoint <https url> --token-file <path> --reference-model <id>` adds a reference
+phase before the local phase in the same capture (#139). The same prompt is streamed through the Open WebUI
+chat-completions API (`<endpoint>/api/chat/completions`, OpenAI-compatible SSE) to the model id
+`--reference-model` (for example `fast`, `thinking` or `coding`). `--model` stays the local Ollama model, so
+the two may differ when a lower local model is documented.
+
+1. Before the capture: the token file is read once, then `<endpoint>/api/models` must accept the token and
+   list the model id (otherwise exit 3, no capture).
+2. After `--lead-ms`: the cues "reference sent", "reference first token" and "reference done" are added on
+   the capture's time axis. The GPU sampler keeps running: the local GPU should stay idle, which is the
+   control.
+3. After another `--lead-ms`: the local phase runs as without `--reference` (with `--cold` if given).
+
+Both sides use temperature 0, `--seed` (default 42) and `--max-tokens` (default 256; Ollama `num_predict`,
+OpenAI `max_tokens`). `--seed` or `--max-tokens` alone also fixes the local decoding; without any of these
+flags, the Ollama request is unchanged. The clip starts 1 s before "reference sent".
+
+The receipt gets `decoding`, `reference` (model id, endpoint scheme and SHA-256 rather than the host, answer
+SHA-256 and a 200-character excerpt, usage) and one `comparison` block. For each side, `comparison` holds the
+first-token latency, total time, output count and tokens per second (from the first token to done). The
+reference side also holds `gpuControl`: the local GPU utilization and VRAM during the reference window, and
+`idle` (below `--gpu-threshold-pct`, with less than `--gpu-memory-rise-mb` of memory rise). The local side
+also holds the VRAM peak. `gpuEdges` lists the GPU edges and whether each fell inside the reference window.
+The output count is in `tokens` (the stream's `usage`, or Ollama `eval_count`) or, when no count was
+reported, in `chunks` (non-empty stream deltas), and `outputUnit` says which.
+
+Token rules: the token is sent only as the `Authorization: Bearer` header. It never appears in argv, output,
+logs, the receipt or `capture.json`, and is redacted from the reference excerpt if the endpoint echoes it.
+The file must be non-empty, hold one token of visible ASCII and, on Linux and macOS, be readable by its owner
+only (`chmod 600`); otherwise exit 2 with a message that never shows the content. `--endpoint` must be
+https; plain http is accepted only for `127.0.0.1` or `localhost` (tests). `--reference-timeout-ms` (default
+300000) bounds each reference request.
+
+```powershell
+C:\nvm4w\nodejs\node.exe out\mcp\localModelLoop.js --model <local model> --cold `
+  --reference openwebui --endpoint https://owui.example.invalid --token-file C:\path\owui.key --reference-model fast
+```
 
 ## Agent surface
 

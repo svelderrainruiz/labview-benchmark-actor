@@ -209,6 +209,10 @@ multi-VM / Codespace topology.
 - `node out/mcp/localModelLoop.js` runs that capture, one streamed prompt to a local Ollama model
   through the bridge, the loop and GPU cues and the clip in one command without an editor, and prints
   one metadata-only receipt (LBA-REQ-106, ADR-0095).
+- Its reference mode (`--reference openwebui`, #139) first streams the same prompt to an Open WebUI
+  model in the same capture, with the idle local GPU as the control, and adds a reference-vs-local
+  comparison block; the API token stays in `src/mcp/openWebUiReference.ts` and is sent only as a
+  bearer header (LBA-REQ-106).
 
 ### 3.8 Configuration-management & assurance view — addresses LBA-REQ-016, LBA-REQ-017, LBA-REQ-020, LBA-REQ-021, LBA-REQ-022, LBA-REQ-030, LBA-REQ-034, LBA-REQ-035, LBA-REQ-036, LBA-REQ-037, LBA-REQ-103, LBA-REQ-104
 - GitFlow branch governance (`main` protected + `develop` integration;

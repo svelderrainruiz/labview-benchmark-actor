@@ -27,6 +27,8 @@ export interface BridgeConfig {
   images?: string[];
   /** false withholds every tool (a model without the tools capability). */
   offerTools?: boolean;
+  /** #139: Ollama decoding options sent with every /api/chat turn (e.g. temperature, seed, num_predict). */
+  options?: Record<string, number>;
 }
 
 function options(): BridgeConfig {
@@ -135,9 +137,18 @@ function chatMessage(body: unknown): Message {
   return message as unknown as Message;
 }
 
+/** What one streamed turn produced: non-empty content chunks and Ollama's own counts from the done chunk. */
+export interface ChatStreamStats {
+  contentChunks: number;
+  evalCount: number | null;
+  evalDurationNs: number | null;
+}
+
 export interface ChatTiming {
   onFirstToken?(turn: number): void;
   onDone?(turn: number): void;
+  /** #139: called once per streamed turn, right after onDone. */
+  onStats?(turn: number, stats: ChatStreamStats): void;
 }
 
 /** One streamed /api/chat turn: NDJSON chunks folded into one message; first content or tool call = first token. */
@@ -154,6 +165,7 @@ async function streamChat(endpoint: URL, body: object, turn: number, timing: Cha
   const toolCalls: unknown[] = [];
   let first = true;
   let done = false;
+  let contentChunks = 0;
   const take = (line: string): void => {
     if (!line.trim() || done) return;
     let chunk: unknown;
@@ -163,6 +175,7 @@ async function streamChat(endpoint: URL, body: object, turn: number, timing: Cha
     const text = typeof message.content === 'string' ? message.content : '';
     const calls = Array.isArray(message.tool_calls) ? message.tool_calls as unknown[] : [];
     content += text;
+    if (text.length > 0) contentChunks += 1;
     toolCalls.push(...calls);
     if (first && (text.length > 0 || calls.length > 0)) {
       first = false;
@@ -171,6 +184,8 @@ async function streamChat(endpoint: URL, body: object, turn: number, timing: Cha
     if (chunk.done === true) {
       done = true;
       timing.onDone?.(turn);
+      const count = (value: unknown): number | null => (typeof value === 'number' && Number.isFinite(value) && value >= 0 ? value : null);
+      timing.onStats?.(turn, { contentChunks, evalCount: count(chunk.eval_count), evalDurationNs: count(chunk.eval_duration) });
     }
   };
   const decoder = new TextDecoder();
@@ -249,9 +264,10 @@ export async function runBridge(config: BridgeConfig, hooks: BridgeHooks = {}): 
     for (let turn = 0; turn < config.maxTurns; turn++) {
       stage = 'Ollama chat';
       hooks.onChatRequest?.(turn);
+      const decoding = config.options ? { options: config.options } : {};
       const message = config.stream
-        ? await streamChat(config.endpoint, { model: config.model, stream: true, messages, tools }, turn, hooks)
-        : chatMessage(await api(config.endpoint, '/api/chat', { model: config.model, stream: false, messages, tools }));
+        ? await streamChat(config.endpoint, { model: config.model, stream: true, messages, tools, ...decoding }, turn, hooks)
+        : chatMessage(await api(config.endpoint, '/api/chat', { model: config.model, stream: false, messages, tools, ...decoding }));
       if (!message.tool_calls?.length) {
         finalText = message.content;
         break;
