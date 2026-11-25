@@ -10,6 +10,19 @@ follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project
 
 - A Windows host running Hyper-V can run the WIN-plane validate, release-stage, verdict and quorum steps
   against a reviewer guest with the PowerShell driver in `reviewer-workstation/hyperv/` (#124, ADR-0094).
+- Captures record NVIDIA GPU samples: one `nvidia-smi` query per sampling tick, timed by its `timestamp`
+  column, with each GPU's index and name. Without nvidia-smi the series is marked unavailable with the reason,
+  never zeros. `capture.json` keeps older captures loadable, `get_benchmark_series` returns the series for a
+  `runId`, and the frame correlator charts utilization, memory and power (#134, ADR-0095).
+- Agent cues: the `add_capture_marker` MCP tool adds an `agent-cue` marker with the same nearest-frame grab as
+  a user click. After a capture, a rise in GPU memory of more than 100 MiB (model load) and a rise in
+  utilization through `labviewBenchmarkActor.gpuCueThresholdPct` (default 10%, compute) each add one cue
+  that records the platform's measured utilization lag (#134).
+- **Export Clip Between Markers**, the `export_capture_clip` MCP tool and `node out/captureClip.js` encode the
+  frames between two markers (or two frame indices), optionally cropped, into an H.264 MP4 at real time inside
+  the capture's `clips/` folder, with a receipt holding the markers' grab fields, frame range, frame rate,
+  SHA-256, size and duration. The MCP server now publishes 15 tools (6 core plus 9 grid); the two new tools
+  return metadata only and are off by default for the Ollama bridge (`--allow-tool`) (#134).
 
 ## [1.6.7] - 2026-11-23
 

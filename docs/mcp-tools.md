@@ -25,6 +25,9 @@ Tool results go to that endpoint, so use a model service you trust. No listener 
 Enabled by default: `get_host_capabilities`, `get_benchmark_series`, `poll_coordination_bus`.
 Use repeated `--allow-tool <name>` options to enable other listed tools, including the bus write.
 The server inherits the usual bus configuration. A denied call returns an error to the model.
+The capture tools `add_capture_marker` and `export_capture_clip` are opt-in the same way, for example
+`--allow-tool export_capture_clip`. They act only on captures under `LBA_CAPTURE_ROOT` on this machine and
+return metadata (markers, receipts, SHA-256), never pixels: screen frames and clips stay on the machine.
 
 `--self-test` asks for a capability probe. Its JSON receipt lists all discovered tool names, the model and
 Ollama version, each call name, SHA-256 of its JSON arguments and success flag, the SHA-256 of the final
@@ -42,6 +45,8 @@ still counted; if there was no final reply, the final text hash is that of the e
 
 The same server lists bounded, pathless `lba-capture://session/{runId}` metadata resources and supports `resources/read` for session state, ordered frame/sample batches, and explicitly requested PNG frames. Batch and frame URI templates are listed by `resources/templates/list`; frame reads require the SHA-256 returned by a batch. The extension passes its Global Storage root only through the stdio process environment. Reads never control capture. See ADR-0084 / LBA-REQ-101.
 
+The registry publishes 15 tools: 6 core tools and 9 folded corroboration grid tools.
+
 ## `get_host_capabilities`
 
 Report what the current host can actually run for LabVIEW benchmarking (LabVIEW runtime + bitness, Docker engine, etc.) via the lbabus capabilities probe. Run this before proposing benchmark work.
@@ -52,11 +57,11 @@ _(no arguments)_
 
 ## `get_benchmark_series`
 
-Return the deterministic mprr ring-buffer benchmark metric series the extension's viewer renders, as ordered {t,v} points plus a stable content hash (seriesHash). Reproduce this series; do not re-derive it.
+Return the deterministic mprr ring-buffer benchmark metric series the extension's viewer renders, as ordered {t,v} points plus a stable content hash (seriesHash). Reproduce this series; do not re-derive it. Pass runId to also get that local capture's GPU series (nvidia-smi utilization/memory/power, or the reason it is unavailable).
 
 **Arguments:**
 
-_(no arguments)_
+- `runId` (string, optional) — Optional capture run id (uuid) or "latest": adds that capture's GPU series (metadata only).
 
 ## `poll_coordination_bus`
 
@@ -73,6 +78,31 @@ Post a NOTE to the cross-plane coordination bus over the live-only lbabus net bu
 **Arguments:**
 
 - `message` (string, required) — ASCII coordination note body.
+
+## `export_capture_clip`
+
+Encode the frames of one local capture between two markers (default: the latest two) or two frame indices into an H.264 MP4 inside that capture's clips/ directory, held at real time. Returns the receipt only (marker instants, deltaMs/admitted, frame range, fps, SHA-256, size, duration); the clip never leaves the machine.
+
+**Arguments:**
+
+- `runId` (string, optional) — Capture run id (uuid) or "latest" (default).
+- `fromMarker` (integer, optional, range 0..) — Start marker: index into the capture markers[].
+- `toMarker` (integer, optional, range 0..) — End marker: index into the capture markers[].
+- `fromFrame` (integer, optional, range 0..) — Start frame index (instead of markers).
+- `toFrame` (integer, optional, range 0..) — End frame index, inclusive (instead of markers).
+- `monitor` (integer, optional, range 0..) — Crop to this monitor of the recorded screen layout.
+- `crop` (object, optional) — Crop rectangle in frame pixels (must lie inside the frame).
+
+## `add_capture_marker`
+
+Add an agent-cue marker to one local capture at an instant (ms since frame 0) or a frame index. It uses the same nearest-frame grab as a user click (imageGrab: nearestFrameIndex, deltaMs, admitted within toleranceMs).
+
+**Arguments:**
+
+- `runId` (string, optional) — Capture run id (uuid) or "latest" (default).
+- `instantMs` (number, optional) — Instant on the capture time axis (ms since frame 0).
+- `frameIndex` (integer, optional, range 0..) — Or a frame index (its tMs is the instant).
+- `label` (string, required) — What the agent observed (<= 80 characters).
 
 ---
 

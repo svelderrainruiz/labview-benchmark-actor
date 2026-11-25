@@ -94,8 +94,19 @@ const coreRegistry: readonly (BenchmarkActorMcpTool & { ollamaDefault?: true })[
     ollamaDefault: true,
     description:
       "Return the deterministic mprr ring-buffer benchmark metric series the extension's viewer renders, as " +
-      "ordered {t,v} points plus a stable content hash (seriesHash). Reproduce this series; do not re-derive it.",
-    inputSchema: { type: 'object', properties: {}, additionalProperties: false }
+      "ordered {t,v} points plus a stable content hash (seriesHash). Reproduce this series; do not re-derive it. " +
+      "Pass runId to also get that local capture's GPU series (nvidia-smi utilization/memory/power, or the reason it is unavailable).",
+    inputSchema: {
+      type: 'object',
+      properties: {
+        runId: {
+          type: 'string',
+          maxLength: 64,
+          description: 'Optional capture run id (uuid) or "latest": adds that capture\'s GPU series (metadata only).'
+        }
+      },
+      additionalProperties: false
+    }
   },
   {
     name: 'poll_coordination_bus',
@@ -127,6 +138,54 @@ const coreRegistry: readonly (BenchmarkActorMcpTool & { ollamaDefault?: true })[
       required: ['message'],
       additionalProperties: false
     }
+  },
+  {
+    name: 'export_capture_clip',
+    description:
+      'Encode the frames of one local capture between two markers (default: the latest two) or two frame indices ' +
+      'into an H.264 MP4 inside that capture\'s clips/ directory, held at real time. Returns the receipt only ' +
+      '(marker instants, deltaMs/admitted, frame range, fps, SHA-256, size, duration); the clip never leaves the machine.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        runId: { type: 'string', maxLength: 64, description: 'Capture run id (uuid) or "latest" (default).' },
+        fromMarker: { type: 'integer', minimum: 0, description: 'Start marker: index into the capture markers[].' },
+        toMarker: { type: 'integer', minimum: 0, description: 'End marker: index into the capture markers[].' },
+        fromFrame: { type: 'integer', minimum: 0, description: 'Start frame index (instead of markers).' },
+        toFrame: { type: 'integer', minimum: 0, description: 'End frame index, inclusive (instead of markers).' },
+        monitor: { type: 'integer', minimum: 0, description: 'Crop to this monitor of the recorded screen layout.' },
+        crop: {
+          type: 'object',
+          description: 'Crop rectangle in frame pixels (must lie inside the frame).',
+          properties: {
+            x: { type: 'integer', minimum: 0 },
+            y: { type: 'integer', minimum: 0 },
+            w: { type: 'integer', minimum: 1 },
+            h: { type: 'integer', minimum: 1 }
+          },
+          required: ['x', 'y', 'w', 'h'],
+          additionalProperties: false
+        }
+      },
+      additionalProperties: false
+    }
+  },
+  {
+    name: 'add_capture_marker',
+    description:
+      'Add an agent-cue marker to one local capture at an instant (ms since frame 0) or a frame index. It uses the ' +
+      'same nearest-frame grab as a user click (imageGrab: nearestFrameIndex, deltaMs, admitted within toleranceMs).',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        runId: { type: 'string', maxLength: 64, description: 'Capture run id (uuid) or "latest" (default).' },
+        instantMs: { type: 'number', description: 'Instant on the capture time axis (ms since frame 0).' },
+        frameIndex: { type: 'integer', minimum: 0, description: 'Or a frame index (its tMs is the instant).' },
+        label: { type: 'string', minLength: 1, maxLength: 80, description: 'What the agent observed (<= 80 characters).' }
+      },
+      required: ['label'],
+      additionalProperties: false
+    }
   }
 ] as const;
 
@@ -143,9 +202,13 @@ export interface BenchmarkActorMcpToolDeps {
   /** Version reported in `initialize` → `serverInfo.version` (the extension/package version). */
   readonly serverVersion: string;
   getHostCapabilities(): Promise<McpToolResult>;
-  getBenchmarkSeries(): Promise<McpToolResult>;
+  getBenchmarkSeries(args?: { runId?: string }): Promise<McpToolResult>;
   pollCoordinationBus(args: { tail: number }): Promise<McpToolResult>;
   postCoordinationNote(args: { message: string }): Promise<McpToolResult>;
+  /** Encode a clip between two markers of a local capture; returns the receipt (never pixels). */
+  exportCaptureClip?(args: ExportCaptureClipArgs): Promise<McpToolResult>;
+  /** Append an agent-cue marker to a local capture. */
+  addCaptureMarker?(args: AddCaptureMarkerArgs): Promise<McpToolResult>;
   /**
    * Optional EXTRA tools folded into this single server at runtime (the ACG corroboration-grid surface).
    * Their schemas are published in `tools/list` alongside the core tools; a `tools/call` for one routes to
@@ -154,8 +217,24 @@ export interface BenchmarkActorMcpToolDeps {
   readonly extraTools?: readonly BenchmarkActorMcpTool[];
   /** Execute a folded extra tool by name. Throw {@link McpArgumentError} for a bad argument shape (-32602). */
   dispatchExtraTool?(name: string, args: unknown): Promise<unknown> | unknown;
-  /** Read-only active-capture MCP resources; independent of the four core tool registry. */
+  /** Read-only active-capture MCP resources; independent of the core tool registry. */
   readonly captureResources?: BenchmarkActorMcpResources;
+}
+
+export interface ExportCaptureClipArgs {
+  runId?: string;
+  fromMarker?: number;
+  toMarker?: number;
+  fromFrame?: number;
+  toFrame?: number;
+  monitor?: number;
+  crop?: { x: number; y: number; w: number; h: number };
+}
+export interface AddCaptureMarkerArgs {
+  runId?: string;
+  instantMs?: number;
+  frameIndex?: number;
+  label: string;
 }
 
 function success(id: number | string | null, result: unknown): JsonRpcResponse {
@@ -206,6 +285,87 @@ function parseMessage(rawArguments: unknown): string {
   return message;
 }
 
+function argumentObject(rawArguments: unknown, allowed: readonly string[]): Record<string, unknown> {
+  if (rawArguments === undefined || rawArguments === null) return {};
+  if (typeof rawArguments !== 'object' || Array.isArray(rawArguments)) {
+    throw new McpArgumentError('arguments must be an object');
+  }
+  const args = rawArguments as Record<string, unknown>;
+  const unknown = Object.keys(args).find((key) => !allowed.includes(key));
+  if (unknown !== undefined) throw new McpArgumentError(`unknown argument "${unknown}"`);
+  return args;
+}
+
+function optionalRunId(args: Record<string, unknown>): string | undefined {
+  const runId = args.runId;
+  if (runId === undefined) return undefined;
+  if (typeof runId !== 'string' || !/^(latest|[0-9a-f-]{36})$/i.test(runId)) {
+    throw new McpArgumentError('"runId" must be a capture run id (uuid) or "latest"');
+  }
+  return runId;
+}
+
+function optionalIndex(args: Record<string, unknown>, name: string, minimum = 0): number | undefined {
+  const value = args[name];
+  if (value === undefined) return undefined;
+  if (typeof value !== 'number' || !Number.isSafeInteger(value) || value < minimum) {
+    throw new McpArgumentError(`"${name}" must be an integer >= ${minimum}`);
+  }
+  return value;
+}
+
+function parseSeriesArgs(rawArguments: unknown): { runId?: string } | undefined {
+  const runId = optionalRunId(argumentObject(rawArguments, ['runId']));
+  return runId === undefined ? undefined : { runId };
+}
+
+export function parseExportClipArgs(rawArguments: unknown): ExportCaptureClipArgs {
+  const args = argumentObject(rawArguments, ['runId', 'fromMarker', 'toMarker', 'fromFrame', 'toFrame', 'monitor', 'crop']);
+  const parsed: ExportCaptureClipArgs = {};
+  const runId = optionalRunId(args);
+  if (runId !== undefined) parsed.runId = runId;
+  for (const name of ['fromMarker', 'toMarker', 'fromFrame', 'toFrame', 'monitor'] as const) {
+    const value = optionalIndex(args, name);
+    if (value !== undefined) parsed[name] = value;
+  }
+  if (args.crop !== undefined) {
+    const crop = argumentObject(args.crop, ['x', 'y', 'w', 'h']);
+    const [x, y, w, h] = [optionalIndex(crop, 'x'), optionalIndex(crop, 'y'), optionalIndex(crop, 'w', 1), optionalIndex(crop, 'h', 1)];
+    if (x === undefined || y === undefined || w === undefined || h === undefined) {
+      throw new McpArgumentError('"crop" needs integer x, y, w and h');
+    }
+    parsed.crop = { x, y, w, h };
+  }
+  return parsed;
+}
+
+export function parseAddMarkerArgs(rawArguments: unknown): AddCaptureMarkerArgs {
+  const args = argumentObject(rawArguments, ['runId', 'instantMs', 'frameIndex', 'label']);
+  const label = args.label;
+  if (typeof label !== 'string' || label.trim().length === 0 || label.trim().length > 80) {
+    throw new McpArgumentError('"label" must be a non-empty string of at most 80 characters');
+  }
+  const parsed: AddCaptureMarkerArgs = { label: label.trim() };
+  const runId = optionalRunId(args);
+  if (runId !== undefined) parsed.runId = runId;
+  const frameIndex = optionalIndex(args, 'frameIndex');
+  const instantMs = args.instantMs;
+  if (instantMs !== undefined && (typeof instantMs !== 'number' || !Number.isFinite(instantMs))) {
+    throw new McpArgumentError('"instantMs" must be a finite number');
+  }
+  if ((instantMs === undefined) === (frameIndex === undefined)) {
+    throw new McpArgumentError('give exactly one of "instantMs" or "frameIndex"');
+  }
+  if (frameIndex !== undefined) parsed.frameIndex = frameIndex;
+  else parsed.instantMs = instantMs as number;
+  return parsed;
+}
+
+const CAPTURE_TOOLS_UNAVAILABLE: McpToolResult = {
+  content: [{ type: 'text', text: 'Tool error: capture tools are not available in this server.' }],
+  isError: true
+};
+
 async function callTool(
   name: string,
   rawArguments: unknown,
@@ -214,12 +374,22 @@ async function callTool(
   switch (name) {
     case 'get_host_capabilities':
       return deps.getHostCapabilities();
-    case 'get_benchmark_series':
-      return deps.getBenchmarkSeries();
+    case 'get_benchmark_series': {
+      const seriesArgs = parseSeriesArgs(rawArguments);
+      return seriesArgs ? deps.getBenchmarkSeries(seriesArgs) : deps.getBenchmarkSeries();
+    }
     case 'poll_coordination_bus':
       return deps.pollCoordinationBus({ tail: parseTail(rawArguments) });
     case 'post_coordination_note':
       return deps.postCoordinationNote({ message: parseMessage(rawArguments) });
+    case 'export_capture_clip': {
+      const clipArgs = parseExportClipArgs(rawArguments);
+      return deps.exportCaptureClip ? deps.exportCaptureClip(clipArgs) : CAPTURE_TOOLS_UNAVAILABLE;
+    }
+    case 'add_capture_marker': {
+      const markerArgs = parseAddMarkerArgs(rawArguments);
+      return deps.addCaptureMarker ? deps.addCaptureMarker(markerArgs) : CAPTURE_TOOLS_UNAVAILABLE;
+    }
     default:
       // Unreachable: tools/call already rejected unknown names against KNOWN_TOOL_NAMES.
       throw new McpArgumentError(`unknown tool: ${name}`);

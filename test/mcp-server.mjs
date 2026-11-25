@@ -54,8 +54,8 @@ assert(init.result.capabilities && init.result.capabilities.tools, 'initialize a
 
 const listed = await core.handleBenchmarkActorMcpMessage({ id: 2, method: 'tools/list' }, deps);
 const names = listed.result.tools.map((t) => t.name);
-assert(names.length === 4, 'tools/list publishes 4 tools');
-for (const n of ['get_host_capabilities', 'get_benchmark_series', 'poll_coordination_bus', 'post_coordination_note']) {
+assert(names.length === 6, 'tools/list publishes 6 tools');
+for (const n of ['get_host_capabilities', 'get_benchmark_series', 'poll_coordination_bus', 'post_coordination_note', 'export_capture_clip', 'add_capture_marker']) {
   assert(names.includes(n), `tools/list includes ${n}`);
 }
 for (const t of listed.result.tools) {
@@ -163,7 +163,7 @@ const extraDeps = {
   },
 };
 const extraList = await core.handleBenchmarkActorMcpMessage({ id: 20, method: 'tools/list' }, extraDeps);
-assert(extraList.result.tools.length === 5 && extraList.result.tools.some((t) => t.name === 'demo_grid_tool'), 'tools/list folds injected extra tools alongside the 4 core tools');
+assert(extraList.result.tools.length === 7 && extraList.result.tools.some((t) => t.name === 'demo_grid_tool'), 'tools/list folds injected extra tools alongside the 6 core tools');
 const extraCall = await core.handleBenchmarkActorMcpMessage({ id: 21, method: 'tools/call', params: { name: 'demo_grid_tool', arguments: { x: 1 } } }, extraDeps);
 assert(JSON.parse(extraCall.result.content[0].text).ok === true, 'tools/call routes a folded tool to dispatchExtraTool and wraps its plain result');
 const alreadyWrappedDeps = {
@@ -193,7 +193,7 @@ assert(
   'loadAcgGridTools folds the 9 ACG grid tools into the server deps from the staged bundle'
 );
 const gridList = await core.handleBenchmarkActorMcpMessage({ id: 30, method: 'tools/list' }, gridDeps);
-assert(gridList.result.tools.length === 13, 'the folded deps publish all 13 tools (4 core + 9 grid)');
+assert(gridList.result.tools.length === 15, 'the folded deps publish all 15 tools (6 core + 9 grid)');
 const gridOk = await core.handleBenchmarkActorMcpMessage({ id: 31, method: 'tools/call', params: { name: 'spin_up_witness', arguments: { plane: 'WIN' } } }, gridDeps);
 assert(JSON.parse(gridOk.result.content[0].text).plane === 'WIN', 'a folded grid tool executes via the loaded deps');
 const gridBad = await core.handleBenchmarkActorMcpMessage({ id: 32, method: 'tools/call', params: { name: 'run_quorum', arguments: {} } }, gridDeps);
@@ -308,6 +308,9 @@ assert(
 );
 const envCapture = providerMod.busEnvFromConfig({ netHosts: '', netLog: '' }, '/private/global-storage/captures');
 assert(envCapture.LBA_CAPTURE_ROOT === '/private/global-storage/captures', 'busEnvFromConfig passes the capture root only as a private child-process environment value');
+assert(envCapture.LBA_FFMPEG_PATH === undefined, 'busEnvFromConfig omits LBA_FFMPEG_PATH when the ffmpegPath setting is empty');
+const envFfmpeg = providerMod.busEnvFromConfig({ netHosts: '', netLog: '' }, '', '/opt/ffmpeg/bin/ffmpeg');
+assert(envFfmpeg.LBA_FFMPEG_PATH === '/opt/ffmpeg/bin/ffmpeg' && envFfmpeg.LBA_CAPTURE_ROOT === undefined, 'busEnvFromConfig passes the configured ffmpegPath to the MCP server for export_capture_clip');
 const fDefault = providerMod.buildBenchmarkActorMcpServerDefinitionFields({ extensionPath: '/x', execPath: '/node', version: '1.2.3' });
 assert(fDefault.args[0] === providerMod.resolveBenchmarkActorMcpServerScriptPath('/x') && fDefault.version === '1.2.3', 'buildFields resolves the default script path + carries the version');
 const capturedDirect = [];
@@ -355,7 +358,7 @@ await new Promise((resolve, reject) => {
       assert(got.get(1).result.protocolVersion === '2025-06-18', '[stdio] initialize protocol version');
       assert(got.get(1).result.serverInfo.name === 'labview-benchmark-actor', '[stdio] initialize serverInfo name');
       const stdioTools = got.get(2).result.tools.map((t) => t.name);
-      assert(stdioTools.length === 13, '[stdio] tools/list folds the 4 core + 9 ACG grid tools (13 total)');
+      assert(stdioTools.length === 15, '[stdio] tools/list folds the 6 core + 9 ACG grid tools (15 total)');
       for (const g of ['run_quorum', 'verify_attestation', 'verify_inclusion', 'verify_before_install', 'spin_up_witness']) {
         assert(stdioTools.includes(g), `[stdio] tools/list includes the folded grid tool ${g}`);
       }

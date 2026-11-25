@@ -292,6 +292,7 @@ try {
     'labviewBenchmarkActor.writeAgents',
     'labviewBenchmarkActor.showAgents',
     'labviewBenchmarkActor.checkAgents',
+    'labviewBenchmarkActor.exportClip',
   ];
   const manifest = JSON.parse(readFileSync(join(repoRoot, 'package.json'), 'utf8'));
   // Issue #88: VS Code caches the MCP definition per workspace and the agent host launches it without activating
@@ -600,6 +601,30 @@ try {
     assert(rec.frames[0].cpuPct === 10 && rec.frames[1].cpuPct === 12, 'assembleCaptureFromDir normalizes legacy Linux nanoseconds and correlates distinct resource samples');
     assert(rec.frames[1].disks && rec.frames[1].disks[0].writeMBs === 11.4, 'assembleCaptureFromDir carries per-disk write throughput onto frames');
     assert(rec.plane === 'LINUX' && rec.source === 'gnome-shell-screencast', 'assembleCaptureFromDir preserves the visible GNOME capture source');
+    assert(!('gpu' in rec) && !('markers' in rec) && rec.frames.every((f) => !('gpus' in f)), 'a capture without gpu.json assembles exactly as before (#134 is additive)');
+
+    // #134 slices 2-3: the GPU series rides on capture.json + frames, and its two edges become agent cues.
+    const grab = (await import(pathToFileURL(join(repoRoot, 'media', 'markerImageGrab.mjs')).href)).resolveMarkerImageGrab;
+    const gpuReading = (util, mem) => [{ index: 0, utilizationPct: util, memoryUsedMb: mem, powerW: 5 }];
+    writeFileSync(join(capDir, 'gpu.json'), JSON.stringify({ schema: 'labview-benchmark-actor/gpu-series@v1', source: 'nvidia-smi', available: false, reason: 'nvidia-smi not found on PATH', gpus: [] }));
+    const unavailableRec = ext.assembleCaptureFromDir(capDir, capBuilder, { grab });
+    assert(unavailableRec.gpu.available === false && /not found/.test(unavailableRec.gpu.reason) && !('markers' in unavailableRec), 'an unavailable GPU series is persisted with its reason and adds no cues');
+    writeFileSync(join(capDir, 'gpu.json'), JSON.stringify({ schema: 'labview-benchmark-actor/gpu-series@v1', source: 'nvidia-smi', available: true, gpus: [{ index: 0, name: 'NVIDIA Test GPU' }] }));
+    writeFileSync(join(capDir, 'gpu.jsonl'), [
+      { ms: 1_700_000_000_000, gpus: gpuReading(0, 45) },
+      { ms: 1_700_000_000_400, gpus: gpuReading(0, 2045) },
+      { ms: 1_700_000_000_990, gpus: gpuReading(55, 2045) }
+    ].map((sample) => JSON.stringify(sample)).join('\n'));
+    const noGrabRec = ext.assembleCaptureFromDir(capDir, capBuilder);
+    assert(noGrabRec.gpu.available && noGrabRec.gpu.samples.length === 3 && !('markers' in noGrabRec), 'without the shared grab the GPU series is attached but no cue is derived');
+    const gpuRec = ext.assembleCaptureFromDir(capDir, capBuilder, { grab, gpuCue: { utilThresholdPct: 10, memoryRiseMb: 100 } });
+    assert(gpuRec.frames[0].gpus[0].memoryUsedMb === 45 && gpuRec.frames[1].gpus[0].utilizationPct === 55, 'each frame carries the nearest GPU sample');
+    assert(gpuRec.markers.length === 2 && gpuRec.markers.every((m) => m.kind === 'agent-cue' && m.imageGrab && typeof m.imageGrab.admitted === 'boolean'), 'the GPU edges become agent-cue markers with the shared image grab');
+    assert(gpuRec.markers[0].label === 'GPU memory rose >100 MiB above start (model load)' && gpuRec.markers[0].instantMs === 400 && gpuRec.markers[0].imageGrab.admitted === false, 'the VRAM rise is the model-load cue at its sample instant');
+    assert(gpuRec.markers[1].label === 'GPU rose above 10% (compute, util lags 0.18-0.38 s)' && gpuRec.markers[1].frameIndex === 1 && gpuRec.markers[1].imageGrab.deltaMs === 10 && gpuRec.markers[1].source.utilizationLag.platform === 'linux', 'the utilization rise is the compute cue, labelled with the measured Linux lag');
+    assert(JSON.parse(readFileSync(join(capDir, 'capture.json'), 'utf8')).markers.length === 2, 'the automatic cues are persisted in capture.json');
+    const quietRec = ext.assembleCaptureFromDir(capDir, capBuilder, { grab, gpuCue: { utilThresholdPct: 90, memoryRiseMb: 5000 } });
+    assert(quietRec.gpu.available && !('markers' in quietRec), 'a GPU series with no edge over the thresholds adds no cue');
 
     // empty dir -> fails closed (no frames were captured).
     const capEmpty = join(tmpdir(), 'lba-test-capture-empty-xyz');
@@ -942,6 +967,49 @@ try {
       const stopped = JSON.parse(readFileSync(join(directory, 'active-capture-session.json'), 'utf8'));
       assert(finalized.workload === 'desktop-capture' && finalized.fps === 1 / 60, 'desktop finalization preserves truthful workload and cadence');
       assert(stopped.state === 'stopped' && stopped.workload === 'desktop-capture', 'desktop capture uses the shared stop lifecycle');
+      // #134 slice 2: no nvidia-smi (execFile is mocked to ENOENT) => the GPU series is unavailable WITH the reason.
+      assert(finalized.gpu && finalized.gpu.available === false && /nvidia-smi not found/.test(finalized.gpu.reason) && finalized.gpu.samples.length === 0, 'a capture without nvidia-smi records an unavailable GPU series with the reason, never zeros');
+      assert(finalized.frames.every((frame) => frame.gpus === undefined), 'an unavailable GPU series adds no GPU readings to frames');
+      // #134 slice 1: Export Clip Between Markers on the capture just recorded (receipt only; ffmpeg via execFile).
+      const exportClip = registered.find((command) => command.id === 'labviewBenchmarkActor.exportClip');
+      const fakePng = Buffer.alloc(33);
+      Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]).copy(fakePng, 0);
+      fakePng.write('IHDR', 12, 'latin1');
+      fakePng.writeUInt32BE(64, 16);
+      fakePng.writeUInt32BE(48, 20);
+      writeFileSync(join(directory, 'frame-00001.png'), fakePng);
+      // Inputs an earlier test left unconsumed on this host (on Windows the clone-port prompt returns early) are
+      // set aside so the Export Clip prompts read their own answers, then restored for the tests that follow.
+      const pendingInputs = inputQueue.splice(0);
+      let clipErrors = errorMessages.length;
+      inputQueue.push('');
+      await exportClip.handler();
+      assert(errorMessages.slice(clipErrors).some((message) => /has 0 marker\(s\)/.test(message)), `Export Clip defaults to the latest two markers and explains when there are none (got ${JSON.stringify(errorMessages.slice(clipErrors))})`);
+      clipErrors = errorMessages.length;
+      await exportClip.handler();
+      assert(errorMessages.length === clipErrors, 'cancelling the Export Clip option box does nothing');
+      inputQueue.push('--from-frame 0 --to-frame 0');
+      await exportClip.handler();
+      assert(errorMessages.slice(clipErrors).some((message) => /labviewBenchmarkActor\.ffmpegPath/.test(message)), 'Export Clip names the ffmpegPath setting when ffmpeg cannot run');
+      const savedClipHandler = execFileHandler;
+      const clipCalls = [];
+      execFileHandler = (file, args) => {
+        clipCalls.push([file, ...args]);
+        if (!args.includes('-version')) writeFileSync(args.at(-1), 'mp4');
+        return { stdout: '', stderr: '' };
+      };
+      try {
+        const infoBefore = infoMessages.length;
+        inputQueue.push(' --from-frame 0  --to-frame 0 ');
+        await exportClip.handler();
+        assert(infoMessages.slice(infoBefore).some((message) => /Clip exported to clips\/clip-0-0\.mp4/.test(message)), 'Export Clip reports the clip written inside the capture');
+        assert(clipCalls.length === 2 && clipCalls[1][0] === process.execPath && clipCalls[1].includes('libx264'), 'Export Clip runs the configured ffmpeg with an argument array');
+        const clipReceipt = JSON.parse(readFileSync(join(directory, 'clips', 'clip-0-0.json'), 'utf8'));
+        assert(clipReceipt.frameRange.count === 1 && clipReceipt.timing.realDurationMs === 60000 && clipReceipt.crop.width === 64, 'a desktop clip holds the frame for its real 60 s interval');
+      } finally {
+        execFileHandler = savedClipHandler;
+        inputQueue.push(...pendingInputs);
+      }
     } finally {
       delete configStore.labviewPath;
       delete configStore.ffmpegPath;

@@ -83,6 +83,9 @@ function render() {
   lines.push(`Enabled by default: ${[...OLLAMA_DEFAULT_TOOLS].map(name => `\`${name}\``).join(', ')}.`);
   lines.push('Use repeated `--allow-tool <name>` options to enable other listed tools, including the bus write.');
   lines.push('The server inherits the usual bus configuration. A denied call returns an error to the model.');
+  lines.push('The capture tools `add_capture_marker` and `export_capture_clip` are opt-in the same way, for example');
+  lines.push('`--allow-tool export_capture_clip`. They act only on captures under `LBA_CAPTURE_ROOT` on this machine and');
+  lines.push('return metadata (markers, receipts, SHA-256), never pixels: screen frames and clips stay on the machine.');
   lines.push('');
   lines.push('`--self-test` asks for a capability probe. Its JSON receipt lists all discovered tool names, the model and');
   lines.push('Ollama version, each call name, SHA-256 of its JSON arguments and success flag, the SHA-256 of the final');
@@ -104,6 +107,11 @@ function render() {
       'Batch and frame URI templates are listed by `resources/templates/list`; frame reads require the SHA-256 ' +
       'returned by a batch. The extension passes its Global Storage root only through the stdio process environment. ' +
       'Reads never control capture. See ADR-0084 / LBA-REQ-101.'
+  );
+  lines.push('');
+  lines.push(
+    `The registry publishes ${BENCHMARK_ACTOR_MCP_TOOLS.length + ACG_GRID_TOOLS.length} tools: ` +
+      `${BENCHMARK_ACTOR_MCP_TOOLS.length} core tools and ${ACG_GRID_TOOLS.length} folded corroboration grid tools.`
   );
   lines.push('');
   for (const tool of BENCHMARK_ACTOR_MCP_TOOLS) {

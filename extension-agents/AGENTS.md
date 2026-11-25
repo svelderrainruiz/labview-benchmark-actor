@@ -132,7 +132,9 @@ Code:
 - **Coordination bus** — read and post notes on the cross-plane coordination bus (the WIN ⟷ LINUX channel).
 - **MCP tools (agent mode)** — the extension contributes a Model Context Protocol server so you can call its
   tools directly in agent mode: `get_host_capabilities`, `get_benchmark_series`, `poll_coordination_bus`, and
-  `post_coordination_note` — the same surfaces as the commands, callable programmatically.
+  `post_coordination_note` — the same surfaces as the commands, callable programmatically. For a local capture,
+  `add_capture_marker` adds an `agent-cue` marker and `export_capture_clip` encodes the clip between two markers
+  inside that capture's directory; both return metadata only (receipts, hashes), never pixels.
 
 ## Commands (Command Palette)
 
@@ -154,6 +156,7 @@ Code:
 | `LabVIEW Benchmark Actor: Capture Desktop` | Record a standalone Windows desktop without launching LabVIEW, at the bounded configured frame interval. |
 | `LabVIEW Benchmark Actor: Capture LabVIEW Launch (mprr, cross-platform VM)` | Capture a VM LabVIEW launch through the mprr visual ring. |
 | `LabVIEW Benchmark Actor: Stop LabVIEW Capture` | Stop the active launch capture and finalize available evidence. |
+| `LabVIEW Benchmark Actor: Export Clip Between Markers` | Encode the latest capture's frames between two markers into an MP4 inside that capture (receipt with SHA-256). |
 | `LabVIEW Benchmark Actor: Mark Handoff Step Done` | Complete the active human-assisted handoff step. |
 | `LabVIEW Benchmark Actor: Skip Handoff Step` | Explicitly skip the active handoff step with recorded intent. |
 | `LabVIEW Benchmark Actor: Render Reviewer Verdict` | Render and sign PASS/CHANGES/FAIL for the bound release candidate. |

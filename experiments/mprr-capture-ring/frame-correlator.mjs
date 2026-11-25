@@ -69,6 +69,11 @@ const SCRIPT = `
   // same 12 FPS frame axis), else the legacy flat CPU/RAM/disk fields. Backward-compatible.
   var PALETTE = ['#4fc1ff', '#a5d6a7', '#ffd166', '#ff8fab', '#c792ea', '#82e0aa', '#f78c6c', '#7fdbff'];
   function valueOf(f, m) {
+    if (m.gpu != null) {
+      if (!f || !Array.isArray(f.gpus)) { return null; }
+      for (var g = 0; g < f.gpus.length; g++) { if (f.gpus[g] && f.gpus[g].index === m.gpu) { var gv = f.gpus[g][m.field]; return typeof gv === 'number' ? gv : null; } }
+      return null;
+    }
     if (m.disk != null) {
       if (!f || !Array.isArray(f.disks)) { return null; }
       for (var j = 0; j < f.disks.length; j++) { if (f.disks[j] && f.disks[j].name === m.disk) { var dv = f.disks[j][m.field]; return typeof dv === 'number' ? dv : null; } }
@@ -104,6 +109,15 @@ const SCRIPT = `
   diskNames.forEach(function (name) {
     metrics.push({ disk: name, field: 'writeMBs', label: 'Disk ' + name + ' write MB/s' });
     metrics.push({ disk: name, field: 'readMBs', label: 'Disk ' + name + ' read MB/s' });
+  });
+  // per-GPU curves (#134): utilization %, memory used MiB and power W from the nearest nvidia-smi sample, one set
+  // per GPU index, when the capture recorded a GPU series. "[N/A]" readings stay gaps (null), never zero.
+  var gpuIndices = [];
+  frames.forEach(function (f) { if (f && Array.isArray(f.gpus)) { f.gpus.forEach(function (g) { if (g && typeof g.index === 'number' && gpuIndices.indexOf(g.index) < 0) { gpuIndices.push(g.index); } }); } });
+  gpuIndices.sort(function (a, b) { return a - b; }).forEach(function (index) {
+    metrics.push({ gpu: index, field: 'utilizationPct', label: 'GPU ' + index + ' util %' });
+    metrics.push({ gpu: index, field: 'memoryUsedMb', label: 'GPU ' + index + ' mem MiB' });
+    metrics.push({ gpu: index, field: 'powerW', label: 'GPU ' + index + ' power W' });
   });
   metrics.forEach(function (m, i) { m.color = PALETTE[i % PALETTE.length]; });
   var VW = 1000, VH = 300, PADL = 8, PADR = 8, PADT = 10, PADB = 16;
@@ -216,7 +230,8 @@ const SCRIPT = `
     var g = m.imageGrab || {};
     markreadout.className = 'on';
     markreadout.textContent = 'marker @frame ' + ((m.frameIndex | 0) + 1) + '  t=' + Math.round(m.instantMs) + 'ms  image ' +
-      (g.admitted ? '\\u2713 \\u0394' + Math.round(g.deltaMs) + 'ms' : '\\u2014 outside ' + TOL + 'ms');
+      (g.admitted ? '\\u2713 \\u0394' + Math.round(g.deltaMs) + 'ms' : '\\u2014 outside ' + TOL + 'ms') +
+      (m.label ? '  ' + m.kind + ': ' + m.label : '');
   }
   function addMarker(m, silent) {
     markers.push(m); drawMarkerPin(m);
@@ -270,7 +285,7 @@ const SCRIPT = `
     var inst = (mk && mk.instantMs != null) ? mk.instantMs : ((mk && mk.frameIndex != null) ? tMsOf(mk.frameIndex) : 0);
     var grab = (mk && mk.imageGrab) ? mk.imageGrab : grabNearestImage(inst);
     var fi = (mk && mk.frameIndex != null) ? mk.frameIndex : (grab.nearestFrameIndex == null ? 0 : grab.nearestFrameIndex);
-    addMarker({ id: (mk && mk.id) || ('m-seed-' + markerSeq), instantMs: inst, frameIndex: fi, kind: (mk && mk.kind) || 'seed', imageGrab: grab }, true);
+    addMarker({ id: (mk && mk.id) || ('m-seed-' + markerSeq), instantMs: inst, frameIndex: fi, kind: (mk && mk.kind) || 'seed', label: (mk && typeof mk.label === 'string') ? mk.label : undefined, imageGrab: grab }, true);
   });
   if (markers.length) { renderMarkReadout(markers[markers.length - 1]); }
 
@@ -281,7 +296,8 @@ const SCRIPT = `
 /**
  * Build the frame-correlator document.
  * @param {object} model { title, fps, frames:[{index,tMs,imageSrc, cpuPct?,ramMb?,diskPct?, counters?:{key:number}}],
- *   selectedIndex, counterKeys?:string[], markers?:[{id?,instantMs?,frameIndex?,kind?,imageGrab?}], markerToleranceMs? }
+ *   selectedIndex, counterKeys?:string[], markers?:[{id?,instantMs?,frameIndex?,kind?,label?,imageGrab?}], markerToleranceMs? }
+ *   (frames may carry gpus:[{index,utilizationPct,memoryUsedMb,powerW}] -> per-GPU curves)
  *   -- frames carrying a v2 `counters` object plot the performance-counter curves (counterKeys selects/orders which,
  *   else a curated default subset); legacy flat {cpuPct,ramMb,diskPct} frames still plot CPU/RAM/disk (back-compat).
  *   A CLICK (vs a scrub drag) drops a marker at that instant (nearest-frame image grabbed only within

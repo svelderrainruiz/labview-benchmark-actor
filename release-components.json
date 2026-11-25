@@ -1,7 +1,7 @@
 {
   "schema": "labview-benchmark-actor/release-components@1",
   "extension": "1.6.7",
-  "agents": "0.3.30",
+  "agents": "0.3.31",
   "lbabus": "0.17.1",
   "lbabusRelease": {
     "repository": "https://github.com/svelderrainruiz/lbabus",

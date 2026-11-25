@@ -182,7 +182,7 @@ multi-VM / Codespace topology.
   `resultHash`), making a static-analysis run a cross-plane-comparable benchmark
   (LBA-REQ-015).
 
-### 3.7 Agentic-infrastructure view — addresses LBA-REQ-012, LBA-REQ-013, LBA-REQ-018, LBA-REQ-019, LBA-REQ-101, LBA-REQ-102
+### 3.7 Agentic-infrastructure view — addresses LBA-REQ-012, LBA-REQ-013, LBA-REQ-018, LBA-REQ-019, LBA-REQ-101, LBA-REQ-102, LBA-REQ-105
 - The `lbabus` binary embeds version-pinned agent base instructions and exposes
   them via `lbabus agents` (print / --out / --check), so every session on a given
   version shares byte-identical, hardenable base instructions (LBA-REQ-012).
@@ -203,6 +203,9 @@ multi-VM / Codespace topology.
   bounded, read-only pathless resources: opaque run identity, explicit lifecycle,
   ordered frame/sample metadata, and frame bytes only on a requested validated
   resource read (LBA-REQ-101, ADR-0084).
+- A capture also records nvidia-smi GPU samples at their own timestamps, agent cues placed
+  through the same nearest-frame grab as a user click, and clips between two markers encoded
+  inside the capture; MCP returns only markers and receipts, never pixels (LBA-REQ-105, ADR-0095).
 
 ### 3.8 Configuration-management & assurance view — addresses LBA-REQ-016, LBA-REQ-017, LBA-REQ-020, LBA-REQ-021, LBA-REQ-022, LBA-REQ-030, LBA-REQ-034, LBA-REQ-035, LBA-REQ-036, LBA-REQ-037, LBA-REQ-103, LBA-REQ-104
 - GitFlow branch governance (`main` protected + `develop` integration;
@@ -404,6 +407,7 @@ Detailed decisions are recorded as ADRs in [adr/](adr/README.md):
 | [ADR-0091](adr/ADR-0091-verify-fork-wiki-submissions-as-data.md) | Verify fork wiki submissions as data | LINUX |
 | [ADR-0093](adr/ADR-0093-digest-only-reviewer-infrastructure.md) | Publish only the digest of the reviewer infrastructure receipt | LINUX |
 | [ADR-0094](adr/ADR-0094-hyperv-reviewer-driver.md) | Drive a Hyper-V reviewer guest from a Windows host with the same protocol | WIN |
+| [ADR-0095](adr/ADR-0095-correlated-capture-local-clips.md) | Correlate GPU samples, agent cues and clips on the capture's time base; clips stay local | LINUX |
 | [ADR-0007](adr/ADR-0007-image-derived-timing-binary-strip.md) | Image-derived timing binds to the pixel-decoded binary strip (cross-platform) | WIN |
 | [ADR-0008](adr/ADR-0008-interactive-ollama-drive-mirrored-build-coordination.md) | Interactive host-Ollama drive + mirrored build-coordination over `lbabus` | WIN |
 | [ADR-0009](adr/ADR-0009-absorb-mprr-model-self-owned.md) | Absorb the mprr ring/timing model as self-owned (retire the external `svelderrainruiz/mprr`) | WIN |

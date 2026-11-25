@@ -8,6 +8,9 @@ import * as path from 'node:path';
 
 import { registerBenchmarkActorMcpServerProvider } from './mcp/benchmarkActorMcpServerProvider';
 import { ActiveCapturePlane, ActiveCaptureState, buildActiveCaptureSession, newCaptureRunId, writeActiveCaptureSession } from './captureSession';
+import { exportCaptureClip, parseClipArgs } from './captureClip';
+import { appendCaptureMarker, gpuCueMarkers, MarkerImageGrabFn, resolveCaptureDir } from './captureMarkers';
+import { attachGpuSeries, gpuCues, GpuCueOptions, GpuSampler, nvidiaSmiRunner, readGpuSeries, startGpuSampler } from './gpuSamples';
 import { registerHumanTasks } from './humanTasks';
 import { resolveLbabusExecutable } from './lbabusPath';
 import { reviewerStationForEnvironment } from './reviewerStation';
@@ -987,6 +990,8 @@ export function buildCorrelatorFrame(f: Record<string, unknown>, imageSrc: strin
     disks: f.disks,
     // v2: the frame's performance-counter catalog when the capture carries it (else CPU/RAM/disk fallback).
     counters: f.counters,
+    // #134: per-GPU utilization / memory / power from the nearest nvidia-smi sample, when the capture has one.
+    gpus: f.gpus,
     imageSrc,
   };
 }
@@ -1003,6 +1008,7 @@ interface ActiveCapture {
   framePattern: string;
   videoFile?: string;
   sampler: ChildProcess;
+  gpuSampler: GpuSampler;
   status: vscode.StatusBarItem;
   startedAt: string;
 }
@@ -1463,6 +1469,10 @@ async function captureLaunchCommand(context: vscode.ExtensionContext, output: vs
       { windowsHide: true, stdio: 'ignore' }
     );
 
+  // 2b) GPU sampler: one-shot nvidia-smi per sample at the same cadence, stamped by nvidia-smi's own timestamp
+  // on the same epoch-ms axis; no nvidia-smi => gpu.json says why (never zeros).
+  const gpuSampler = startGpuSampler({ dir, run: nvidiaSmiRunner() });
+
   // 3) launch LabVIEW itself.
   if (labview) {
     try {
@@ -1491,6 +1501,7 @@ async function captureLaunchCommand(context: vscode.ExtensionContext, output: vs
     framePattern,
     videoFile,
     sampler,
+    gpuSampler,
     status,
     startedAt
   };
@@ -1521,6 +1532,8 @@ async function stopCaptureCommand(context: vscode.ExtensionContext, output: vsco
   } catch {
     /* ignore */
   }
+  const gpuHeader = await cap.gpuSampler.stop();
+  output.appendLine(`GPU series: ${JSON.stringify({ available: gpuHeader.available, reason: gpuHeader.reason, gpus: gpuHeader.gpus, sampleCount: gpuHeader.sampleCount })}`);
   // Finalize the active recorder before assembling its frames.
   try {
     if (cap.recorderKind === 'gnome-video') cap.recorder.kill('SIGINT');
@@ -1589,13 +1602,26 @@ async function stopCaptureCommand(context: vscode.ExtensionContext, output: vsco
 
 async function assembleCapture(context: vscode.ExtensionContext, dir: string): Promise<LaunchCaptureRecord> {
   const builder = await loadCaptureBuilder(context.extensionUri);
-  return assembleCaptureFromDir(dir, builder);
+  const grab = (await importEsm(mediaEsmUrl(context.extensionUri, 'markerImageGrab.mjs'))).resolveMarkerImageGrab as MarkerImageGrabFn;
+  return assembleCaptureFromDir(dir, builder, {
+    grab,
+    gpuCue: {
+      utilThresholdPct: captureCfg<number>('gpuCueThresholdPct', 10),
+      memoryRiseMb: captureCfg<number>('gpuCueMemoryRiseMb', 100)
+    }
+  });
+}
+
+/** Optional #134 assembly extras: the shared marker grab (for automatic GPU agent cues) + the cue thresholds. */
+export interface AssembleCaptureExtras {
+  grab?: MarkerImageGrabFn;
+  gpuCue?: GpuCueOptions;
 }
 
 // Assemble the captured PNG frames + resource samples in `dir` into a launch-capture@1 record (mprr dual-packet)
 // and write capture.json. Split out from the cleanroom-gated ffmpeg CAPTURE that PRODUCES the frames, so this
 // pure file-assembly around the unit-tested builder is itself directly unit-testable with fixture frames.
-export function assembleCaptureFromDir(dir: string, builder: CaptureBuilder): LaunchCaptureRecord {
+export function assembleCaptureFromDir(dir: string, builder: CaptureBuilder, extras: AssembleCaptureExtras = {}): LaunchCaptureRecord {
   const frameFiles = readdirSync(dir)
     .filter((f) => /^frame-\d+\.png$/.test(f))
     .sort();
@@ -1628,6 +1654,15 @@ export function assembleCaptureFromDir(dir: string, builder: CaptureBuilder): La
     fps: meta.workload === 'desktop-capture' ? 1 / desktopCaptureInterval(meta.frameIntervalSeconds) : 12,
     meta,
   });
+  // #134: the GPU series (additive; a capture without gpu.json is assembled exactly as before) and the automatic
+  // GPU agent cues (memory rise = model load, utilization rise = compute) on the shared marker grab.
+  const gpu = readGpuSeries(dir);
+  attachGpuSeries(record, gpu);
+  if (gpu && gpu.header.available && extras.grab) {
+    const cues = gpuCueMarkers(record, gpuCues(gpu.samples, { platform: meta.plane, ...extras.gpuCue }), extras.grab);
+    // The builder emits no markers; the correlator's user-click markers are appended later.
+    if (cues.length > 0) record.markers = cues;
+  }
   writeFileSync(path.join(dir, 'capture.json'), `${JSON.stringify(record, null, 2)}\n`);
   return record;
 }
@@ -1662,13 +1697,9 @@ async function openCorrelatorForCapture(
         return;
       }
       try {
-        const current = JSON.parse(readFileSync(capturePath, 'utf8')) as LaunchCaptureRecord;
-        const markers = Array.isArray(current.markers) ? current.markers : [];
-        markers.push(msg.marker);
-        current.markers = markers;
-        writeFileSync(capturePath, `${JSON.stringify(current, null, 2)}\n`);
+        const count = appendCaptureMarker(capturePath, msg.marker);
         const m = msg.marker as { frameIndex?: unknown };
-        output.appendLine(`persisted frame-marker @frame ${String(m.frameIndex)} (${markers.length} total) to ${capturePath}`);
+        output.appendLine(`persisted frame-marker @frame ${String(m.frameIndex)} (${count} total) to ${capturePath}`);
       } catch (err) {
         output.appendLine(`failed to persist frame-marker: ${String(err)}`);
       }
@@ -1677,6 +1708,27 @@ async function openCorrelatorForCapture(
     context.subscriptions
   );
   output.appendLine(`correlator opened for ${dir} (${framesModel.length} frames)`);
+}
+
+// #134 slice 1: export the frames between two markers of the latest local capture as an MP4 inside that capture's
+// clips/ directory (the clip never leaves the machine). Options use the clip CLI's flags.
+async function exportClipCommand(context: vscode.ExtensionContext, output: vscode.OutputChannel): Promise<void> {
+  try {
+    const { dir, runId } = resolveCaptureDir(capturesRoot(context), 'latest');
+    const spec = await vscode.window.showInputBox({
+      title: 'Export Clip Between Markers',
+      prompt: `Capture ${runId}: leave empty for the latest two markers (full frame), or give clip options`,
+      placeHolder: '--from-marker 0 --to-marker 1 | --from-frame 10 --to-frame 40 [--crop x,y,w,h | --monitor 0]'
+    });
+    if (spec === undefined) return;
+    const { options } = parseClipArgs(spec.split(/\s+/).filter((t) => t.length > 0));
+    const receipt = await exportCaptureClip(dir, options, { ffmpeg: resolveFfmpegChecked() });
+    const clip = receipt.clip as { file: string; sha256: string; durationMs: number };
+    output.appendLine(`clip exported: ${path.join(dir, clip.file)} sha256=${clip.sha256} (${clip.durationMs} ms)`);
+    void vscode.window.showInformationMessage(`Clip exported to ${clip.file} in capture ${runId} (${clip.durationMs} ms, sha256 ${clip.sha256.slice(0, 12)}\u2026).`);
+  } catch (err) {
+    reportUiError(output, 'Export Clip Between Markers', err);
+  }
 }
 
 // Open the frame correlator for the most recent VM-local capture (or guide the user to record one).
@@ -2147,6 +2199,9 @@ export function activate(context: vscode.ExtensionContext): void {
     ),
     vscode.commands.registerCommand('labviewBenchmarkActor.stopCapture', () =>
       stopCaptureCommand(context, output)
+    ),
+    vscode.commands.registerCommand('labviewBenchmarkActor.exportClip', () =>
+      exportClipCommand(context, output)
     )
   );
 

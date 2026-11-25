@@ -55,6 +55,12 @@ writeFileSync(
   join(repo, 'media', 'frame-correlator.mjs'),
   readFileSync(join(repo, 'experiments', 'mprr-capture-ring', 'frame-correlator.mjs'))
 );
+// 1c-ii-b. The nearest-frame image grab shared by user-click markers and agent cues (#134). Import-free, so
+//     the extension host, the MCP server and the clip CLI import it from media/ unchanged.
+writeFileSync(
+  join(repo, 'media', 'markerImageGrab.mjs'),
+  readFileSync(join(repo, 'experiments', 'resource-usage-correlation', 'markerImageGrab.mjs'))
+);
 // 1c-iii. Handoff Beacon capture-status builder (LBA-REQ-055): the extension writes capture-status.json at
 //     capture start/stop from this pure, gated payload builder so the agent can await the human's Stop.
 writeFileSync(
@@ -172,4 +178,4 @@ for (const f of readdirSync(join(repo, 'media'))) {
   }
 }
 
-console.log(`staged media/viewerCursor.mjs + media/counter-render.mjs + media/benchmark-panels.mjs + media/launch-capture.mjs + media/frame-correlator.mjs + media/captureStatus.mjs + media/mprr-series.json (${series.length} points) + benchmark fixtures + media/AGENTS.md`);
+console.log(`staged media/viewerCursor.mjs + media/counter-render.mjs + media/benchmark-panels.mjs + media/launch-capture.mjs + media/frame-correlator.mjs + media/markerImageGrab.mjs + media/captureStatus.mjs + media/mprr-series.json (${series.length} points) + benchmark fixtures + media/AGENTS.md`);

@@ -103,6 +103,7 @@
 | [ADR-0092](ADR-0092-local-ollama-mcp-bridge.md) | Let a local Ollama model call the bundled MCP server | WIN | Accepted | LBA-REQ-019 |
 | [ADR-0093](ADR-0093-digest-only-reviewer-infrastructure.md) | Publish only the digest of the reviewer infrastructure receipt | LINUX | Accepted | LBA-REQ-057, LBA-REQ-071 |
 | [ADR-0094](ADR-0094-hyperv-reviewer-driver.md) | Drive a Hyper-V reviewer guest from a Windows host with the same protocol | WIN | Accepted | LBA-REQ-057, LBA-REQ-069 |
+| [ADR-0095](ADR-0095-correlated-capture-local-clips.md) | Correlate GPU samples, agent cues and clips on the capture's time base; clips stay local | LINUX | Accepted | LBA-REQ-105 |
 
 Numbering is split by owner to avoid collisions: WIN takes 0001–0002 (+0005, 0006, 0007, 0008, 0009),
 LINUX takes 0003–0004 (+0010, 0011, 0012, 0013, 0014, 0015, 0016, 0017, 0018, 0019, 0020, 0021, 0022, 0023, 0024). Add new ADRs by extending your own range.

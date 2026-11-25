@@ -111,5 +111,6 @@
 | LBA-REQ-102 | Standalone Windows desktop capture | Planned | §3.7 Agentic-infrastructure | ADR-0085 | T-102 | 7 |
 | LBA-REQ-103 | Obsidian-ready wiki generated from docs | Proven | §3.8 Configuration-management & assurance | ADR-0089, ADR-0090 | T-103 | 5 |
 | LBA-REQ-104 | Fork wiki submissions are verified as data | Proven | §3.8 Configuration-management & assurance | ADR-0091 | T-104 | 6 |
+| LBA-REQ-105 | Correlated capture of GPU samples, agent cues and clips | Planned | §3.7 Agentic-infrastructure | ADR-0095 | T-105 | 15 |
 
-_Generated for 104 requirements._
+_Generated for 105 requirements._
